@@ -361,7 +361,10 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   const orderSvc = new OrderService();
   orderSvc.updateStatus(order.id, 'CONFIRMED');
   orderSvc.updateStatus(order.id, 'PROCESSING');
-  orderSvc.recordDeposit(order.id, 1000, 'CASH', 'عربون اختبار');
+  orderSvc.recordDeposit(order.id, 1000, 'CASH', 'عربون اختبار', undefined, 'integration-order-deposit-key');
+  orderSvc.recordDeposit(order.id, 1000, 'CASH', 'عربون اختبار', undefined, 'integration-order-deposit-key');
+  assert.equal(q('SELECT COUNT(*) AS count FROM order_deposits WHERE order_id = ?', [order.id])[0].count, 1,
+    'retrying the same deposit request must not create another receipt');
   const firstDelivery = orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم أول');
   assert.equal(firstDelivery.status, 'PARTIAL');
   assert.equal(firstDelivery.items![0].deliveredM2, 10);

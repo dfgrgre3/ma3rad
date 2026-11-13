@@ -37,6 +37,9 @@ export interface PosCheckoutPanelProps {
   setShippingCost: (value: number) => void;
   paymentType: PaymentType;
   setPaymentType: (type: PaymentType) => void;
+  bankAccounts: Array<{ id: string; accountName: string; bankName: string }>;
+  bankAccountId: string;
+  setBankAccountId: (id: string) => void;
   visiblePaymentTypes: PaymentType[];
   showCouponCode: boolean;
   showLoyaltyPoints: boolean;
@@ -100,6 +103,9 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   setShippingCost,
   paymentType,
   setPaymentType,
+  bankAccounts,
+  bankAccountId,
+  setBankAccountId,
   visiblePaymentTypes,
   showCouponCode,
   showLoyaltyPoints,
@@ -256,6 +262,16 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
           );
         })}
       </div>
+      {(paymentType === 'BANK_TRANSFER' || (paymentType === 'MIXED' && splitBank > 0)) && (
+        <div>
+          <label className="text-xs font-bold text-slate-600 dark:text-slate-300">الحساب البنكي المستلم *</label>
+          <select required value={bankAccountId} onChange={(event) => setBankAccountId(event.target.value)} className={numberInputCls}>
+            <option value="">اختر الحساب البنكي</option>
+            {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+          </select>
+          {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر وسيلة دفع أخرى.</p>}
+        </div>
+      )}
     </section>
 
     {paymentType === 'MIXED' && (

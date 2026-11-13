@@ -8,6 +8,7 @@ import { round2 } from '../finance/financials';
 import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
+import { getActiveBankAccount, updateBankBalance } from '../sales/paymentAccounts';
 
 export interface CustomerPageFilters {
   customerType?: Customer['customerType'];
@@ -23,6 +24,7 @@ function getExistingCustomerPayment(
   shiftId: string | undefined,
   notes: string,
   branchId: string,
+  bankAccountId?: string,
 ): CustomerPayment | undefined {
   if (prior.some((row) => row.branchId !== branchId)) {
     throw new Error('The customer payment idempotency key was already used in another branch.');
@@ -36,6 +38,7 @@ function getExistingCustomerPayment(
     existingPayment.paymentType !== paymentType ||
     (existingPayment.registerId || 'cr_main') !== register ||
     (existingPayment.shiftId || null) !== (shiftId || null) ||
+    ((existingPayment as any).bankAccountId || null) !== (bankAccountId || null) ||
     (existingPayment.notes || '') !== notes
   ) {
     throw new Error('The customer payment idempotency key was already used for a different request.');
@@ -266,7 +269,8 @@ export class CustomerService {
     notes = '',
     _performedBy = 'usr_admin',
     paymentDate?: string,
-    idempotencyKey?: string
+    idempotencyKey?: string,
+    bankAccountId?: string
   ): CustomerPayment {
     if (amount <= 0) throw new Error('يجب أن يكون مبلغ السند أكبر من الصفر.');
     const actor = AuthService.requireAuth();
@@ -288,16 +292,16 @@ export class CustomerService {
       const prior = idempotencyKey
         ? sqliteDb.query<CustomerPayment>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey])
         : [];
-      const existingPayment = getExistingCustomerPayment(prior, customerId, amount, paymentType, register, shiftId, notes, branchId);
+      const existingPayment = getExistingCustomerPayment(prior, customerId, amount, paymentType, register, shiftId, notes, branchId, bankAccountId);
       if (existingPayment) return existingPayment;
 
       const receiptNumber = sqliteDb.nextNumber('REC');
       // 1. Record customer payment receipt
       sqliteDb.run(`
         INSERT INTO customer_payments (
-          id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, branch_id, notes, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, branchId, notes, actor.id]);
+          id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, branch_id, notes, performed_by, bank_account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, branchId, notes, actor.id, bankAccountId || null]);
       let unapplied = round2(amount);
       const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount,total_amount FROM sales_invoices WHERE customer_id=? AND branch_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [customerId, branchId, today]);
       for (const invoice of openInvoices) {
@@ -323,6 +327,8 @@ export class CustomerService {
           UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?
         `, [amount, register]);
       }
+      const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(sqliteDb, bankAccountId) : null;
+      if (bank) updateBankBalance(sqliteDb, bank.id, amount);
       postLedgerEntry(sqliteDb.getDatabase(), {
         date: today,
         description: `Customer receipt ${receiptNumber}`,
@@ -330,7 +336,7 @@ export class CustomerService {
         referenceId: paymentId,
         createdBy: actor.id,
         lines: [
-          { accountCode: paymentAccountCode(paymentType), debit: amount, credit: 0 },
+          { accountCode: bank?.glAccountCode || paymentAccountCode(paymentType), debit: amount, credit: 0 },
           { accountCode: '1103', debit: 0, credit: amount },
         ],
       });
@@ -363,7 +369,7 @@ export class CustomerService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.payment.reverse');
     const payment = this.db.query<any>(
-      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id, branch_id
+      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id, branch_id, bank_account_id AS bankAccountId
        FROM customer_payments WHERE id = ?`,
       [paymentId]
     )[0];
@@ -394,6 +400,12 @@ export class CustomerService {
       if (payment.paymentType === 'CASH') {
         db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
       }
+      const bank = payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId
+        ? db.query<{ glAccountCode: string }>(`SELECT coa.code AS glAccountCode FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ?`, [payment.bankAccountId])[0]
+        : null;
+      if (payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId) {
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, payment.bankAccountId]);
+      }
       if (payment.shiftId) {
         db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
       }
@@ -405,7 +417,7 @@ export class CustomerService {
         createdBy: actor.id,
         lines: [
           { accountCode: '1103', debit: amount, credit: 0 },
-          { accountCode: paymentAccountCode(payment.paymentType), debit: 0, credit: amount },
+          { accountCode: bank?.glAccountCode || paymentAccountCode(payment.paymentType), debit: 0, credit: amount },
         ],
       });
       const allocations = db.query<any>(`SELECT sales_invoice_id,amount FROM customer_payment_allocations WHERE payment_id=?`, [paymentId]);

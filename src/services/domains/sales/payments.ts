@@ -10,6 +10,14 @@ import type { Effect } from '../../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
 import type { CustomerPayment, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
+import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
+
+function validatePaymentDate(date: string, label: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
+      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+    throw new Error(label);
+  }
+}
 
 /** Collect a payment against an unpaid/partially-paid invoice (brief §68/§220). */
 export function recordInvoicePaymentEntry(
@@ -21,7 +29,8 @@ export function recordInvoicePaymentEntry(
   shiftId?: string,
   notes = '',
   idempotencyKey?: string,
-  paymentDate?: string
+  paymentDate?: string,
+  bankAccountId?: string
 ): CustomerPayment {
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.customers.detail.payment');
@@ -39,10 +48,7 @@ export function recordInvoicePaymentEntry(
   }
 
   const today = paymentDate || localDateString();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`)) ||
-      new Date(`${today}T00:00:00Z`).toISOString().slice(0, 10) !== today) {
-    throw new Error('تاريخ التحصيل غير صحيح.');
-  }
+  validatePaymentDate(today, 'تاريخ التحصيل غير صحيح.');
   const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
   const register = registerId || 'cr_main';
   const branchId = ctx.branchAccess.requireRegisterAccess(register, actor, invoiceBranchId);
@@ -58,27 +64,41 @@ export function recordInvoicePaymentEntry(
         [idempotencyKey]
       )[0];
       if (prior) {
-        if (prior.invoiceId !== invoiceId || round2(Number(prior.amount)) !== value || prior.paymentType !== paymentType) {
+        if (prior.invoiceId !== invoiceId || round2(Number(prior.amount)) !== value || prior.paymentType !== paymentType ||
+            ((prior as any).bankAccountId || null) !== (bankAccountId || null)) {
           throw new Error('The idempotency key was already used for a different payment.');
         }
         return prior;
       }
     }
+    const currentInvoice = db.query<{
+      id: string; customerId: string; invoiceNumber: string; paidAmount: number;
+      remainingAmount: number; invoiceStatus: string;
+    }>(`SELECT id, customer_id AS customerId, invoice_number AS invoiceNumber,
+               paid_amount AS paidAmount, remaining_amount AS remainingAmount,
+               invoice_status AS invoiceStatus
+        FROM sales_invoices WHERE id = ?`, [invoiceId])[0];
+    if (!currentInvoice || currentInvoice.invoiceStatus === 'VOID') throw new Error('الفاتورة غير متاحة للتحصيل.');
+    if (Number(currentInvoice.remainingAmount) <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
+    if (value - round2(Number(currentInvoice.remainingAmount)) > 0.009) {
+      throw new Error(`مبلغ التحصيل (${value.toFixed(2)}) يتجاوز المتبقي على الفاتورة (${round2(Number(currentInvoice.remainingAmount)).toFixed(2)}).`);
+    }
     const receiptNumber = db.nextNumber('REC');
-    const newPaid = round2(invoice.paidAmount + value);
-    const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
+    const newPaid = round2(Number(currentInvoice.paidAmount) + value);
+    const newRemaining = round2(Math.max(0, Number(currentInvoice.remainingAmount) - value));
     const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
     db.run(
       `INSERT INTO customer_payments (
          id, receipt_number, customer_id, invoice_id, amount, payment_type, date, branch_id,
-         register_id, shift_id, notes, performed_by, idempotency_key
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         register_id, shift_id, notes, performed_by, idempotency_key, bank_account_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        paymentId, receiptNumber, invoice.customerId, invoiceId, value, paymentType, today, branchId,
+        paymentId, receiptNumber, currentInvoice.customerId, invoiceId, value, paymentType, today, branchId,
         register, shiftId || null,
-        notes || `تحصيل دفعة على الفاتورة ${invoice.invoiceNumber}`,
+        notes || `تحصيل دفعة على الفاتورة ${currentInvoice.invoiceNumber}`,
         actor.id,
         idempotencyKey || null,
+        bankAccountId || null,
       ]
     );
     db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
@@ -86,18 +106,22 @@ export function recordInvoicePaymentEntry(
 
     db.run(
       `UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [value, invoice.customerId]
+      [value, currentInvoice.customerId]
     );
 
     db.run(
       `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
-       updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [newPaid, newRemaining, status, invoiceId]
+       updated_at = CURRENT_TIMESTAMP WHERE id = ? AND invoice_status != 'VOID'
+       AND remaining_amount >= ?`,
+      [newPaid, newRemaining, status, invoiceId, value]
     );
+    if (db.getDatabase().getRowsModified() !== 1) throw new Error('تغير رصيد الفاتورة أثناء التحصيل؛ أعد المحاولة.');
 
     if (paymentType === 'CASH') {
       db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, register]);
     }
+    const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(db, bankAccountId) : null;
+    if (bank) updateBankBalance(db, bank.id, value);
     const effects: Effect[] = [
       {
         type: 'ledger.post',
@@ -111,7 +135,7 @@ export function recordInvoicePaymentEntry(
             referenceId: paymentId,
             createdBy: actor.id,
             lines: [
-              { accountCode: paymentAccountCode(paymentType), debit: value, credit: 0 },
+              { accountCode: bank?.glAccountCode || paymentAccountCode(paymentType), debit: value, credit: 0 },
               { accountCode: '1103', debit: 0, credit: value },
             ],
           },
@@ -165,11 +189,14 @@ export function recordCustomerPaymentAllocationsEntry(
   notes = '',
   shiftId?: string,
   idempotencyKey?: string,
+  bankAccountId?: string,
 ): { groupId: string; total: number; receipts: string[] } {
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.customers.detail.payment');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('تاريخ الدفعة غير صحيح.');
-  const entries = allocations.filter((a) => Number(a.amount) > 0);
+  validatePaymentDate(date, 'تاريخ الدفعة غير صحيح.');
+  const entries = allocations.filter((a) => Number(a.amount) > 0)
+    .map((a) => ({ invoiceId: a.invoiceId, amount: round2(Number(a.amount)) }))
+    .sort((a, b) => a.invoiceId.localeCompare(b.invoiceId));
   if (!entries.length || new Set(entries.map((a) => a.invoiceId)).size !== entries.length) throw new Error('حدد فواتير ومبالغ صحيحة دون تكرار.');
   let branchId: string | undefined;
   for (const entry of entries) {
@@ -187,15 +214,34 @@ export function recordCustomerPaymentAllocationsEntry(
   }
   const groupId = idempotencyKey || `cpgrp_${uuidv4().slice(0, 10)}`;
   return ctx.db.executeTransaction((db) => {
-    const prior = db.query<{ receiptNumber: string; amount: number; branchId: string }>(
-      `SELECT receipt_number AS receiptNumber, amount, branch_id AS branchId
+    const prior = db.query<{
+      receiptNumber: string; amount: number; branchId: string; customerId: string;
+      invoiceId: string | null; paymentType: PaymentType; date: string;
+      registerId: string | null; shiftId: string | null; notes: string | null;
+      bankAccountId: string | null;
+    }>(
+      `SELECT receipt_number AS receiptNumber, amount, branch_id AS branchId,
+              customer_id AS customerId, invoice_id AS invoiceId, payment_type AS paymentType,
+              date, register_id AS registerId, shift_id AS shiftId, notes, bank_account_id AS bankAccountId
        FROM customer_payments WHERE payment_group_id = ? ORDER BY created_at`,
       [groupId]
     );
-    if (prior.some((row) => row.branchId !== branchId)) {
-      throw new Error('The customer payment idempotency key was already used in another branch.');
+    if (prior.length) {
+      const expectedNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
+      const priorAllocations = prior
+        .map((row) => ({ invoiceId: row.invoiceId || '', amount: round2(Number(row.amount)) }))
+        .sort((a, b) => a.invoiceId.localeCompare(b.invoiceId));
+      const requestMatches = prior.every((row) =>
+        row.branchId === branchId && row.customerId === customerId && row.paymentType === paymentType &&
+        row.date === date && row.registerId === registerId && (row.shiftId || null) === (shiftId || null) &&
+        (row.bankAccountId || null) === (bankAccountId || null) &&
+        row.notes === expectedNotes
+      ) && priorAllocations.length === entries.length && priorAllocations.every((row, index) =>
+        row.invoiceId === entries[index].invoiceId && row.amount === entries[index].amount
+      );
+      if (!requestMatches) throw new Error('The idempotency key was already used for a different customer payment request.');
+      return { groupId, total: round2(prior.reduce((sum,row)=>sum+Number(row.amount),0)), receipts: prior.map(row=>row.receiptNumber) };
     }
-    if (prior.length) return { groupId, total: round2(prior.reduce((sum,row)=>sum+Number(row.amount),0)), receipts: prior.map(row=>row.receiptNumber) };
     const customer = db.query<{ id: string }>('SELECT id FROM customers WHERE id=?', [customerId])[0];
     if (!customer) throw new Error('العميل غير موجود.');
     const receipts: string[] = [];
@@ -210,8 +256,8 @@ export function recordCustomerPaymentAllocationsEntry(
       const remaining = round2(Math.max(0, Number(invoice.remainingAmount) - amount));
       const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
       const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
-      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, branchId, paymentNotes, actor.id]);
+      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by,bank_account_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
       db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
       db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
@@ -221,6 +267,8 @@ export function recordCustomerPaymentAllocationsEntry(
     }
     db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
     if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, registerId]);
+    const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(db, bankAccountId) : null;
+    if (bank) updateBankBalance(db, bank.id, total);
     postLedgerEntry(db.getDatabase(), {
       date,
       description: `Customer receipt group ${groupId}`,
@@ -228,7 +276,7 @@ export function recordCustomerPaymentAllocationsEntry(
       referenceId: groupId,
       createdBy: actor.id,
       lines: [
-        { accountCode: paymentAccountCode(paymentType), debit: total, credit: 0 },
+        { accountCode: bank?.glAccountCode || paymentAccountCode(paymentType), debit: total, credit: 0 },
         { accountCode: '1103', debit: 0, credit: total },
       ],
     });
@@ -297,6 +345,9 @@ function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], acto
       if (row.paymentType === 'CASH') {
         db.run(`UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?`, [value, row.registerId || 'cr_main']);
       }
+      if (row.paymentType === 'BANK_TRANSFER' && row.bankAccountId) {
+        db.run('UPDATE bank_accounts SET current_balance=current_balance-? WHERE id=?', [value, row.bankAccountId]);
+      }
       if (row.shiftId) {
         db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
       }
@@ -345,6 +396,9 @@ function reverseSingleInvoicePayment(
     if (payment.paymentType === 'CASH') {
       db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
     }
+    if (payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId) {
+      db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, payment.bankAccountId]);
+    }
     if (payment.shiftId) {
       db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
     }
@@ -365,7 +419,7 @@ export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string):
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'customers.payment.reverse');
   const payment = ctx.db.query<any>(
-    `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id
+    `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id, bank_account_id AS bankAccountId
      FROM customer_payments WHERE id = ?`,
     [paymentId]
   )[0];

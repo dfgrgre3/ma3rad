@@ -12,7 +12,9 @@ import { PrintService } from '../../../services/shared/PrintService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CashierService } from '../../../services/domains/finance/CashierService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import { SalesInvoice, SalesReturn, SalesReturnItem, Product } from '../../../types';
+import type { BankAccount } from '../../../types/finance';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
@@ -70,6 +72,7 @@ export const ReturnsPage: React.FC = () => {
   const location = useLocation() as { state?: { invoiceId?: string } };
   const service = useMemo(() => new SalesService(), []);
   const cashierService = useMemo(() => new CashierService(), []);
+  const financeService = useMemo(() => new FinanceEnterpriseService(), []);
   const productService = useMemo(() => new ProductService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
@@ -100,6 +103,8 @@ export const ReturnsPage: React.FC = () => {
   const [invoiceInfo, setInvoiceInfo] = useState<(SalesInvoice & { customerName?: string }) | null>(null);
   const [refundCash, setRefundCash] = useState(true);
   const [refundMethod, setRefundMethod] = useState<RefundMethod>('CASH');
+  const [refundBankAccountId, setRefundBankAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [lines, setLines] = useState<ReturnLine[]>([]);
   const [topReasons, setTopReasons] = useState<{ reason: string; count: number; amount: number }[]>([]);
 
@@ -116,6 +121,14 @@ export const ReturnsPage: React.FC = () => {
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const [valuesByReturn, setValuesByReturn] = useState<Record<string, Record<string, string>>>({});
   const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
+
+  useEffect(() => {
+    try {
+      const accounts = financeService.getBankAccounts().filter((account) => account.isActive);
+      setBankAccounts(accounts);
+      setRefundBankAccountId(accounts[0]?.id || '');
+    } catch { setBankAccounts([]); }
+  }, [financeService]);
 
   useEffect(() => {
     if (!exchangeMode || !newSearch.trim()) { setNewResults([]); return; }
@@ -294,6 +307,7 @@ export const ReturnsPage: React.FC = () => {
             idempotencyKey: returnIdempotency.getKey(),
             registerId: activeShift?.registerId,
             shiftId: activeShift?.id,
+            bankAccountId: refundBankAccountId || undefined,
           }
         );
         fieldService.setRecordValues('sales_returns', returned.id, operationalFieldValues, 'create');
@@ -636,6 +650,16 @@ export const ReturnsPage: React.FC = () => {
                   {REFUND_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
+              {refundMethod === 'BANK_TRANSFER' && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">الحساب البنكي الذي سيصدر منه الرد *</label>
+                  <select required value={refundBankAccountId} onChange={(event) => setRefundBankAccountId(event.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+                    <option value="">اختر الحساب البنكي</option>
+                    {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+                  </select>
+                  {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر طريقة أخرى.</p>}
+                </div>
+              )}
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-500 self-end">
                 نقدي: <b className="text-amber-600">{fmt(refundPreview.cash)}</b> • على الرصيد: <b className="text-sky-600">{fmt(refundPreview.balance)}</b>
                 <div className="mt-0.5 text-[9px] text-slate-400">يُحسب الاسترداد النقدي من الجزء المسدد فقط، والباقي يُسجل كرصيد دائن للعميل.</div>

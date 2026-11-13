@@ -1,4 +1,4 @@
-import type { Migration } from './support';
+import { addColumn, type Migration } from './support';
 
 export const MIGRATION_PART_67: Migration[] = [
   {
@@ -69,6 +69,20 @@ export const MIGRATION_PART_67: Migration[] = [
         );
         CREATE INDEX IF NOT EXISTS idx_warranty_claim_executions_date
           ON warranty_claim_executions(executed_at);
+      `);
+    },
+  },
+  {
+    id: '190_sales_payment_bank_accounts',
+    description: 'Link sales tenders, customer receipts, and refunds to their bank accounts.',
+    up: (db) => {
+      addColumn(db, 'sales_invoice_payments', 'bank_account_id', 'TEXT REFERENCES bank_accounts(id)');
+      addColumn(db, 'customer_payments', 'bank_account_id', 'TEXT REFERENCES bank_accounts(id)');
+      addColumn(db, 'sales_returns', 'refund_bank_account_id', 'TEXT REFERENCES bank_accounts(id)');
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sales_invoice_payments_bank ON sales_invoice_payments(bank_account_id);
+        CREATE INDEX IF NOT EXISTS idx_customer_payments_bank ON customer_payments(bank_account_id);
+        CREATE INDEX IF NOT EXISTS idx_sales_returns_refund_bank ON sales_returns(refund_bank_account_id);
       `);
     },
   },

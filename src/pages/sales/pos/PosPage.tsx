@@ -14,7 +14,9 @@ import { LoyaltyService } from '../../../services/domains/sales/LoyaltyService';
 import { PrintService } from '../../../services/shared/PrintService';
 import { PricingService, type AppliedPromotion } from '../../../services/domains/sales/PricingService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../../../types';
+import type { BankAccount } from '../../../types/finance';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { CeramicCalculatorModal } from '../../../components/products/CeramicCalculatorModal';
@@ -85,6 +87,8 @@ export const PosView: React.FC = () => {
   const [splitCash, setSplitCash] = useState<number>(0);
   const [splitCard, setSplitCard] = useState<number>(0);
   const [splitBank, setSplitBank] = useState<number>(0);
+  const [paymentBankAccountId, setPaymentBankAccountId] = useState('');
+  const [paymentBankAccounts, setPaymentBankAccounts] = useState<BankAccount[]>([]);
   const [splitCheque, setSplitCheque] = useState<number>(0);
   const [splitCredit, setSplitCredit] = useState<number>(0);
   const [activeCartIndex, setActiveCartIndex] = useState<number | null>(null);
@@ -139,6 +143,7 @@ export const PosView: React.FC = () => {
   const loyaltyService = useMemo(() => new LoyaltyService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
+  const financeEnterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
 
   useEffect(() => {
     if (!registers.length) {
@@ -339,6 +344,17 @@ export const PosView: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
+  useEffect(() => {
+    try {
+      const accounts = financeEnterpriseService.getBankAccounts().filter((account) => account.isActive);
+      setPaymentBankAccounts(accounts);
+      setPaymentBankAccountId(accounts[0]?.id || '');
+    } catch {
+      setPaymentBankAccounts([]);
+      setPaymentBankAccountId('');
+    }
+  }, [financeEnterpriseService]);
+
   const { heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder } = usePosHeldOrders({
     heldOrderService,
     currentUserId: currentUser?.id,
@@ -485,11 +501,17 @@ export const PosView: React.FC = () => {
     paidAmount,
     setPaidAmount,
     paymentType,
+    bankAccountId: paymentBankAccountId || undefined,
     splitCash,
+    setSplitCash,
     splitCard,
+    setSplitCard,
     splitBank,
+    setSplitBank,
     splitCheque,
+    setSplitCheque,
     splitCredit,
+    setSplitCredit,
     notes,
     setNotes,
     remainingAmount,
@@ -552,7 +574,10 @@ export const PosView: React.FC = () => {
     if (paymentType === 'CREDIT') {
       setPaidAmount(0);
     }
-  }, [totalAmount, paymentType]);
+    if (paymentType === 'MIXED') {
+      setPaidAmount(round2(splitCash + splitCard + splitBank + splitCheque));
+    }
+  }, [totalAmount, paymentType, splitCash, splitCard, splitBank, splitCheque]);
 
   useEffect(() => {
     if (isCloseShiftModalOpen && activeShift) {
@@ -913,6 +938,9 @@ export const PosView: React.FC = () => {
           setShippingCost={setShippingCost}
           paymentType={paymentType}
           setPaymentType={setPaymentType}
+          bankAccounts={paymentBankAccounts}
+          bankAccountId={paymentBankAccountId}
+          setBankAccountId={setPaymentBankAccountId}
           visiblePaymentTypes={visiblePaymentTypes}
           showCouponCode={settings?.posShowCouponCode !== false}
           showLoyaltyPoints={settings?.posShowLoyaltyPoints !== false}

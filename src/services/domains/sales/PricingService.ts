@@ -274,7 +274,7 @@ export class PricingService {
    * customer override → matching active price list (best min-qty tier) → default list → product base price.
    */
   public getEffectivePrice(productId: string, customerId?: string | null, quantityM2 = 0): {
-    priceM2: number; source: 'OVERRIDE' | 'PRICE_LIST' | 'DEFAULT_LIST' | 'BASE';
+    priceM2: number; priceBox?: number; source: 'OVERRIDE' | 'PRICE_LIST' | 'DEFAULT_LIST' | 'BASE';
     listName?: string; originalPrice: number;
   } {
     const product = this.db.query<any>(`SELECT selling_price_m2 AS basePrice, category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?`, [productId])[0];
@@ -300,7 +300,7 @@ export class PricingService {
 
     if (mappedType) {
       const listItem = this.db.query<any>(
-        `SELECT i.price_m2 AS price, pl.name AS listName
+        `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
          FROM price_list_items i JOIN price_lists pl ON pl.id = i.price_list_id
          WHERE i.product_id = ? AND pl.is_active = 1 AND pl.customer_type = ?
            AND (pl.valid_from IS NULL OR pl.valid_from <= ?) AND (pl.valid_to IS NULL OR pl.valid_to >= ?)
@@ -309,12 +309,12 @@ export class PricingService {
         [productId, mappedType, today, today, quantityM2]
       )[0];
       if (listItem) {
-        return { priceM2: Number(listItem.price), source: 'PRICE_LIST', listName: listItem.listName, originalPrice: basePrice };
+        return { priceM2: Number(listItem.price), priceBox: Number(listItem.priceBox) || undefined, source: 'PRICE_LIST', listName: listItem.listName, originalPrice: basePrice };
       }
     }
 
     const defaultItem = this.db.query<any>(
-      `SELECT i.price_m2 AS price, pl.name AS listName
+      `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
        FROM price_list_items i JOIN price_lists pl ON pl.id = i.price_list_id
        WHERE i.product_id = ? AND pl.is_active = 1 AND pl.is_default = 1
          AND (pl.valid_from IS NULL OR pl.valid_from <= ?) AND (pl.valid_to IS NULL OR pl.valid_to >= ?)
@@ -323,7 +323,7 @@ export class PricingService {
       [productId, today, today, quantityM2]
     )[0];
     if (defaultItem) {
-      return { priceM2: Number(defaultItem.price), source: 'DEFAULT_LIST', listName: defaultItem.listName, originalPrice: basePrice };
+      return { priceM2: Number(defaultItem.price), priceBox: Number(defaultItem.priceBox) || undefined, source: 'DEFAULT_LIST', listName: defaultItem.listName, originalPrice: basePrice };
     }
 
     return { priceM2: basePrice, source: 'BASE', originalPrice: basePrice };

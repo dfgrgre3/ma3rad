@@ -98,6 +98,51 @@ test('POS totals cap combined discounts to the net subtotal', () => {
   assert.equal(totals.totalAmount, 0);
 });
 
+test('POS totals match persisted invoice for stacked discounts, tax, and shipping', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'POS totals parity customer', phone: '01088776655', customerType: 'RETAIL', creditLimit: 0,
+  });
+  db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
+    pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+    VALUES ('prod_pos_totals_parity','SKU-PTP','BAR-PTP','POS totals parity','cat_floor','br_cleo','GRADE_1','1x1',
+    'M2','M2',1,1,40,100,90,0,0,1)`);
+  db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
+    VALUES ('stk_pos_totals_parity','wh_main','prod_pos_totals_parity',10,0)`);
+  const today = localDateString();
+  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,starts_at,ends_at,is_active,usage_count,created_by)
+    VALUES ('promo_pos_totals_parity','PTP','POS totals parity','FIXED_AMOUNT',10,?,?,1,0,'usr_admin')`, [today, today]);
+  const loyalty = new LoyaltyService();
+  loyalty.initializeCustomerLoyalty(customer.id);
+  loyalty.earnPoints({ customerId: customer.id, points: 5, referenceType: 'TEST_SEED', referenceId: 'pos-totals-parity' });
+  const posTotals = calculatePosTotals({
+    cart: [{
+      product: { id: 'prod_pos_totals_parity', name: 'POS totals parity', productType: 'CERAMIC', baseUnit: 'M2', sellUnit: 'M2', sellingPriceM2: 100, price: 100 } as any,
+      soldBy: 'M2', soldQuantity: 2, quantityM2: 2, boxesCount: 0, piecesCount: 0,
+      unitPrice: 100, discountAmount: 10, availableStockM2: 10,
+    }],
+    discountAmount: 20, promotionDiscount: 10, loyaltyDiscount: 5,
+    taxPercentage: 10, shippingCost: 7, paidAmount: 177.5, activeShift: null,
+  });
+  const invoice = new SalesService().createSale({
+    customerId: customer.id, warehouseId: 'wh_main',
+    items: [{ productId: 'prod_pos_totals_parity', soldBy: 'M2', quantityM2: 2, boxesCount: 0,
+      piecesCount: 0, unitPrice: 100, discountAmount: 10 }],
+    discountAmount: 35, taxAmount: posTotals.taxAmount, shippingCost: 7,
+    paidAmount: posTotals.totalAmount, paymentType: 'CASH',
+    promotionUsage: { promotionId: 'promo_pos_totals_parity', discountAmount: 10 },
+    loyaltyRedemption: { points: 5, discountAmount: 5 },
+  });
+  assert.equal(posTotals.taxableBase, 155);
+  assert.equal(posTotals.taxAmount, 15.5);
+  assert.equal(posTotals.totalAmount, 177.5);
+  assert.equal(invoice.totalAmount, posTotals.totalAmount);
+  assert.equal(invoice.remainingAmount, posTotals.remainingAmount);
+});
+
 test('POS expected closing cash includes partner cash movements', () => {
   const totals = calculatePosTotals({
     cart: [],
@@ -223,8 +268,70 @@ test('sales reject POS discounts that exceed the net item subtotal', async () =>
   loyalty.earnPoints({
     customerId: customer.id,
     points: 15,
-    referenceType: 'SALES_INVOICE',
+    referenceType: 'TEST_SEED',
     referenceId: 'invoice-loyalty-test',
   });
   assert.equal(loyalty.getRedeemablePointBalance(customer.id), 15);
+});
+
+test('sale creation validates numeric inputs and matches promotion and loyalty discounts', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'Sale integrity customer', phone: '01099887766', customerType: 'RETAIL', creditLimit: 0,
+  });
+  db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
+    pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+    VALUES ('prod_integrity_sale','SKU-IS','BAR-IS','Integrity sale product','cat_floor','br_cleo','GRADE_1','60x60',
+    'M2','M2',4,1.44,40,100,90,0,0,1)`);
+  db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
+    VALUES ('stk_integrity_sale','wh_main','prod_integrity_sale',20,0)`);
+  const sales = new SalesService();
+  const baseDto = {
+    customerId: customer.id, warehouseId: 'wh_main',
+    items: [{ productId: 'prod_integrity_sale', soldBy: 'M2', quantityM2: 2, boxesCount: 0,
+      piecesCount: 0, unitPrice: 100, discountAmount: 10 }],
+    paidAmount: 0, paymentType: 'CASH' as const,
+  };
+  assert.throws(() => sales.createSale({ ...baseDto, taxAmount: Number.NaN }), /مبلغ الضريبة غير صحيح/);
+  assert.throws(() => sales.createSale({ ...baseDto, shippingCost: Number.POSITIVE_INFINITY }), /تكلفة الشحن غير صحيح/);
+  assert.throws(() => sales.createSale({ ...baseDto, payments: [{ method: 'CASH', amount: -1 }] }), /مبلغ إحدى وسائل الدفع غير صحيح/);
+  assert.throws(() => sales.createSale({ ...baseDto, items: [{ ...baseDto.items[0], discountAmount: 201 }] }), /خصم الصنف/);
+  assert.throws(() => sales.createSale({
+    ...baseDto, discountAmount: 35,
+    promotionUsage: { promotionId: 'missing-promo', discountAmount: 10 },
+    loyaltyRedemption: { points: 5, discountAmount: 5 },
+  }), /رصيد نقاط الولاء غير كافٍ/);
+
+  const today = new Date().toISOString().slice(0, 10);
+  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,starts_at,ends_at,is_active,usage_limit,usage_count,created_by)
+    VALUES ('promo_integrity_sale','IS','Integrity sale promo','FIXED_AMOUNT',10,?,?,1,5,0,'usr_admin')`, [today, today]);
+  const loyalty = new LoyaltyService();
+  loyalty.initializeCustomerLoyalty(customer.id);
+  loyalty.earnPoints({ customerId: customer.id, points: 20, referenceType: 'TEST_SEED', referenceId: 'integrity-seed' });
+  loyalty.earnPoints({ customerId: customer.id, points: 20, referenceType: 'TEST_SEED', referenceId: 'integrity-seed-2' });
+  const invoice = sales.createSale({
+    ...baseDto,
+    discountAmount: 35,
+    taxAmount: 15,
+    loyaltyRedemption: { points: 5, discountAmount: 5 },
+    promotionUsage: { promotionId: 'promo_integrity_sale', couponCode: 'IS', discountAmount: 10 },
+  });
+  assert.equal(invoice.discountAmount, 35);
+  assert.equal(invoice.totalCost, 80);
+  assert.equal(invoice.grossProfit, 75);
+  const stockCost = Number(db.query<any>(`SELECT total_cost AS totalCost FROM inventory_transactions WHERE reference_id=? AND type='SALE'`, [invoice.id])[0].totalCost);
+  const cogs = Number(db.query<any>(`SELECT jel.debit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
+    JOIN chart_of_accounts coa ON coa.id=jel.account_id
+    WHERE je.reference_type='SALES_INVOICE' AND je.reference_id=? AND coa.code='5101'`, [invoice.id])[0].debit);
+  const revenue = Number(db.query<any>(`SELECT jel.credit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
+    JOIN chart_of_accounts coa ON coa.id=jel.account_id
+    WHERE je.reference_type='SALES_INVOICE' AND je.reference_id=? AND coa.code='4101'`, [invoice.id])[0].credit);
+  assert.equal(stockCost, invoice.totalCost);
+  assert.equal(cogs, invoice.totalCost);
+  assert.equal(invoice.grossProfit, revenue - cogs);
+  assert.equal(Number(db.query<any>(`SELECT usage_count FROM promotions WHERE id='promo_integrity_sale'`)[0].usageCount), 1);
+  assert.equal(loyalty.getRedeemablePointBalance(customer.id), 52);
 });

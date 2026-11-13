@@ -590,6 +590,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   );
   const listed = pricing.getEffectivePrice(pid, customer.id, 10);
   assert.equal(listed.priceM2, 280);
+  assert.equal(listed.priceBox, 403.2);
   assert.equal(listed.source, 'PRICE_LIST');
 
   pricing.setCustomerOverride({ customerId: customer.id, productId: pid, priceM2: 260 });

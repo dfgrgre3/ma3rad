@@ -246,6 +246,7 @@ export class ReservationService {
       `UPDATE stock_reservations SET status = ?, released_at = ? WHERE id = ? AND status = 'ACTIVE'`,
       [reason, new Date().toISOString(), row.id]
     );
+    if (Number((db.getDatabase() as any).getRowsModified?.() ?? 0) !== 1) return;
     db.run(
       `UPDATE warehouse_stock SET reserved_m2 = MAX(0, reserved_m2 - ?), last_updated = CURRENT_TIMESTAMP
        WHERE product_id = ? AND warehouse_id = ?`,

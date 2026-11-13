@@ -8,6 +8,7 @@ import { BatchService } from '../inventory/BatchService';
 import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel, isServiceProduct } from '../../../utils/products/productUnits';
 import { paymentAccountCode } from '../../../database/repositories/ledger';
+import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../finance/financials';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
@@ -57,6 +58,55 @@ function assertSaleHasItems(dto: CreateSaleDTO): void {
   }
 }
 
+function assertFiniteNonNegative(value: unknown, label: string, required = false): void {
+  if (value === undefined || value === null) {
+    if (required) throw new Error(`${label} غير صحيح.`);
+    return;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} غير صحيح.`);
+  }
+}
+
+function validateSaleNumbers(dto: CreateSaleDTO): void {
+  assertFiniteNonNegative(dto.paidAmount, 'المبلغ المدفوع', true);
+  assertFiniteNonNegative(dto.discountAmount, 'مبلغ الخصم');
+  assertFiniteNonNegative(dto.discountPercentage, 'نسبة الخصم');
+  assertFiniteNonNegative(dto.taxAmount, 'مبلغ الضريبة');
+  assertFiniteNonNegative(dto.taxPercentage, 'نسبة الضريبة');
+  assertFiniteNonNegative(dto.shippingCost, 'تكلفة الشحن');
+  if (Number(dto.discountPercentage || 0) > 100 || Number(dto.taxPercentage || 0) > 100) {
+    throw new Error('نسبة الخصم أو الضريبة غير صحيحة.');
+  }
+  if (!dto.items || !Array.isArray(dto.items)) return;
+  for (const [index, item] of dto.items.entries()) {
+    const prefix = `بيانات الصنف رقم ${index + 1}`;
+    assertFiniteNonNegative(item.quantityM2, `${prefix}: الكمية`, true);
+    assertFiniteNonNegative(item.boxesCount, `${prefix}: عدد العبوات`, true);
+    assertFiniteNonNegative(item.piecesCount, `${prefix}: عدد القطع`, true);
+    assertFiniteNonNegative(item.unitPrice, `${prefix}: سعر البيع`, true);
+    assertFiniteNonNegative(item.unitCost, `${prefix}: التكلفة`);
+    assertFiniteNonNegative(item.discountAmount, `${prefix}: الخصم`);
+    assertFiniteNonNegative(item.quantity, `${prefix}: الكمية بوحدة البيع`);
+  }
+  if (dto.payments) {
+    if (!Array.isArray(dto.payments)) throw new Error('تفاصيل الدفع غير صحيحة.');
+    for (const payment of dto.payments) assertFiniteNonNegative(payment.amount, 'مبلغ إحدى وسائل الدفع', true);
+  }
+  if (dto.loyaltyRedemption) {
+    assertFiniteNonNegative(dto.loyaltyRedemption.discountAmount, 'خصم نقاط الولاء', true);
+  }
+  if (dto.promotionUsage) {
+    assertFiniteNonNegative(dto.promotionUsage.discountAmount, 'خصم العرض الترويجي', true);
+  }
+  const declaredDiscount = round2(Number(dto.discountAmount || 0));
+  const loyaltyDiscount = round2(Number(dto.loyaltyRedemption?.discountAmount || 0));
+  const promotionDiscount = round2(Number(dto.promotionUsage?.discountAmount || 0));
+  if (loyaltyDiscount + promotionDiscount - declaredDiscount > 0.009) {
+    throw new Error('مجموع خصومات الولاء والعروض يتجاوز الخصم المسجل على الفاتورة.');
+  }
+}
+
 function resolveCashRegister(ctx: SalesContext, dto: CreateSaleDTO, actor: any): { branchId: string; cashRegisterId: string } {
   const branchId = ctx.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
   const branchRegisterId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
@@ -73,7 +123,7 @@ function resolveCashRegister(ctx: SalesContext, dto: CreateSaleDTO, actor: any):
 }
 
 function validateItemQuantity(quantityM2: number): void {
-  if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
+  if (!Number.isFinite(quantityM2) || quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
 }
 
 function getUnitLabel(product: any): string {
@@ -85,6 +135,7 @@ function getUnitLabel(product: any): string {
 }
 
 function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number): void {
+  if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) throw new Error('سعر بيع الصنف غير صحيح.');
   if (round2(baseUnitPrice) !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
@@ -236,6 +287,7 @@ function buildPreparedItem(
     unitCost: costPerSellUnit,
     discountAmount: item.discountAmount || 0,
   });
+  if (line.lineDiscount > line.lineSubtotal) throw new Error(`خصم الصنف "${product.name}" يتجاوز إجمالي سعره.`);
 
   const metersPerBox = Number(product.metersPerBox) || 1.44;
   const piecesPerBox = Number(product.piecesPerBox) || 4;
@@ -305,6 +357,7 @@ function validateDiscountAndCredit(
   totalLineDiscount: number
 ): void {
   const headerDiscount = dto.discountAmount || 0;
+  if (!Number.isFinite(headerDiscount) || headerDiscount < 0) throw new Error('مبلغ الخصم غير صحيح.');
   if (headerDiscount > totals.subtotal) {
     throw new Error('إجمالي الخصم يتجاوز صافي قيمة الأصناف في الفاتورة.');
   }
@@ -448,15 +501,16 @@ function insertInvoiceItems(
   }
 }
 
-function resolvePayments(dto: CreateSaleDTO): { method: PaymentType; amount: number; reference?: string }[] {
+function resolvePayments(dto: CreateSaleDTO): { method: PaymentType; amount: number; reference?: string; bankAccountId?: string }[] {
   if (dto.payments && dto.payments.length > 0) {
     // ── CREDIT legs are NOT tender payments: they are the invoice's receivable
     // (remaining_amount on the invoice + customer balance). Posting them here
     // would double-count and break the ledger mapping (no CREDIT account exists).
-    return dto.payments.filter((p) => p.amount > 0 && (p.method as PaymentType) !== 'CREDIT');
+    return dto.payments.filter((p) => p.amount > 0 && (p.method as PaymentType) !== 'CREDIT')
+      .map((p) => ({ ...p, bankAccountId: p.bankAccountId || dto.bankAccountId }));
   }
   if (dto.paidAmount > 0) {
-    return [{ method: dto.paymentType, amount: dto.paidAmount }];
+    return [{ method: dto.paymentType, amount: dto.paidAmount, bankAccountId: dto.bankAccountId }];
   }
   return [];
 }
@@ -484,6 +538,10 @@ function updateCustomerAndCash(
   if (cashPortion > 0) {
     sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [cashPortion, cashRegisterId]);
   }
+  for (const payment of payments.filter((row) => row.method === 'BANK_TRANSFER')) {
+    const bank = getActiveBankAccount(sqliteDb, payment.bankAccountId);
+    updateBankBalance(sqliteDb, bank.id, payment.amount);
+  }
 
   if (!dto.shiftId) return;
 
@@ -497,6 +555,7 @@ function updateCustomerAndCash(
 }
 
 function buildLedgerEntries(
+  sqliteDb: any,
   dto: CreateSaleDTO,
   totals: ReturnType<typeof computeSaleTotals>,
   inventoryCost: number,
@@ -504,7 +563,9 @@ function buildLedgerEntries(
 ): any[] {
   const payments = resolvePayments(dto);
   const paymentLines = payments.map((p) => ({
-    accountCode: paymentAccountCode(p.method),
+    accountCode: p.method === 'BANK_TRANSFER'
+      ? getActiveBankAccount(sqliteDb, p.bankAccountId).glAccountCode
+      : paymentAccountCode(p.method),
     debit: round2(p.amount),
     credit: 0,
   }));
@@ -545,9 +606,13 @@ function buildLedgerEntries(
 
 export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
   assertSaleHasItems(dto);
+  validateSaleNumbers(dto);
   // حارس عدم الاتساق: مجموع أطر الدفع بعد الاستبعاد يجب أن يساوي المدفوع المعلن —
   // يمنع دفتر يومية غير متوازن قبل الدخول في المعاملة برسالة واضحة.
   const tenderPayments = resolvePayments(dto);
+  if (dto.payments?.some((payment) => payment.amount <= 0)) {
+    throw new Error('يجب أن يكون مبلغ كل وسيلة دفع أكبر من صفر.');
+  }
   const tenderSum = round2(tenderPayments.reduce((sum, payment) => sum + payment.amount, 0));
   if (Math.abs(tenderSum - round2(dto.paidAmount || 0)) > 0.01) {
     throw new Error(`المبلغ المدفوع (${round2(dto.paidAmount || 0).toFixed(2)}) لا يساوي مجموع أطر الدفع (${tenderSum.toFixed(2)}).`);
@@ -672,8 +737,8 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     // Persist split-payment breakdown (one row per method).
     for (const p of payments) {
       sqliteDb.run(
-        `INSERT INTO sales_invoice_payments (id, invoice_id, method, amount, reference) VALUES (?, ?, ?, ?, ?)`,
-        [`sip_${uuidv4().substring(0, 8)}`, invoiceId, p.method, round2(p.amount), p.reference || null]
+        `INSERT INTO sales_invoice_payments (id, invoice_id, method, amount, reference, bank_account_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        [`sip_${uuidv4().substring(0, 8)}`, invoiceId, p.method, round2(p.amount), p.reference || null, p.bankAccountId || null]
       );
     }
 
@@ -682,7 +747,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       : 0;
     // Any cost not relieved from inventory belongs to stock-free lines (services).
     const serviceCost = trackInventory ? round2(financialTotals.totalCost - inventoryCost) : 0;
-    const ledgerLines = buildLedgerEntries(dto, financialTotals, inventoryCost, Math.max(0, serviceCost));
+    const ledgerLines = buildLedgerEntries(sqliteDb, dto, financialTotals, inventoryCost, Math.max(0, serviceCost));
     const effects: Effect[] = [
       {
         type: 'ledger.post',

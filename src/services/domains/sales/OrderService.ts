@@ -303,6 +303,12 @@ export class OrderService {
     if (existing.status !== 'PENDING') {
       throw new Error('لا يمكن تعديل طلب بعد تأكيده. يمكنك إلغاؤه وإنشاء طلب جديد.');
     }
+    const existingDeposits = Number(this.db.query<{ amount: number }>(
+      'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [id]
+    )[0]?.amount || 0);
+    if (existingDeposits > 0) {
+      throw new Error('لا يمكن تعديل طلب عليه عربون قبل تسوية العربون أو رده.');
+    }
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
     const items = this.normalizeItems(input.items);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
@@ -370,6 +376,12 @@ export class OrderService {
 
     this.db.executeTransaction((db) => {
       if (status === 'CANCELLED') {
+        const depositTotal = Number(db.query<{ amount: number }>(
+          'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [id]
+        )[0]?.amount || 0);
+        if (depositTotal > 0) {
+          throw new Error('لا يمكن إلغاء طلب عليه عربون قبل تسوية العربون أو رده.');
+        }
         this.releaseReservations(db, order.warehouseId, order.items || []);
       }
       db.run(`UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id]);
@@ -465,7 +477,7 @@ export class OrderService {
     );
   }
 
-  public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string, bankAccountId?: string): Order {
+  public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string, bankAccountId?: string, idempotencyKey?: string): Order {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.update');
     const order = this.getOrder(id);
@@ -476,12 +488,6 @@ export class OrderService {
     const deposit = round2(Number(amount));
     if (!Number.isFinite(deposit)) throw new Error('مبلغ العربون غير صحيح.');
     if (deposit <= 0) throw new Error('مبلغ العربون يجب أن يكون أكبر من صفر.');
-    const newPaid = round2(Number(order.paidAmount || 0) + deposit);
-    if (newPaid > order.totalAmount) {
-      throw new Error(`مجموع المدفوع (${newPaid} ج) يتجاوز إجمالي الطلب (${order.totalAmount} ج).`);
-    }
-    const newRemaining = round2(order.totalAmount - newPaid);
-
     const cashier = new CashierService();
     const shift = cashier.getActiveShift(actor.id, order.branchId || undefined);
     if (shift && shift.status !== 'OPEN') throw new Error('وردية التحصيل مغلقة.');
@@ -496,10 +502,47 @@ export class OrderService {
     }
 
     return this.db.executeTransaction((db) => {
+      if (idempotencyKey) {
+        const prior = db.query<{ orderId: string; amount: number; paymentMethod: string; bankAccountId: string | null }>(
+          `SELECT od.order_id AS orderId, od.amount, od.payment_method AS paymentMethod,
+                  od.bank_account_id AS bankAccountId
+           FROM order_deposits od JOIN customer_payments cp ON cp.id = od.receipt_id
+           WHERE cp.idempotency_key = ?`, [idempotencyKey]
+        )[0];
+        if (prior) {
+          if (prior.orderId !== id || round2(Number(prior.amount)) !== deposit || prior.paymentMethod !== paymentType ||
+              (prior.bankAccountId || null) !== (bankAccountId || null)) {
+            throw new Error('The deposit idempotency key was already used for a different request.');
+          }
+          return this.getOrder(id)!;
+        }
+      }
+      const current = db.query<{ paidAmount: number; remainingAmount: number; totalAmount: number; status: OrderStatus; billingStatus: string; customerId: string; branchId: string | null }>(
+        `SELECT paid_amount AS paidAmount, remaining_amount AS remainingAmount, total_amount AS totalAmount,
+                status, billing_status AS billingStatus, customer_id AS customerId, branch_id AS branchId
+         FROM orders WHERE id = ?`, [id]
+      )[0];
+      if (!current || ['COMPLETED', 'CANCELLED'].includes(current.status) || current.billingStatus === 'INVOICED') {
+        throw new Error('Cannot record a deposit for a completed, cancelled, or invoiced order.');
+      }
+      const newPaid = round2(Number(current.paidAmount || 0) + deposit);
+      const newRemaining = round2(Number(current.remainingAmount || 0) - deposit);
+      if (deposit > Number(current.remainingAmount || 0) + 0.009 || newRemaining < -0.009) {
+        throw new Error('Deposit exceeds the order balance.');
+      }
+      db.run(
+        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, financial_status = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED') AND billing_status != 'INVOICED'
+           AND remaining_amount >= ?`,
+        [newPaid, Math.max(0, newRemaining), newPaid >= Number(current.totalAmount) - 0.009 ? 'PAID' : 'PARTIAL', id, deposit]
+      );
+      if (Number((db.getDatabase() as any).getRowsModified?.() ?? 0) !== 1) {
+        throw new Error('Order balance changed while recording the deposit; retry.');
+      }
       const receiptId = `cpay_${uuidv4().substring(0, 8)}`;
       const receiptNumber = db.nextNumber('REC');
-      db.run(`INSERT INTO customer_payments (id, receipt_number, customer_id, invoice_id, amount, payment_type, date, register_id, shift_id, notes, performed_by, branch_id)
-        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, order.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, order.branchId || null]);
+      db.run(`INSERT INTO customer_payments (id, receipt_number, customer_id, invoice_id, amount, payment_type, date, register_id, shift_id, notes, performed_by, branch_id, idempotency_key)
+        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, current.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, current.branchId || null, idempotencyKey || null]);
       postLedgerEntry(db.getDatabase(), {
         date, description: `Order deposit ${order.orderNumber} (${receiptNumber})`, referenceType: 'ORDER_DEPOSIT', referenceId: receiptId, createdBy: actor.id,
         lines: [{ accountCode: cashAccount, debit: deposit, credit: 0 }, { accountCode: '2106', debit: 0, credit: deposit }],
@@ -510,18 +553,14 @@ export class OrderService {
         if (paymentType === 'CASH') db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?', [deposit, shift.id]);
       }
       db.run(`INSERT INTO order_deposits (id, deposit_number, order_id, customer_id, amount, payment_method, register_id, shift_id, receipt_id, bank_account_id, date, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, id, order.customerId, deposit, paymentType, registerId, shift?.id || null, receiptId, bankAccountId || null, date, actor.id]);
-      db.run(
-        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, financial_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [newPaid, newRemaining, newPaid >= order.totalAmount - 0.009 ? 'PAID' : 'PARTIAL', id]
-      );
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, id, current.customerId, deposit, paymentType, registerId, shift?.id || null, receiptId, bankAccountId || null, date, actor.id]);
       this.logStatus(
         db, id, order.status, order.status,
         `سند قبض ${receiptNumber} بقيمة ${deposit} ج (${paymentType}) ${notes || ''}`.trim(),
         actor.id, actor.fullName
       );
       this.audit(actor.id, actor.fullName, 'تسجيل عربون طلب', id, {
-        orderNumber: order.orderNumber, receiptId, receiptNumber, deposit, totalPaid: newPaid, remaining: newRemaining
+        orderNumber: order.orderNumber, receiptId, receiptNumber, deposit, totalPaid: newPaid, remaining: Math.max(0, newRemaining)
       });
       return this.getOrder(id)!;
     });
@@ -625,6 +664,14 @@ export class OrderService {
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (order.status !== 'CANCELLED') throw new Error('يمكن حذف الطلبات الملغاة فقط.');
+    const financialLinks = this.db.query<{ count: number }>(
+      `SELECT (SELECT COUNT(*) FROM order_deposits WHERE order_id = ?) +
+              (SELECT COUNT(*) FROM customer_payments WHERE id IN
+                (SELECT receipt_id FROM order_deposits WHERE order_id = ?)) AS count`, [id, id]
+    )[0]?.count || 0;
+    if (Number(financialLinks) > 0) {
+      throw new Error('لا يمكن حذف طلب له سندات عربون؛ سوِّ العربون أو رده أولاً.');
+    }
     this.db.executeTransaction((db) => {
       db.run(`DELETE FROM order_items WHERE order_id = ?`, [id]);
       db.run(`DELETE FROM orders WHERE id = ?`, [id]);

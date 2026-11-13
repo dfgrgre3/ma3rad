@@ -33,7 +33,8 @@ export interface CreateSaleDTO {
   paidAmount: number;
   paymentType: PaymentType;
   /** Optional split-payment breakdown. When provided, sum(amount) should equal paidAmount. */
-  payments?: { method: PaymentType; amount: number; reference?: string }[];
+  payments?: { method: PaymentType; amount: number; reference?: string; bankAccountId?: string }[];
+  bankAccountId?: string;
   notes?: string;
   performedBy?: string;
   loyaltyRedemption?: { points: number; discountAmount: number };

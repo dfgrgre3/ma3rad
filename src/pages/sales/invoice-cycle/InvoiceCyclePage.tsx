@@ -14,6 +14,8 @@ import { SalesInvoice, PaymentType } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
+import type { BankAccount } from '../../../types/finance';
 
 const PAGE_SIZE = 20;
 
@@ -85,9 +87,20 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
   const service = useMemo(() => new SalesService(), []);
   const [amount, setAmount] = useState(String(invoice.remainingAmount ?? 0));
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const financeService = useMemo(() => new FinanceEnterpriseService(), []);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const accounts = financeService.getBankAccounts().filter((account) => account.isActive);
+      setBankAccounts(accounts);
+      setBankAccountId(accounts[0]?.id || '');
+    } catch { setBankAccounts([]); }
+  }, [financeService]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -95,7 +108,7 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
     if (isNaN(val) || val <= 0) { setError('يجب إدخال مبلغ صحيح.'); return; }
     setBusy(true);
     try {
-      service.recordInvoicePayment(invoice.id, val, paymentType, undefined, undefined, notes);
+      service.recordInvoicePayment(invoice.id, val, paymentType, undefined, undefined, notes, undefined, undefined, bankAccountId || undefined);
       onSuccess();
     } catch (e: any) {
       setError(e?.message || 'حدث خطأ أثناء التحصيل.');
@@ -148,6 +161,16 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
               ))}
             </div>
           </div>
+          {paymentType === 'BANK_TRANSFER' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">الحساب البنكي المستلم *</label>
+              <select required value={bankAccountId} onChange={(event) => setBankAccountId(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
+                <option value="">اختر الحساب البنكي</option>
+                {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+              </select>
+              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">ملاحظات</label>
             <input

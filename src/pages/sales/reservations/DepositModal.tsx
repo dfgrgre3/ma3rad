@@ -3,6 +3,7 @@ import { Loader2, X, CheckCheck, DollarSign } from 'lucide-react';
 import type { Order } from '../../../services/domains/sales/OrderService';
 import { fmtCurrency } from './helpers';
 import type { DepositPaymentType } from '../../../types/sales/reservationsPage';
+import type { BankAccount } from '../../../types/finance';
 
 interface DepositModalProps {
   order: Order;
@@ -10,6 +11,9 @@ interface DepositModalProps {
   onAmountChange: (value: string) => void;
   paymentType: DepositPaymentType;
   onPaymentTypeChange: (value: DepositPaymentType) => void;
+  bankAccounts: BankAccount[];
+  bankAccountId: string;
+  onBankAccountChange: (value: string) => void;
   notes: string;
   onNotesChange: (value: string) => void;
   submitting: boolean;
@@ -23,6 +27,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   onAmountChange,
   paymentType,
   onPaymentTypeChange,
+  bankAccounts,
+  bankAccountId,
+  onBankAccountChange,
   notes,
   onNotesChange,
   submitting,
@@ -68,6 +75,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <span className="text-rose-600">{fmtCurrency(order.remainingAmount)}</span>
             </div>
           </div>
+
+          {paymentType === 'BANK_TRANSFER' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">الحساب البنكي المستلم *</label>
+              <select required value={bankAccountId} onChange={(event) => onBankAccountChange(event.target.value)} className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl">
+                <option value="">اختر الحساب البنكي</option>
+                {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+              </select>
+              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">

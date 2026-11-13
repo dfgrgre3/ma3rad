@@ -9,6 +9,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel, isServiceProduct } from '../../../utils/products/productUnits';
 import { convertQuantity } from '../../../utils/products/uom';
 import { paymentAccountCode } from '../../../database/repositories/ledger';
+import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
 import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../finance/financials';
 import type { SalesReturn } from '../../../types';
 import type { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -24,6 +25,7 @@ type ReturnOptions = {
   registerId?: string;
   shiftId?: string;
   refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
+  bankAccountId?: string;
   idempotencyKey?: string;
   requestFingerprint?: string;
 };
@@ -104,6 +106,7 @@ export function createSaleReturn(
     refundMethod,
     registerId: options.registerId || null,
     shiftId: options.shiftId || null,
+    bankAccountId: options.bankAccountId || null,
     items: fingerprintItems,
   });
 
@@ -150,6 +153,12 @@ export function createSaleReturn(
   const trackInventory = ModuleRegistryService.isInventoryTracked();
 
   return ctx.db.executeTransaction((sqliteDb) => {
+    const currentState = sqliteDb.getDatabase().exec(
+      `SELECT invoice_status FROM sales_invoices WHERE id = ?`, [invoiceId]
+    )[0]?.values[0];
+    if (!currentState || String(currentState[0]) === 'VOID') {
+      throw new Error('لا يمكن إرجاع فاتورة ملغاة أو غير متاحة.');
+    }
     validateReturnShift(ctx, sqliteDb, options, actor, invoiceBranchId, refundMethod, refundCash, inv.paidAmount);
     return createReturnInTransaction(sqliteDb, {
       invoiceId,
@@ -269,12 +278,16 @@ function createReturnInTransaction(
   const returnCosts = processReturnItems(sqliteDb, params, authoritativeItems, fifoEnabled);
   updateCustomerAfterReturn(sqliteDb, inv.customerId, impact.balanceDelta, totalReturnIncludingTax);
   updateCashRegisterAfterReturn(sqliteDb, options, refundMethod, impact.cashRefund);
+  if (impact.cashRefund > 0 && refundMethod === 'BANK_TRANSFER') {
+    const bank = getActiveBankAccount(sqliteDb, options.bankAccountId);
+    updateBankBalance(sqliteDb, bank.id, -impact.cashRefund);
+  }
 
   // No stock was relieved when the sale was created, so a return must not
   // restore inventory value to the ledger.
   const returnedCost = params.trackInventory ? returnCosts.inventoryCost : 0;
   const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
-  const ledgerLines = buildReturnLedgerLines(params, totalReturnAmount, returnTax, impact, returnedCost, returnedServiceCost);
+  const ledgerLines = buildReturnLedgerLines(sqliteDb, params, totalReturnAmount, returnTax, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, refundMethod === 'CASH' ? impact.cashRefund : 0);
   updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnIncludingTax, impact.balanceDelta);
 
@@ -476,8 +489,8 @@ function insertSalesReturn(
     INSERT INTO sales_returns (
       id, return_number, original_invoice_id, original_invoice_number, customer_id,
       warehouse_id, date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
-      register_id, shift_id, refund_method, created_by, idempotency_key, request_fingerprint
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      register_id, shift_id, refund_method, created_by, idempotency_key, request_fingerprint, refund_bank_account_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
     inv.warehouseId, today, totalReturnAmount, returnTaxAmount, impact.cashRefund, impact.balanceDelta,
@@ -485,6 +498,7 @@ function insertSalesReturn(
     impact.cashRefund > 0 && refundMethod === 'CASH' ? options.registerId : null,
     options.shiftId || null, refundMethod, actor.id, options.idempotencyKey || null,
     options.requestFingerprint || null,
+    refundMethod === 'BANK_TRANSFER' ? options.bankAccountId || null : null,
   ]);
 }
 
@@ -752,6 +766,7 @@ function updateCashRegisterAfterReturn(
 }
 
 function buildReturnLedgerLines(
+  sqliteDb: DatabaseManager,
   params: ReturnTransactionParams,
   totalReturnAmount: number,
   taxReduction: number,
@@ -759,7 +774,11 @@ function buildReturnLedgerLines(
   returnedCost: number,
   returnedServiceCost = 0
 ): any[] {
-  const refundAccount = impact.cashRefund > 0 ? paymentAccountCode(params.options.refundMethod || 'CASH') : undefined;
+  const refundAccount = impact.cashRefund > 0
+    ? params.options.refundMethod === 'BANK_TRANSFER'
+      ? getActiveBankAccount(sqliteDb, params.options.bankAccountId).glAccountCode
+      : paymentAccountCode(params.options.refundMethod || 'CASH')
+    : undefined;
   const lines = [
     { accountCode: '4101', debit: totalReturnAmount, credit: 0 },
   ];

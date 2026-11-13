@@ -4,6 +4,8 @@ import { ReservationService, StockReservation } from '../../../services/domains/
 import { OrderService, Order } from '../../../services/domains/sales/OrderService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
+import type { BankAccount } from '../../../types/finance';
 import { useToast } from '../../../components/ui/Toast';
 import { Product } from '../../../types';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -24,6 +26,7 @@ import { StockReservationsTable } from './StockReservationsTable';
 import { DepositModal } from './DepositModal';
 import { NewReservationModal } from './NewReservationModal';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
 
 export type ReservationPageMode = 'sales' | 'inventory';
 interface ReservationsDepositPageProps { mode?: ReservationPageMode; }
@@ -39,6 +42,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   const canAdjustInventory = can('inventory.adjust');
   const resService = useMemo(() => new ReservationService(), []);
   const orderService = useMemo(() => new OrderService(), []);
+  const financeService = useMemo(() => new FinanceEnterpriseService(), []);
 
   const initialTab: ReservationTab = mode === 'inventory' ? 'reservations' : 'orders';
   const [activeTab, setActiveTab] = useState<ReservationTab>(initialTab);
@@ -63,7 +67,18 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   const [depositModalOrder, setDepositModalOrder] = useState<Order | null>(null);
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [depositPaymentType, setDepositPaymentType] = useState<DepositPaymentType>('CASH');
+  const [depositBankAccountId, setDepositBankAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [depositNotes, setDepositNotes] = useState('');
+  const depositIdempotency = useIdempotencyKey();
+
+  useEffect(() => {
+    try {
+      const accounts = financeService.getBankAccounts().filter((account) => account.isActive);
+      setBankAccounts(accounts);
+      setDepositBankAccountId(accounts[0]?.id || '');
+    } catch { setBankAccounts([]); }
+  }, [financeService]);
   const [submittingDeposit, setSubmittingDeposit] = useState(false);
 
   // Load all data
@@ -194,11 +209,12 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
     setSubmittingDeposit(true);
     try {
-      orderService.recordDeposit(depositModalOrder.id, amount, depositPaymentType, depositNotes);
+      orderService.recordDeposit(depositModalOrder.id, amount, depositPaymentType, depositNotes, depositBankAccountId || undefined, depositIdempotency.getKey());
       toast.success(`تم تسجيل عربون بقيمة ${fmtCurrency(amount)} للطلب بنجاح.`);
       setDepositModalOrder(null);
       setDepositAmount('');
       setDepositNotes('');
+      depositIdempotency.resetKey();
       loadData();
     } catch (e: any) {
       toast.error(e?.message || 'فشل تسجيل العربون.');
@@ -217,8 +233,10 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
     if (!window.confirm(`هل تريد تحويل الطلب رقم "${order.orderNumber}" إلى فاتورة مبيعات معتمدة وصرف البضاعة؟`)) return;
     try {
       const inv = orderService.convertToInvoice(order.id, {
-        paidAmount: order.paidAmount,
-        paymentType: order.remainingAmount <= 0 ? 'CASH' : 'CREDIT',
+        // Existing deposits are settled by OrderService during conversion.
+        // This screen collects no new money, so pass only the additional payment.
+        paidAmount: 0,
+        paymentType: 'CREDIT',
         notes: `تحويل طلب حجز رقم ${order.orderNumber}`,
       });
       toast.success(`تم إنشاء الفاتورة بنجاح برقم: ${inv.invoiceNumber}`);
@@ -320,6 +338,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
             setDepositModalOrder(order);
             setDepositAmount('');
             setDepositNotes('');
+            depositIdempotency.resetKey();
           }}
           onConvertToInvoice={handleConvertToInvoice}
         />
@@ -341,6 +360,9 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
           onAmountChange={setDepositAmount}
           paymentType={depositPaymentType}
           onPaymentTypeChange={setDepositPaymentType}
+          bankAccounts={bankAccounts}
+          bankAccountId={depositBankAccountId}
+          onBankAccountChange={setDepositBankAccountId}
           notes={depositNotes}
           onNotesChange={setDepositNotes}
           submitting={submittingDeposit}

@@ -22,6 +22,21 @@ interface UsePosCartOptions {
   allowDuplicateItems?: boolean;
 }
 
+const effectiveBaseUnitPrice = (
+  pricingService: PricingService,
+  product: Product,
+  customerId: string | null | undefined,
+  quantityM2: number,
+  soldBy: PosUnit,
+): number => {
+  const price = pricingService.getEffectivePrice(product.id, customerId, quantityM2);
+  if (String(soldBy).toUpperCase() === 'BOX' && Number(price.priceBox) > 0) {
+    const baseQuantity = toBaseQuantity(1, 'BOX', product).quantity;
+    if (baseQuantity > 0) return round2(Number(price.priceBox) / baseQuantity);
+  }
+  return price.priceM2;
+};
+
 export const usePosCart = ({
   can,
   notify,
@@ -39,15 +54,15 @@ export const usePosCart = ({
     const boxes = isGeneral
       ? product.baseUnit === 'BOX' ? quantityM2 : 0
       : CeramicMath.calculateBoxes(quantityM2, metersPerBox, true);
-    let unitPrice = product.sellingPriceM2;
-    try {
-      unitPrice = pricingService.getEffectivePrice(product.id, selectedCustomer?.id, quantityM2).priceM2;
-    } catch {
-      unitPrice = product.sellingPriceM2;
-    }
     const sellable = getSellableUnits(product);
     const preferred = product.sellUnit && sellable.includes(product.sellUnit) ? product.sellUnit : (product.baseUnit || 'M2');
     const soldBy = sellable.includes(preferred) ? preferred : sellable[0];
+    let unitPrice = product.sellingPriceM2;
+    try {
+      unitPrice = effectiveBaseUnitPrice(pricingService, product, selectedCustomer?.id, quantityM2, soldBy);
+    } catch {
+      unitPrice = product.sellingPriceM2;
+    }
     return {
       product,
       soldBy,
@@ -68,7 +83,7 @@ export const usePosCart = ({
     setCart((prev) => prev.map((item) => {
       if (item.specialStockId) return item;
       try {
-        return { ...item, unitPrice: pricingService.getEffectivePrice(item.product.id, customer?.id, item.quantityM2).priceM2 };
+        return { ...item, unitPrice: effectiveBaseUnitPrice(pricingService, item.product, customer?.id, item.quantityM2, item.soldBy) };
       } catch {
         return item;
       }
@@ -101,7 +116,7 @@ export const usePosCart = ({
           current.piecesCount = CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
         }
         try {
-          current.unitPrice = pricingService.getEffectivePrice(current.product.id, selectedCustomer?.id, newM2).priceM2;
+          current.unitPrice = effectiveBaseUnitPrice(pricingService, current.product, selectedCustomer?.id, newM2, current.soldBy);
         } catch {
           // Keep the current price if a pricing rule cannot be resolved.
         }
@@ -183,6 +198,11 @@ export const usePosCart = ({
       }
       item.soldQuantity = round2(value);
       item.quantityM2 = baseQuantity;
+      try {
+        item.unitPrice = effectiveBaseUnitPrice(pricingService, item.product, selectedCustomer?.id, baseQuantity, item.soldBy);
+      } catch {
+        // Keep the current line price when a quantity tier cannot be resolved.
+      }
       const metersPerBox = item.product.metersPerBox || 1.44;
       const piecesPerBox = item.product.piecesPerBox || 4;
       const soldInBoxes = String(item.soldBy).toUpperCase() === 'BOX';
@@ -224,6 +244,7 @@ export const usePosCart = ({
       try {
         item.soldBy = unit;
         item.soldQuantity = round2(fromBaseQuantity(item.quantityM2, unit, item.product));
+        item.unitPrice = effectiveBaseUnitPrice(pricingService, item.product, selectedCustomer?.id, item.quantityM2, unit);
       } catch {
         return prev;
       }

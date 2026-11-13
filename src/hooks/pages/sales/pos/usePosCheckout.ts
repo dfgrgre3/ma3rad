@@ -45,12 +45,18 @@ interface UsePosCheckoutOptions {
   paidAmount: number;
   setPaidAmount: Dispatch<SetStateAction<number>>;
   paymentType: PaymentType;
+  bankAccountId?: string;
   splitCash: number;
+  setSplitCash: Dispatch<SetStateAction<number>>;
   splitCard: number;
+  setSplitCard: Dispatch<SetStateAction<number>>;
   splitBank: number;
+  setSplitBank: Dispatch<SetStateAction<number>>;
   splitCheque: number;
+  setSplitCheque: Dispatch<SetStateAction<number>>;
   /** الجزء الآجل من الدفع المختلط — يُسجَّل كرصيد على العميل وليس كدفعة */
   splitCredit: number;
+  setSplitCredit: Dispatch<SetStateAction<number>>;
   notes: string;
   setNotes: Dispatch<SetStateAction<string>>;
   remainingAmount: number;
@@ -102,11 +108,17 @@ export const usePosCheckout = ({
   paidAmount,
   setPaidAmount,
   paymentType,
+  bankAccountId,
   splitCash,
+  setSplitCash,
   splitCard,
+  setSplitCard,
   splitBank,
+  setSplitBank,
   splitCheque,
+  setSplitCheque,
   splitCredit,
+  setSplitCredit,
   notes,
   setNotes,
   remainingAmount,
@@ -378,10 +390,11 @@ export const usePosCheckout = ({
         shippingCost: round2(shippingCost + (extraFees || 0)),
         paidAmount,
         paymentType,
+        bankAccountId,
         payments: paymentType === 'MIXED' ? ([
           { method: 'CASH', amount: splitCash },
           { method: 'CARD', amount: splitCard },
-          { method: 'BANK_TRANSFER', amount: splitBank },
+          { method: 'BANK_TRANSFER', amount: splitBank, bankAccountId },
           { method: 'CHEQUE', amount: splitCheque },
         ].filter((payment) => payment.amount > 0) as { method: PaymentType; amount: number }[]) : undefined,
         notes,
@@ -403,6 +416,11 @@ export const usePosCheckout = ({
       setExtraFees?.(0);
       setNotes('');
       setPaidAmount(0);
+      setSplitCash(0);
+      setSplitCard(0);
+      setSplitBank(0);
+      setSplitCheque(0);
+      setSplitCredit(0);
       // جدول المنتجات لم يتغير — نُعيد تحميل الأرصدة من المخزن فقط (تحديث البيانات المتأثرة فقط)
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
       setActiveShift(cashierService.getActiveShift());
@@ -420,7 +438,8 @@ export const usePosCheckout = ({
     isProcessing, validateCheckoutDetails, selectedCustomer, showToneMixingWarning,
     salesService, selectedWarehouseId, activeShift, cart, discountAmount,
     promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
-    paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, notes,
+    paidAmount, paymentType, bankAccountId, splitCash, splitCard, splitBank, splitCheque, splitCredit, notes,
+    setSplitCash, setSplitCard, setSplitBank, setSplitCheque, setSplitCredit,
     redeemPoints,
     performedBy, appliedPromotion, couponCode,
     setCart, setDiscountAmount, setPromotionDiscount, setLoyaltyDiscount,

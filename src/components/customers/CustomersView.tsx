@@ -15,6 +15,8 @@ import { ConfiguredActionButton } from '../config/ConfiguredActionButton';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
+import { FinanceEnterpriseService } from '../../services/domains/finance/FinanceEnterpriseService';
+import type { BankAccount } from '../../types/finance';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs border-slate-200">
     <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
@@ -70,11 +72,19 @@ export const CustomersView: React.FC = () => {
   const [paymentData, setPaymentData] = useState({
     amount: 1000,
     paymentType: 'CASH' as any,
+    bankAccountId: '',
     notes: 'تحصيل دفعة نقدية'
   });
 
   const customerService = useMemo(() => new CustomerService(), []);
   const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
+  const financeEnterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  useEffect(() => {
+    try { setBankAccounts(financeEnterpriseService.getBankAccounts().filter((account) => account.isActive)); }
+    catch { setBankAccounts([]); }
+  }, [financeEnterpriseService]);
 
   const loadCustomers = useCallback(() => {
     try {
@@ -165,7 +175,8 @@ export const CustomersView: React.FC = () => {
         paymentData.notes,
         AuthService.getCurrentUser()?.id || 'usr_admin',
         undefined,
-        paymentIdempotency.getKey()
+        paymentIdempotency.getKey(),
+        paymentData.bankAccountId || undefined
       );
       paymentIdempotency.resetKey();
       setIsPaymentModalOpen(false);
@@ -556,6 +567,17 @@ export const CustomersView: React.FC = () => {
                   <option value="BANK_TRANSFER">تحويل بنكي / محفظة</option>
                 </select>
               </div>
+
+              {paymentData.paymentType === 'BANK_TRANSFER' && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">الحساب البنكي المستلم *</label>
+                  <select required value={paymentData.bankAccountId} onChange={(e) => setPaymentData({ ...paymentData, bankAccountId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                    <option value="">اختر الحساب البنكي</option>
+                    {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+                  </select>
+                  {bankAccounts.length === 0 && <p className="mt-1 text-rose-600">لا توجد حسابات بنكية متاحة بصلاحياتك.</p>}
+                </div>
+              )}
 
               <div>
                 <label htmlFor="customer-payment-notes" className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>

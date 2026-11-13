@@ -131,4 +131,28 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
     SELECT COUNT(*) AS count FROM inventory_transactions
     WHERE reference_type = 'SPECIAL_STOCK_SALE_VOID' AND reference_id = ?
   `, [invoiceItem.id])[0]?.count, 1, 'Invoice reversal is linked to the original discounted sale line');
+
+  const returnedSale = sales.createSale({
+    customerId: customerId!, warehouseId,
+    items: [{ productId, specialStockId: source.id, soldBy: 'M2', uom: 'M2', quantity: 1,
+      quantityM2: 1, boxesCount: 0, piecesCount: 0, unitPrice: 15 }],
+    paidAmount: 15, paymentType: 'CASH',
+  });
+  const returnedSaleItem = db.query<any>('SELECT id FROM sales_invoice_items WHERE invoice_id=?', [returnedSale.id])[0];
+  const returned = sales.returnSale(returnedSale.id, [{
+    productId, quantityM2: 1, boxesCount: 1, unitPrice: 15, unitCost: 10,
+    reason: 'Return to discounted source', specialStockId: source.id, disposition: 'SPECIAL_STOCK',
+  }], false);
+  assert.equal(returned.totalAmount, 15);
+  assert.equal(db.query<{ remaining: number }>(
+    'SELECT remaining_quantity_m2 AS remaining FROM inventory_special_stocks WHERE id = ?', [source.id]
+  )[0]?.remaining, 4);
+  assert.equal(db.query<{ quantityM2: number }>(
+    'SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
+    [productId, warehouseId]
+  )[0]?.quantityM2, ordinaryStockBeforeSale, 'Returning discounted stock does not change ordinary stock');
+  assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM inventory_transactions
+    WHERE reference_type='SPECIAL_STOCK_RETURN' AND reference_id=?`, [source.id])[0]?.count, 1);
+  assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM inventory_transactions
+    WHERE reference_type='SPECIAL_STOCK_RETURN_HOLD' AND reference_id=?`, [returnedSaleItem.id])[0]?.count, 0);
 });

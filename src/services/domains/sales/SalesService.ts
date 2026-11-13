@@ -92,10 +92,11 @@ export class SalesService {
     shiftId?: string,
     notes = '',
     idempotencyKey?: string,
-    paymentDate?: string
+    paymentDate?: string,
+    bankAccountId?: string
   ): CustomerPayment {
     ModuleRegistryService.assertModuleEnabled('sales');
-    return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes, idempotencyKey, paymentDate);
+    return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes, idempotencyKey, paymentDate, bankAccountId);
   }
 
   /** Record one receipt allocated across several open invoices in one transaction. */
@@ -109,6 +110,7 @@ export class SalesService {
     notes = '',
     shiftId?: string,
     idempotencyKey?: string,
+    bankAccountId?: string,
   ): { groupId: string; total: number; receipts: string[] } {
     ModuleRegistryService.assertModuleEnabled('sales');
     return recordCustomerPaymentAllocationsEntry(
@@ -122,6 +124,7 @@ export class SalesService {
       notes,
       shiftId,
       idempotencyKey,
+      bankAccountId,
     );
   }
 
@@ -145,6 +148,7 @@ export class SalesService {
       registerId?: string;
       shiftId?: string;
       refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
+      bankAccountId?: string;
       idempotencyKey?: string;
     } = {}
   ): SalesReturn {

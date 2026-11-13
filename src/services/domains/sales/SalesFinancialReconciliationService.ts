@@ -150,7 +150,7 @@ export class SalesFinancialReconciliationService {
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${ledgerScope.clause} AND a.code = '5101'
+      WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${ledgerScope.clause} AND a.code IN ('5101', '5102')
         AND (
           (e.reference_type = 'SALES_INVOICE' AND EXISTS (
             SELECT 1 FROM sales_invoices si

@@ -464,6 +464,11 @@ export class WarrantyClaimService {
     let claimNumber = '';
 
     this.db.executeTransaction((db) => {
+      const currentEligible = this.computeEligibleItems(input.invoiceId, months)
+        .find((item) => item.productId === input.productId);
+      if (!currentEligible || quantity > currentEligible.availableQuantity) {
+        throw new Error(`Eligible warranty quantity changed; available quantity is ${currentEligible?.availableQuantity ?? 0}.`);
+      }
       claimNumber = db.nextNumber('WCLM');
       db.run(
         `INSERT INTO customer_warranty_claims (

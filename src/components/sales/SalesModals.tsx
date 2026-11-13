@@ -12,6 +12,7 @@ import { Modal, InfoBox, SummaryRow } from './SalesUi';
 import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
+import type { BankAccount } from '../../types/finance';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 
@@ -39,6 +40,9 @@ export interface SalesModalsProps {
   setPayAmount: (value: string) => void;
   payType: PaymentType;
   setPayType: (value: PaymentType) => void;
+  payBankAccountId: string;
+  setPayBankAccountId: (value: string) => void;
+  bankAccounts: BankAccount[];
   payNotes: string;
   setPayNotes: (value: string) => void;
   submitPayment: (event: React.FormEvent) => void;
@@ -85,6 +89,9 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
   setPayAmount,
   payType,
   setPayType,
+  payBankAccountId,
+  setPayBankAccountId,
+  bankAccounts,
   payNotes,
   setPayNotes,
   submitPayment,
@@ -304,6 +311,16 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
                 </select>
               </div>
             </div>
+            {payType === 'BANK_TRANSFER' && (
+              <div>
+                <label htmlFor="sales-payment-bank-account" className="block text-xs font-bold text-slate-700 mb-1">الحساب البنكي المستلم *</label>
+                <select id="sales-payment-bank-account" required value={payBankAccountId} onChange={(e) => setPayBankAccountId(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                  <option value="">اختر الحساب البنكي</option>
+                  {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+                </select>
+                {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية نشطة.</p>}
+              </div>
+            )}
             <div>
               <label htmlFor="sales-payment-notes" className="block text-xs font-bold text-slate-700 mb-1">ملاحظات</label>
               <input id="sales-payment-notes" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="اختياري" />

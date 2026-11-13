@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Trash2, Loader2, Save, AlertTriangle } from 'lucide-react';
 import { CustomerService } from '../../services/domains/customers/CustomerService';
 import { SalesService } from '../../services/domains/sales/SalesService';
@@ -12,6 +12,8 @@ import { LoadErrorNotice, ModalShell } from './DailyModalShared';
 import { useRegisters } from '../../hooks/domains/daily/useRegisters';
 import { fmt, input, label } from './DailyModalUtils';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
+import { FinanceEnterpriseService } from '../../services/domains/finance/FinanceEnterpriseService';
+import type { BankAccount } from '../../types/finance';
 
 export type PaymentTarget =
   | { kind: 'sale'; id: string; branchId?: string; name: string; remaining: number }
@@ -24,12 +26,23 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
   const { registers, error: registersError } = useRegisters();
   const [amount, setAmount] = useState(String(target.remaining));
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const financeService = useMemo(() => new FinanceEnterpriseService(), []);
   const [registerId, setRegisterId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const availableRegisters = target.branchId
     ? registers.filter((register) => register.branchId === target.branchId)
     : registers;
+
+  useEffect(() => {
+    try {
+      const accounts = financeService.getBankAccounts().filter((account) => account.isActive);
+      setBankAccounts(accounts);
+      setBankAccountId(accounts[0]?.id || '');
+    } catch { setBankAccounts([]); }
+  }, [financeService]);
 
   useEffect(() => {
     if (availableRegisters.some((register) => register.id === registerId)) return;
@@ -46,11 +59,11 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
     setSaving(true);
     try {
       if (target.kind === 'sale') {
-        new SalesService().recordInvoicePayment(target.id, value, paymentType, registerId, undefined, notes, paymentKey.getKey());
+        new SalesService().recordInvoicePayment(target.id, value, paymentType, registerId, undefined, notes, paymentKey.getKey(), undefined, bankAccountId || undefined);
       } else if (target.kind === 'purchase') {
         new PurchaseService().recordPayment(target.id, value, paymentType, registerId, notes, paymentKey.getKey());
       } else {
-        new CustomerService().recordPayment(target.id, value, paymentType, registerId, undefined, notes, AuthService.getCurrentUser()?.id || 'usr_admin', undefined, paymentKey.getKey());
+        new CustomerService().recordPayment(target.id, value, paymentType, registerId, undefined, notes, AuthService.getCurrentUser()?.id || 'usr_admin', undefined, paymentKey.getKey(), bankAccountId || undefined);
       }
       paymentKey.resetKey();
       toast.success('تم تسجيل الدفعة');
@@ -86,13 +99,22 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
             </select>
           </div>
         </div>
-        <div>
+        {paymentType !== 'BANK_TRANSFER' && <div>
           <label htmlFor="payment-register" className={label}>الخزينة</label>
           <select id="payment-register" value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={input} disabled={Boolean(registersError) || availableRegisters.length === 0}>
             <option value="">اختر الخزينة</option>
             {availableRegisters.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}</option>)}
           </select>
-        </div>
+        </div>}
+        {paymentType === 'BANK_TRANSFER' && target.kind === 'purchase' && (
+          <div>
+            <label htmlFor="payment-bank-account" className={label}>Bank account</label>
+            <select id="payment-bank-account" value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)} className={input}>
+              <option value="">Select bank account</option>
+              {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor="payment-notes" className={label}>ملاحظات</label>
           <input id="payment-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />

@@ -39,6 +39,10 @@ test('purchase order partial and full receipts post only received stock and pres
 
 test('one customer receipt allocates across several invoices atomically', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  const bankAccountId = 'bank_receivable_test';
+  const bankGlId = db.query<any>(`SELECT id FROM chart_of_accounts WHERE code='1102'`)[0].id;
+  db.run(`INSERT INTO bank_accounts (id,account_name,bank_name,account_number,opening_balance,current_balance,gl_account_id,branch_id,is_active)
+    VALUES (?,?,?,?,0,0,?,NULL,1)`, [bankAccountId,'Test receipt account','Test Bank','BANK-RCV-001',bankGlId]);
   const pid = 'prod_alloc_test'; const customer = new CustomerService().createCustomer({ name:'عميل توزيع', phone:'01000000002', customerType:'RETAIL', creditLimit:0, paymentTermsDays:15 });
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
     [pid,'SKU-ALLOC','BAR-ALLOC','صنف توزيع','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,5,10,9,0,0]);
@@ -47,11 +51,19 @@ test('one customer receipt allocates across several invoices atomically', async 
   const makeInvoice = () => sales.createSale({ customerId:customer.id, warehouseId:'wh_main', items:[{productId:pid,soldBy:'M2',quantityM2:2,boxesCount:0,piecesCount:0,unitPrice:10}], paidAmount:0, paymentType:'CREDIT' });
   const first = makeInvoice(); const second = makeInvoice();
   assert.ok(db.query<any>(`SELECT due_date FROM sales_invoices WHERE id=?`,[first.id])[0].dueDate,'invoice due date follows the customer terms');
+  assert.throws(
+    () => sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:1}],'CASH','cr_main','2026-99-99'),
+    /تاريخ الدفعة غير صحيح/
+  );
   const receiptKey='receipt-key-alloc-test';
-  const result = sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey);
+  const result = sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey,bankAccountId);
   assert.equal(result.total,DATA_INTEGRITY_BASELINE.customerAllocation.totalReceipt); assert.equal(result.receipts.length,DATA_INTEGRITY_BASELINE.customerAllocation.paymentRows);
-  const replay = sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:999}],'CASH','cr_main','2026-10-24','TR-42','',undefined,receiptKey);
+  const replay = sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:second.id,amount:10},{invoiceId:first.id,amount:5}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey,bankAccountId);
   assert.deepEqual(replay,result,'replaying the same receipt key cannot post duplicate allocations');
+  assert.throws(() => sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:15}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey,bankAccountId), /different customer payment request/);
+  assert.throws(() => sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'CASH','cr_main','2026-10-24','TR-42','',undefined,receiptKey), /different customer payment request/);
+  const otherCustomer = new CustomerService().createCustomer({ name:'Ø¹Ù…ÙŠÙ„ Ø¢Ø®Ø±', phone:'01000000003', customerType:'RETAIL', creditLimit:0, paymentTermsDays:15 });
+  assert.throws(() => sales.recordCustomerPaymentAllocations(otherCustomer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey), /different customer payment request/);
   assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[first.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[0]);
   assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[1]);
   assert.equal(db.query<any>(`SELECT COUNT(*) AS n FROM customer_payments WHERE payment_group_id=?`,[result.groupId])[0].n,DATA_INTEGRITY_BASELINE.customerAllocation.paymentRows);
@@ -62,10 +74,10 @@ test('one customer receipt allocates across several invoices atomically', async 
   assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,20);
   assert.equal(db.query<any>(`SELECT COUNT(*) AS n FROM customer_payments WHERE payment_group_id=?`,[result.groupId])[0].n,0);
   const customerService=new CustomerService();
-  const generalPayment=customerService.recordPayment(customer.id,5,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key');
-  const genericReplay=customerService.recordPayment(customer.id,5,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key');
+  const generalPayment=customerService.recordPayment(customer.id,5,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key',bankAccountId);
+  const genericReplay=customerService.recordPayment(customer.id,5,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key',bankAccountId);
   assert.equal(genericReplay.id,generalPayment.id);
-  assert.throws(() => customerService.recordPayment(customer.id,6,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key'), /already used for a different request/);
+  assert.throws(() => customerService.recordPayment(customer.id,6,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key',bankAccountId), /already used for a different request/);
   customerService.deletePayment(generalPayment.id);
   assert.throws(() => sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:999}],'CASH','cr_main'));
 });

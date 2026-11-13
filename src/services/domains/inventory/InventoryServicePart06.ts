@@ -1,4 +1,5 @@
 import type { InventoryTransactionType } from '../../../types';
+import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { InventoryCostingService } from './InventoryCostingService';

@@ -105,17 +105,24 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
   PermissionService.require(actor, 'ui.sales.invoices.void');
   const inv = ctx.getInvoiceById(invoiceId);
   if (!inv) throw new Error('الفاتورة غير موجودة.');
-  const returnsCount = ctx.db.query<{ count: number }>(
-    'SELECT COUNT(*) as count FROM sales_returns WHERE original_invoice_id = ?',
-    [invoiceId]
-  )[0]?.count ?? 0;
-  if (returnsCount > 0) {
-    throw new Error('لا يمكن إلغاء فاتورة لها مرتجعات مسجلة. سجّل مرتجعاً للكميات المتبقية بدلاً من ذلك.');
-  }
   if (inv.invoiceStatus === 'VOID') throw new Error('الفاتورة ملغاة بالفعل.');
   if (!reason || !reason.trim()) throw new Error('يرجى إدخال سبب إلغاء الفاتورة.');
 
   return ctx.db.executeTransaction((sqliteDb) => {
+    const currentState = sqliteDb.getDatabase().exec(
+      `SELECT invoice_status, paid_amount, remaining_amount FROM sales_invoices WHERE id = ?`, [invoiceId]
+    )[0]?.values[0];
+    if (!currentState || String(currentState[0]) === 'VOID') throw new Error('الفاتورة ملغاة بالفعل أو غير متاحة.');
+    const returnsCount = sqliteDb.query<{ count: number }>(
+      'SELECT COUNT(*) as count FROM sales_returns WHERE original_invoice_id = ?', [invoiceId]
+    )[0]?.count ?? 0;
+    if (returnsCount > 0) {
+      throw new Error('لا يمكن إلغاء فاتورة لها مرتجعات مسجلة. سجّل مرتجعاً للكميات المتبقية بدلاً من ذلك.');
+    }
+    if (Number(currentState[1]) !== Number(inv.paidAmount)
+      || Number(currentState[2]) !== Number(inv.remainingAmount)) {
+      throw new Error('تغير رصيد الفاتورة أثناء الإلغاء؛ أعد المحاولة.');
+    }
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const linkedPayments = sqliteDb.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?
@@ -178,30 +185,29 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     const settledDeposits = sqliteDb.query<{ amount: number }>(
       `SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE invoice_id = ?`, [invoiceId]
     )[0]?.amount ?? 0;
-    if (settledDeposits > 0) {
-      const depositReceipts = sqliteDb.query<{ amount: number; paymentMethod: string; registerId: string | null; shiftId: string | null; bankAccountId: string | null }>(
-        `SELECT amount, payment_method AS paymentMethod, register_id AS registerId, shift_id AS shiftId, bank_account_id AS bankAccountId FROM order_deposits WHERE invoice_id = ?`, [invoiceId]
-      );
-      for (const receipt of depositReceipts) {
-        if (receipt.paymentMethod === 'CASH' && receipt.registerId) {
-          sqliteDb.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [receipt.amount, receipt.registerId]);
-          if (receipt.shiftId) sqliteDb.run('UPDATE cash_shifts SET total_customer_payments = MAX(0, total_customer_payments - ?) WHERE id = ?', [receipt.amount, receipt.shiftId]);
-        }
-        if (receipt.paymentMethod === 'BANK_TRANSFER' && receipt.bankAccountId) {
-          sqliteDb.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [receipt.amount, receipt.bankAccountId]);
-        }
-      }
-    }
 
     // عكس قيد البيع: نتبع بالضبط الحسابات التي خُصمت عند الإنشاء (أطر الدفع المسجلة)
-    const splitPaymentsForLedger = sqliteDb.query<{ method: string; amount: number }>(
-      `SELECT method, COALESCE(SUM(amount), 0) AS amount
-       FROM sales_invoice_payments WHERE invoice_id = ? AND method != 'CREDIT' GROUP BY method`,
+    const splitPaymentsForLedger = sqliteDb.query<{ method: string; amount: number; bankAccountId: string | null }>(
+      `SELECT method, COALESCE(SUM(amount), 0) AS amount, bank_account_id AS bankAccountId
+       FROM sales_invoice_payments WHERE invoice_id = ? AND method != 'CREDIT' GROUP BY method, bank_account_id`,
       [invoiceId]
     );
     const reversedPaymentLines = splitPaymentsForLedger.length > 0
-      ? splitPaymentsForLedger.map((row) => ({ accountCode: paymentAccountCode(row.method), debit: 0, credit: round2(row.amount) }))
+      ? splitPaymentsForLedger.map((row) => ({
+          accountCode: row.method === 'BANK_TRANSFER' && row.bankAccountId
+            ? sqliteDb.query<{ code: string }>(
+                `SELECT coa.code AS code FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ?`,
+                [row.bankAccountId]
+              )[0]?.code || paymentAccountCode(row.method)
+            : paymentAccountCode(row.method),
+          debit: 0, credit: round2(row.amount),
+        }))
       : (inv.paidAmount > 0 ? [{ accountCode: paymentAccountCode(inv.paymentType), debit: 0, credit: inv.paidAmount }] : []);
+    for (const row of splitPaymentsForLedger) {
+      if (row.method === 'BANK_TRANSFER' && row.bankAccountId) {
+        sqliteDb.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [row.amount, row.bankAccountId]);
+      }
+    }
     const inventoryCost = trackInventory
       ? round2(inv.items.filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
         .reduce((sum, item) => sum + Number(item.totalCost || 0), 0)) : 0;
@@ -227,6 +233,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
               ...reversedPaymentLines,
               ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
               ...(settledDeposits > 0 ? [{ accountCode: '1103', debit: round2(settledDeposits), credit: 0 }, { accountCode: '2106', debit: 0, credit: round2(settledDeposits) }] : []),
+              ...(settledDeposits > 0 ? [{ accountCode: '1103', debit: 0, credit: round2(settledDeposits) }] : []),
               ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: inventoryCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: inventoryCost }] : []),
               ...(serviceCost > 0 ? [{ accountCode: '2105', debit: serviceCost, credit: 0 }, { accountCode: '5102', debit: 0, credit: serviceCost }] : []),
             ],
@@ -257,7 +264,12 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
       actorId: actor.id,
     });
 
-    sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
+    sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND invoice_status != 'VOID'
+      AND NOT EXISTS (SELECT 1 FROM sales_returns WHERE original_invoice_id = ?)`, [invoiceId, invoiceId]);
+    if ((sqliteDb.getDatabase() as any).getRowsModified() !== 1) {
+      throw new Error('تغيرت حالة الفاتورة أو سُجل مرتجع أثناء الإلغاء؛ أعد المحاولة.');
+    }
     if (inv.orderId) {
       const orderDeposits = sqliteDb.query<{ amount: number }>('SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [inv.orderId])[0]?.amount ?? 0;
       sqliteDb.run('UPDATE order_deposits SET invoice_id = NULL WHERE invoice_id = ?', [invoiceId]);

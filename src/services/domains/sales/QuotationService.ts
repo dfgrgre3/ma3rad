@@ -301,6 +301,7 @@ export class QuotationService {
     }
     const subtotal = round2([...prepared, ...preparedServices].reduce((sum, item) => sum + item.totalPrice, 0));
     const headerDiscount = round2(Math.max(0, input.discountAmount || 0));
+    if (headerDiscount > subtotal + 0.009) throw new Error('Quotation discount cannot exceed the subtotal.');
     const taxAmount = round2(Math.max(0, input.taxAmount || 0));
     const totalAmount = round2(Math.max(0, subtotal - headerDiscount + taxAmount));
     const validDays = Math.max(1, Math.min(365, Number(input.validDays) || 15));
@@ -374,6 +375,7 @@ export class QuotationService {
     }
     const subtotal = round2([...prepared, ...preparedServices].reduce((sum, item) => sum + item.totalPrice, 0));
     const headerDiscount = round2(Math.max(0, input.discountAmount || 0));
+    if (headerDiscount > subtotal + 0.009) throw new Error('Quotation discount cannot exceed the subtotal.');
     const taxAmount = round2(Math.max(0, input.taxAmount || 0));
     const totalAmount = round2(Math.max(0, subtotal - headerDiscount + taxAmount));
     const validDays = Math.max(1, Math.min(365, Number(input.validDays) || 15));

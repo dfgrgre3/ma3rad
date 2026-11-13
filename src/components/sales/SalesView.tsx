@@ -22,6 +22,8 @@ import { openWhatsAppChat } from '../../utils/shared/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
+import { FinanceEnterpriseService } from '../../services/domains/finance/FinanceEnterpriseService';
+import type { BankAccount } from '../../types/finance';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
 
@@ -52,6 +54,7 @@ export const SalesView: React.FC = () => {
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
+  const financeEnterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
   const user = AuthService.getCurrentUser();
   const canVoid = PermissionService.can(user, 'ui.sales.invoices.void');
   const canCollect = PermissionService.can(user, 'ui.customers.detail.payment');
@@ -95,6 +98,8 @@ export const SalesView: React.FC = () => {
   const [payTarget, setPayTarget] = useState<(SalesInvoice & { items: SalesInvoiceItem[] }) | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payType, setPayType] = useState<PaymentType>('CASH');
+  const [payBankAccountId, setPayBankAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [payNotes, setPayNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
@@ -117,10 +122,13 @@ export const SalesView: React.FC = () => {
     try {
       setCustomers(customerService.getAllCustomers());
       setWarehouses(inventoryService.getAllWarehouses());
+      const accounts = financeEnterpriseService.getBankAccounts().filter((account) => account.isActive);
+      setBankAccounts(accounts);
+      setPayBankAccountId(accounts[0]?.id || '');
     } catch {
       /* reference data is optional for the list screen */
     }
-  }, [customerService, inventoryService]);
+  }, [customerService, inventoryService, financeEnterpriseService]);
 
   const applyPreset = (preset: 'today' | 'yesterday' | 'week' | 'month' | 'clear') => {
     const today = new Date();
@@ -248,7 +256,7 @@ export const SalesView: React.FC = () => {
     if (amount > payTarget.remainingAmount) return alert('المبلغ أكبر من المتبقي على الفاتورة.');
     setSaving(true);
     try {
-      salesService.recordInvoicePayment(payTarget.id, amount, payType, undefined, undefined, payNotes);
+      salesService.recordInvoicePayment(payTarget.id, amount, payType, undefined, undefined, payNotes, undefined, undefined, payBankAccountId || undefined);
       setPayTarget(null);
       refreshSelected(payTarget.id);
       load();
@@ -601,6 +609,9 @@ export const SalesView: React.FC = () => {
         setPayAmount={setPayAmount}
         payType={payType}
         setPayType={setPayType}
+        payBankAccountId={payBankAccountId}
+        setPayBankAccountId={setPayBankAccountId}
+        bankAccounts={bankAccounts}
         payNotes={payNotes}
         setPayNotes={setPayNotes}
         submitPayment={submitPayment}
