@@ -210,6 +210,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'approvals.approve', name: 'اعتماد الطلبات', module: 'APPROVALS' },
   { code: 'approvals.reject', name: 'رفض الطلبات', module: 'APPROVALS' },
   { code: 'approvals.cancel', name: 'إلغاء طلب اعتماد', module: 'APPROVALS' },
+  { code: 'approvals.settings.manage', name: 'إدارة سياسات الموافقات', module: 'APPROVALS' },
 
   // Notifications
   { code: 'notifications.view', name: 'عرض الإشعارات', module: 'NOTIFICATIONS' },
@@ -605,6 +606,7 @@ const ALL = PERMISSIONS.map((p) => p.code);
 const MANAGER_RESTRICTED = new Set([
   ...ALL.filter((code) => code.endsWith('.delete')),
   'roles.manage',
+  'approvals.settings.manage',
   'users.create',
   'users.update',
   'users.delete',

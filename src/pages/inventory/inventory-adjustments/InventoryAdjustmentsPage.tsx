@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, FileText, Plus, Search, Wrench } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -115,6 +116,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   const [qtyM2, setQtyM2] = useState(0);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     loadData();
@@ -229,6 +231,18 @@ export const InventoryAdjustmentsPage: React.FC = () => {
     adjustment.warehouse.includes(search) ||
     adjustment.reason.includes(search)
   );
+  const pendingCount = useMemo(() => adjustments.filter((adjustment) => adjustment.status === 'PENDING_APPROVAL').length, [adjustments]);
+  const requestedAdjustmentId = searchParams.get('adjustmentId');
+
+  useEffect(() => {
+    if (!requestedAdjustmentId || !adjustments.length) return;
+    const requested = adjustments.find((adjustment) => adjustment.id === requestedAdjustmentId);
+    if (requested) {
+      setSearch(requested.code);
+      handleViewDetails(requested);
+      setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('adjustmentId'); return next; }, { replace: true });
+    }
+  }, [requestedAdjustmentId, adjustments]);
   const fmt = (value: number) => new Intl.NumberFormat('ar-EG').format(Math.round(value)) + ' ج';
   const selectedProduct = products.find((product) => product.id === selectedProductId);
   const selectedUnit = selectedProduct ? getStockQuantityLabel(selectedProduct) : 'م²';
@@ -253,6 +267,14 @@ export const InventoryAdjustmentsPage: React.FC = () => {
             <Plus className="w-4 h-4" />
             طلب تسوية جديد
           </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-amber-50 px-6 py-2 text-xs text-amber-900">
+        <span className="rounded-full bg-amber-200 px-2 py-1 font-black">{pendingCount}</span>
+        <span>طلب تسوية بانتظار الاعتماد أو الترحيل</span>
+        {pendingCount > 0 && (!canApprove || !canPost) && (
+          <span className="text-amber-800">{!canApprove && 'اعتماد: تحتاج صلاحية inventory.adjustment.approve. '}{!canPost && 'ترحيل: تحتاج صلاحية inventory.adjustment.post.'}</span>
         )}
       </div>
 

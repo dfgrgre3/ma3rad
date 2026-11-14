@@ -28,6 +28,7 @@ import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { parseBusinessConfiguration } from '../../config/businessProfiles';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
+import { useToast } from '../ui/Toast';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 import { FilterToolbar } from '../ui/FilterToolbar';
 import { FormField } from '../ui/FormField';
@@ -239,6 +240,7 @@ export const ProductsView: React.FC = () => {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
+  const toast = useToast();
   const permissionUser = AuthService.getCurrentUser();
   // صلاحيات دقيقة لكل زر، مع توافق خلفي تلقائي مع products.* القديمة.
   const canCreateProduct = PermissionService.can(permissionUser, 'ui.products.catalog.create');
@@ -357,8 +359,8 @@ export const ProductsView: React.FC = () => {
     const m2 = Number(p.totalStockM2 ?? 0);
     if (p.productType === 'GENERAL') return {
       m2,
-      boxes: p.baseUnit === 'BOX' ? m2 : 0,
-      pieces: p.baseUnit === 'PIECE' ? m2 : 0,
+      boxes: Number(p.totalStockBoxes ?? (p.baseUnit === 'BOX' ? m2 : 0)),
+      pieces: Number(p.totalStockPieces ?? (p.baseUnit === 'PIECE' ? m2 : 0)),
     };
     const metersPerBox = p.metersPerBox || 0;
     const boxes = metersPerBox > 0 ? m2 / metersPerBox : 0;
@@ -977,11 +979,11 @@ export const ProductsView: React.FC = () => {
     setStockSaving(true);
     try {
       const metersPerBox = stockProduct.metersPerBox || 0;
-      rows.forEach((row) => {
+      const adjustmentIds = rows.map((row) => {
         const quantity = stockProduct.productType === 'GENERAL'
           ? row.addBoxes
           : metersPerBox > 0 ? row.addBoxes * metersPerBox : row.addBoxes;
-        inventoryService.createAdjustment({
+        return inventoryService.createAdjustment({
           productId: stockProduct.id,
           warehouseId: row.warehouseId,
           type: 'ADD',
@@ -992,9 +994,10 @@ export const ProductsView: React.FC = () => {
       setStockProduct(null);
       loadProducts();
       loadStats();
-      alert(`تم إنشاء ${rows.length} طلب إضافة للمخزون، ويظهر الرصيد بعد اعتمادها وترحيلها.`);
+      toast.success(`تم إنشاء ${rows.length} طلب إضافة`, 'لن يتغير الرصيد حتى الاعتماد والترحيل.');
+      navigate(`/inventory/adjustments?adjustmentId=${encodeURIComponent(adjustmentIds[0])}`);
     } catch (err: any) {
-      alert(`تعذر إضافة الكمية: ${err?.message || err}`);
+      toast.error('تعذر إضافة الكمية', err?.message || String(err));
     } finally {
       setStockSaving(false);
     }

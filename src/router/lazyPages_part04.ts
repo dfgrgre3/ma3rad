@@ -36,6 +36,8 @@ export const DataImportPage = lazy(() => import('../pages/settings/data-import/D
 
 export const SettingsHubPage = lazy(() => import('../pages/settings/settings-hub/SettingsHubPage').then(m => ({ default: m.SettingsHubPage })));
 
+export const ApprovalSettingsPage = lazy(() => import('../pages/settings/approvals/ApprovalSettingsPage').then(m => ({ default: m.ApprovalSettingsPage })));
+
 export const CentralActivationView = lazy(() => import('../components/auth/CentralActivationView').then(m => ({ default: m.CentralActivationView })));
 
 export const UsersView = lazy(() => import('../components/admin/UsersView').then(m => ({ default: m.UsersView })));

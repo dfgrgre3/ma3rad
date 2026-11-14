@@ -14,7 +14,7 @@ export class ApprovalService {
     return this.queries.getRequests(status, search, type);
   }
 
-  getStats(): { pending: number; approved: number; rejected: number } {
+  getStats(): { pending: number; approved: number; rejected: number; cancelled: number; expired: number } {
     return this.queries.getStats();
   }
 

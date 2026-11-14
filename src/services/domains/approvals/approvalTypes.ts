@@ -1,4 +1,4 @@
-export type ApprovalType =
+﻿export type ApprovalType =
   | 'DISCOUNT' | 'PRICE_CHANGE' | 'SALES_RETURN' | 'PURCHASE_RETURN'
   | 'STOCK_ADJUSTMENT' | 'PURCHASE_ORDER' | 'EXPENSE' | 'CREDIT_LIMIT' | 'LEAVE' | 'OTHER';
 
@@ -10,6 +10,7 @@ export interface ApprovalRequest {
   referenceId?: string | null;
   title: string;
   description?: string | null;
+  payload?: string | null;
   requestedValue?: number | null;
   currentValue?: number | null;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -21,6 +22,8 @@ export interface ApprovalRequest {
   decidedAt?: string | null;
   decisionNotes?: string | null;
   createdAt: string;
+  approvalCount?: number;
+  decisionHistory?: string;
 }
 
 export interface CreateApprovalRequestInput {
@@ -33,4 +36,7 @@ export interface CreateApprovalRequestInput {
   referenceType?: string;
   referenceId?: string;
   branchId?: string;
+  operationCode?: string;
+  details?: Record<string, unknown>;
 }
+

@@ -48,7 +48,7 @@ const REQUIRED_PERMISSION: Record<string, string> = {
   transfers: 'inventory.transfer',
   counts: 'inventory.count',
   valuation: 'inventory.view',
-  adjustments: 'inventory.adjust',
+  adjustments: 'inventory.view',
   'stock-reservations': 'inventory.view',
   'reorder-planning': 'inventory.view',
   locations: 'inventory.view',

@@ -26,6 +26,38 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 CREATE INDEX IF NOT EXISTS idx_approvals_status ON approval_requests(status);
 CREATE INDEX IF NOT EXISTS idx_approvals_type ON approval_requests(request_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_approvals_reference_request_type
+  ON approval_requests(reference_type, reference_id, request_type)
+  WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS approval_policies (
+  operation_code TEXT PRIMARY KEY,
+  mode TEXT NOT NULL DEFAULT 'APPROVAL' CHECK(mode IN ('DIRECT', 'APPROVAL', 'DISABLED')),
+  executor_roles TEXT NOT NULL DEFAULT '[]',
+  approver_roles TEXT NOT NULL DEFAULT '[]',
+  min_approvals INTEGER NOT NULL DEFAULT 1 CHECK(min_approvals >= 1),
+  allow_self_approval INTEGER NOT NULL DEFAULT 0 CHECK(allow_self_approval IN (0, 1)),
+  max_value REAL,
+  expires_after_hours INTEGER,
+  approval_mode TEXT NOT NULL DEFAULT 'SINGLE' CHECK(approval_mode IN ('SINGLE', 'MULTI')),
+  scope_type TEXT NOT NULL DEFAULT 'BRANCH' CHECK(scope_type IN ('BRANCH', 'WAREHOUSE', 'GLOBAL')),
+  updated_by TEXT,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS approval_decisions (
+  id TEXT PRIMARY KEY,
+  approval_request_id TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK(decision IN ('APPROVED', 'REJECTED')),
+  decided_by TEXT NOT NULL,
+  notes TEXT,
+  decided_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (approval_request_id) REFERENCES approval_requests(id) ON DELETE CASCADE,
+  FOREIGN KEY (decided_by) REFERENCES users(id),
+  UNIQUE (approval_request_id, decided_by)
+);
+CREATE INDEX IF NOT EXISTS idx_approval_decisions_request ON approval_decisions(approval_request_id, decided_at);
 
 -- 31. AUTH: ROLES, SESSIONS, LOGIN HISTORY
 -- users.role stays as the coarse label; roles/role_permissions let an admin

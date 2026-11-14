@@ -6,6 +6,8 @@ import { AppConfigurationPage } from '../app-configuration/AppConfigurationPage'
 import { ConfigurationStudioPage } from '../configuration-studio/ConfigurationStudioPage';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import { ApprovalSettingsPage } from '../approvals/ApprovalSettingsPage';
+import { Link } from 'react-router-dom';
 
 const ADMIN_TABS = ['general', 'business', 'branding', 'customization', 'invoice', 'inventory', 'operations', 'security', 'backup'];
 
@@ -168,6 +170,9 @@ export const SettingsHubPage: React.FC = () => {
   if (requested === 'configStudio') {
     return <ConfigurationStudioPage />;
   }
+  if (requested === 'approvals') {
+    return <ApprovalSettingsPage />;
+  }
 
   const initial = requested && ADMIN_TABS.includes(requested) ? (requested as any) : 'general';
   const handleAdminTabChange = (tab: string) => {
@@ -185,6 +190,11 @@ export const SettingsHubPage: React.FC = () => {
       />
 
       <UpdateSettings />
+
+      <Link to="/settings/approvals" className="erp-card block border border-amber-200 bg-amber-50/60 hover:bg-amber-50">
+        <span className="font-bold">إعدادات الاعتمادات والموافقات</span>
+        <span className="mt-1 block text-sm text-[var(--cerami-muted)]">إدارة سياسة إضافة المخزون والأدوار المعتمدة.</span>
+      </Link>
 
       <div className="erp-card erp-card--flush p-2">
         <AdminSettingsTab initialTab={initial} onTabChange={handleAdminTabChange} />

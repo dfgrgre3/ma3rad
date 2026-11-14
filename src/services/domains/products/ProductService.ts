@@ -1,4 +1,4 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
+﻿import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import type { Product, WarehouseStock } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
@@ -175,9 +175,19 @@ export class ProductService {
     return this.db.queryPage<Product>(
       `SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName,
               COALESCE(st.qty, 0) as totalStockM2,
-              CASE WHEN p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box ELSE 0 END as totalStockBoxes,
-              CASE WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
-                   THEN (COALESCE(st.qty, 0) / p.meters_per_box) * p.pieces_per_box ELSE 0 END as totalStockPieces
+              CASE
+                WHEN p.product_type = 'GENERAL' AND p.base_unit = 'BOX' THEN COALESCE(st.qty, 0)
+                WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
+                WHEN p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box
+                ELSE 0
+              END as totalStockBoxes,
+              CASE
+                WHEN p.product_type = 'GENERAL' AND p.base_unit = 'PIECE' THEN COALESCE(st.qty, 0)
+                WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
+                WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
+                  THEN (COALESCE(st.qty, 0) / p.meters_per_box) * p.pieces_per_box
+                ELSE 0
+              END as totalStockPieces
        ${fromSql} ORDER BY ${orderBy}`,
       `SELECT COUNT(*) as total_items ${countFromSql}`,
       params, page, pageSize, countParams,
@@ -567,3 +577,6 @@ export class ProductService {
     };
   }
 }
+
+
+

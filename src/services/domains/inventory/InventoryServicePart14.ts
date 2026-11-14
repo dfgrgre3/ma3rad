@@ -10,6 +10,10 @@ import { InventoryCostingService } from './InventoryCostingService';
 import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { InventoryServicePart13 } from './InventoryServicePart13';
 import { StockTrackedProductPolicy } from './StockTrackedProductPolicy';
+import { ApprovalPolicyService } from '../approvals/ApprovalPolicyService';
+import { ApprovalRequestService } from '../approvals/ApprovalRequestService';
+import { registerApprovalEffect, registerApprovalRejectionEffect } from '../approvals/ApprovalEffectRegistry';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 
 type AdjustmentType = 'ADD' | 'SUBTRACT' | 'DAMAGE' | 'OPENING_BALANCE';
 type AdjustmentSign = 1 | -1;
@@ -107,6 +111,12 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
     this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
+    const policy = new ApprovalPolicyService().assertCanExecute('inventory.adjustment.create', actor);
+    if (actor.role !== 'ADMIN' && policy.mode === 'APPROVAL') ModuleRegistryService.assertModuleEnabled('approvals');
+    if (policy.mode === 'DISABLED') throw new Error('تم تعطيل إنشاء تسويات المخزون بواسطة سياسة الموافقات.');
+    const requiresApproval = actor.role !== 'ADMIN' && (
+      policy.mode === 'APPROVAL' || (policy.maxValue != null && input.quantity > policy.maxValue)
+    );
 
     if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
       throw new Error('يجب أن تكون كمية التسوية أكبر من صفر.');
@@ -141,6 +151,26 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         `adji_${uuidv4().substring(0, 8)}`, adjustmentId, currentProduct.id,
         currentProduct.name, input.quantity, input.notes?.trim() || null,
       ]);
+      const adjustmentNumberForApproval = adjustmentNumber;
+      if (requiresApproval) {
+        const existing = txDb.query<{ id: string }>(
+          `SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND request_type = 'STOCK_ADJUSTMENT'`,
+          [adjustmentId]
+        )[0];
+        if (existing) throw new Error('طلب موافقة هذه التسوية موجود بالفعل.');
+        const approval = new ApprovalRequestService();
+        approval.createInventoryAdjustmentRequest({
+          id: adjustmentId,
+          adjustmentNumber: adjustmentNumberForApproval,
+          warehouseId: input.warehouseId,
+          productName: currentProduct.name,
+          productId: currentProduct.id,
+          quantity: input.quantity,
+          reason: input.reason.trim(),
+          branchId: txDb.query<{ branchId: string | null }>('SELECT branch_id AS branchId FROM warehouses WHERE id = ?', [input.warehouseId])[0]?.branchId ?? null,
+          expiresAfterHours: policy.expiresAfterHours,
+        }, actor, txDb);
+      }
       this.recordPostedAdjustmentAudit(txDb, actor.id, actor.fullName, adjustmentId, 'CREATE', null, {
         status: 'PENDING_APPROVAL',
         type: input.type,
@@ -148,9 +178,76 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         quantity: input.quantity,
         warehouseId: input.warehouseId,
       });
+      if (!requiresApproval) this.approveAndPostAdjustmentInTransaction(txDb, adjustmentId, actor, true, true);
     });
 
     return adjustmentId;
+  }
+
+  public approveAndPostAdjustmentInTransaction(db: DatabaseManager, adjustmentId: string, actor: ReturnType<typeof AuthService.requireAuth>, approve: boolean, trustedDirectExecution = false): string {
+    const current = this.getAdjustmentHeader(db, adjustmentId);
+    if (!current || current.status !== 'PENDING_APPROVAL' || current.approvalStatus !== 'PENDING') throw new Error('حالة التسوية لا تسمح بالاعتماد أو الترحيل.');
+    this.branchAccess.requireWarehouseAccess(current.warehouseId, actor);
+    if (approve && !trustedDirectExecution && current.createdBy === actor.id && actor.role !== 'ADMIN') throw new Error('لا يمكن لمنشئ التسوية اعتمادها.');
+    if (!approve) {
+      db.run(`UPDATE stock_adjustments SET approval_status = 'REJECTED', status = 'REJECTED' WHERE id = ? AND approval_status = 'PENDING'`, [adjustmentId]);
+      this.recordPostedAdjustmentAudit(db, actor.id, actor.fullName, adjustmentId, 'REJECT', null, { approvalStatus: 'REJECTED' });
+      return 'تم رفض إضافة المخزون دون تغيير الرصيد.';
+    }
+    db.run(`UPDATE stock_adjustments SET approval_status = 'APPROVED', approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ? AND approval_status = 'PENDING'`, [actor.id, adjustmentId]);
+    this.postAdjustmentInTransaction(db, adjustmentId, actor);
+    return 'تم اعتماد إضافة المخزون وترحيلها فعليًا.';
+  }
+
+  private postAdjustmentInTransaction(txDb: DatabaseManager, adjustmentId: string, actor: ReturnType<typeof AuthService.requireAuth>): void {
+    const current = this.getAdjustmentHeader(txDb, adjustmentId);
+    if (!current || current.status !== 'PENDING_APPROVAL' || current.approvalStatus !== 'APPROVED') throw new Error('حالة التسوية لا تسمح بالترحيل.');
+    const items = txDb.query<{ id: string; productId: string; quantity: number }>(
+      `SELECT id, product_id AS productId, quantity_m2 AS quantity FROM stock_adjustment_items WHERE adjustment_id = ?`, [adjustmentId]);
+    if (!items.length) throw new Error('لا تحتوي التسوية على بنود.');
+    let totalValue = 0;
+    for (const item of items) {
+      const product = this.getAdjustmentProduct(txDb, item.productId);
+      if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
+      this.validateAdjustmentStock(txDb, current.warehouseId, item.productId, current.adjustmentType, item.quantity);
+      const sign: AdjustmentSign = current.adjustmentType === 'ADD' || current.adjustmentType === 'OPENING_BALANCE' ? 1 : -1;
+      const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+      const fifoPlan = fifoEnabled && sign < 0 ? InventoryCostingService.planFifo(txDb, item.productId, current.warehouseId, item.quantity) : null;
+      const unitCost = Number(fifoPlan?.unitCost ?? product.costPrice ?? 0);
+      const itemValue = Math.round(Math.abs(item.quantity * unitCost) * 100) / 100;
+      const boxFactor = conversionFactor(product.baseUnit, 'BOX', product);
+      const boxesCount = boxFactor === null ? 0 : Number(fromBaseQuantity(item.quantity, 'BOX', product).toFixed(2));
+      const transactionId = `tx_${uuidv4().substring(0, 8)}`;
+      const transactionNumber = txDb.nextNumber('TX-ADJ');
+      const transactionType = sign > 0 ? 'ADJUSTMENT_ADD' : current.adjustmentType === 'DAMAGE' ? 'DAMAGE' : 'ADJUSTMENT_SUB';
+      this.applyPostedAdjustmentStock(txDb, item.productId, current.warehouseId, item.quantity * sign, actor.id);
+      txDb.run(`INSERT INTO inventory_transactions (
+        id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
+        unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, ?, CURRENT_TIMESTAMP)`, [
+        transactionId, transactionNumber, transactionType, item.productId, current.warehouseId,
+        item.quantity * sign, boxesCount * sign, unitCost, itemValue, adjustmentId,
+        `تسوية مخزنية (${current.reason})`, actor.id,
+      ]);
+      txDb.run(`UPDATE stock_adjustment_items SET boxes_count = ?, unit_cost = ?, total_value = ? WHERE id = ?`, [boxesCount, unitCost, itemValue, item.id]);
+      if (fifoPlan) InventoryCostingService.consumeFifo(txDb, transactionId, fifoPlan);
+      else if (fifoEnabled && sign > 0) InventoryCostingService.addLayer(txDb, {
+        productId: item.productId, warehouseId: current.warehouseId, sourceTransactionId: transactionId,
+        sourceType: 'INVENTORY_ADJUSTMENT', sourceId: adjustmentId, date: localDateString(), quantity: item.quantity, unitCost,
+      });
+      if (itemValue > 0) postLedgerEntry(txDb.getDatabase(), {
+        date: localDateString(), description: `Inventory adjustment ${current.adjustmentNumber}: ${current.reason}`,
+        referenceType: 'INVENTORY_ADJUSTMENT', referenceId: adjustmentId, createdBy: actor.id,
+        lines: sign > 0 ? [
+          { accountCode: '1104', debit: itemValue, credit: 0 }, { accountCode: '5201', debit: 0, credit: itemValue },
+        ] : [
+          { accountCode: '5201', debit: itemValue, credit: 0 }, { accountCode: '1104', debit: 0, credit: itemValue },
+        ],
+      });
+      totalValue += itemValue;
+    }
+    txDb.run(`UPDATE stock_adjustments SET status = 'POSTED', total_value = ?, posted_by = ?, posted_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING_APPROVAL' AND approval_status = 'APPROVED'`, [Math.round(totalValue * 100) / 100, actor.id, adjustmentId]);
+    this.recordPostedAdjustmentAudit(txDb, actor.id, actor.fullName, adjustmentId, 'POST', { status: 'PENDING_APPROVAL', approvalStatus: 'APPROVED' }, { status: 'POSTED', totalValue: Math.round(totalValue * 100) / 100, postedBy: actor.id });
   }
 
   public approveAdjustment(adjustmentId: string): void {
@@ -158,6 +255,8 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjustment.approve');
     const adjustment = this.getAdjustmentHeader(this.db, adjustmentId);
+    const centralRequest = this.db.query<{ id: string }>(`SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND request_type = 'STOCK_ADJUSTMENT' AND status = 'PENDING'`, [adjustmentId])[0];
+    if (centralRequest) throw new Error('Use the approvals inbox to decide this inventory request.');
     if (!adjustment) throw new Error('طلب التسوية غير موجود.');
     this.branchAccess.requireWarehouseAccess(adjustment.warehouseId, actor);
     if (adjustment.status !== 'PENDING_APPROVAL' || adjustment.approvalStatus === 'APPROVED') {
@@ -188,6 +287,8 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjustment.post');
     const adjustment = this.getAdjustmentHeader(this.db, adjustmentId);
+    const centralRequest = this.db.query<{ id: string }>(`SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND request_type = 'STOCK_ADJUSTMENT'`, [adjustmentId])[0];
+    if (centralRequest) throw new Error('This adjustment is controlled by the approvals inbox and cannot be posted manually.');
     if (!adjustment) throw new Error('طلب التسوية غير موجود.');
     this.branchAccess.requireWarehouseAccess(adjustment.warehouseId, actor);
     if (adjustment.status !== 'PENDING_APPROVAL' || adjustment.approvalStatus !== 'APPROVED') {
@@ -415,3 +516,14 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     ]);
   }
 }
+
+registerApprovalEffect('STOCK_ADJUSTMENT', (request, actor, db) => {
+  if (request.referenceType !== 'STOCK_ADJUSTMENT' || !request.referenceId) throw new Error('مرجع تسوية المخزون غير صالح.');
+  const inventory = new InventoryServicePart14();
+  return inventory.approveAndPostAdjustmentInTransaction(db, request.referenceId, actor, true);
+});
+
+registerApprovalRejectionEffect('STOCK_ADJUSTMENT', (request, actor, db) => {
+  if (request.referenceType !== 'STOCK_ADJUSTMENT' || !request.referenceId) throw new Error('مرجع تسوية المخزون غير صالح.');
+  return new InventoryServicePart14().approveAndPostAdjustmentInTransaction(db, request.referenceId, actor, false);
+});

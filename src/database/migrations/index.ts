@@ -3361,6 +3361,55 @@ export const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: '195_dynamic_approval_policies',
+    description: 'Add configurable operation approval policies',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS approval_policies (
+          operation_code TEXT PRIMARY KEY,
+          mode TEXT NOT NULL DEFAULT 'APPROVAL' CHECK(mode IN ('DIRECT', 'APPROVAL', 'DISABLED')),
+          executor_roles TEXT NOT NULL DEFAULT '[]',
+          approver_roles TEXT NOT NULL DEFAULT '[]',
+          min_approvals INTEGER NOT NULL DEFAULT 1 CHECK(min_approvals >= 1),
+          allow_self_approval INTEGER NOT NULL DEFAULT 0 CHECK(allow_self_approval IN (0, 1)),
+          max_value REAL,
+          expires_after_hours INTEGER,
+          approval_mode TEXT NOT NULL DEFAULT 'SINGLE' CHECK(approval_mode IN ('SINGLE', 'MULTI')),
+          scope_type TEXT NOT NULL DEFAULT 'BRANCH' CHECK(scope_type IN ('BRANCH', 'WAREHOUSE', 'GLOBAL')),
+          updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    },
+  },
+  {
+    id: '196_approval_workflow_decisions',
+    description: 'Add approval decision history and policy workflow scope',
+    up: (db: Database) => {
+      const columns = db.exec("PRAGMA table_info('approval_policies')")[0]?.values.map((row) => String(row[1])) || [];
+      if (!columns.includes('approval_mode')) {
+        addColumn(db, 'approval_policies', 'approval_mode', "TEXT NOT NULL DEFAULT 'SINGLE'");
+      }
+      if (!columns.includes('scope_type')) {
+        addColumn(db, 'approval_policies', 'scope_type', "TEXT NOT NULL DEFAULT 'BRANCH'");
+      }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS approval_decisions (
+          id TEXT PRIMARY KEY,
+          approval_request_id TEXT NOT NULL,
+          decision TEXT NOT NULL CHECK(decision IN ('APPROVED', 'REJECTED')),
+          decided_by TEXT NOT NULL,
+          notes TEXT,
+          decided_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (approval_request_id) REFERENCES approval_requests(id) ON DELETE CASCADE,
+          FOREIGN KEY (decided_by) REFERENCES users(id),
+          UNIQUE (approval_request_id, decided_by)
+        );
+        CREATE INDEX IF NOT EXISTS idx_approval_decisions_request ON approval_decisions(approval_request_id, decided_at);
+      `);
+    },
+  },
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

@@ -1,4 +1,4 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
+﻿import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { BranchAccessService } from '../auth/BranchAccessService';
@@ -6,6 +6,10 @@ import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { localDateString } from '../../../utils/shared/date';
 import type { ApprovalRequest } from './approvalTypes';
+import { ApprovalPolicyService } from './ApprovalPolicyService';
+import { applyRegisteredApprovalEffect } from './ApprovalEffectRegistry';
+import { applyRegisteredRejectionEffect } from './ApprovalEffectRegistry';
+import '../inventory/InventoryService';
 
 export class ApprovalDecisionService {
   private readonly db = DatabaseManager.getInstance();
@@ -15,24 +19,75 @@ export class ApprovalDecisionService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, approved ? 'ui.approvals.inbox.approve' : 'ui.approvals.inbox.reject');
     ModuleRegistryService.assertModuleEnabled('approvals');
-    const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const row = this.db.query<ApprovalRequest>(
-      `SELECT * FROM approval_requests WHERE id = ? AND ${scope.clause}`,
-      [id, ...scope.params]
+      `SELECT a.*, a.request_type AS requestType, a.reference_type AS referenceType,
+              a.reference_id AS referenceId, a.requested_by AS requestedBy, a.requested_value AS requestedValue,
+              a.current_value AS currentValue, a.payload AS payload
+       FROM approval_requests a WHERE a.id = ? AND ${this.branchAccess.sqlScope('a.branch_id', undefined, actor).clause}`,
+      [id, ...this.branchAccess.sqlScope('a.branch_id', undefined, actor).params]
     )[0];
     if (!row) throw new Error('الطلب غير موجود.');
     if (row.status !== 'PENDING') throw new Error('تم اتخاذ قرار في هذا الطلب بالفعل.');
-    if (ModuleRegistryService.getModuleSettings('approvals').requireSegregationOfDuties === true
-      && row.requestedBy === actor.id) {
-      throw new Error('لا يمكنك اعتماد طلب أنشأته بنفسك وفق سياسة فصل المهام.');
+    if (!approved && !notes?.trim()) throw new Error('يجب كتابة سبب الرفض.');
+    if (row.requestType === 'STOCK_ADJUSTMENT' && row.referenceType === 'STOCK_ADJUSTMENT') {
+      const details = row.payload ? JSON.parse(row.payload) as { policy?: { approverRoles?: string[]; allowSelfApproval?: boolean; minApprovals?: number; approvalMode?: string }; operationCode?: string } : {};
+      const policy = details.policy || new ApprovalPolicyService().getPolicy('inventory.adjustment.create');
+      PermissionService.require(actor, 'inventory.adjustment.approve');
+      if (!policy.allowSelfApproval && row.requestedBy === actor.id) throw new Error('لا يمكن لمنشئ طلب المخزون اعتماده.');
+      if (policy.approverRoles?.length && !policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN') {
+        throw new Error('دور المستخدم غير مخول لاعتماد هذا الطلب.');
+      }
     }
-
+    if (row.requestedBy === actor.id) {
+      const details = row.payload ? JSON.parse(row.payload) as { operationCode?: string; policy?: { allowSelfApproval?: boolean } } : {};
+      if (row.requestType !== 'STOCK_ADJUSTMENT' && ModuleRegistryService.getModuleSettings('approvals').requireSegregationOfDuties === true && !details.policy?.allowSelfApproval) {
+        throw new Error('لا يمكنك اعتماد طلب أنشأته بنفسك وفق سياسة فصل المهام.');
+      }
+    }
+    if (row.payload) {
+      const payload = JSON.parse(row.payload) as { operationCode?: string; policy?: { approverRoles?: string[]; allowSelfApproval?: boolean } };
+      if (payload.operationCode && payload.operationCode !== 'inventory.adjustment.create') {
+        throw new Error(`لا يمكن اعتماد هذا الطلب؛ تنفيذ العملية ${payload.operationCode} غير موصول بعد.`);
+      }
+      if (approved && payload.policy?.approverRoles?.length && !payload.policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN') {
+        throw new Error('دور المستخدم غير مخول لاعتماد هذا الطلب.');
+      }
+    }
     this.db.executeTransaction((db) => {
+      if (!db.query<{ id: string }>(`SELECT id FROM approval_requests WHERE id = ? AND status = 'PENDING'`, [id])[0]) {
+        throw new Error('تغيرت حالة الطلب؛ أعد تحميل قائمة الموافقات.');
+      }
+      if (!approved && !notes?.trim()) throw new Error('يجب كتابة سبب الرفض.');
+      if (!approved && row.payload) {
+        const rejectionPolicy = JSON.parse(row.payload) as { policy?: { approvalMode?: string } };
+        if (rejectionPolicy.policy?.approvalMode === 'MULTI') db.run(`INSERT OR IGNORE INTO approval_decisions (id, approval_request_id, decision, decided_by, notes) VALUES (?, ?, 'REJECTED', ?, ?)`, [`apd_${uuidv4().substring(0, 8)}`, id, actor.id, notes || null]);
+      }
+      if (approved && row.payload) {
+        const details = JSON.parse(row.payload) as { policy?: { approvalMode?: string; minApprovals?: number } };
+        if (details.policy?.approvalMode === 'MULTI') {
+          if (db.query<{ id: string }>('SELECT id FROM approval_decisions WHERE approval_request_id = ? AND decided_by = ?', [id, actor.id]).length) {
+            throw new Error('سجلت قرارك لهذا الطلب بالفعل.');
+          }
+          db.run(`INSERT INTO approval_decisions (id, approval_request_id, decision, decided_by, notes) VALUES (?, ?, 'APPROVED', ?, ?)`,
+            [`apd_${uuidv4().substring(0, 8)}`, id, actor.id, notes || null]);
+          const approvals = db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM approval_decisions WHERE approval_request_id = ? AND decision = 'APPROVED'`, [id])[0]?.count || 0;
+          if (approvals < Math.max(1, details.policy.minApprovals || 1)) {
+            db.run(`INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values) VALUES (?, ?, ?, 'تسجيل موافقة مرحلية', 'APPROVALS', ?, ?)`,
+              [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ approvals, required: details.policy.minApprovals })]);
+            return;
+          }
+        }
+      }
+
+      const applied = row.requestType === 'STOCK_ADJUSTMENT'
+        ? (approved ? applyRegisteredApprovalEffect(row, actor, db) : applyRegisteredRejectionEffect(row, actor, db))
+        : approved ? this.applyApprovedEffect(row, db) : null;
+      db.run(`INSERT OR IGNORE INTO approval_decisions (id, approval_request_id, decision, decided_by, notes) VALUES (?, ?, ?, ?, ?)`,
+        [`apd_${uuidv4().substring(0, 8)}`, id, approved ? 'APPROVED' : 'REJECTED', actor.id, notes || null]);
       db.run(
-        `UPDATE approval_requests SET status = ?, decided_by = ?, decided_at = ?, decision_notes = ? WHERE id = ?`,
+        `UPDATE approval_requests SET status = ?, decided_by = ?, decided_at = ?, decision_notes = ? WHERE id = ? AND status = 'PENDING'`,
         [approved ? 'APPROVED' : 'REJECTED', actor.id, new Date().toISOString(), notes || null, id]
       );
-      const applied = approved ? this.applyApprovedEffect(row, db) : null;
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
          VALUES (?, ?, ?, ?, 'APPROVALS', ?, ?)`,
@@ -119,4 +174,11 @@ export class ApprovalDecisionService {
     }
     return null;
   }
+
 }
+
+
+
+
+
+

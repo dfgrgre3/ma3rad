@@ -68,6 +68,22 @@ const ApprovalRequestCard: React.FC<ApprovalRequestCardProps> = ({
         </div>
         <p className="text-sm font-semibold text-slate-900">{request.title}</p>
         {request.description && <p className="text-xs text-slate-500">{request.description}</p>}
+        {request.status === 'PENDING' && request.payload && (() => {
+          try {
+            const payload = JSON.parse(request.payload) as { operationCode?: string; policy?: { minApprovals?: number; approvalMode?: string }; details?: { updates?: Record<string, unknown>; product?: Record<string, unknown> } };
+            const required = payload.policy?.approvalMode === 'MULTI' ? payload.policy.minApprovals || 1 : 1;
+            return <p className="text-xs font-semibold text-indigo-700">الموافقات: {request.approvalCount || 0} / {required}{payload.operationCode ? ` · ${payload.operationCode}` : ''}{payload.details?.updates ? ` · التعديلات: ${Object.keys(payload.details.updates).join('، ')}` : ''}</p>;
+          } catch { return null; }
+        })()}
+        {request.decisionHistory && (() => {
+          try { const history = JSON.parse(request.decisionHistory) as Array<{ decision: string; user: string; notes?: string; at: string }>; return history.length > 0 ? <p className="text-xs text-slate-500">سجل القرارات: {history.map((item) => `${item.user || '—'}: ${item.decision}${item.notes ? ` (${item.notes})` : ''}`).join(' · ')}</p> : null; } catch { return null; }
+        })()}
+        {request.requestType === 'STOCK_ADJUSTMENT' && request.payload && (() => {
+          try {
+            const details = JSON.parse(request.payload) as { productName?: string; warehouseName?: string; quantity?: number; reason?: string };
+            return <p className="text-xs font-semibold text-slate-700">الصنف: {details.productName || '—'} · المخزن: {details.warehouseName || '—'} · الكمية: {details.quantity ?? '—'}{details.reason ? ` · السبب: ${details.reason}` : ''}</p>;
+          } catch { return <p className="text-xs text-amber-700">تعذر قراءة تفاصيل الطلب؛ افتح التسوية المرتبطة للمراجعة.</p>; }
+        })()}
         {request.requestedValue != null && (
           <p className="text-[11px] font-bold text-sky-600">
             القيمة: {new Intl.NumberFormat('ar-EG').format(request.requestedValue)} ج
@@ -110,7 +126,7 @@ export const ApprovalsPage: React.FC = () => {
   const canCreate = PermissionService.can(user, 'ui.approvals.inbox.create');
 
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
-  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
+  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, cancelled: 0, expired: 0 });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [loading, setLoading] = useState(true);
@@ -137,7 +153,8 @@ export const ApprovalsPage: React.FC = () => {
   }, [load]);
 
   const decide = (req: ApprovalRequest, approved: boolean) => {
-    const notes = prompt(approved ? 'ملاحظات الاعتماد (اختياري):' : 'سبب الرفض (اختياري):') || undefined;
+    const notes = prompt(approved ? 'ملاحظات الاعتماد (اختياري):' : (req.requestType === 'STOCK_ADJUSTMENT' ? 'سبب رفض طلب المخزون (مطلوب):' : 'سبب الرفض (اختياري):')) || undefined;
+    if (!approved && req.requestType === 'STOCK_ADJUSTMENT' && !notes?.trim()) return;
     try {
       service.decide(req.id, approved, notes);
       load();
@@ -196,11 +213,13 @@ export const ApprovalsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+        {[ 
           { label: 'قيد الانتظار', value: stats.pending, color: 'text-amber-600 bg-amber-50 border-amber-200' },
           { label: 'تم اعتمادها', value: stats.approved, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
           { label: 'مرفوضة', value: stats.rejected, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+          { label: 'ملغاة', value: stats.cancelled, color: 'text-slate-600 bg-slate-100 border-slate-200' },
+          { label: 'منتهية', value: stats.expired, color: 'text-slate-600 bg-slate-100 border-slate-200' },
         ].map((c) => (
           <div key={c.label} className={`rounded-xl border p-3.5 ${c.color}`}>
             <p className="text-[10px] font-bold opacity-80">{c.label}</p>
@@ -221,6 +240,7 @@ export const ApprovalsPage: React.FC = () => {
             <option value="APPROVED">معتمدة</option>
             <option value="REJECTED">مرفوضة</option>
             <option value="CANCELLED">ملغاة</option>
+            <option value="EXPIRED">منتهية</option>
           </select>
           <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
         </div>

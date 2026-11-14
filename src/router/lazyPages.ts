@@ -124,6 +124,7 @@ export { SalesReportsPage } from './lazyPages_part04';
 export { PosReportsPage } from './lazyPages_part04';
 export { PurchaseInventoryReportPage } from './lazyPages_part04';
 export { ApprovalsPage } from './lazyPages_part04';
+export { ApprovalSettingsPage } from './lazyPages_part04';
 export { DocumentsPage } from './lazyPages_part04';
 export { NotificationsView } from './lazyPages_part04';
 export { AuditLogView } from './lazyPages_part04';
