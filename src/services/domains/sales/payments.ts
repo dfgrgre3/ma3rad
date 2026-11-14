@@ -11,6 +11,21 @@ import '../effects/handlers/salesInvoiceHandlers';
 import type { CustomerPayment, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
 import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
+import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
+
+export type InvoicePaymentComponent = {
+  paymentType: Exclude<PaymentType, 'CREDIT' | 'MIXED'>;
+  amount: number;
+  bankAccountId?: string;
+};
+
+function assertCollectionPaymentType(paymentType: PaymentType): asserts paymentType is InvoicePaymentComponent['paymentType'] {
+  if (paymentType === 'CREDIT') throw new Error('لا يمكن تسجيل الآجل كتحصيل فعلي.');
+  if (paymentType === 'MIXED') throw new Error('استخدم مسار مكونات التحصيل المختلط لتسجيل كل وسيلة على حدة.');
+  if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(paymentType)) {
+    throw new Error(`وسيلة التحصيل غير مدعومة: ${String(paymentType)}.`);
+  }
+}
 
 function validatePaymentDate(date: string, label: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
@@ -32,6 +47,7 @@ export function recordInvoicePaymentEntry(
   paymentDate?: string,
   bankAccountId?: string
 ): CustomerPayment {
+  assertCollectionPaymentType(paymentType);
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.customers.detail.payment');
   const invoice = ctx.getInvoiceById(invoiceId);
@@ -50,12 +66,14 @@ export function recordInvoicePaymentEntry(
   const today = paymentDate || localDateString();
   validatePaymentDate(today, 'تاريخ التحصيل غير صحيح.');
   const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
-  const register = registerId || 'cr_main';
+  const shiftContext = new CashShiftPolicyService().resolve(invoiceBranchId, {
+    registerId,
+    shiftId,
+    required: paymentType === 'CASH',
+  });
+  const register = registerId || shiftContext.registerId || ctx.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
   const branchId = ctx.branchAccess.requireRegisterAccess(register, actor, invoiceBranchId);
-  if (shiftId) {
-    const shift = ctx.branchAccess.requireShiftAccess(shiftId, actor, register);
-    if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
-  }
+  const resolvedShiftId = shiftContext.shiftId;
 
   return ctx.db.executeTransaction((db) => {
     if (idempotencyKey) {
@@ -94,7 +112,7 @@ export function recordInvoicePaymentEntry(
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         paymentId, receiptNumber, currentInvoice.customerId, invoiceId, value, paymentType, today, branchId,
-        register, shiftId || null,
+        register, resolvedShiftId || null,
         notes || `تحصيل دفعة على الفاتورة ${currentInvoice.invoiceNumber}`,
         actor.id,
         idempotencyKey || null,
@@ -156,8 +174,8 @@ export function recordInvoicePaymentEntry(
     ];
     defaultEffectEngine.run({ db, actorId: actor.id, actorName: actor.fullName }, effects);
 
-    if (shiftId) {
-      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, shiftId]);
+    if (paymentType === 'CASH' && resolvedShiftId) {
+      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, resolvedShiftId]);
     }
 
     return {
@@ -169,12 +187,48 @@ export function recordInvoicePaymentEntry(
       paymentType,
       date: today,
       registerId: register,
-      shiftId,
+      shiftId: resolvedShiftId,
       notes,
       performedBy: actor.id,
       createdAt: new Date().toISOString(),
     };
   });
+}
+
+/** Record a mixed invoice collection as individually posted tender receipts atomically. */
+export function recordInvoicePaymentComponentsEntry(
+  ctx: SalesContext,
+  invoiceId: string,
+  components: InvoicePaymentComponent[],
+  registerId?: string,
+  shiftId?: string,
+  notes = '',
+  idempotencyKey?: string,
+  paymentDate?: string,
+): CustomerPayment[] {
+  if (!Array.isArray(components) || components.length < 2) {
+    throw new Error('يتطلب التحصيل المختلط وسيلتي دفع منفصلتين على الأقل.');
+  }
+  for (const component of components) {
+    assertCollectionPaymentType(component?.paymentType as PaymentType);
+    if (!Number.isFinite(component.amount) || component.amount <= 0) {
+      throw new Error('يجب أن يكون مبلغ كل مكوّن دفع أكبر من صفر.');
+    }
+  }
+  return ctx.db.executeTransaction(() => components.map((component, index) =>
+    recordInvoicePaymentEntry(
+      ctx,
+      invoiceId,
+      component.amount,
+      component.paymentType,
+      registerId,
+      shiftId,
+      notes,
+      idempotencyKey ? `${idempotencyKey}:tender:${index}` : undefined,
+      paymentDate,
+      component.bankAccountId,
+    )
+  ));
 }
 
 /** Record one receipt allocated across several open invoices in one transaction. */
@@ -183,7 +237,7 @@ export function recordCustomerPaymentAllocationsEntry(
   customerId: string,
   allocations: Array<{ invoiceId: string; amount: number }>,
   paymentType: PaymentType = 'CASH',
-  registerId = 'cr_main',
+  registerId?: string,
   date = localDateString(),
   reference = '',
   notes = '',
@@ -191,6 +245,7 @@ export function recordCustomerPaymentAllocationsEntry(
   idempotencyKey?: string,
   bankAccountId?: string,
 ): { groupId: string; total: number; receipts: string[] } {
+  assertCollectionPaymentType(paymentType);
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.customers.detail.payment');
   validatePaymentDate(date, 'تاريخ الدفعة غير صحيح.');
@@ -207,11 +262,14 @@ export function recordCustomerPaymentAllocationsEntry(
     branchId = invoiceBranchId;
   }
   if (!branchId) throw new Error('تعذر تحديد فرع الدفعة.');
-  ctx.branchAccess.requireRegisterAccess(registerId, actor, branchId);
-  if (shiftId) {
-    const shift = ctx.branchAccess.requireShiftAccess(shiftId, actor, registerId);
-    if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
-  }
+  const shiftContext = new CashShiftPolicyService().resolve(branchId, {
+    registerId,
+    shiftId,
+    required: paymentType === 'CASH',
+  });
+  const resolvedRegisterId = registerId || shiftContext.registerId || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+  ctx.branchAccess.requireRegisterAccess(resolvedRegisterId, actor, branchId);
+  const resolvedShiftId = shiftContext.shiftId;
   const groupId = idempotencyKey || `cpgrp_${uuidv4().slice(0, 10)}`;
   return ctx.db.executeTransaction((db) => {
     const prior = db.query<{
@@ -233,7 +291,7 @@ export function recordCustomerPaymentAllocationsEntry(
         .sort((a, b) => a.invoiceId.localeCompare(b.invoiceId));
       const requestMatches = prior.every((row) =>
         row.branchId === branchId && row.customerId === customerId && row.paymentType === paymentType &&
-        row.date === date && row.registerId === registerId && (row.shiftId || null) === (shiftId || null) &&
+        row.date === date && row.registerId === resolvedRegisterId && (row.shiftId || null) === (resolvedShiftId || null) &&
         (row.bankAccountId || null) === (bankAccountId || null) &&
         row.notes === expectedNotes
       ) && priorAllocations.length === entries.length && priorAllocations.every((row, index) =>
@@ -257,7 +315,7 @@ export function recordCustomerPaymentAllocationsEntry(
       const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
       const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
       db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by,bank_account_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, resolvedRegisterId, resolvedShiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
       db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
       db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
@@ -266,7 +324,7 @@ export function recordCustomerPaymentAllocationsEntry(
       receipts.push(receiptNumber); total = round2(total + amount);
     }
     db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
-    if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, registerId]);
+    if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, resolvedRegisterId]);
     const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(db, bankAccountId) : null;
     if (bank) updateBankBalance(db, bank.id, total);
     postLedgerEntry(db.getDatabase(), {
@@ -280,7 +338,7 @@ export function recordCustomerPaymentAllocationsEntry(
         { accountCode: '1103', debit: 0, credit: total },
       ],
     });
-    if (shiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?`, [total, shiftId]);
+    if (paymentType === 'CASH' && resolvedShiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?`, [total, resolvedShiftId]);
     db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
       [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'تحصيل دفعة موزعة على فواتير', 'SALES', groupId, JSON.stringify({ customerId, allocations: entries, total, date, reference, receipts })]);
     return { groupId, total, receipts };
@@ -348,7 +406,7 @@ function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], acto
       if (row.paymentType === 'BANK_TRANSFER' && row.bankAccountId) {
         db.run('UPDATE bank_accounts SET current_balance=current_balance-? WHERE id=?', [value, row.bankAccountId]);
       }
-      if (row.shiftId) {
+      if (row.paymentType === 'CASH' && row.shiftId) {
         db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
       }
     }
@@ -399,7 +457,7 @@ function reverseSingleInvoicePayment(
     if (payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId) {
       db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, payment.bankAccountId]);
     }
-    if (payment.shiftId) {
+    if (payment.paymentType === 'CASH' && payment.shiftId) {
       db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
     }
     db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);

@@ -1,27 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Settings, Loader2, AlertTriangle, CheckCircle2, Save, Bell, BellOff,
+  Settings, Loader2, AlertTriangle, CheckCircle2, Bell, BellOff,
   Calendar, Clock, Building2, RefreshCw, Shield,
 } from 'lucide-react';
 import { PayrollNotificationSettingsService, PayrollNotificationSettings } from '../../../services/domains/hr/PayrollNotificationSettingsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
-import { localDateString } from '../../../utils/shared/date';
 
 export const PayrollNotificationSettingsPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
-  const canManage = PermissionService.can(actor, 'employees.payroll.manage');
   const canView = PermissionService.canAny(actor, [
     'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.view',
   ]);
-
-  if (!canView) {
-    return (
-      <div className="h-full flex items-center justify-center text-slate-500">
-        ليس لديك صلاحية عرض إعدادات إشعارات الرواتب.
-      </div>
-    );
-  }
 
   const [settings, setSettings] = useState<PayrollNotificationSettings[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +71,13 @@ export const PayrollNotificationSettingsPage: React.FC = () => {
     handleSave(branchId, { overdueHorizonDays: days });
   };
 
-  const today = localDateString();
+  if (!canView) {
+    return (
+      <div className="h-full flex items-center justify-center text-slate-500">
+        ليس لديك صلاحية عرض إعدادات إشعارات الرواتب.
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
@@ -288,7 +284,7 @@ export const PayrollNotificationSettingsPage: React.FC = () => {
   );
 };
 
-function SummaryCard({ label, value, icon: Icon, color, bg }: {
+function SummaryCard({ label, value, icon: Icon, color: _color, bg }: {
   label: string; value: number; icon: React.ReactNode; color: string; bg: string;
 }) {
   return (

@@ -16,7 +16,9 @@ import { createSalesInvoice } from './invoiceCreation';
 import {
   deleteInvoicePaymentEntry,
   recordCustomerPaymentAllocationsEntry,
+  recordInvoicePaymentComponentsEntry,
   recordInvoicePaymentEntry,
+  type InvoicePaymentComponent,
 } from './payments';
 import { createSaleReturn } from './returns';
 import { voidSalesInvoice } from './invoiceVoid';
@@ -99,12 +101,28 @@ export class SalesService {
     return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes, idempotencyKey, paymentDate, bankAccountId);
   }
 
+  /** Record a mixed collection as separate tender receipts and ledger lines in one transaction. */
+  public recordInvoicePaymentComponents(
+    invoiceId: string,
+    components: InvoicePaymentComponent[],
+    registerId?: string,
+    shiftId?: string,
+    notes = '',
+    idempotencyKey?: string,
+    paymentDate?: string,
+  ): CustomerPayment[] {
+    ModuleRegistryService.assertModuleEnabled('sales');
+    return recordInvoicePaymentComponentsEntry(
+      this.context(), invoiceId, components, registerId, shiftId, notes, idempotencyKey, paymentDate
+    );
+  }
+
   /** Record one receipt allocated across several open invoices in one transaction. */
   public recordCustomerPaymentAllocations(
     customerId: string,
     allocations: Array<{ invoiceId: string; amount: number }>,
     paymentType: PaymentType = 'CASH',
-    registerId = 'cr_main',
+    registerId?: string,
     date?: string,
     reference = '',
     notes = '',

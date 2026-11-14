@@ -11,7 +11,7 @@ import type { User } from '../../../types/auth/identity';
 import type { NotificationType } from '../../../types/notifications';
 
 const CONTRACT_NOTICE_HORIZON_DAYS = 30;
-const DOCUMENT_EXPIRY_HORIZON_DAYS = 30;
+const _DOCUMENT_EXPIRY_HORIZON_DAYS = 30;
 const LEAVE_LOW_BALANCE_THRESHOLD = 5;
 const LEAVE_CARRYOVER_HORIZON_DAYS = 60;
 
@@ -213,7 +213,7 @@ export class HrAlertsService {
   }
 
   /** إشعارات أرصدة الإجازات السنوية المنخفضة وقرب موعد الترحيل */
-  private checkLeaveBalances(actor: User, horizon: string): { created: number } {
+  private checkLeaveBalances(actor: User, _horizon: string): { created: number } {
     let created = 0;
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);

@@ -20,6 +20,8 @@ export interface DailySalesRow {
   tax: number;
   discount: number;
   profit: number;
+  shippingCost?: number;
+  extraFees?: number;
   paymentType: string;
   paymentStatus: string;
   invoiceStatus: string;
@@ -216,6 +218,7 @@ export class DailyOperationsService {
               (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
               si.total_amount AS total, si.paid_amount AS paid, si.remaining_amount AS remaining,
               si.tax_amount AS tax, si.discount_amount AS discount, si.gross_profit AS profit,
+              si.shipping_cost AS shippingCost, COALESCE(si.extra_fees, 0) AS extraFees,
               si.payment_type AS paymentType, si.payment_status AS paymentStatus,
               si.invoice_status AS invoiceStatus, u.full_name AS createdByName
        FROM sales_invoices si

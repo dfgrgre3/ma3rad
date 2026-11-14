@@ -129,6 +129,9 @@ export class EscPosService {
     if (invoice.shippingCost > 0) {
       line(EscPosService.row('مشال ونقل', `+${CeramicMath.formatCurrency(invoice.shippingCost)}`, width));
     }
+    if (Number(invoice.extraFees || 0) > 0) {
+      line(EscPosService.row('مصاريف إضافية', `+${CeramicMath.formatCurrency(Number(invoice.extraFees))}`, width));
+    }
     push(ESC, 0x45, 0x01); // bold the grand total
     line(EscPosService.row('الإجمالي', CeramicMath.formatCurrency(invoice.totalAmount), width));
     push(ESC, 0x45, 0x00);

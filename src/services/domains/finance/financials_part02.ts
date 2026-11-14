@@ -63,5 +63,6 @@ export interface SaleTotalsInput {
   discountAmount?: number;
   taxAmount?: number;
   shippingCost?: number;
+  extraFees?: number;
   paidAmount: number;
 }

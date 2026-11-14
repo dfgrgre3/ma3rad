@@ -25,6 +25,7 @@ export interface SalesInvoice {
   taxPercentage: number;
   taxAmount: number;
   shippingCost: number; // مشال ونقل
+  extraFees?: number;
   totalAmount: number;
   
   paidAmount: number;

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS sales_invoices (
   tax_percentage REAL DEFAULT 0,
   tax_amount REAL DEFAULT 0,
   shipping_cost REAL DEFAULT 0,
+  extra_fees REAL DEFAULT 0,
   total_amount REAL NOT NULL,
   
   paid_amount REAL NOT NULL DEFAULT 0,

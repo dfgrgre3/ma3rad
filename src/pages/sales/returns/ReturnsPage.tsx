@@ -297,9 +297,6 @@ export const ReturnsPage: React.FC = () => {
         const activeShift = cashRefund
           ? cashierService.getActiveShift(AuthService.getCurrentUser()?.id, invoiceInfo?.branchId)
           : null;
-        if (cashRefund && !activeShift) {
-          throw new Error('افتح وردية نقدية على فرع الفاتورة قبل تسجيل التعويض النقدي.');
-        }
         const returned = service.returnSale(
           invoiceId,
           selected.map((l) => ({

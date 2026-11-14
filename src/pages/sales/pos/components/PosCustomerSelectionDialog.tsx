@@ -15,6 +15,7 @@ interface PosCustomerSelectionDialogProps {
   isOpen: boolean;
   customerService: Pick<CustomerService, 'getCustomersPage'>;
   selectedCustomerId?: string;
+  canSearchTaxNumber?: boolean;
   onClose: () => void;
   onSelectCustomer: (customer: Customer) => void;
 }
@@ -25,6 +26,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
   isOpen,
   customerService,
   selectedCustomerId,
+  canSearchTaxNumber = false,
   onClose,
   onSelectCustomer,
 }) => {
@@ -59,6 +61,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
           {
             customerType: customerType === 'ALL' ? undefined : customerType,
             status: status === 'ALL' ? undefined : status,
+              includeTaxNumber: canSearchTaxNumber,
           },
         );
         if (!cancelled) {
@@ -76,7 +79,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [customerService, customerType, debouncedSearch, isOpen, page, reloadToken, status]);
+  }, [canSearchTaxNumber, customerService, customerType, debouncedSearch, isOpen, page, reloadToken, status]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

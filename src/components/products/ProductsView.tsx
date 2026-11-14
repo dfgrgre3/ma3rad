@@ -103,7 +103,7 @@ const applyRememberedFormFields = (
   return next;
 };
 
-const normalizeImportNumber = (value: string): number =>
+const _normalizeImportNumber = (value: string): number =>
   Number(
     value
       .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))

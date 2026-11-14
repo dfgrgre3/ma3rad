@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Scale, CheckCircle2, AlertTriangle, RefreshCw, BookmarkCheck,
+  Scale, CheckCircle2, AlertTriangle, RefreshCw, BookmarkCheck, Building2,
   ShieldCheck, Database, Layers, Check
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';

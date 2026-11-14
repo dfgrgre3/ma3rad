@@ -199,7 +199,7 @@ export class ProjectExecutionService {
   }
 
   public recordCertificatePayment(id: string, amount: number, reference = '') {
-    const actor = this.requireWriteForRecord('project_payment_certificates', id);
+    const _actor = this.requireWriteForRecord('project_payment_certificates', id);
     const row = this.db.query<any>('SELECT * FROM project_payment_certificates WHERE id = ?', [id])[0];
     if (!row || !['APPROVED', 'PAID'].includes(row.status)) throw new Error('لا يمكن تسجيل دفعة لمستخلص غير معتمد.');
     if (!Number.isFinite(amount) || amount <= 0 || Number(row.paid_amount) + amount > Number(row.approved_amount) + 0.005) throw new Error('قيمة الدفعة تتجاوز الرصيد المعتمد أو غير صالحة.');

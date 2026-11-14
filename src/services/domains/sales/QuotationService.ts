@@ -651,15 +651,16 @@ export class QuotationService {
       const invoice = this.sales.createSale({
         customerId: fresh.customerId,
         warehouseId,
+        quotationId: fresh.id,
         items: fresh.items!.map((item) => ({
           productId: item.productId,
+          quotationItemId: item.id,
           soldBy: this.baseUnitOf(item.productId),
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
-          piecesCount: Math.round(item.boxesCount * 4),
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
-          pricingSource: 'POS',
+          pricingSource: 'QUOTATION',
         })),
         discountAmount: fresh.discountAmount,
         taxAmount: fresh.taxAmount,

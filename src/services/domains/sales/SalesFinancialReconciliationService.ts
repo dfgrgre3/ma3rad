@@ -94,7 +94,7 @@ export class SalesFinancialReconciliationService {
     const warehouseCompanyScope = this.branchAccess.companyScope('w.company_id');
 
     const netSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost), 0)
+      SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost + COALESCE(si.extra_fees, 0)), 0)
         - COALESCE((
           SELECT SUM(sr.total_amount)
           FROM sales_returns sr
@@ -115,7 +115,7 @@ export class SalesFinancialReconciliationService {
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
         AND ${ledgerScope.clause}
-        AND a.code IN ('4101', '4102')
+        AND a.code IN ('4101', '4102', '4103')
         AND (
           (e.reference_type = 'SALES_INVOICE' AND EXISTS (
             SELECT 1 FROM sales_invoices si

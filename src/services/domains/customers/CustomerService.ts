@@ -13,6 +13,7 @@ import { getActiveBankAccount, updateBankBalance } from '../sales/paymentAccount
 export interface CustomerPageFilters {
   customerType?: Customer['customerType'];
   status?: 'ACTIVE' | 'INACTIVE';
+  includeTaxNumber?: boolean;
 }
 
 function getExistingCustomerPayment(
@@ -92,9 +93,12 @@ export class CustomerService {
     const params: any[] = [...scope.params];
     let where = ` WHERE ${scope.clause} AND id <> 'cust_cash'`;
     if (search.trim()) {
-      where += ' AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?)';
+      where += filters.includeTaxNumber
+        ? ' AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ? OR tax_number LIKE ?)'
+        : ' AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?)';
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
+      if (filters.includeTaxNumber) params.push(term);
     }
     if (filters.customerType) {
       where += ' AND customer_type = ?';

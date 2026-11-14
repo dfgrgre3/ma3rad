@@ -334,6 +334,9 @@ export class OrderService {
     if (existing.status !== 'PENDING') {
       throw new Error('لا يمكن تعديل طلب بعد تأكيده. يمكنك إلغاؤه وإنشاء طلب جديد.');
     }
+    if ((existing.items || []).some((item) => Number(item.deliveredM2 || 0) > 0)) {
+      throw new Error('لا يمكن تعديل طلب سُجّل له تسليم. أصدر الفاتورة ثم سجّل أي مرتجع بمستند إرجاع.');
+    }
     const existingDeposits = Number(this.db.query<{ amount: number }>(
       `SELECT COALESCE(SUM(od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
          WHERE r.order_deposit_id = od.id), 0)), 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
@@ -403,6 +406,9 @@ export class OrderService {
     if (!allowed[order.status].includes(status)) {
       throw new Error(`لا يمكن الانتقال من حالة "${order.status}" إلى "${status}".`);
     }
+    if (status === 'CANCELLED' && (order.items || []).some((item) => Number(item.deliveredM2 || 0) > 0)) {
+      throw new Error('لا يمكن إلغاء طلب سُجّل له تسليم. أصدر الفاتورة ثم سجّل أي مرتجع بمستند إرجاع.');
+    }
     if (status === 'COMPLETED' && !order.invoiceId) {
       throw new Error('لا يمكن إتمام الطلب قبل إصدار فاتورة مبيعات له.');
     }
@@ -448,7 +454,6 @@ export class OrderService {
       throw new Error('يجب تأكيد الطلب أولاً قبل تسجيل التسليم.');
     }
     if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
-
     const byId = new Map(order.items.map((item) => [item.id, item]));
     const aggregatedLines = new Map<string, number>();
     for (const line of lines || []) {
@@ -719,6 +724,9 @@ export class OrderService {
     if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
 
     const warehouseId = options.warehouseId || order.warehouseId;
+    if (warehouseId !== order.warehouseId) {
+      throw new Error('يجب إصدار فاتورة الطلب من المستودع الذي حُجزت منه البضاعة.');
+    }
     this.branchAccess.requireWarehouseAccess(warehouseId);
     const total = round2(order.totalAmount);
     const paymentType: PaymentType = options.paymentType || 'CREDIT';
@@ -743,13 +751,13 @@ export class OrderService {
         shiftId: options.shiftId,
         items: order.items!.map((item) => ({
           productId: item.productId,
+          orderItemId: item.id,
           soldBy: item.baseUnit || 'M2',
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
-          piecesCount: Math.round(item.boxesCount * 4),
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
-          pricingSource: 'POS',
+          pricingSource: 'ORDER',
         })),
         discountAmount: order.discountAmount,
         taxAmount: order.taxAmount,

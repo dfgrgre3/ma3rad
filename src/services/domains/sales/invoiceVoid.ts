@@ -292,6 +292,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
             lines: [
               { accountCode: '4101', debit: round2(inv.subtotal - inv.discountAmount), credit: 0 },
               ...(inv.shippingCost > 0 ? [{ accountCode: '4102', debit: inv.shippingCost, credit: 0 }] : []),
+              ...(Number(inv.extraFees || 0) > 0 ? [{ accountCode: '4103', debit: Number(inv.extraFees), credit: 0 }] : []),
               ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
               ...reversedPaymentLines,
               ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),

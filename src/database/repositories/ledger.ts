@@ -152,6 +152,9 @@ export function paymentAccountCode(paymentType: string): string {
     case 'CARD':
     case 'BANK_TRANSFER': return '1102';
     case 'CHEQUE': return '1105';
+    // MIXED is only an aggregate invoice classification. Current collection
+    // services must post each tender separately; this clearing mapping remains
+    // for historical aggregate records that lack tender-level detail.
     case 'MIXED': return '1106';
     default: throw new Error(`Unsupported ledger payment type: ${paymentType}`);
   }

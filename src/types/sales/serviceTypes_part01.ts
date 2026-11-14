@@ -5,10 +5,13 @@ export interface CreateSaleDTO {
   warehouseId: string;
   shiftId?: string;
   orderId?: string;
+  quotationId?: string;
   restaurantOrderId?: string;
   projectId?: string;
   items: {
     productId: string;
+    orderItemId?: string;
+    quotationItemId?: string;
     /** Source special-stock record for approved discounted sale inventory. */
     specialStockId?: string;
     /** Unit the cashier entered the line in; kept for display/reporting. */
@@ -20,10 +23,10 @@ export interface CreateSaleDTO {
     /** Quantity expressed in `uom`. When present, `unitPrice` is per `uom`. */
     quantity?: number;
     boxesCount: number;
-    piecesCount: number;
+    piecesCount?: number;
     unitPrice: number;
     /** Indicates the price was selected by the POS pricing resolver. The service still revalidates it. */
-    pricingSource?: 'POS';
+    pricingSource?: 'POS' | 'ORDER' | 'QUOTATION';
     unitCost?: number;
     discountAmount?: number;
   }[];
@@ -32,6 +35,7 @@ export interface CreateSaleDTO {
   taxPercentage?: number;
   taxAmount?: number;
   shippingCost?: number;
+  extraFees?: number;
   paidAmount: number;
   paymentType: PaymentType;
   /** Optional split-payment breakdown. When provided, sum(amount) should equal paidAmount. */

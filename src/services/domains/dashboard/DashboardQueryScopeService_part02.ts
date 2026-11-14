@@ -20,7 +20,7 @@ export function queryFinanceOverviewMetrics(
   const companyParams = [...sales.params, ...salesCompany.params];
   const salesWhere = `${sales.clause} AND ${salesCompany.clause}`;
   const revenue = scalar(db.exec(
-    `SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost),0) FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesWhere}`,
+    `SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost + COALESCE(si.extra_fees,0)),0) FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesWhere}`,
     [from, to, ...companyParams]
   ));
   const expenses = scalar(db.exec(

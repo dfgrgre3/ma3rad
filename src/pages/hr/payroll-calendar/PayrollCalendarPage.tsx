@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Calendar, Printer, FileDown, Loader2, AlertTriangle, ChevronRight, Wallet,
-  CheckCircle2, Clock, Plus, Banknote, RotateCw, Activity, X,
+  Calendar, Loader2, AlertTriangle, ChevronRight, Wallet,
+  CheckCircle2, Clock, Banknote, RotateCw, Activity, X,
 } from 'lucide-react';
 import { PayrollCalendarService, PayrollCalendarEventView, PayrollCalendarMonthView } from '../../../services/domains/hr/PayrollCalendarService';
 import { EmployeeService, PayrollRun } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
-import { fmt } from '../../../pages/operations/payroll/payrollDisplay';
-import { localDateString, addLocalDays } from '../../../utils/shared/date';
 
 const MONTH_NAMES_AR: Record<number, string> = {
   1: 'يناير', 2: 'فبراير', 3: 'مارس', 4: 'أبريل', 5: 'مايو', 6: 'يونيو',
@@ -114,7 +112,7 @@ export const PayrollCalendarPage: React.FC = () => {
   const currentPeriod = period;
   const [monthName] = [MONTH_NAMES_AR[month]];
 
-  const runForPeriod = useMemo(() => {
+  const _runForPeriod = useMemo(() => {
     if (!view) return null;
     return view.events.find((e) => e.period === currentPeriod) ?? null;
   }, [view, currentPeriod]);
@@ -379,7 +377,7 @@ export const PayrollCalendarPage: React.FC = () => {
   );
 };
 
-function StatCard({ label, value, icon: Icon, color, bg }: {
+function StatCard({ label, value, icon: Icon, color: _color, bg }: {
   label: string; value: string | number; icon: React.ReactNode; color: string; bg: string;
 }) {
   return (

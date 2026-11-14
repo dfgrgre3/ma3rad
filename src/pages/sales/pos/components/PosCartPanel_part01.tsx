@@ -10,6 +10,8 @@ export interface PosCartPanelProps {
   hasMoreCustomers?: boolean;
   onLoadMoreCustomers?: () => void;
   canCreateCustomer: boolean;
+  canSearchTaxNumber?: boolean;
+  canViewCustomerFinancials?: boolean;
   onCustomerSearchChange: (value: string) => void;
   onSelectCustomer: (customer: Customer) => void;
   onCreateNewCustomer: () => void;

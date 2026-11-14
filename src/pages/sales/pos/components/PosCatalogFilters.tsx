@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import {
   Calculator, ChevronDown, Layers, ListFilter, Package, Search, X,
 } from 'lucide-react';
@@ -6,6 +6,7 @@ import type { Product, Warehouse } from '../../../../types';
 import type { CategoryWithCount } from '../../../../services/domains/products/CategoryService';
 import type { SortMode } from '../../../../types/pos';
 import type { ProductGradeOption } from '../../../../services/domains/products/OperationalFieldService';
+import { formatProductQuantity } from '../../../../utils/products/productUnits';
 
 export interface PosCatalogFiltersProps {
   barcodeInputRef: React.RefObject<HTMLInputElement>;
@@ -42,6 +43,7 @@ export interface PosCatalogFiltersProps {
   onClearFilters: () => void;
   searchSuggestions?: Product[];
   onSelectSuggestion?: (product: Product) => void;
+  stockOf?: (productId: string) => number;
 }
 
 const controlCls = 'h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition';
@@ -81,8 +83,14 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   onClearFilters,
   searchSuggestions = [],
   onSelectSuggestion,
+  stockOf = () => 0,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const suggestionListId = useId();
+  const suggestions = searchSuggestions.slice(0, 8);
+  const suggestionsOpen = Boolean(searchQuery.trim() && suggestions.length && onSelectSuggestion);
+  const closeSuggestions = () => setActiveSuggestionIndex(-1);
   const advancedActiveCount = [
     inStockOnly,
     selectedBrand !== 'ALL',
@@ -106,37 +114,65 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
               aria-label="بحث عن منتج"
               placeholder="امسح الباركود أو ابحث بالاسم / SKU / الكود الداخلي / المقاس… (F2)"
               value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
+              onChange={(e) => { onSearchQueryChange(e.target.value); closeSuggestions(); }}
               className="w-full h-11 pl-10 pr-11 bg-sky-50/60 border-2 border-sky-100 rounded-2xl text-sm font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition"
               role="combobox"
               aria-autocomplete="list"
-              aria-expanded={searchQuery.trim().length > 0 && searchSuggestions.length > 0}
+              aria-expanded={suggestionsOpen}
+              aria-controls={suggestionListId}
+              aria-activedescendant={activeSuggestionIndex >= 0 ? `${suggestionListId}-option-${activeSuggestionIndex}` : undefined}
+              onKeyDown={(event) => {
+                if (!suggestionsOpen) return;
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((index) => Math.min(index + 1, suggestions.length - 1));
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex(-1);
+                  if (activeSuggestionIndex >= 0) return;
+                  onSearchQueryChange('');
+                } else if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+                  event.preventDefault();
+                  onSelectSuggestion?.(suggestions[activeSuggestionIndex]);
+                  setActiveSuggestionIndex(-1);
+                }
+              }}
             />
             {searchQuery && (
               <button
                 type="button"
                 aria-label="مسح البحث"
-                onClick={() => onSearchQueryChange('')}
+                onClick={() => { onSearchQueryChange(''); closeSuggestions(); }}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             )}
           </form>
-          {searchQuery.trim() && searchSuggestions.length > 0 && (
-            <div className="selection-list absolute z-30 mt-1.5 w-full max-h-80 overflow-y-auto">
-              {searchSuggestions.slice(0, 8).map((product) => (
+          {suggestionsOpen && (
+            <div id={suggestionListId} role="listbox" aria-label="اقتراحات المنتجات" className="selection-list absolute z-30 mt-1.5 w-full max-h-80 overflow-y-auto">
+              {suggestions.map((product, index) => (
                 <button
                   key={product.id}
+                  id={`${suggestionListId}-option-${index}`}
                   type="button"
-                  onClick={() => {
-                    if (onSelectSuggestion) onSelectSuggestion(product);
-                    else onSearchQueryChange(product.name);
-                  }}
-                  className="selection-list__row w-full text-right px-4 py-2.5 text-xs flex items-center justify-between gap-3 last:border-0"
+                  role="option"
+                  aria-selected={activeSuggestionIndex === index}
+                  onMouseEnter={() => setActiveSuggestionIndex(index)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => { onSelectSuggestion?.(product); setActiveSuggestionIndex(-1); }}
+                  className={`selection-list__row w-full text-right px-4 py-2.5 text-xs flex items-center justify-between gap-3 last:border-0 ${activeSuggestionIndex === index ? 'bg-sky-50' : ''}`}
                 >
-                  <span className="font-bold truncate">{product.name}</span>
-                  <span className="selection-list__meta text-[11px] font-mono shrink-0">{product.sku || product.barcode}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold">{product.name}</span>
+                    <span className="mt-1 block text-[10px] text-slate-500">
+                      {product.sku || product.barcode || 'بدون SKU'} · {Number(product.sellingPriceM2 || 0).toLocaleString('ar-EG')} ج.م
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-slate-500">المتاح: {formatProductQuantity(stockOf(product.id), product)}</span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -149,7 +185,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
           aria-label="اختيار المخزن"
           value={selectedWarehouseId}
           onChange={(e) => onWarehouseChange(e.target.value)}
-          className={`${controlCls} hidden sm:block max-w-[180px]`}
+          className={`${controlCls} min-w-0 w-[34%] flex-1 sm:flex-none sm:max-w-[180px]`}
         >
           {warehouses.map((w) => (
             <option key={w.id} value={w.id}>المخزن: {w.name}</option>
@@ -162,7 +198,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
           aria-label="ترتيب المنتجات"
           value={sortMode}
           onChange={(e) => onSortModeChange(e.target.value as SortMode)}
-          className={`${controlCls} hidden md:block`}
+          className={`${controlCls} min-w-0 w-[29%] flex-1 sm:flex-none sm:max-w-[150px]`}
         >
           <option value="NAME">ترتيب: الاسم</option>
           <option value="PRICE_ASC">الأرخص أولاً</option>

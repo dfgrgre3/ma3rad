@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, RefreshCw, Loader2, AlertTriangle, Clock, FileText, CheckCircle2, ChevronRight } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Bell, RefreshCw, Loader2, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { HrAlertsService } from '../../../services/domains/hr/HrAlertsService';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
-import { localDateString } from '../../../utils/shared/date';
 
 const TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   HR_CONTRACT_EXPIRY: { label: 'انتهاء عقد', color: 'text-rose-700', bg: 'bg-rose-50' },
@@ -19,13 +18,6 @@ const TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> 
 export const HrAlertsPage: React.FC = () => {
   const can = usePermission();
   const canView = can('hr.contracts.view') || can('hr.documents.view') || can('hr.leave.view') || can('employees.payroll.view') || can('employees.view');
-  if (!canView) {
-    return (
-      <div className="h-full flex items-center justify-center text-slate-500">
-        ليس لديك صلاحية عرض تنبيهات الموارد البشرية.
-      </div>
-    );
-  }
 
   const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<Array<{
@@ -69,7 +61,7 @@ export const HrAlertsPage: React.FC = () => {
       const result = svc.runHrAlerts();
       load();
       if (result.created > 0) {
-        // eslint-disable-next-line no-alert
+         
         window.alert(`تم إنشاء ${result.created} تنبيه جديد للموارد البشرية.\n${result.details.join('\n')}`);
       } else {
         window.alert('لا توجد تنبيهات جديدة للموارد البشرية في الوقت الحالي.');
@@ -89,7 +81,14 @@ export const HrAlertsPage: React.FC = () => {
     } catch { /* ignore */ }
   }, []);
 
-  const today = localDateString();
+  if (!canView) {
+    return (
+      <div className="h-full flex items-center justify-center text-slate-500">
+        ليس لديك صلاحية عرض تنبيهات الموارد البشرية.
+      </div>
+    );
+  }
+
   const unreadCount = alerts.filter((a) => !a.isRead).length;
 
   const typeMeta = (type: string) => TYPE_LABELS[type] ?? { label: type, color: 'text-slate-600', bg: 'bg-slate-50' };

@@ -407,6 +407,9 @@ export class PrintService {
     const shippingRow = invoice.shippingCost > 0
       ? `<div class="total-row"><span>التوصيل والنقل</span><strong>${CeramicMath.formatCurrency(invoice.shippingCost)}</strong></div>`
       : '';
+    const extraFeesRow = Number(invoice.extraFees || 0) > 0
+      ? `<div class="total-row"><span>مصاريف إضافية</span><strong>${CeramicMath.formatCurrency(Number(invoice.extraFees))}</strong></div>`
+      : '';
     const taxRow = invoice.taxAmount > 0
       ? `<div class="total-row"><span>ضريبة القيمة المضافة (${taxPercent}%)</span><strong>${CeramicMath.formatCurrency(invoice.taxAmount)}</strong></div>`
       : '';
@@ -453,7 +456,7 @@ export class PrintService {
             <div class="details">${detailsHtml}</div>
             <div class="totals">
               <div class="total-row"><span>المجموع الفرعي</span><strong>${CeramicMath.formatCurrency(invoice.subtotal)}</strong></div>
-              ${discountRow}${taxRow}${shippingRow}
+              ${discountRow}${taxRow}${shippingRow}${extraFeesRow}
               <div class="total-row grand-total"><span>الإجمالي</span><strong>${CeramicMath.formatCurrency(invoice.totalAmount)}</strong></div>
               <div class="total-row paid"><span>المبلغ المسدد</span><strong>${CeramicMath.formatCurrency(invoice.paidAmount)}</strong></div>
               ${invoice.remainingAmount > 0 ? `<div class="total-row balance"><span>المتبقي</span><strong>${CeramicMath.formatCurrency(invoice.remainingAmount)}</strong></div>` : ''}
@@ -726,6 +729,7 @@ export class PrintService {
               ${invoice.discountAmount > 0 ? `<div class="total-row" style="color: #dc2626;"><span>خصم الفاتورة:</span> <span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
               ${invoice.taxAmount > 0 ? `<div class="total-row"><span>ضريبة القيمة المضافة (${this.esc(invoice.taxPercentage)}%):</span> <span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
               ${invoice.shippingCost > 0 ? `<div class="total-row"><span>مصاريف النقل والمشال:</span> <span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+              ${Number(invoice.extraFees || 0) > 0 ? `<div class="total-row"><span>مصاريف إضافية:</span> <span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
               <div class="total-row grand-total"><span>صافي الفاتورة:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="total-row" style="color: #16a34a; font-weight: 700; margin-top: 4px;"><span>المبلغ المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="total-row" style="color: #dc2626; font-weight: 700;"><span>المتبقي (آجل):</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
@@ -900,6 +904,7 @@ export class PrintService {
               ${invoice.discountAmount > 0 ? `<div class="sum-row" style="color: #e11d48;"><span>خصم الفاتورة</span> <span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
               ${invoice.taxAmount > 0 ? `<div class="sum-row"><span>ضريبة القيمة المضافة (${this.esc(invoice.taxPercentage)}%)</span> <span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
               ${invoice.shippingCost > 0 ? `<div class="sum-row"><span>مصاريف النقل والمشال</span> <span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+              ${Number(invoice.extraFees || 0) > 0 ? `<div class="sum-row"><span>مصاريف إضافية</span> <span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
               <div class="grand-sum"><span>صافي الفاتورة</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="sum-row" style="margin-top: 6px; font-weight: 700; color: #16a34a;"><span>المبلغ المسدد</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="sum-row" style="font-weight: 700; color: #e11d48;"><span>المتبقي (آجل)</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
@@ -1032,6 +1037,7 @@ export class PrintService {
               ${invoice.discountAmount > 0 ? `<div class="tot-line" style="color:#dc2626;"><span>خصم:</span> <span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
               ${invoice.taxAmount > 0 ? `<div class="tot-line"><span>ضريبة (${this.esc(invoice.taxPercentage)}%):</span> <span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
               ${invoice.shippingCost > 0 ? `<div class="tot-line"><span>نقل:</span> <span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+              ${Number(invoice.extraFees || 0) > 0 ? `<div class="tot-line"><span>مصاريف إضافية:</span> <span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
               <div class="tot-line" style="font-weight: 900; border-top: 1.5px solid #000; margin-top: 2px; padding-top: 2px; font-size: ${isA5 ? '11px' : '12px'};">
                 <span>الصافي:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span>
               </div>
@@ -1207,6 +1213,7 @@ export class PrintService {
               ${invoice.discountAmount > 0 ? `<div class="tot-row" style="color: #dc2626;"><span>خصم الفاتورة:</span> <span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
               ${invoice.taxAmount > 0 ? `<div class="tot-row"><span>الضريبة (${this.esc(invoice.taxPercentage)}%):</span> <span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
               ${invoice.shippingCost > 0 ? `<div class="tot-row"><span>المشال والنقل:</span> <span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+              ${Number(invoice.extraFees || 0) > 0 ? `<div class="tot-row"><span>مصاريف إضافية:</span> <span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
               <div class="tot-row grand-tot"><span>صافي القيمة:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="tot-row" style="color: #16a34a; font-weight: 700;"><span>المبلغ المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="tot-row" style="color: #dc2626; font-weight: 700;"><span>المتبقي (آجل):</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
@@ -1297,6 +1304,7 @@ export class PrintService {
           ${invoice.discountAmount > 0 ? `<div class="totals-row"><span>خصم الفاتورة</span><span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
           ${invoice.taxAmount > 0 ? `<div class="totals-row"><span>ضريبة</span><span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
           ${invoice.shippingCost > 0 ? `<div class="totals-row"><span>مشال ونقل</span><span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+          ${Number(invoice.extraFees || 0) > 0 ? `<div class="totals-row"><span>مصاريف إضافية</span><span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
           <div class="totals-row grand"><span>الإجمالي</span><span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : 'آجل'}</span></div>
@@ -1406,6 +1414,7 @@ export class PrintService {
           ${invoice.discountAmount > 0 ? `<div class="totals-row"><span>خصم الفاتورة</span><span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
           ${invoice.taxAmount > 0 ? `<div class="totals-row"><span>ضريبة</span><span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
           ${invoice.shippingCost > 0 ? `<div class="totals-row"><span>مشال ونقل</span><span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
+          ${Number(invoice.extraFees || 0) > 0 ? `<div class="totals-row"><span>مصاريف إضافية</span><span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
           <div class="totals-row grand"><span>الإجمالي</span><span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : invoice.paymentType === 'BANK_TRANSFER' ? 'تحويل بنكي' : invoice.paymentType === 'CHEQUE' ? 'شيك' : invoice.paymentType === 'MIXED' ? 'دفع مختلط' : 'آجل'}</span></div>

@@ -10,6 +10,7 @@ export interface PosToolbarProps {
   canOpenShift: boolean;
   touchMode: boolean;
   heldCount: number;
+  isToolbarStacked?: boolean;
   isFullScreen?: boolean;
   onToggleFullScreen?: () => void;
   onCloseShift: () => void;
@@ -24,7 +25,7 @@ export interface PosToolbarProps {
 }
 
 export const PosToolbar: React.FC<PosToolbarProps> = (props) => (
-  <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 max-[1100px]:flex-col max-[1100px]:items-stretch">
+  <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 ${props.isToolbarStacked ? 'flex-col items-stretch' : ''}`}>
     <PosShiftStatus activeShift={props.activeShift} />
     <PosToolbarActions {...props} />
   </div>

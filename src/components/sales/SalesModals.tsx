@@ -193,6 +193,7 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
                 <SummaryRow label="خصم الفاتورة" value={-selected.discountAmount} tone={selected.discountAmount ? 'text-rose-600' : ''} />
                 <SummaryRow label="الضريبة" value={selected.taxAmount} />
                 <SummaryRow label="المشال والنقل" value={selected.shippingCost} />
+                <SummaryRow label="مصاريف إضافية" value={selected.extraFees || 0} />
                 <div className="border-t border-slate-300 mt-1 pt-2">
                   <SummaryRow label="إجمالي الفاتورة" value={selected.totalAmount} strong />
                   {canViewDebts && <SummaryRow label="المدفوع" value={selected.paidAmount} tone="text-emerald-600" />}

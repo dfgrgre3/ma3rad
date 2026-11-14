@@ -152,7 +152,7 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
       (SELECT id FROM sales_returns WHERE original_invoice_id=?)`, [invoice.id])[0].total);
   const returnIdempotencyKey = `sales-test-return-replay-${Date.now()}-${Math.random()}`;
   const saleItemId = q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [invoice.id])[0].id;
-  const partialReturn = svc.returnSale(invoice.id, [{
+  const _partialReturn = svc.returnSale(invoice.id, [{
     productId: 'prod_sale_1', invoiceItemId: saleItemId, quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'اختبار',
   }], false, 'usr_admin', { idempotencyKey: returnIdempotencyKey });
   assert.equal(Number(q(`SELECT COALESCE(SUM(total_cost),0) AS total FROM inventory_transactions

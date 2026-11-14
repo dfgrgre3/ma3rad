@@ -60,6 +60,7 @@ const formatInvoiceDetails = (invoice: DetailedInvoice, index: number): string[]
     `الإجمالي قبل الخصم والضريبة: ${fmt(invoice.subtotal)}`,
     `الخصم${invoice.discountPercentage ? ` (${invoice.discountPercentage}%)` : ''}: ${fmt(invoice.discountAmount)}`,
     `الشحن: ${fmt(invoice.shippingCost)}`,
+    ...(Number(invoice.extraFees || 0) > 0 ? [`مصاريف إضافية: ${fmt(Number(invoice.extraFees))}`] : []),
     `الضريبة${invoice.taxPercentage ? ` (${invoice.taxPercentage}%)` : ''}: ${fmt(invoice.taxAmount)}`,
     `إجمالي الفاتورة: ${fmt(invoice.totalAmount)}`,
     `المدفوع: ${fmt(invoice.paidAmount)} | المتبقي: ${fmt(invoice.remainingAmount)}`,

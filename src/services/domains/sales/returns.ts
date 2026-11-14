@@ -17,6 +17,7 @@ import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem, ReturnDisposition } from '../../../types/sales/serviceTypes';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { PartnerService } from '../customers/PartnerService';
+import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
@@ -77,12 +78,6 @@ export function createSaleReturn(
 
   const refundMethod = options.refundMethod || 'CASH';
   const invoiceBranchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
-  if (refundMethod === 'CASH' && refundCash) {
-    const registerId = options.registerId || ctx.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
-    ctx.branchAccess.requireRegisterAccess(registerId, actor, invoiceBranchId);
-    options = { ...options, registerId };
-  }
-
   const normalizedItems = normalizeReturnUnits(ctx, returnItems);
   const fingerprintItems = normalizedItems.map((item) => ({
     productId: item.productId,
@@ -160,7 +155,7 @@ export function createSaleReturn(
     if (!currentState || String(currentState[0]) === 'VOID') {
       throw new Error('لا يمكن إرجاع فاتورة ملغاة أو غير متاحة.');
     }
-    validateReturnShift(ctx, sqliteDb, options, actor, invoiceBranchId, refundMethod, refundCash, inv.paidAmount);
+    const resolvedOptions = validateReturnShift(options, invoiceBranchId, refundMethod, refundCash, inv.paidAmount);
     return createReturnInTransaction(sqliteDb, {
       invoiceId,
       returnId,
@@ -168,7 +163,7 @@ export function createSaleReturn(
       inv,
       items: normalizedItems,
       refundCash,
-      options,
+      options: { ...options, ...resolvedOptions },
       actor,
       trackInventory,
     }, requestedByProduct);
@@ -176,31 +171,18 @@ export function createSaleReturn(
 }
 
 function validateReturnShift(
-  ctx: SalesContext,
-  sqliteDb: DatabaseManager,
   options: ReturnOptions,
-  actor: ReturnType<typeof AuthService.requireAuth>,
   invoiceBranchId: string,
   refundMethod: NonNullable<ReturnOptions['refundMethod']>,
   refundCash: boolean,
   invoicePaidAmount: number
-): void {
-  if (refundMethod === 'CASH' && refundCash && Number(invoicePaidAmount || 0) > 0 && !options.shiftId) {
-    throw new Error('An open cash shift is required for a cash refund.');
-  }
-  if (!options.shiftId) return;
-  const shift = ctx.branchAccess.requireShiftAccess(options.shiftId, actor, options.registerId);
-  if (shift.status !== 'OPEN') throw new Error('The selected cash shift is closed.');
-  if (shift.branchId !== invoiceBranchId) throw new Error('The selected cash shift belongs to a different branch.');
-  const persistedShift = sqliteDb.query<{ status: string; branchId: string; registerId: string }>(
-    `SELECT status, branch_id AS branchId, register_id AS registerId FROM cash_shifts WHERE id = ?`,
-    [options.shiftId]
-  )[0];
-  if (!persistedShift || persistedShift.status !== 'OPEN'
-    || persistedShift.branchId !== invoiceBranchId
-    || (options.registerId && persistedShift.registerId !== options.registerId)) {
-    throw new Error('The selected cash shift is not open for this invoice branch and register.');
-  }
+): ReturnOptions {
+  const shift = new CashShiftPolicyService().resolve(invoiceBranchId, {
+    shiftId: options.shiftId,
+    registerId: options.registerId,
+    required: refundMethod === 'CASH' && refundCash && Number(invoicePaidAmount || 0) > 0,
+  });
+  return { ...options, shiftId: shift.shiftId, registerId: shift.registerId || options.registerId };
 }
 
 /**

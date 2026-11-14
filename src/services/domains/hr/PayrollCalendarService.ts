@@ -8,6 +8,8 @@ import { localDateString, addLocalDays } from '../../../utils/shared/date';
 import type { User } from '../../../types/auth/identity';
 import type { PayrollRun, PayrollRunItem } from './EmployeeService';
 
+import { EmployeeService } from './EmployeeService';
+
 const PAYROLL_EVENT_TITLE = (period: string) => `صرف رواتب موظفي شهر ${period}`;
 
 export interface PayrollCalendarEventView {
@@ -77,7 +79,6 @@ export class PayrollCalendarService {
   /** إنشاء أو تحديث حدث مالي في التقويم عند اعتماد دورة رواتب */
   public ensureEventForRun(runId: string): { eventId: string; created: boolean } {
     const actor = this.requireManage();
-    const { EmployeeService } = require('./EmployeeService');
     const run = EmployeeService.getPayrollRunById(runId);
     this.branchAccess.requireBranchAccess(run.branchId, actor);
 
@@ -166,7 +167,6 @@ export class PayrollCalendarService {
     this.branchAccess.requireBranchAccess(branchId, actor);
 
     const period = `${year}-${String(month).padStart(2, '0')}`;
-    const { EmployeeService } = require('./EmployeeService');
     const runs = EmployeeService.getAllPayrollRuns().filter((r: PayrollRun) => r.period === period);
 
     const events: PayrollCalendarEventView[] = [];
@@ -281,7 +281,6 @@ export class PayrollCalendarService {
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     this.branchAccess.requireBranchAccess(branchId, actor);
 
-    const { EmployeeService } = require('./EmployeeService');
     const runs = EmployeeService.getAllPayrollRuns();
     const today = localDateString();
 
@@ -311,7 +310,7 @@ export class PayrollCalendarService {
       const isOverdue = dueDate < today && remainingAmount > 0.009;
 
       if (isOverdue || remainingAmount > 0.009) {
-        const daysOverdue = dueDate < today
+        const _daysOverdue = dueDate < today
           ? Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${dueDate}T00:00:00Z`).getTime()) / 86_400_000)
           : 0;
 
@@ -382,7 +381,7 @@ export class PayrollCalendarService {
     reference?: string;
     notes?: string;
   }): void {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     this.financeCalendar.recordPayment({
       eventId: input.eventId,
       amount: input.amount,
@@ -394,13 +393,12 @@ export class PayrollCalendarService {
 
   /** إعادة جدولة تاريخ الاستحقاق لحدث رواتب */
   public reschedule(eventId: string, dueDate: string): void {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     this.financeCalendar.reschedule(eventId, dueDate);
   }
 
   /** جلب خيارات الصرف (خزينة، حسابات بنكية) */
   public getPayoutOptions() {
-    const { EmployeeService } = require('./EmployeeService');
     return EmployeeService.getPayrollPayoutOptions();
   }
 }

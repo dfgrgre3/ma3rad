@@ -19,6 +19,7 @@ export interface PosProductGridProps {
   gradeLabel: (grade: Product['grade']) => string;
   onAddToCart: (product: Product) => void;
   onAddMultipleToCart?: (products: Product[]) => void;
+  allowNegativeStock?: boolean;
   multiSelectEnabled?: boolean;
   viewMode?: PosProductViewMode;
   onViewModeChange?: (mode: PosProductViewMode) => void;
@@ -32,6 +33,21 @@ const stockStatusOf = (available: number, minLevel: number) => {
 
 const PAGE_SIZE = 48;
 
+const ProductImage: React.FC<{ src?: string; alt: string; compact?: boolean }> = ({ src, alt, compact = false }) => {
+  const [failed, setFailed] = useState(false);
+  const sizeClass = compact ? 'h-8 w-8' : 'h-[72px] w-full';
+
+  if (!src || failed) {
+    return (
+      <div aria-hidden="true" className={`flex ${sizeClass} shrink-0 items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 text-slate-300`}>
+        <Package className={compact ? 'h-4 w-4' : 'h-8 w-8'} strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} loading="lazy" className={`${sizeClass} shrink-0 object-cover bg-slate-100`} onError={() => setFailed(true)} />;
+};
+
 export const PosProductGrid: React.FC<PosProductGridProps> = ({
   products,
   productsTotal = products.length,
@@ -41,6 +57,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
   gradeLabel,
   onAddToCart,
   onAddMultipleToCart,
+  allowNegativeStock = false,
   multiSelectEnabled = false,
   viewMode = 'grid',
   onViewModeChange,
@@ -72,7 +89,12 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
   };
 
   const handleAddSelected = () => {
-    const toAdd = products.filter((p) => selectedProductIds.has(p.id));
+    const selected = products.filter((p) => selectedProductIds.has(p.id));
+    const blocked = selected.filter((p) => p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE' && stockOf(p.id) <= 0 && !allowNegativeStock);
+    const toAdd = selected.filter((p) => !blocked.includes(p));
+    if (blocked.length > 0) window.alert(`تم استبعاد ${blocked.length} صنف لعدم توفر رصيد في المخزن المحدد.`);
+    const outOfStock = toAdd.filter((p) => p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE' && stockOf(p.id) <= 0);
+    if (outOfStock.length > 0 && !window.confirm(`يوجد ${outOfStock.length} صنف بدون رصيد. هل تريد إضافتها مع السماح بالمخزون السالب؟`)) return;
     if (toAdd.length === 0) return;
     if (onAddMultipleToCart) {
       onAddMultipleToCart(toAdd);
@@ -123,9 +145,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
       render: (product) => (
         <div className="flex min-w-[180px] items-center gap-2">
           <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-            {product.imagePath
-              ? <img src={product.imagePath} alt="" loading="lazy" className="h-full w-full object-cover" />
-              : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-4 w-4" /></div>}
+            <ProductImage src={product.imagePath} alt="" compact />
           </div>
           <span className="font-bold text-slate-900">{product.name}</span>
         </div>
@@ -232,8 +252,14 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
         <button
           type="button"
           aria-label={`إضافة ${product.name} إلى السلة`}
-          onClick={() => onAddToCart(product)}
-          className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+          onClick={() => {
+            const available = stockOf(product.id);
+            if (available <= 0 && allowNegativeStock && !window.confirm(`رصيد ${product.name} غير متاح (${formatProductQuantity(available, product)}). هل تريد إضافته مع السماح بالمخزون السالب؟`)) return;
+            onAddToCart(product);
+          }}
+          disabled={stockOf(product.id) <= 0 && !allowNegativeStock && product.productType !== 'GENERAL' && product.baseUnit !== 'SERVICE'}
+          title={stockOf(product.id) <= 0 && !allowNegativeStock ? 'لا يمكن الإضافة: لا يوجد رصيد متاح في المخزن المحدد' : undefined}
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
         >
           <Plus className="h-3.5 w-3.5" />
           أضف للسلة
@@ -253,6 +279,8 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
     const status = stockStatusOf(available, p.minStockLevel);
     const unitLabel = getProductUnitLabel(p);
     const isCeramic = p.productType !== 'GENERAL';
+    const isTrackedStock = p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE';
+    const cannotAdd = isTrackedStock && available <= 0 && !allowNegativeStock;
 
     return (
       <article
@@ -286,26 +314,17 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
         <button
           type="button"
           aria-label={`إضافة ${p.name} إلى السلة`}
-          onClick={() => onAddToCart(p)}
-          className="w-full flex flex-1 flex-col text-right rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500"
+          onClick={() => {
+            if (cannotAdd) return;
+            if (isTrackedStock && available <= 0 && allowNegativeStock && !window.confirm(`رصيد ${p.name} غير متاح (${formatProductQuantity(available, p)}). هل تريد إضافته مع السماح بالمخزون السالب؟`)) return;
+            onAddToCart(p);
+          }}
+          disabled={cannotAdd}
+          title={cannotAdd ? 'لا يمكن الإضافة: لا يوجد رصيد متاح في المخزن المحدد' : undefined}
+          className={`w-full flex flex-1 flex-col text-right rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${cannotAdd ? 'cursor-not-allowed opacity-70' : ''}`}
         >
           {/* صورة المنتج — أو مكان مخصص لها لو لم تُضف بعد */}
-          {p.imagePath ? (
-            <img
-              src={p.imagePath}
-              alt={p.name}
-              loading="lazy"
-              className="h-[72px] w-full shrink-0 object-cover bg-slate-100"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          ) : (
-            <div
-              aria-hidden="true"
-              className="flex h-[72px] w-full shrink-0 items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 text-slate-300"
-            >
-              <Package className="h-8 w-8" strokeWidth={1.5} />
-            </div>
-          )}
+          <ProductImage src={p.imagePath} alt={p.name} />
 
           <div className="flex min-w-0 flex-1 flex-col p-2 pb-1.5">
             <div className="mb-1 flex items-center justify-between gap-1.5">
@@ -337,7 +356,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.className}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                  {status.label}
+                  {cannotAdd ? 'غير متاح للبيع' : status.label}
                 </span>
                 <span className={`text-[11px] font-black tabular-nums ${isLow || available <= 0 ? 'text-amber-700' : 'text-slate-600'}`}>
                   {formatProductQuantity(available, p)}
@@ -346,8 +365,8 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
             </div>
           </div>
 
-          <span className="flex items-center justify-center gap-1.5 border-t border-slate-100 bg-slate-50/60 py-1.5 text-[11px] font-black text-sky-800 transition group-hover:bg-sky-50 group-hover:text-sky-900">
-            <Plus className="h-3.5 w-3.5" /> أضف إلى السلة
+          <span className={`flex items-center justify-center gap-1.5 border-t border-slate-100 py-1.5 text-[11px] font-black ${cannotAdd ? 'bg-rose-50 text-rose-700' : isTrackedStock && available <= p.minStockLevel ? 'bg-amber-50 text-amber-800' : 'bg-slate-50/60 text-sky-800 transition group-hover:bg-sky-50 group-hover:text-sky-900'}`}>
+            <Plus className="h-3.5 w-3.5" /> {cannotAdd ? 'لا يوجد رصيد متاح' : isTrackedStock && available <= p.minStockLevel ? `رصيد منخفض · ${formatProductQuantity(available, p)}` : 'أضف إلى السلة'}
           </span>
         </button>
       </article>
@@ -359,7 +378,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
       {/* شريط الوضع: Grid / List + عدد النتائج */}
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-1 pt-2">
         <span className="text-[11px] text-slate-500 font-bold" aria-live="polite">
-          {products.length > 0 && `يعرض ${Math.min(renderedProducts.length, products.length)} من ${products.length} صنف`}
+          {products.length > 0 && `يعرض ${Math.min(renderedProducts.length, products.length)} من ${products.length} محمّل · الإجمالي ${productsTotal} · المتبقي للتحميل ${Math.max(0, productsTotal - products.length)}`}
         </span>
         {onViewModeChange && (
           <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -399,7 +418,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                 onClick={selectAll}
                 className="text-[11px] text-sky-700 hover:text-sky-900 font-bold px-1.5 py-0.5 rounded hover:bg-sky-100"
               >
-                تحديد الكل
+                تحديد المنتجات المعروضة
               </button>
               {selectedProductIds.size > 0 && (
                 <button
@@ -456,11 +475,11 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                   </button>
                 </div>
               )}
-              {onLoadMore && products.length < productsTotal && <div className="flex shrink-0 justify-center pt-3"><button type="button" onClick={onLoadMore} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 shadow-sm">تحميل الصفحة التالية</button></div>}
+              {onLoadMore && products.length < productsTotal && <div className="flex shrink-0 justify-center pt-3"><button type="button" onClick={onLoadMore} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 shadow-sm">تحميل المزيد من المنتجات ({productsTotal - products.length} متبقي)</button></div>}
             </>
           ) : (
             <>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start items-start gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] content-start items-start gap-2">
                 {renderedProducts.map(renderCard)}
               </div>
               {visibleLimit < products.length && (
@@ -474,7 +493,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                   </button>
                 </div>
               )}
-              {onLoadMore && products.length < productsTotal && <div className="flex justify-center pt-4"><button type="button" onClick={onLoadMore} className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 shadow-sm">تحميل الصفحة التالية</button></div>}
+              {onLoadMore && products.length < productsTotal && <div className="flex justify-center pt-4"><button type="button" onClick={onLoadMore} className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 shadow-sm">تحميل المزيد من المنتجات ({productsTotal - products.length} متبقي)</button></div>}
             </>
           )
         )}

@@ -82,9 +82,20 @@ export const CartLine: React.FC<CartLineProps> = ({
 
   return (
     <div
+      role="group"
+      tabIndex={0}
+      aria-label={`سطر السلة: ${item.product.name}`}
+      onFocus={() => onSelect?.(index)}
       onClick={() => onSelect?.(index)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect?.(index);
+        }
+      }}
       aria-current={isActive || undefined}
-      className={`bg-white dark:bg-slate-900 p-2 rounded-xl border text-xs space-y-1.5 cursor-pointer transition ${
+      className={`bg-white dark:bg-slate-900 p-2 rounded-xl border text-xs space-y-1.5 cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 ${
         overStock ? 'border-rose-500/50' : isActive ? 'border-sky-500 ring-2 ring-sky-500/25' : 'border-slate-200/80 dark:border-slate-800'
       }`}
     >

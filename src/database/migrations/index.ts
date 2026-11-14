@@ -3350,6 +3350,17 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '194_sales_invoice_extra_fee_breakdown',
+    description: 'Store additional sales invoice fees separately and post them to their own revenue account.',
+    up: (db: Database) => {
+      addColumn(db, 'sales_invoices', 'extra_fees', 'REAL NOT NULL DEFAULT 0');
+      db.run(
+        `INSERT OR IGNORE INTO chart_of_accounts (id, code, name, type, balance, is_active)
+         VALUES ('acc_4103', '4103', 'إيرادات المصاريف الإضافية', 'REVENUE', 0, 1)`
+      );
+    },
+  },
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

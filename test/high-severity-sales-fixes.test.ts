@@ -8,7 +8,6 @@ import { BranchAccessService } from '../src/services/domains/auth/BranchAccessSe
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { OrderService } from '../src/services/domains/sales/OrderService.ts';
 import { ApprovalService } from '../src/services/domains/approvals/ApprovalService.ts';
-import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { evaluateManualDiscountPolicy } from '../src/services/domains/sales/discountPolicy.ts';
 import { basePriceFromUnitPrice, toBaseQuantity } from '../src/utils/products/uom.ts';
@@ -58,7 +57,7 @@ test('discount policy uses a single gross-subtotal basis across all entry points
   const lineDiscount = 50;
   const headerDiscount = 150;
   const gross = 1000;
-  const net = gross - lineDiscount; // 950
+  const _net = gross - lineDiscount; // 950
   const p2 = evaluateManualDiscountPolicy({ grossSubtotal: gross, totalDiscount: lineDiscount + headerDiscount, thresholdPercent: 10 });
   assert.equal(p2.requiresApproval, true);
   // the old net-base computation would have used 200/950 = 21.05% — still approval,
@@ -71,7 +70,7 @@ test('discount policy uses a single gross-subtotal basis across all entry points
 });
 
 test('POS box price conversion agrees with invoice service for all base units', async () => {
-  for (const [baseUnit, boxToBase] of [['M2', 1.44], ['PIECE', 12], ['BOX', 1]] as [string, number][]) {
+  for (const [baseUnit, _boxToBase] of [['M2', 1.44], ['PIECE', 12], ['BOX', 1]] as [string, number][]) {
     const product = {
       baseUnit,
       metersPerBox: baseUnit === 'M2' ? 1.44 : 1,

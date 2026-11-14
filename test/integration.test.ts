@@ -369,6 +369,9 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(firstDelivery.status, 'PARTIAL');
   assert.equal(firstDelivery.items![0].deliveredM2, 10);
   assert.equal(firstDelivery.deliveryStatus, 'PARTIAL');
+  assert.throws(() => orderSvc.cancelOrder(order.id), /لا يمكن إلغاء طلب سُجّل له تسليم/);
+  assert.equal(q('SELECT reserved_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].reservedM2, 20,
+    'a rejected cancellation must retain the order reservation');
   assert.throws(() => orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 11 }]), /تتجاوز المتبقي/);
   orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم ثانٍ');
   assert.equal(orderSvc.getOrder(order.id)!.items![0].deliveredM2, 20);

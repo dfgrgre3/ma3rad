@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { UserPlus, Wallet, CreditCard, Star, Receipt, X, ListFilter } from 'lucide-react';
 import type { Customer } from '../../../../types';
 import { CeramicMath } from '../../../../utils/products/ceramicMath';
@@ -30,6 +30,8 @@ export interface PosCustomerPickerProps {
   hasMoreCustomers?: boolean;
   onLoadMoreCustomers?: () => void;
   canCreateCustomer: boolean;
+  canSearchTaxNumber?: boolean;
+  canViewCustomerFinancials?: boolean;
   onSearchChange: (value: string) => void;
   onSelectCustomer: (customer: Customer) => void;
   onCreateNewCustomer: () => void;
@@ -49,6 +51,8 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
   hasMoreCustomers = false,
   onLoadMoreCustomers,
   canCreateCustomer,
+  canSearchTaxNumber = false,
+  canViewCustomerFinancials = false,
   onSearchChange,
   onSelectCustomer,
   onCreateNewCustomer,
@@ -56,12 +60,22 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
   customerSummary,
 }) => {
   const [isCustomerSelectionOpen, setIsCustomerSelectionOpen] = useState(false);
+  const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
   const closeCustomerSelection = useCallback(() => setIsCustomerSelectionOpen(false), []);
+  useEffect(() => {
+    if (!selectedCustomer || selectedCustomer.id === 'cust_cash') return;
+    setRecentCustomers((current) => [selectedCustomer, ...current.filter((customer) => customer.id !== selectedCustomer.id)].slice(0, 4));
+  }, [selectedCustomer]);
   const isWalkIn = selectedCustomer?.id === 'cust_cash';
   const balance = selectedCustomer?.currentBalance ?? 0;
   const availableCredit = selectedCustomer
     ? Math.max(0, selectedCustomer.creditLimit - Math.max(0, balance))
     : 0;
+  const creditUsage = selectedCustomer && selectedCustomer.creditLimit > 0
+    ? Math.max(0, balance) / selectedCustomer.creditLimit
+    : 0;
+  const isOverCreditLimit = Boolean(selectedCustomer && selectedCustomer.creditLimit > 0 && balance > selectedCustomer.creditLimit);
+  const isNearCreditLimit = Boolean(selectedCustomer && selectedCustomer.creditLimit > 0 && creditUsage >= 0.8 && !isOverCreditLimit);
   return (
     <div className="shrink-0 space-y-1 border-b border-slate-200 bg-slate-50/70 p-2 dark:border-slate-800 dark:bg-slate-900/70">
       <div className="flex items-center justify-between text-xs font-black text-slate-700 dark:text-slate-200">
@@ -91,7 +105,7 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
             id="pos-customer-search"
             value={selectedCustomer ? selectedCustomer.name : customerSearch}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="ابحث بالاسم أو الهاتف أو الكود… (F3)"
+            placeholder={`ابحث بالاسم أو الهاتف أو الكود${canSearchTaxNumber ? ' أو الرقم الضريبي' : ''}… (F3)`}
             aria-label="بحث العميل"
             className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
@@ -108,6 +122,16 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
             <ListFilter className="w-4 h-4" />
           </button>
         </div>
+        {!selectedCustomer && !customerSearch.trim() && recentCustomers.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-1.5" aria-label="عملاء تم اختيارهم مؤخرًا خلال هذه الجلسة">
+            <span className="text-[10px] font-bold text-slate-500">الأخيرة:</span>
+            {recentCustomers.map((customer) => (
+              <button key={customer.id} type="button" onClick={() => onSelectCustomer(customer)} className="max-w-36 truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-sky-400 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                {customer.name}
+              </button>
+            ))}
+          </div>
+        )}
         {!selectedCustomer && customerSearch.trim() && (
           <div className="selection-list absolute z-20 mt-1 max-h-64 w-full overflow-y-auto">
             {filteredCustomers.length === 0 ? (
@@ -125,8 +149,8 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
                   </div>
                   <div className="selection-list__meta flex items-center justify-between gap-2 text-xs">
                     <span>{CUSTOMER_TYPE_LABELS[c.customerType]}</span>
-                    {c.currentBalance > 0 && <span className="font-bold text-amber-700 dark:text-amber-400">مدين: {CeramicMath.formatCurrency(c.currentBalance)}</span>}
-                    {c.currentBalance < 0 && <span className="font-bold text-emerald-700 dark:text-emerald-400">دائن: {CeramicMath.formatCurrency(-c.currentBalance)}</span>}
+                    {canViewCustomerFinancials && c.currentBalance > 0 && <span className="font-bold text-amber-700 dark:text-amber-400">مدين: {CeramicMath.formatCurrency(c.currentBalance)}</span>}
+                    {canViewCustomerFinancials && c.currentBalance < 0 && <span className="font-bold text-emerald-700 dark:text-emerald-400">دائن: {CeramicMath.formatCurrency(-c.currentBalance)}</span>}
                   </div>
                 </button>
               ))
@@ -139,6 +163,7 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
       <PosCustomerSelectionDialog
         isOpen={isCustomerSelectionOpen}
         customerService={customerService}
+        canSearchTaxNumber={canSearchTaxNumber}
         selectedCustomerId={selectedCustomer?.id}
         onClose={closeCustomerSelection}
         onSelectCustomer={onSelectCustomer}
@@ -155,12 +180,13 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
             {isWalkIn && <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">بيع نقدي مباشر</span>}
           </div>
 
-          {!isWalkIn && (
+          {!isWalkIn && canViewCustomerFinancials && (
+            <>
             <div className="grid grid-cols-3 gap-x-1">
               {/* الرصيد / المديونية */}
-              <div className="min-w-0 px-1.5 py-1 text-center" title="الرصيد الحالي للعميل">
-              <div className="flex flex-wrap items-center justify-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400"><Wallet className="h-3.5 w-3.5 shrink-0" />الرصيد</div>
-              <div className={`mt-0.5 break-words text-xs font-black leading-tight tabular-nums ${balance > 0 ? 'text-amber-600 dark:text-amber-400' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+              <div className={`min-w-0 rounded-xl border px-1.5 py-2 text-center ${balance > 0 ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700'}`} title="الرصيد الحالي للعميل">
+              <div className={`flex flex-wrap items-center justify-center gap-1 text-xs font-bold ${balance > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400'}`}><Wallet className="h-3.5 w-3.5 shrink-0" />{balance > 0 ? 'مديونية العميل' : 'الرصيد'}</div>
+              <div className={`mt-0.5 break-words text-sm font-black leading-tight tabular-nums ${balance > 0 ? 'text-amber-700 dark:text-amber-300' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
                   {CeramicMath.formatCurrency(Math.abs(balance))}
                 </div>
                 <div className="break-words text-xs leading-tight text-slate-500 dark:text-slate-400">{balance > 0 ? 'عليه مديونية' : balance < 0 ? 'له رصيد' : 'لا يوجد رصيد'}</div>
@@ -180,10 +206,19 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
                 <div className="break-words text-xs leading-tight text-slate-500 dark:text-slate-400">نقاط متاحة</div>
               </div>
             </div>
+
+            {(isOverCreditLimit || isNearCreditLimit) && (
+              <div role="status" className={`rounded-xl border px-3 py-2 text-xs font-bold ${isOverCreditLimit ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'}`}>
+                {isOverCreditLimit
+                  ? `تجاوز العميل حد الائتمان بمقدار ${CeramicMath.formatCurrency(balance - selectedCustomer!.creditLimit)} ج.م.`
+                  : `اقترب العميل من حد الائتمان: استُخدم ${Math.round(creditUsage * 100)}٪، والمتاح ${CeramicMath.formatCurrency(availableCredit)} ج.م.`}
+              </div>
+            )}
+            </>
           )}
 
           {/* آخر تعاملات العميل */}
-          {!isWalkIn && customerSummary && customerSummary.recentInvoices.length > 0 && (
+          {!isWalkIn && canViewCustomerFinancials && customerSummary && customerSummary.recentInvoices.length > 0 && (
             <div className="min-w-0 px-2.5 py-1">
               <div className="mb-1 flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300"><Receipt className="h-3.5 w-3.5" />آخر التعاملات</div>
               <ul className="space-y-0.5">

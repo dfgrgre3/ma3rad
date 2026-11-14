@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, Calculator, ClipboardList, Plus, Trash2, Package, ArrowRight,
@@ -358,7 +358,7 @@ export const ApartmentEstimatePage: React.FC = () => {
       setSelectedEstimateId('');
       setDataError(error instanceof Error ? error.message : 'تعذر تحميل تصميم المشروع.');
     }
-  }, [projectId, projects, projectEstimateService]);
+  }, [projectId, projects, projectEstimateService, selectedEstimateId]);
 
   const restoreEstimateDraft = () => {
     if (!recoveryDraft) return;
@@ -445,7 +445,7 @@ export const ApartmentEstimatePage: React.FC = () => {
     try { window.localStorage.setItem(LOCAL_LINE_TEMPLATES_KEY, JSON.stringify(next)); }
     catch { setDataError('تعذر حفظ قالب البند في هذا الجهاز.'); }
   };
-  const useLineTemplate = (templateId: string) => {
+  const applyLineTemplate = (templateId: string) => {
     const template = lineTemplates.find((item) => item.id === templateId);
     if (template) setLines((current) => [...current, { ...template.line, id: makeId(), attachments: [] }]);
   };
@@ -650,7 +650,7 @@ export const ApartmentEstimatePage: React.FC = () => {
     setProjectEstimates(projectEstimateService.getByProject(projectId));
   };
 
-  const refreshExecution = (id = projectId) => {
+  const refreshExecution = useCallback((id = projectId) => {
     if (!id || !canViewProjects) { setExecutionSummary(null); setExecutionContracts([]); setExecutionCertificates([]); setExecutionCosts([]); setExecutionPurchases([]); return; }
     try {
       setExecutionSummary(executionService.getSummary(id));
@@ -659,9 +659,9 @@ export const ApartmentEstimatePage: React.FC = () => {
       setExecutionCosts(executionService.getActualCosts(id));
       setExecutionPurchases(canViewPurchaseRequests ? new PurchaseRequestService().getProjectRequests(id) : []);
     } catch (error) { setDataError(error instanceof Error ? error.message : 'تعذر تحميل دورة تنفيذ المشروع.'); }
-  };
+  }, [projectId, canViewProjects, canViewPurchaseRequests, executionService]);
 
-  useEffect(() => { refreshExecution(); }, [projectId, canViewProjects, canViewPurchaseRequests, executionService]);
+  useEffect(() => { refreshExecution(); }, [projectId, canViewProjects, canViewPurchaseRequests, executionService, refreshExecution]);
 
   const initializeExecution = () => {
     if (!selectedEstimateId || !projectId) return;
@@ -1197,7 +1197,7 @@ export const ApartmentEstimatePage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" disabled={materialActionBusy || materialActionsCreated.purchase} onClick={() => { if (window.confirm('هل اعتمدت المقايسة؟ سيتم إنشاء طلب شراء للعجز فقط.')) createPurchaseRequestForShortages(); }} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 disabled:opacity-50">{materialActionsCreated.purchase ? 'تم إنشاء طلب الشراء' : 'طلب شراء للعجز'}</button>
             <button type="button" disabled={materialActionBusy || materialActionsCreated.issue} onClick={() => { if (window.confirm('هل اعتمدت المقايسة؟ سينشأ طلب صرف للمواد المتاحة، وسيبقى بانتظار اعتماد المخول.')) createStockIssueRequests(); }} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900 disabled:opacity-50">{materialActionsCreated.issue ? 'تم إنشاء طلب الصرف' : 'طلب صرف المتاح'}</button>
-            <select aria-label="إضافة قالب بند محفوظ" defaultValue="" onChange={(event) => { useLineTemplate(event.target.value); event.target.value = ''; }} className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-800"><option value="">إضافة من القوالب…</option>{lineTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>
+            <select aria-label="إضافة قالب بند محفوظ" defaultValue="" onChange={(event) => { applyLineTemplate(event.target.value); event.target.value = ''; }} className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-800"><option value="">إضافة من القوالب…</option>{lineTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>
             <button type="button" onClick={() => setLines((current) => [...current, newLine('أعمال أخرى', 'بند جديد', 'manual', 'بند')])} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-800"><Plus className="h-4 w-4" /> إضافة بند</button>
           </div>
         </div>

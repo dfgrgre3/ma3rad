@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Customer, Product } from '../../../../types';
 import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../../../utils/products/productUnits';
@@ -46,6 +46,8 @@ export const usePosCart = ({
   allowDuplicateItems = false,
 }: UsePosCartOptions) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [recentlyRemoved, setRecentlyRemoved] = useState<{ item: CartItem; index: number } | null>(null);
+  const recentlyRemovedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const makeCartItem = useCallback((product: Product, quantityM2: number): CartItem => {
     const metersPerBox = product.metersPerBox || 1.44;
@@ -178,8 +180,26 @@ export const usePosCart = ({
   };
 
   const removeFromCart = (index: number) => {
+    const item = cart[index];
+    if (!item) return;
+    setRecentlyRemoved({ item, index });
+    if (recentlyRemovedTimer.current) clearTimeout(recentlyRemovedTimer.current);
+    recentlyRemovedTimer.current = setTimeout(() => setRecentlyRemoved(null), 6000);
     setCart((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const undoRemoveFromCart = useCallback(() => {
+    if (!recentlyRemoved) return;
+    const removed = recentlyRemoved;
+    setCart((prev) => {
+      const next = [...prev];
+      next.splice(Math.min(removed.index, next.length), 0, removed.item);
+      return next;
+    });
+    setRecentlyRemoved(null);
+    if (recentlyRemovedTimer.current) clearTimeout(recentlyRemovedTimer.current);
+    recentlyRemovedTimer.current = null;
+  }, [recentlyRemoved]);
 
   const updateCartQuantity = (index: number, value: number) => {
     if (!Number.isFinite(value) || value < 0) return;
@@ -295,5 +315,7 @@ export const usePosCart = ({
     updateCartPrice,
     updateCartLineDiscount,
     removeFromCart,
+    recentlyRemoved: recentlyRemoved?.item || null,
+    undoRemoveFromCart,
   };
 };

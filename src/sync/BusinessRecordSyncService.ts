@@ -29,7 +29,7 @@ const RECORD_SPECS: Record<BusinessRecordType, RecordSpec> = {
     headerColumns: [
       'id', 'invoice_number', 'date', 'due_date', 'customer_id', 'warehouse_id',
       'branch_id', 'company_id', 'subtotal', 'discount_amount', 'tax_amount',
-      'shipping_cost', 'total_amount', 'paid_amount', 'remaining_amount',
+      'shipping_cost', 'extra_fees', 'total_amount', 'paid_amount', 'remaining_amount',
       'payment_type', 'payment_status', 'invoice_status', 'total_cost',
       'gross_profit', 'returned_amount', 'notes', 'created_at', 'updated_at',
     ],

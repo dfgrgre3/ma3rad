@@ -12,6 +12,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   hasMoreCustomers,
   onLoadMoreCustomers,
   canCreateCustomer,
+  canSearchTaxNumber,
+  canViewCustomerFinancials,
   onCustomerSearchChange,
   onSelectCustomer,
   onCreateNewCustomer,
@@ -43,6 +45,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
       hasMoreCustomers={hasMoreCustomers}
       onLoadMoreCustomers={onLoadMoreCustomers}
       canCreateCustomer={canCreateCustomer}
+      canSearchTaxNumber={canSearchTaxNumber}
+      canViewCustomerFinancials={canViewCustomerFinancials}
       onSearchChange={onCustomerSearchChange}
       onSelectCustomer={onSelectCustomer}
       onCreateNewCustomer={onCreateNewCustomer}
@@ -51,13 +55,13 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
     />
 
     {recentlyRemoved && onUndoRemove && (
-      <div className="px-3 pt-2">
+      <div className="px-3 pt-2" role="status" aria-live="polite">
         <button
           type="button"
           onClick={onUndoRemove}
           className="w-full px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold transition"
         >
-          تراجع عن حذف {recentlyRemoved.product?.name || 'المنتج'}
+          تم حذف {recentlyRemoved.product?.name || 'المنتج'} من السلة — تراجع
         </button>
       </div>
     )}
@@ -80,7 +84,14 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
             index={index}
             enableNegativeStock={enableNegativeStock}
             gradeLabel={gradeLabel}
-            onRemove={onRemove}
+            onRemove={(removedIndex) => {
+              onRemove(removedIndex);
+              if (activeCartIndex === removedIndex) {
+                const nextIndex = Math.min(removedIndex, cart.length - 2);
+                if (nextIndex >= 0) onSelectCartLine?.(nextIndex);
+              }
+              else if (activeCartIndex !== undefined && activeCartIndex !== null && activeCartIndex > removedIndex) onSelectCartLine?.(activeCartIndex - 1);
+            }}
             onUpdateUnit={onUpdateUnit}
             onStepQuantity={onStepQuantity}
             onUpdateQuantity={onUpdateQuantity}

@@ -5,6 +5,7 @@ export interface Customer {
   phone: string;
   phone2?: string;
   nationalId?: string;
+  taxNumber?: string;
   address?: string;
   city?: string;
   customerType: 'RETAIL' | 'CONTRACTOR' | 'WHOLESALE' | 'ENGINEER';

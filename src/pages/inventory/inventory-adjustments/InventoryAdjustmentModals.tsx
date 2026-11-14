@@ -71,7 +71,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
   setShowDetailModal,
   selectedAdjustment,
   selectedItems,
-  _fmt,
+  fmt,
   showCreateModal,
   setShowCreateModal,
   errorMsg,

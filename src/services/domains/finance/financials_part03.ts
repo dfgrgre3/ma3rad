@@ -6,6 +6,7 @@ export interface SaleTotalsResult {
   discountAmount: number;
   taxAmount: number;
   shippingCost: number;
+  extraFees: number;
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number;
@@ -23,7 +24,9 @@ export function computeSaleTotals(input: SaleTotalsInput): SaleTotalsResult {
   const taxAmount = fromMinorUnits(taxMinor);
   const shippingMinor = toMinorUnits(Math.max(0, input.shippingCost || 0));
   const shippingCost = fromMinorUnits(shippingMinor);
-  const totalMinor = subtotalMinor - discountMinor + taxMinor + shippingMinor;
+  const extraFeesMinor = toMinorUnits(Math.max(0, input.extraFees || 0));
+  const extraFees = fromMinorUnits(extraFeesMinor);
+  const totalMinor = subtotalMinor - discountMinor + taxMinor + shippingMinor + extraFeesMinor;
   const totalAmount = fromMinorUnits(totalMinor);
   const paidMinor = toMinorUnits(Math.max(0, input.paidAmount || 0));
   const paidAmount = fromMinorUnits(paidMinor);
@@ -38,6 +41,7 @@ export function computeSaleTotals(input: SaleTotalsInput): SaleTotalsResult {
     discountAmount,
     taxAmount,
     shippingCost,
+    extraFees,
     totalAmount,
     paidAmount,
     remainingAmount,

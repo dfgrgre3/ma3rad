@@ -26,6 +26,7 @@ import { PricingService } from './PricingService';
 import { evaluateManualDiscountPolicy } from './discountPolicy';
 import { AppConfigService } from '../config/AppConfigService';
 import { basePriceFromUnitPrice } from '../../../utils/products/uom';
+import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
 
 type PreparedSaleItem = {
   id: string;
@@ -79,6 +80,7 @@ function validateSaleNumbers(dto: CreateSaleDTO): void {
   assertFiniteNonNegative(dto.taxAmount, 'مبلغ الضريبة');
   assertFiniteNonNegative(dto.taxPercentage, 'نسبة الضريبة');
   assertFiniteNonNegative(dto.shippingCost, 'تكلفة الشحن');
+  assertFiniteNonNegative(dto.extraFees, 'المصاريف الإضافية');
   if (Number(dto.discountPercentage || 0) > 100 || Number(dto.taxPercentage || 0) > 100) {
     throw new Error('نسبة الخصم أو الضريبة غير صحيحة.');
   }
@@ -87,7 +89,7 @@ function validateSaleNumbers(dto: CreateSaleDTO): void {
     const prefix = `بيانات الصنف رقم ${index + 1}`;
     assertFiniteNonNegative(item.quantityM2, `${prefix}: الكمية`, true);
     assertFiniteNonNegative(item.boxesCount, `${prefix}: عدد العبوات`, true);
-    assertFiniteNonNegative(item.piecesCount, `${prefix}: عدد القطع`, true);
+    assertFiniteNonNegative(item.piecesCount, `${prefix}: عدد القطع`);
     assertFiniteNonNegative(item.unitPrice, `${prefix}: سعر البيع`, true);
     assertFiniteNonNegative(item.unitCost, `${prefix}: التكلفة`);
     assertFiniteNonNegative(item.discountAmount, `${prefix}: الخصم`);
@@ -111,18 +113,17 @@ function validateSaleNumbers(dto: CreateSaleDTO): void {
   }
 }
 
-function resolveCashRegister(ctx: SalesContext, dto: CreateSaleDTO, actor: any): { branchId: string; cashRegisterId: string } {
+function resolveCashRegister(
+  ctx: SalesContext,
+  dto: CreateSaleDTO,
+  actor: any,
+  tenderPayments: ReturnType<typeof resolvePayments>
+): { branchId: string; cashRegisterId: string } {
   const branchId = ctx.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
-  const branchRegisterId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
-  let cashRegisterId = branchRegisterId;
-
-  if (dto.shiftId) {
-    const shift = ctx.branchAccess.requireShiftAccess(dto.shiftId, actor);
-    if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
-    if (shift.branchId !== branchId) throw new Error('يجب أن تتبع الوردية فرع فاتورة البيع.');
-    cashRegisterId = shift.registerId;
-  }
-
+  const requiresShift = tenderPayments.some((payment) => payment.method === 'CASH' && payment.amount > 0);
+  const shift = new CashShiftPolicyService().resolve(branchId, { shiftId: dto.shiftId, required: requiresShift });
+  dto.shiftId = shift.shiftId;
+  const cashRegisterId = shift.registerId || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
   return { branchId, cashRegisterId };
 }
 
@@ -140,6 +141,31 @@ function getUnitLabel(product: any): string {
 
 function validateProductPricing(sqliteDb: any, dto: CreateSaleDTO, item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number, quantityM2: number): void {
   if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) throw new Error('سعر بيع الصنف غير صحيح.');
+  if (item.pricingSource === 'ORDER') {
+    const agreed = dto.orderId && item.orderItemId ? sqliteDb.query<any>(
+      `SELECT oi.quantity_m2 AS quantityM2, oi.unit_price AS unitPrice, oi.discount_amount AS discountAmount
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+       WHERE o.id = ? AND o.customer_id = ? AND oi.id = ? AND oi.product_id = ?`,
+      [dto.orderId, dto.customerId, item.orderItemId, item.productId]
+    )[0] : null;
+    if (!agreed || round2(Number(agreed.quantityM2)) !== round2(quantityM2)
+      || round2(Number(agreed.unitPrice)) !== round2(baseUnitPrice)
+      || round2(Number(agreed.discountAmount || 0)) !== round2(Number(item.discountAmount || 0))) {
+      throw new Error('سعر الطلب أو كميته لا يطابقان بيانات الطلب المرتبط.');
+    }
+  } else if (item.pricingSource === 'QUOTATION') {
+    const agreed = dto.quotationId && item.quotationItemId ? sqliteDb.query<any>(
+      `SELECT qi.quantity_m2 AS quantityM2, qi.unit_price AS unitPrice, qi.discount_amount AS discountAmount
+       FROM quotation_items qi JOIN quotations q ON q.id = qi.quotation_id
+       WHERE q.id = ? AND q.customer_id = ? AND q.status = 'PENDING' AND qi.id = ? AND qi.product_id = ?`,
+      [dto.quotationId, dto.customerId, item.quotationItemId, item.productId]
+    )[0] : null;
+    if (!agreed || round2(Number(agreed.quantityM2)) !== round2(quantityM2)
+      || round2(Number(agreed.unitPrice)) !== round2(baseUnitPrice)
+      || round2(Number(agreed.discountAmount || 0)) !== round2(Number(item.discountAmount || 0))) {
+      throw new Error('سعر عرض السعر أو كميته لا يطابقان بيانات العرض المرتبط.');
+    }
+  }
   let approvedPolicyPrice = round2(Number(product.sellingPriceM2));
   if (item.pricingSource === 'POS') {
     const pricing = new PricingService();
@@ -149,7 +175,8 @@ function validateProductPricing(sqliteDb: any, dto: CreateSaleDTO, item: CreateS
       approvedPolicyPrice = round2(basePriceFromUnitPrice(Number(effective.priceBox), 'BOX', product));
     }
   }
-  if (round2(baseUnitPrice) !== approvedPolicyPrice && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
+  const hasValidatedAgreedPrice = item.pricingSource === 'ORDER' || item.pricingSource === 'QUOTATION';
+  if (!hasValidatedAgreedPrice && round2(baseUnitPrice) !== approvedPolicyPrice && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
   if (round2(baseUnitPrice) < (product.minSellingPriceM2 || 0)) {
@@ -718,6 +745,11 @@ function buildLedgerEntries(
       debit: 0,
       credit: totals.shippingCost,
     }] : []),
+    ...(totals.extraFees > 0 ? [{
+      accountCode: '4103',
+      debit: 0,
+      credit: totals.extraFees,
+    }] : []),
     ...(totals.taxAmount > 0 ? [{
       accountCode: '2102',
       debit: 0,
@@ -746,6 +778,12 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     throw new Error('يجب أن يكون مبلغ كل وسيلة دفع أكبر من صفر.');
   }
   const tenderSum = round2(tenderPayments.reduce((sum, payment) => sum + payment.amount, 0));
+  if (dto.paymentType === 'MIXED' && (!dto.payments || dto.payments.length === 0)) {
+    throw new Error('يجب تحديد مكوّنات وسائل الدفع عند اختيار الدفع المختلط.');
+  }
+  if (tenderPayments.some((payment) => !['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(payment.method))) {
+    throw new Error('تحتوي الفاتورة على وسيلة دفع لا تمثل تحصيلاً فعلياً مدعوماً.');
+  }
   if (Math.abs(tenderSum - round2(dto.paidAmount || 0)) > 0.01) {
     throw new Error(`المبلغ المدفوع (${round2(dto.paidAmount || 0).toFixed(2)}) لا يساوي مجموع أطر الدفع (${tenderSum.toFixed(2)}).`);
   }
@@ -753,7 +791,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   PermissionService.require(actor, 'ui.sales.invoices.create');
   CentralUsageLimitService.assertWithin('maxInvoices');
   WarehouseTypePolicy.assertSellable(ctx.db, dto.warehouseId, 'البيع');
-  const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
+  const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor, tenderPayments);
   const companyId = ctx.db.query<{ companyId: string | null }>(
     `SELECT b.company_id AS companyId FROM branches b WHERE b.id = ?`,
     [branchId]
@@ -776,6 +814,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       discountAmount: headerDiscount,
       taxAmount: dto.taxAmount || 0,
       shippingCost: dto.shippingCost || 0,
+      extraFees: dto.extraFees || 0,
       paidAmount: dto.paidAmount,
     });
 
@@ -801,14 +840,14 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       INSERT INTO sales_invoices (
         id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, restaurant_order_id, project_id,
         subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
-        shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
+        shipping_cost, extra_fees, total_amount, paid_amount, remaining_amount, payment_type,
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
     `, [
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, dto.shiftId || null,
       dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
-      totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
+      totals.shippingCost, totals.extraFees, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id
     ]);
 
@@ -916,6 +955,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
               discountAmount: totals.discountAmount,
               taxAmount: totals.taxAmount,
               shippingCost: totals.shippingCost,
+              extraFees: totals.extraFees,
               paidAmount: totals.paidAmount,
               remainingAmount: totals.remainingAmount,
               paymentType: dto.paymentType,

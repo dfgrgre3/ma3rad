@@ -210,22 +210,22 @@ export const PosView: React.FC = () => {
   useEffect(() => {
     if (!customerSearch.trim()) { setCustomers([]); setCustomersTotal(0); setCustomerPage(1); return; }
     try {
-      const result = customerService.getCustomersPage(customerSearch.trim(), 1, 40);
+      const result = customerService.getCustomersPage(customerSearch.trim(), 1, 40, {}, { includeTaxNumber: can('customers.update') });
       setCustomerPage(1);
       setCustomers(result.items);
       setCustomersTotal(result.totalItems);
     } catch (error: any) {
       notify(error?.message || 'تعذر البحث عن العملاء', 'error');
     }
-  }, [customerService, customerSearch, notify]);
+  }, [can, customerService, customerSearch, notify]);
 
   const loadMoreCustomers = useCallback(() => {
     const nextPage = customerPage + 1;
-    const result = customerService.getCustomersPage(customerSearch.trim(), nextPage, 40);
+    const result = customerService.getCustomersPage(customerSearch.trim(), nextPage, 40, {}, { includeTaxNumber: can('customers.update') });
     setCustomers((current) => [...current, ...result.items]);
     setCustomerPage(nextPage);
     setCustomersTotal(result.totalItems);
-  }, [customerPage, customerService, customerSearch]);
+  }, [can, customerPage, customerService, customerSearch]);
 
   const {
     cart,
@@ -240,6 +240,8 @@ export const PosView: React.FC = () => {
     updateCartPrice,
     updateCartLineDiscount,
     removeFromCart,
+    recentlyRemoved,
+    undoRemoveFromCart,
   } = usePosCart({
     can,
     notify,
@@ -737,8 +739,9 @@ export const PosView: React.FC = () => {
     holdCurrentOrder,
     deleteActiveCartLine: () => {
       if (activeCartIndex === null) return;
-      removeFromCart(activeCartIndex);
-      setActiveCartIndex(null);
+      const removedIndex = activeCartIndex;
+      removeFromCart(removedIndex);
+      setActiveCartIndex(cart.length > 1 ? Math.min(removedIndex, cart.length - 2) : null);
     },
     stepActiveCartLine: (direction) => {
       if (activeCartIndex === null) return;
@@ -778,6 +781,13 @@ export const PosView: React.FC = () => {
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           onSearchSubmit={handleSearchSubmit}
+          searchSuggestions={filteredProducts}
+          onSelectSuggestion={(product) => {
+            addToCart(product);
+            setSearchQuery('');
+            barcodeInputRef.current?.focus();
+          }}
+          stockOf={stockOf}
           warehouses={warehouses}
           selectedWarehouseId={selectedWarehouseId}
           onWarehouseChange={(warehouseId) => {
@@ -835,6 +845,7 @@ export const PosView: React.FC = () => {
           cart={cart}
           stockOf={stockOf}
           gradeLabel={gradeLabel}
+          allowNegativeStock={settings?.enableNegativeStock ?? false}
           onAddToCart={addToCart}
           onAddMultipleToCart={(prods) => {
             prods.forEach((prod) => addToCart(prod));
@@ -885,6 +896,8 @@ export const PosView: React.FC = () => {
           customerSearch={customerSearch}
           filteredCustomers={filteredCustomers}
           canCreateCustomer={can('customers.create')}
+          canSearchTaxNumber={can('customers.update')}
+          canViewCustomerFinancials={can('customers.payment')}
           onCustomerSearchChange={(value) => {
             setCustomerSearch(value);
             setSelectedCustomer(null);
@@ -904,6 +917,8 @@ export const PosView: React.FC = () => {
           enableNegativeStock={settings?.enableNegativeStock ?? false}
           gradeLabel={gradeLabel}
           onRemove={removeFromCart}
+          recentlyRemoved={recentlyRemoved}
+          onUndoRemove={undoRemoveFromCart}
           onUpdateUnit={updateCartUnit}
           onStepQuantity={stepCartQuantity}
           onUpdateQuantity={updateCartQuantity}

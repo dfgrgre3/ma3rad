@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Package, RefreshCw, Search } from 'lucide-react';
+import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../services/domains/products/ProductService';

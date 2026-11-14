@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Printer, FileDown, Loader2, AlertTriangle, ChevronRight, Wallet, CheckCircle2, Clock } from 'lucide-react';
-import { EmployeeService, Employee, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
+import { Calendar, Printer, FileDown, Loader2, AlertTriangle, Wallet, Clock } from 'lucide-react';
+import { EmployeeService, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { fmt } from '../../../pages/operations/payroll/payrollDisplay';
@@ -257,7 +257,7 @@ export const PayslipsPage: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {periods.map((p) => {
                     const isSelected = p === selectedPeriod;
-                    const runForPeriod = periods.map(() => null); // placeholder
+                    const _runForPeriod = periods.map(() => null); // placeholder
                     return (
                       <button
                         key={p}

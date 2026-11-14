@@ -273,6 +273,8 @@ export const SalesView: React.FC = () => {
     customer: inv.customerName || '',
     phone: inv.customerPhone || '',
     warehouse: inv.warehouseName || '',
+    shippingCost: inv.shippingCost || 0,
+    extraFees: inv.extraFees || 0,
     total: inv.totalAmount,
     ...(canViewDebts ? {
       paid: inv.paidAmount,
@@ -291,6 +293,8 @@ export const SalesView: React.FC = () => {
     { key: 'customer', label: 'العميل' },
     { key: 'phone', label: 'الهاتف' },
     { key: 'warehouse', label: 'المخزن' },
+    { key: 'shippingCost', label: 'النقل والشحن' },
+    { key: 'extraFees', label: 'مصاريف إضافية' },
     { key: 'total', label: 'الإجمالي' },
     ...(canViewDebts ? [
       { key: 'paid', label: 'المدفوع' },

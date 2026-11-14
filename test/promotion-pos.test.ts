@@ -53,7 +53,7 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   assert.equal(pricing.evaluatePromotions(cart)?.discountAmount, 10, 'target scope limits the discount base');
   disable(target.id);
 
-  const coupon = create({ promotionType: 'FIXED_AMOUNT', discountAmount: 3, couponCode: 'SAVE3' });
+  const _coupon = create({ promotionType: 'FIXED_AMOUNT', discountAmount: 3, couponCode: 'SAVE3' });
   assert.equal(pricing.evaluatePromotions(cart), null, 'coupon-only promotion is not applied without its code');
   assert.equal(pricing.evaluatePromotions(cart, 'save3')?.discountAmount, 3);
 

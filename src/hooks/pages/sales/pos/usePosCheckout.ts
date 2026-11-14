@@ -1,4 +1,4 @@
-﻿import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BatchService } from '../../../../services/domains/inventory/BatchService';
 import { AppConfigService } from '../../../../services/domains/config/AppConfigService';
 import { ApprovalService } from '../../../../services/domains/approvals/ApprovalService';
@@ -37,7 +37,7 @@ interface UsePosCheckoutOptions {
   taxPercentage: number;
   taxAmount: number;
   shippingCost: number;
-  /** Extra fees (رسوم إضافية). Recorded on the invoice inside shippingCost. */
+  /** Additional invoice fees, stored separately from shipping. */
   extraFees?: number;
   setExtraFees?: Dispatch<SetStateAction<number>>;
   /** Invoice-discount percentage (for display/storage on the sale record). */
@@ -334,16 +334,6 @@ export const usePosCheckout = ({
     }
   }, [redeemPoints, loyaltyDiscount, selectedCustomer, loyaltyService, notify]);
 
-  const confirmActiveShift = useCallback(() => {
-    if (!activeShift) {
-      const proceed = window.confirm(
-        'لا توجد وردية كاشير مفتوحة. سيتم تسجيل الفاتورة بدون ربطها بوردية. هل تريد المتابعة؟'
-      );
-      if (!proceed) return false;
-    }
-    return true;
-  }, [activeShift]);
-
   const validateCheckoutDetails = useCallback(() => (
     validateCartAndPermissions()
       && validateStockAvailability()
@@ -351,10 +341,9 @@ export const usePosCheckout = ({
       && validateDiscount()
       && validateCreditLimit()
       && validateLoyaltyRedemption()
-      && confirmActiveShift()
   ), [
     validateCartAndPermissions, validateStockAvailability, validateMinimumPrices,
-    validateDiscount, validateCreditLimit, validateLoyaltyRedemption, confirmActiveShift,
+    validateDiscount, validateCreditLimit, validateLoyaltyRedemption,
   ]);
 
   const showToneMixingWarning = useCallback(() => {
@@ -409,7 +398,8 @@ export const usePosCheckout = ({
         discountPercentage: round2(discountPercentage),
         taxPercentage,
         taxAmount,
-        shippingCost: round2(shippingCost + (extraFees || 0)),
+        shippingCost: round2(shippingCost),
+        extraFees: round2(extraFees || 0),
         paidAmount,
         paymentType,
         bankAccountId,
@@ -465,8 +455,8 @@ export const usePosCheckout = ({
   }, [
     isProcessing, validateCheckoutDetails, selectedCustomer, showToneMixingWarning,
     salesService, selectedWarehouseId, activeShift, cart, discountAmount,
-    promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
-    paidAmount, paymentType, bankAccountId, splitCash, splitCard, splitBank, splitCheque, splitCredit, notes,
+    promotionDiscount, loyaltyDiscount, lineDiscountTotal, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
+    paidAmount, paymentType, bankAccountId, splitCash, splitCard, splitBank, splitCheque, notes,
     setSplitCash, setSplitCard, setSplitBank, setSplitCheque, setSplitCredit,
     redeemPoints,
     performedBy, appliedPromotion, couponCode,
