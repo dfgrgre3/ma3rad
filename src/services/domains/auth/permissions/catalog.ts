@@ -244,6 +244,20 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'admin.data.delete', name: 'حذف بيانات النظام', module: 'ADMIN' },
   { code: 'admin.license.manage', name: 'إدارة ترخيص المنصة المركزية', module: 'ADMIN' },
 
+  // Platform owner (Super Admin) console
+  { code: 'platform.tenants.view', name: 'عرض عملاء المنصة', module: 'PLATFORM' },
+  { code: 'platform.tenants.manage', name: 'إدارة عملاء المنصة', module: 'PLATFORM' },
+  { code: 'platform.licenses.view', name: 'عرض التراخيص', module: 'PLATFORM' },
+  { code: 'platform.licenses.manage', name: 'إصدار وإدارة التراخيص', module: 'PLATFORM' },
+  { code: 'platform.billing.view', name: 'عرض مبيعات المنصة', module: 'PLATFORM' },
+  { code: 'platform.billing.manage', name: 'إدارة الفواتير والمدفوعات', module: 'PLATFORM' },
+  { code: 'platform.plans.view', name: 'عرض خطط الاشتراك', module: 'PLATFORM' },
+  { code: 'platform.plans.manage', name: 'إدارة خطط الاشتراك', module: 'PLATFORM' },
+  { code: 'platform.product.view', name: 'عرض إعدادات المنتج', module: 'PLATFORM' },
+  { code: 'platform.product.manage', name: 'إدارة وحدات ومزايا المنتج', module: 'PLATFORM' },
+  { code: 'platform.audit.view', name: 'عرض سجل عمليات المنصة', module: 'PLATFORM' },
+  { code: 'platform.settings.manage', name: 'إدارة إعدادات المنصة', module: 'PLATFORM' },
+
   // Electronic invoicing
   { code: 'electronic_invoices.view', name: 'عرض الفواتير الإلكترونية', module: 'E_INVOICING' },
   { code: 'electronic_invoices.create', name: 'إنشاء فاتورة إلكترونية', module: 'E_INVOICING' },
@@ -642,6 +656,7 @@ const MANAGER_RESTRICTED = new Set([
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   ADMIN: [...ALL],
+  SUPER_ADMIN: ['*'],
   // المدير يحصل افتراضياً على الصلاحيات الأساسية فقط، ثم تُشتق له الصلاحيات
   // الدقيقة من الصلاحيات الأساسية عبر backfillGranularPermissions.
   MANAGER: [...new Set([...BASE_PERMISSIONS.map((p) => p.code).filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'])],
@@ -988,6 +1003,7 @@ const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
 };
 
 const ROLE_NAMES: Record<string, string> = {  ADMIN: 'مدير النظام',
+  SUPER_ADMIN: 'مالك المنصة',
   MANAGER: 'مدير',
   ACCOUNTANT: 'محاسب',
   SALES: 'مبيعات',

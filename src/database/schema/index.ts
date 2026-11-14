@@ -16,6 +16,16 @@ import { SCHEMA_PART_15 } from './part-15';
 import { SCHEMA_PART_16 } from './part-16';
 import { SCHEMA_PART_17 } from './part-17';
 import { SCHEMA_PART_18 } from './part-18';
+import { SCHEMA_PART_19 } from './part-19';
+import { SCHEMA_PART_20 } from './part-20';
+import { SCHEMA_PART_21 } from './part-21';
+import { SCHEMA_PART_22 } from './part-22';
+import { SCHEMA_PART_23 } from './part-23';
+import { SCHEMA_PART_24 } from './part-24';
+import { SCHEMA_PART_25 } from './part-25';
+import { SCHEMA_PART_26 } from './part-26';
+import { SCHEMA_PART_27 } from './part-27';
+import { SCHEMA_PART_28 } from './part-28';
 
 export const SCHEMA_SQL = [
   SCHEMA_PART_01,
@@ -36,4 +46,14 @@ export const SCHEMA_SQL = [
   SCHEMA_PART_16,
   SCHEMA_PART_17,
   SCHEMA_PART_18,
+  SCHEMA_PART_19,
+  SCHEMA_PART_20,
+  SCHEMA_PART_21,
+  SCHEMA_PART_22,
+  SCHEMA_PART_23,
+  SCHEMA_PART_24,
+  SCHEMA_PART_25,
+  SCHEMA_PART_26,
+  SCHEMA_PART_27,
+  SCHEMA_PART_28,
 ].join('\n');

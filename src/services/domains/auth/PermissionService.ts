@@ -118,6 +118,7 @@ export class PermissionService {
       DOCUMENTS: 'المستندات',
       CONTRACTS: 'العقود',
       HR: 'الموارد البشرية',
+      PLATFORM: 'منصة مالك النظام',
     };
   }
 

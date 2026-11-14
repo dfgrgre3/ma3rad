@@ -72,6 +72,16 @@ import { MIGRATION_PART_68 } from './part68';
 import { MIGRATION_PART_69 } from './part69';
 import { MIGRATION_PART_70 } from './part70';
 import { MIGRATION_PART_71 } from './part71';
+import { MIGRATION_PART_72 } from './part72';
+import { MIGRATION_PART_73 } from './part73';
+import { MIGRATION_PART_74 } from './part74';
+import { MIGRATION_PART_76 } from './part76';
+import { MIGRATION_PART_77 } from './part77';
+import { MIGRATION_PART_79 } from './part79';
+import { MIGRATION_PART_80 } from './part80';
+import { MIGRATION_PART_81 } from './part81';
+import { MIGRATION_PART_82 } from './part82';
+import { MIGRATION_PART_83 } from './part83';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -132,6 +142,16 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_69,
   MIGRATION_PART_70,
   MIGRATION_PART_71,
+  MIGRATION_PART_72,
+  MIGRATION_PART_73,
+  MIGRATION_PART_74,
+  MIGRATION_PART_76,
+  MIGRATION_PART_77,
+  MIGRATION_PART_79,
+  MIGRATION_PART_80,
+  MIGRATION_PART_81,
+  MIGRATION_PART_82,
+  MIGRATION_PART_83,
   {
     id: '050_cash_shift_auto_close',
     description: 'Track automatically closed cashier shifts',

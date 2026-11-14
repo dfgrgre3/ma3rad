@@ -646,6 +646,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               <p className="text-xs leading-relaxed text-[var(--win-text-secondary)]">
                 لأول مرة: استخدم حساب المدير الذي أنشأه مسؤول النظام، ثم غيّر كلمة المرور فورًا من صفحة المستخدمين.
               </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--win-text-muted)]">
+                مالك المنصة يدخل من هذه الصفحة أيضًا باستخدام حساب المنصة المخصص له.
+              </p>
             </div>
           </div>
 
