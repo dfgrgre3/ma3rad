@@ -1,16 +1,24 @@
 import React from 'react';
-import { Cpu, Search } from 'lucide-react';
+import { Cpu, Search, ShieldAlert, ShieldX, Link } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import type { PlatformDevice, PlatformTenant } from '../../services/domains/platform/platformTypes';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { useToast } from '../../components/ui/Toast';
 import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
 
 export const PlatformDevicesPage: React.FC = () => {
+  const toast = useToast();
   const [devices, setDevices] = React.useState<PlatformDevice[]>([]);
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+
+  const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
+  const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
+  const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -34,9 +42,70 @@ export const PlatformDevicesPage: React.FC = () => {
     (device.os || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const detectClones = () => {
+    try {
+      // Use the license page's detection by listing devices and checking for duplicates
+      const hwids = new Map<string, PlatformDevice[]>();
+      for (const d of filtered) {
+        const list = hwids.get(d.hardwareId) ?? [];
+        list.push(d);
+        hwids.set(d.hardwareId, list);
+      }
+      const duplicates: string[] = [];
+      for (const [hwid, list] of hwids.entries()) {
+        if (list.length > 1) {
+          duplicates.push(`بصمة العتاد ${hwid} مستخدمة على ${list.length} أجهزة`);
+        }
+      }
+      setCloneAlerts(duplicates);
+      if (duplicates.length > 0) {
+        toast.warning(`تم اكتشاف ${duplicates.length} حالة اشتباه استنساخ`);
+      } else {
+        toast.success('لا يوجد اشتباه استنساخ بين الأجهزة المعروضة');
+      }
+    } catch (err) {
+      toast.error('تعذر الكشف عن الاستنساخ', err instanceof Error ? err.message : undefined);
+    }
+  };
+
+  const openDeviceAction = (action: 'suspend' | 'release' | 'revoke', device: { id: string; hardwareId: string; tenantId: string; status: string }) => {
+    setDeviceTarget(device);
+    setDeviceAction(action);
+  };
+
+  const executeDeviceAction = () => {
+    if (!deviceTarget || !deviceAction) return;
+    try {
+      if (deviceAction === 'suspend') {
+        platformAdminService.suspendDevice(deviceTarget.id, 'إيقاف عبر لوحة الأجهزة');
+      } else if (deviceAction === 'release') {
+        platformAdminService.releaseDevice(deviceTarget.id, 'تحرير عبر لوحة الأجهزة');
+      } else if (deviceAction === 'revoke') {
+        platformAdminService.revokeDevice(deviceTarget.id, 'إلغاء عبر لوحة الأجهزة');
+      }
+      toast.success(`تم ${deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'} الجهاز`);
+      setDeviceTarget(null);
+      setDeviceAction(null);
+      load();
+    } catch (err) {
+      toast.error('تعذر تنفيذ الإجراء', err instanceof Error ? err.message : undefined);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <PageHeader title="الأجهزة" description="الأجهزة المفعلة لكل عميل: Hardware ID، نظام التشغيل، الإصدار، آخر اتصال، الحالة." icon={<Cpu className="h-5 w-5" />} />
+      <PageHeader
+        title="الأجهزة"
+        description="إدارة الأجهزة المفعلة: Hardware ID، حالة الربط، الإيقاف عن بُعد، الكشف عن الاستنساخ."
+        icon={<Cpu className="h-5 w-5" />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
+              كشف الاستنساخ
+            </Button>
+          </div>
+        }
+      />
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -45,6 +114,16 @@ export const PlatformDevicesPage: React.FC = () => {
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{filtered.length} جهاز</span>
       </div>
       {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>}
+      {cloneAlerts.length > 0 && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h3 className="text-sm font-bold text-amber-800 mb-2">تنبيهات الاستنساخ</h3>
+          <ul className="text-[11px] text-amber-700 space-y-1 list-disc list-inside">
+            {cloneAlerts.map((alert, i) => (
+              <li key={i}>{alert}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل الأجهزة...</div>
@@ -52,7 +131,7 @@ export const PlatformDevicesPage: React.FC = () => {
           <EmptyState icon={<Cpu className="h-5 w-5" />} title="لا توجد أجهزة مسجلة" description="ستُسجّل الأجهزة عند ربط التراخيص." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-right">
+            <table className="w-full min-w-[1000px] text-right">
               <thead className="bg-slate-50 text-[10.5px] text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5 font-semibold">العميل</th>
@@ -87,10 +166,50 @@ export const PlatformDevicesPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1">
-                          <button type="button" onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); load(); }} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title="إيقاف/تفعيل">
+                          <button
+                            type="button"
+                            onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); load(); }}
+                            className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                            title="إيقاف/تفعيل"
+                          >
                             <Cpu className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); load(); } }} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف التفعيل">
+                          {device.status === 'ACTIVE' && (
+                            <button
+                              type="button"
+                              onClick={() => openDeviceAction('suspend', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
+                              className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
+                              title="إيقاف عن بُعد"
+                            >
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {device.licenseId && (
+                            <button
+                              type="button"
+                              onClick={() => openDeviceAction('release', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
+                              className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                              title="تحرير الربط"
+                            >
+                              <Link className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {device.status !== 'REVOKED' && (
+                            <button
+                              type="button"
+                              onClick={() => openDeviceAction('revoke', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
+                              className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="إلغاء الجهاز"
+                            >
+                              <ShieldX className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); load(); } }}
+                            className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                            title="حذف التفعيل"
+                          >
                             <Cpu className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -103,6 +222,33 @@ export const PlatformDevicesPage: React.FC = () => {
           </div>
         )}
       </section>
+
+      {/* Device action modal */}
+      <Modal
+        open={Boolean(deviceTarget)}
+        onClose={() => { setDeviceTarget(null); setDeviceAction(null); }}
+        title={deviceAction === 'suspend' ? 'إيقاف الجهاز عن بُعد' : deviceAction === 'release' ? 'تحرير الجهاز عن بُعد' : 'إلغاء الجهاز عن بُعد'}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
+            <Button variant="danger" onClick={executeDeviceAction}>
+              {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
+            </Button>
+          </div>
+        }
+      >
+        {deviceTarget && (
+          <>
+            <p className="text-[11px] text-slate-600 mb-3">
+              الجهاز: <span className="font-mono text-[10px] text-slate-800" dir="ltr">{deviceTarget.hardwareId}</span>
+            </p>
+            <p className="text-[11px] text-slate-600 mb-1">
+              الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'}
+            </p>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

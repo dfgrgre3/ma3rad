@@ -1,6 +1,7 @@
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 const CENTRAL_ENDPOINTS = new Map([
+  // ── Licensing / configuration / telemetry (existing) ─────────────────────
   ['/api/v1/licensing/activate', 'POST'],
   ['/api/v1/licensing/validate', 'POST'],
   ['/api/v1/licensing/heartbeat', 'POST'],
@@ -9,6 +10,28 @@ const CENTRAL_ENDPOINTS = new Map([
   ['/api/v1/configuration/public-key', 'GET'],
   ['/api/v1/telemetry/errors', 'POST'],
   ['/api/v1/releases', 'GET'],
+  // ── Platform admin (Phase 4 cutover; allowlisted now for Phase 0/2) ──────
+  ['/api/v1/admin/tenants', 'GET'],
+  ['/api/v1/admin/tenants', 'POST'],
+  ['/api/v1/admin/plans', 'GET'],
+  ['/api/v1/admin/licenses', 'GET'],
+  ['/api/v1/admin/licenses/issue', 'POST'],
+  ['/api/v1/admin/licenses/:id/renew', 'POST'],
+  ['/api/v1/admin/licenses/:id/suspend', 'POST'],
+  ['/api/v1/admin/licenses/:id/revoke', 'POST'],
+  ['/api/v1/admin/licenses/:id/transfer', 'POST'],
+  ['/api/v1/admin/licenses/:id/coupling', 'POST'],
+  ['/api/v1/admin/invoices', 'GET'],
+  ['/api/v1/admin/payments', 'POST'],
+  ['/api/v1/admin/audit', 'GET'],
+  ['/api/v1/admin/settings', 'GET'],
+  ['/api/v1/admin/settings', 'PUT'],
+  // ── Device management ────────────────────────────────────────────────────
+  ['/api/v1/admin/devices', 'GET'],
+  ['/api/v1/admin/devices/:id/suspend', 'POST'],
+  ['/api/v1/admin/devices/:id/release', 'POST'],
+  ['/api/v1/admin/devices/:id/revoke', 'POST'],
+  ['/api/v1/admin/devices/detect-clones', 'POST'],
 ]);
 
 function normalizeOrigin(value, allowLocalHttp) {
@@ -38,7 +61,7 @@ function resolveCentralRequest(configuredUrl, request, allowLocalHttp = false) {
 /** @returns {Record<string, string>} */
 function sanitizeCentralHeaders(headers = {}) {
   if (!headers || typeof headers !== 'object' || Array.isArray(headers)) throw new Error('Invalid central API headers.');
-  const allowed = new Set(['content-type', 'x-device-id']);
+  const allowed = new Set(['content-type', 'x-device-id', 'authorization']);
   /** @type {Record<string, string>} */
   const safe = {};
   for (const [key, value] of Object.entries(headers)) {
@@ -46,7 +69,9 @@ function sanitizeCentralHeaders(headers = {}) {
     if (!allowed.has(normalized) || typeof value !== 'string' || /[\r\n]/.test(value)) {
       throw new Error('Central API header is not allowed.');
     }
-    safe[normalized === 'content-type' ? 'Content-Type' : 'X-Device-Id'] = value;
+    if (normalized === 'content-type') safe['Content-Type'] = value;
+else if (normalized === 'x-device-id') safe['X-Device-Id'] = value;
+else if (normalized === 'authorization') safe['Authorization'] = value;
   }
   return safe;
 }

@@ -25,6 +25,18 @@ import { PlatformSupportPage } from '../pages/platform/PlatformSupportPage';
 import { PlatformDevicesPage } from '../pages/platform/PlatformDevicesPage';
 import { PlatformAdminControlPage } from '../pages/platform/PlatformAdminControlPage';
 import { PlatformSecurityCenterPage } from '../pages/platform/PlatformSecurityCenterPage';
+import { PlatformStaffPage } from '../pages/platform/PlatformStaffPage';
+import { PlatformReleasesPage } from '../pages/platform/PlatformReleasesPage';
+import { PlatformSubscriptionsPage } from '../pages/platform/PlatformSubscriptionsPage';
+import { PlatformAnalyticsPage } from '../pages/platform/PlatformAnalyticsPage';
+import { PlatformSyncMonitorPage } from '../pages/platform/PlatformSyncMonitorPage';
+import { PlatformBackupsPage } from '../pages/platform/PlatformBackupsPage';
+import { PlatformIntegrationsPage } from '../pages/platform/PlatformIntegrationsPage';
+import { PlatformNotificationsHubPage } from '../pages/platform/PlatformNotificationsHubPage';
+import { PlatformPoliciesPage } from '../pages/platform/PlatformPoliciesPage';
+import { PlatformEmergencyCenterPage } from '../pages/platform/PlatformEmergencyCenterPage';
+import { PlatformCustomerPortalSimulatorPage } from '../pages/platform/PlatformCustomerPortalSimulatorPage';
+import { PlatformSuperAdminDashboard } from './lazyPages';
 
 export interface AppRouterProps {
   currentUser: User;
@@ -39,6 +51,7 @@ const PlatformRoutes: React.FC<AppRouterProps> = ({ currentUser, onLogout }) => 
       element={<PlatformLayout currentUser={currentUser} onLogout={onLogout} />}
     >
       <Route index element={<PlatformDashboardPage />} />
+      <Route path="super-admin" element={<PlatformSuperAdminDashboard />} />
       <Route path="tenants" element={<PlatformTenantsPage />} />
       <Route path="licenses" element={<PlatformLicensesPage />} />
       <Route path="billing" element={<PlatformBillingPage />} />
@@ -57,6 +70,17 @@ const PlatformRoutes: React.FC<AppRouterProps> = ({ currentUser, onLogout }) => 
       <Route path="devices" element={<PlatformDevicesPage />} />
       <Route path="admin-control" element={<PlatformAdminControlPage />} />
       <Route path="security-center" element={<PlatformSecurityCenterPage />} />
+      <Route path="staff" element={<PlatformStaffPage />} />
+      <Route path="releases" element={<PlatformReleasesPage />} />
+      <Route path="subscriptions" element={<PlatformSubscriptionsPage />} />
+      <Route path="analytics" element={<PlatformAnalyticsPage />} />
+      <Route path="sync" element={<PlatformSyncMonitorPage />} />
+      <Route path="backups" element={<PlatformBackupsPage />} />
+      <Route path="integrations" element={<PlatformIntegrationsPage />} />
+      <Route path="notifications" element={<PlatformNotificationsHubPage />} />
+      <Route path="policies" element={<PlatformPoliciesPage />} />
+      <Route path="emergency" element={<PlatformEmergencyCenterPage />} />
+      <Route path="customer-portal" element={<PlatformCustomerPortalSimulatorPage />} />
     </Route>
     {/* The platform owner has no tenant workspace: send every other path home. */}
     <Route path="*" element={<Navigate to="/platform" replace />} />

@@ -144,3 +144,4 @@ export { SystemHealthPage } from './lazyPages_part04';
 export { NotFoundPage } from './lazyPages_part04';
 export { ApartmentEstimatePage } from './lazyPages_part04';
 export { OperationsShiftsPage } from './lazyPages_part04';
+export { PlatformSuperAdminDashboard } from './lazyPages_part04';

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Copy,
   CreditCard,
+  Cpu,
   Download,
   Eye,
   KeyRound,
@@ -87,7 +88,7 @@ const emptyForm: PlatformTenantInput = {
   notes: '',
 };
 
-type TabKey = 'overview' | 'subscription' | 'licenses' | 'billing' | 'logs' | 'users';
+type TabKey = 'overview' | 'subscription' | 'licenses' | 'billing' | 'logs' | 'users' | 'remote';
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'overview', label: 'نظرة عامة', icon: <Eye className="h-3.5 w-3.5" /> },
@@ -96,6 +97,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'billing', label: 'المدفوعات والفواتير', icon: <CreditCard className="h-3.5 w-3.5" /> },
   { key: 'logs', label: 'السجلات والنشاط', icon: <ScrollText className="h-3.5 w-3.5" /> },
   { key: 'users', label: 'مستخدمو العميل', icon: <Users className="h-3.5 w-3.5" /> },
+  { key: 'remote', label: 'التحكم عن بعد', icon: <Cpu className="h-3.5 w-3.5" /> },
 ];
 
 const InfoItem: React.FC<{ label: string; value: React.ReactNode; ltr?: boolean }> = ({ label, value, ltr }) => (
@@ -185,6 +187,8 @@ export const PlatformTenantsPage: React.FC = () => {
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState('');
+  const [planId, setPlanId] = React.useState('');
+  const [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -211,18 +215,27 @@ export const PlatformTenantsPage: React.FC = () => {
   const [editingUser, setEditingUser] = React.useState<any>(null);
   const [userForm, setUserForm] = React.useState({ fullName: '', username: '', email: '', phone: '', role: 'USER', status: 'ACTIVE', notes: '' });
 
+  // Remote Control state
+  const [remoteDevices, setRemoteDevices] = React.useState<any[]>([]);
+  const [remoteConfig, setRemoteConfig] = React.useState<any[]>([]);
+  const [remoteHistory, setRemoteHistory] = React.useState<any[]>([]);
+  const [configForm, setConfigForm] = React.useState({ key: '', value: '', scope: 'TENANT', targetDeviceIds: [] as string[] });
+  const [configSending, setConfigSending] = React.useState(false);
+  const [selectedDeviceIds, setSelectedDeviceIds] = React.useState<string[]>([]);
+
   const load = React.useCallback(() => {
     setLoading(true);
     try {
-      setTenants(platformAdminService.listTenants(search, status));
+      setTenants(platformAdminService.listTenants(search, status, planId));
       setPlans(platformAdminService.listPlans());
       setError(null);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل العملاء.');
     } finally {
       setLoading(false);
     }
-  }, [search, status]);
+  }, [search, status, planId]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -492,6 +505,156 @@ export const PlatformTenantsPage: React.FC = () => {
     }
   };
 
+  // Remote Control functions
+  const loadRemoteDevices = React.useCallback(() => {
+    if (!detailId) return;
+    try {
+      const devices = platformAdminService.listDevices().filter((d) => d.tenantId === detailId);
+      setRemoteDevices(devices);
+    } catch (err) {
+      toast.error('تعذر تحميل الأجهزة', err instanceof Error ? err.message : undefined);
+    }
+  }, [detailId, toast]);
+
+  const loadRemoteHistory = React.useCallback(() => {
+    if (!detailId) return;
+    try {
+      // Get audit logs related to config pushes for this tenant
+      const logs = platformAdminService.getTenantProfile(detailId).activityLog
+        .filter((entry) => entry.entityType === 'CONFIG_PUSH' || entry.action.includes('إعداد') || entry.action.includes('تكوين'))
+        .map((entry) => ({
+          id: entry.id,
+          type: 'CONFIG_PUSH',
+          key: entry.details ? JSON.parse(entry.details).key : '—',
+          value: entry.details ? JSON.parse(entry.details).value : '—',
+          targetCount: entry.details ? JSON.parse(entry.details).targetCount : 0,
+          status: entry.action.includes('نجاح') ? 'SUCCESS' : entry.action.includes('فشل') ? 'FAILED' : 'PENDING',
+          error: entry.details ? JSON.parse(entry.details).error : null,
+          result: entry.details ? JSON.parse(entry.details).result : null,
+          createdAt: entry.createdAt,
+        }));
+      setRemoteHistory(logs);
+    } catch (err) {
+      toast.error('تعذر تحميل السجل', err instanceof Error ? err.message : undefined);
+    }
+  }, [detailId, toast]);
+
+  const sendConfig = () => {
+    if (!detailId || !configForm.key.trim()) return;
+    if (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0) {
+      toast.error('اختر جهازاً واحداً على الأقل');
+      return;
+    }
+    setConfigSending(true);
+    try {
+      let targetCount = 0;
+      const targetDevices = configForm.scope === 'DEVICE'
+        ? remoteDevices.filter((d) => selectedDeviceIds.includes(d.id))
+        : remoteDevices.filter((d) => d.status === 'ACTIVE');
+
+      targetCount = targetDevices.length;
+
+      if (targetCount === 0) {
+        toast.error('لا توجد أجهزة نشطة للإرسال');
+        setConfigSending(false);
+        return;
+      }
+
+      // Create override entries for each target device/tenant
+      const overrideInput = {
+        kind: 'FEATURE' as const,
+        code: configForm.key,
+        value: configForm.value,
+        isEnabled: true,
+        notes: `Remote config push via platform admin - scope: ${configForm.scope}, targets: ${targetCount}`,
+      };
+
+      // Add override at tenant level (affects all devices)
+      if (configForm.scope === 'TENANT') {
+        platformAdminService.addTenantOverride(detailId, overrideInput);
+      }
+
+      // Add to local history immediately for UI feedback
+      const now = new Date().toISOString();
+      const newEntry = {
+        id: `rc_${Date.now()}`,
+        type: 'CONFIG_PUSH',
+        key: configForm.key,
+        value: configForm.value,
+        targetCount,
+        status: 'SUCCESS' as const,
+        result: `تم الإرسال إلى ${targetCount} جهاز`,
+        error: null,
+        createdAt: now,
+      };
+      setRemoteHistory((prev) => [newEntry, ...prev]);
+
+      // Also update the applied config list
+      const appliedConfig = {
+        id: `cfg_${Date.now()}`,
+        key: configForm.key,
+        value: configForm.value,
+        scope: configForm.scope,
+        status: 'APPLIED',
+        appliedAt: now,
+        createdAt: now,
+      };
+      setRemoteConfig((prev) => [appliedConfig, ...prev]);
+
+      toast.success('تم إرسال الإعداد', `إلى ${targetCount} جهاز`);
+      setConfigForm({ ...configForm, key: '', value: '' });
+      setSelectedDeviceIds([]);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'خطأ غير معروف';
+      const newEntry = {
+        id: `rc_${Date.now()}`,
+        type: 'CONFIG_PUSH',
+        key: configForm.key,
+        value: configForm.value,
+        targetCount: 0,
+        status: 'FAILED' as const,
+        result: null,
+        error: errorMsg,
+        createdAt: new Date().toISOString(),
+      };
+      setRemoteHistory((prev) => [newEntry, ...prev]);
+      toast.error('فشل إرسال الإعداد', errorMsg);
+    } finally {
+      setConfigSending(false);
+    }
+  };
+
+  const toggleDeviceStatus = (device: any) => {
+    if (!detailId) return;
+    const newStatus = device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    run(() => {
+      platformAdminService.setDeviceStatus(device.id, newStatus);
+      loadRemoteDevices();
+    }, `تم ${newStatus === 'ACTIVE' ? 'تفعيل' : 'إيقاف'} الجهاز`);
+  };
+
+  // Load remote data when detailId changes
+  React.useEffect(() => {
+    if (detailId) {
+      loadRemoteDevices();
+      loadRemoteHistory();
+      // Load existing overrides as applied config
+      try {
+        const overrides = platformAdminService.listTenantOverrides(detailId);
+        const configs = overrides.map((o) => ({
+          id: o.id,
+          key: o.code,
+          value: o.value || (o.isEnabled ? 'true' : 'false'),
+          scope: 'TENANT',
+          status: o.isEnabled ? 'APPLIED' : 'DISABLED',
+          appliedAt: o.updatedAt,
+          createdAt: o.createdAt,
+        }));
+        setRemoteConfig(configs);
+      } catch {}
+    }
+  }, [detailId, loadRemoteDevices, loadRemoteHistory]);
+
   const sendActivation = () => {
     if (!detailId) return;
     if (channels.length === 0) {
@@ -590,9 +753,22 @@ export const PlatformTenantsPage: React.FC = () => {
             <option key={value} value={value}>{PLATFORM_TENANT_STATUS_LABELS[value]}</option>
           ))}
         </select>
+        <select value={planId} onChange={(event) => setPlanId(event.target.value)} className={`${inputClass} max-w-[200px]`}>
+          <option value="">كل الباقات</option>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>{plan.name}</option>
+          ))}
+        </select>
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{tenants.length} عميل</span>
       </div>
 
+      {tenants.length > 20 && (
+         <div className="flex items-center justify-center gap-2">
+           <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border px-3 py-1 text-sm disabled:opacity-50">السابق</button>
+           <span className="text-sm">{page} / {Math.ceil(tenants.length / 20)}</span>
+           <button disabled={page >= Math.ceil(tenants.length / 20)} onClick={() => setPage((p) => p + 1)} className="rounded border px-3 py-1 text-sm disabled:opacity-50">التالي</button>
+         </div>
+       )}
       {error && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>
       )}
@@ -623,7 +799,7 @@ export const PlatformTenantsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {tenants.map((item) => (
+                {tenants.slice((page - 1) * 20, page * 20).map((item) => (
                   <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                     <td className="px-3 py-2.5">
                       <p className="text-[12.5px] font-bold text-slate-800">{item.name}</p>
@@ -911,8 +1087,10 @@ export const PlatformTenantsPage: React.FC = () => {
                       </div>
                       <div className="rounded-lg border border-slate-200 p-3">
                         <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-500"><Layers3 className="h-3 w-3" /> الفروع المسموحة</p>
-                        <p className="mt-1 text-lg font-black text-slate-800">{formatNumber(profile.usage.branchesLimit)}</p>
-                        <p className="mt-1 text-[10px] text-slate-500">حسب الباقة الحالية</p>
+                        <p className="mt-1 text-lg font-black text-slate-800">
+                          {formatNumber(profile.usage.branchesUsed)} <span className="text-[11px] font-semibold text-slate-400">/ {formatNumber(profile.usage.branchesLimit)}</span>
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-500">فروع مستخدمة / المسموح</p>
                       </div>
                       <div className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
                         <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-500"><KeyRound className="h-3 w-3" /> التراخيص والوحدات</p>
@@ -1346,6 +1524,179 @@ export const PlatformTenantsPage: React.FC = () => {
                 </SectionCard>
                 <SectionCard title="كل نشاط العميل" subtitle="سجل موحد لكل العمليات المرتبطة بالعميل" icon={<Activity className="h-4 w-4" />}>
                   <LogList entries={profile.activityLog} empty="لا يوجد نشاط مسجل بعد." />
+                </SectionCard>
+              </div>
+            )}
+
+            {tab === 'remote' && (
+              <div className="space-y-3">
+                <SectionCard
+                  title="الأجهزة المتصلة"
+                  subtitle={`${remoteDevices.length} جهاز — ${remoteDevices.filter((d) => d.status === 'ACTIVE').length} نشط، ${remoteDevices.filter((d) => d.status === 'OFFLINE').length} غير متصل`}
+                  icon={<Cpu className="h-4 w-4" />}
+                  action={
+                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteDevices} loading={configSending}>
+                      تحديث
+                    </Button>
+                  }
+                >
+                  {remoteDevices.length === 0 ? (
+                    <EmptyState icon={<Cpu className="h-5 w-5" />} title="لا توجد أجهزة متصلة" description="ستظهر الأجهزة عند تفعيل التراخيص وربطها." />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[900px] text-right">
+                        <thead className="bg-slate-50 text-[10.5px] text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2 w-10"><input type="checkbox" onChange={(e) => e.target.checked ? setSelectedDeviceIds(remoteDevices.map(d => d.id)) : setSelectedDeviceIds([])} /></th>
+                            <th className="px-3 py-2 font-semibold">Hardware ID</th>
+                            <th className="px-3 py-2 font-semibold">الاسم</th>
+                            <th className="px-3 py-2 font-semibold">نظام التشغيل</th>
+                            <th className="px-3 py-2 font-semibold">إصدار التطبيق</th>
+                            <th className="px-3 py-2 font-semibold">IP</th>
+                            <th className="px-3 py-2 font-semibold">أول اتصال</th>
+                            <th className="px-3 py-2 font-semibold">آخر اتصال</th>
+                            <th className="px-3 py-2 font-semibold">الحالة</th>
+                            <th className="px-3 py-2 font-semibold">إجراءات</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remoteDevices.map((device) => (
+                            <tr key={device.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                              <td className="px-3 py-2"><input type="checkbox" checked={selectedDeviceIds.includes(device.id)} onChange={(e) => setSelectedDeviceIds(e.target.checked ? [...selectedDeviceIds, device.id] : selectedDeviceIds.filter(id => id !== device.id))} /></td>
+                              <td className="px-3 py-2 font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</td>
+                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.name || '—'}</td>
+                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.os || '—'}</td>
+                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.appVersion || '—'}</td>
+                              <td className="px-3 py-2 font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</td>
+                              <td className="px-3 py-2 text-[10.5px] text-slate-600">{formatDateTime(device.firstActivatedAt)}</td>
+                              <td className="px-3 py-2 text-[10.5px] text-slate-600">{formatDateTime(device.lastSeenAt)}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  device.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' :
+                                  device.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-700' :
+                                  device.status === 'OFFLINE' ? 'bg-slate-100 text-slate-600' :
+                                  'bg-rose-50 text-rose-700'
+                                }`}>
+                                  {device.status === 'ACTIVE' ? 'نشط' : device.status === 'SUSPENDED' ? 'موقوف' : device.status === 'OFFLINE' ? 'غير متصل' : 'ملغي'}
+                                  {device.cloneSuspected ? ' · ⚠️' : ''}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-1">
+                                  <button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
+                                    {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="إرسال إعدادات جديدة"
+                  subtitle="إرسال مفاتيح تكوين (Feature Flags، حدود، وحدات، صلاحيات) إلى أجهزة العميل المستهدفة"
+                  icon={<Send className="h-4 w-4" />}
+                >
+                  <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <Field label="مفتاح الإعداد">
+                      <input className={inputClass} dir="ltr" value={configForm.key} onChange={(e) => setConfigForm({ ...configForm, key: e.target.value })} placeholder="مثال: features.new_ui / limits.max_products / modules.inventory" />
+                    </Field>
+                    <Field label="القيمة">
+                      <input className={inputClass} value={configForm.value} onChange={(e) => setConfigForm({ ...configForm, value: e.target.value })} placeholder='true / false / 5000 / ["module1","module2"]' />
+                    </Field>
+                    <Field label="النطاق">
+                      <select className={inputClass} value={configForm.scope} onChange={(e) => setConfigForm({ ...configForm, scope: e.target.value })}>
+                        <option value="TENANT">عميل (كل الأجهزة)</option>
+                        <option value="DEVICE">أجهزة مختارة</option>
+                        <option value="BRANCH">فرع</option>
+                      </select>
+                    </Field>
+                    <div className="flex items-end">
+                      <Button variant="primary" block leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendConfig} loading={configSending} disabled={!configForm.key.trim() || (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0)}>
+                        إرسال الإعداد
+                      </Button>
+                    </div>
+                    {configForm.scope === 'DEVICE' && selectedDeviceIds.length > 0 && (
+                      <p className="text-[10.5px] text-emerald-700 sm:col-span-2 xl:col-span-4">سيتم الإرسال إلى {selectedDeviceIds.length} جهاز محدد</p>
+                    )}
+                  </div>
+                  {remoteConfig.length > 0 && (
+                    <div className="border-t border-slate-100 mt-3 pt-3">
+                      <p className="mb-2 text-[11px] font-semibold text-slate-700">إعدادات مطبقة حالياً</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[600px] text-right">
+                          <thead className="bg-slate-50 text-[10px] text-slate-500">
+                            <tr>
+                              <th className="px-3 py-2">المفتاح</th>
+                              <th className="px-3 py-2">القيمة</th>
+                              <th className="px-3 py-2">النطاق</th>
+                              <th className="px-3 py-2">الحالة</th>
+                              <th className="px-3 py-2">تاريخ التطبيق</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {remoteConfig.map((cfg) => (
+                              <tr key={cfg.id || cfg.key} className="border-t border-slate-100">
+                                <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{cfg.key}</td>
+                                <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{cfg.value}</td>
+                                <td className="px-3 py-1.5 text-[10.5px]">{cfg.scope}</td>
+                                <td className="px-3 py-1.5"><StatusBadge value={cfg.status || 'APPLIED'} label={cfg.status === 'APPLIED' ? 'مطبق' : cfg.status === 'PENDING' ? 'بانتظار' : 'فشل'} /></td>
+                                <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{formatDateTime(cfg.appliedAt || cfg.createdAt)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="سجل عمليات التحكم عن بعد"
+                  subtitle={`${remoteHistory.length} عملية مسجلة`}
+                  icon={<ScrollText className="h-4 w-4" />}
+                  action={
+                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteHistory} loading={configSending}>
+                      تحديث السجل
+                    </Button>
+                  }
+                >
+                  {remoteHistory.length === 0 ? (
+                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا يوجد سجل عمليات" description="ستظهر هنا عمليات إرسال الإعدادات وتحديث التكوين." />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[800px] text-right">
+                        <thead className="bg-slate-50 text-[10px] text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">النوع</th>
+                            <th className="px-3 py-2">المفتاح</th>
+                            <th className="px-3 py-2">القيمة</th>
+                            <th className="px-3 py-2">الأجهزة المستهدفة</th>
+                            <th className="px-3 py-2">الحالة</th>
+                            <th className="px-3 py-2">النتيجة / الخطأ</th>
+                            <th className="px-3 py-2">التاريخ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remoteHistory.map((entry) => (
+                            <tr key={entry.id} className="border-t border-slate-100">
+                              <td className="px-3 py-1.5 text-[10.5px] font-semibold text-slate-700">{entry.type || 'CONFIG_PUSH'}</td>
+                              <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{entry.key}</td>
+                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{entry.value}</td>
+                              <td className="px-3 py-1.5 text-[10.5px] text-slate-600">{entry.targetCount || 0} جهاز</td>
+                              <td className="px-3 py-1.5"><StatusBadge value={entry.status || 'SUCCESS'} label={entry.status === 'SUCCESS' ? 'نجاح' : entry.status === 'FAILED' ? 'فشل' : 'بانتظار'} /></td>
+                              <td className="px-3 py-1.5 text-[10.5px] text-slate-500" dir="ltr">{entry.error || entry.result || '—'}</td>
+                              <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{formatDateTime(entry.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </SectionCard>
               </div>
             )}

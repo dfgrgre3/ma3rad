@@ -469,4 +469,161 @@ export class CentralLicenseService {
   static async isConfigured(): Promise<boolean> {
     return (await this.getStatus()).configured;
   }
+
+  // ─── Central License Issuance & Management ──────────────────────────────
+
+  static async issueLicenseCentral(request: {
+    tenantId: string;
+    planId: string;
+    months?: number;
+    seats?: number;
+    branchesLimit?: number;
+    deviceLimit?: number;
+    startsAt?: string;
+    expiresAt?: string;
+    offlineGracePeriodDays?: number;
+    couplingMode?: 'FULL' | 'EXPIRY_ONLY' | 'NONE';
+    modules?: string[];
+    features?: string[];
+    hardwareId?: string | null;
+    notes?: string;
+  }): Promise<any> {
+    const res = await this.request('/api/v1/admin/licenses/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_issue_failed');
+    }
+    return res.json();
+  }
+
+  static async renewLicenseCentral(licenseId: string, months?: number): Promise<any> {
+    const res = await this.request(`/api/v1/admin/licenses/${licenseId}/renew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ months }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_renew_failed');
+    }
+    return res.json();
+  }
+
+  static async suspendLicenseCentral(licenseId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/licenses/${licenseId}/suspend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_suspend_failed');
+    }
+    return res.json();
+  }
+
+  static async revokeLicenseCentral(licenseId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/licenses/${licenseId}/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_revoke_failed');
+    }
+    return res.json();
+  }
+
+  static async transferLicenseCentral(licenseId: string, newHardwareId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/licenses/${licenseId}/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newHardwareId, reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_transfer_failed');
+    }
+    return res.json();
+  }
+
+  static async setLicenseCouplingModeCentral(licenseId: string, couplingMode: 'FULL' | 'EXPIRY_ONLY' | 'NONE'): Promise<any> {
+    const res = await this.request(`/api/v1/admin/licenses/${licenseId}/coupling`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ couplingMode }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'license_coupling_failed');
+    }
+    return res.json();
+  }
+
+  // ─── Central Device Management ──────────────────────────────────────────
+
+  static async fetchDevicesCentral(): Promise<any[]> {
+    const res = await this.request('/api/v1/admin/devices', {
+      method: 'GET',
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  static async suspendDeviceCentral(deviceId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/devices/${deviceId}/suspend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'device_suspend_failed');
+    }
+    return res.json();
+  }
+
+  static async releaseDeviceCentral(deviceId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/devices/${deviceId}/release`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'device_release_failed');
+    }
+    return res.json();
+  }
+
+  static async revokeDeviceCentral(deviceId: string, reason?: string): Promise<any> {
+    const res = await this.request(`/api/v1/admin/devices/${deviceId}/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'device_revoke_failed');
+    }
+    return res.json();
+  }
+
+  static async detectCloneDevicesCentral(): Promise<any> {
+    const res = await this.request('/api/v1/admin/devices/detect-clones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'clone_detection_failed');
+    }
+    return res.json();
+  }
 }

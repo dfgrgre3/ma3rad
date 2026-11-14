@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
 import { ProductService } from '../../../services/domains/products/ProductService';

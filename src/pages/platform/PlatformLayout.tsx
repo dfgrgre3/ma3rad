@@ -15,6 +15,16 @@ import {
   ShieldCheck,
   Menu,
   X,
+  Users,
+  Package,
+  CalendarClock,
+  BarChart3,
+  RefreshCw,
+  Database,
+  Webhook,
+  Bell,
+  FileText,
+  AlertOctagon,
 } from 'lucide-react';
 import type { User } from '../../types';
 
@@ -26,9 +36,12 @@ interface PlatformLayoutProps {
 const NAV_ITEMS = [
   { to: '/platform', label: 'نظرة عامة', icon: LayoutDashboard, end: true },
   { to: '/platform/tenants', label: 'العملاء', icon: Building2 },
+  { to: '/platform/subscriptions', label: 'إدارة الاشتراكات', icon: CalendarClock },
   { to: '/platform/licenses', label: 'التراخيص', icon: KeyRound },
   { to: '/platform/billing', label: 'المبيعات والفواتير', icon: ReceiptText },
   { to: '/platform/plans', label: 'خطط الاشتراك', icon: Layers3 },
+  { to: '/platform/staff', label: 'فريق ومستخدمي المنصة', icon: Users },
+  { to: '/platform/releases', label: 'حزم الإصدارات', icon: Package },
   { to: '/platform/product', label: 'المنتج والمزايا', icon: Boxes },
   { to: '/platform/audit', label: 'سجل العمليات', icon: ScrollText },
   { to: '/platform/settings', label: 'إعدادات المنصة', icon: Settings },
@@ -43,14 +56,25 @@ const NAV_ITEMS = [
   { to: '/platform/devices', label: 'الأجهزة', icon: ShieldCheck },
   { to: '/platform/admin-control', label: 'مركز التحكم الإداري', icon: SlidersHorizontal },
   { to: '/platform/security-center', label: 'مركز الأمان', icon: ShieldCheck },
+  { to: '/platform/analytics', label: 'التقارير والتحليلات', icon: BarChart3 },
+  { to: '/platform/sync', label: 'مراقبة المزامنة', icon: RefreshCw },
+  { to: '/platform/backups', label: 'النسخ الاحتياطي', icon: Database },
+  { to: '/platform/integrations', label: 'التكاملات و Webhooks', icon: Webhook },
+  { to: '/platform/notifications', label: 'مركز الإشعارات', icon: Bell },
+  { to: '/platform/policies', label: 'سياسات المنصة', icon: FileText },
+  { to: '/platform/emergency', label: 'إجراءات الطوارئ', icon: AlertOctagon },
+  { to: '/platform/customer-portal', label: 'تجربة بوابة العملاء', icon: Building2 },
 ];
 
 const TITLES: Record<string, string> = {
   '/platform': 'نظرة عامة على المنصة',
   '/platform/tenants': 'إدارة العملاء',
+  '/platform/subscriptions': 'إدارة الاشتراكات المركزية',
   '/platform/licenses': 'إدارة التراخيص',
   '/platform/billing': 'المبيعات والفواتير',
   '/platform/plans': 'خطط الاشتراك',
+  '/platform/staff': 'فريق ومستخدمي المنصة',
+  '/platform/releases': 'حزم الإصدارات والتحديثات',
   '/platform/product': 'التحكم في المنتج',
   '/platform/audit': 'سجل عمليات المنصة',
   '/platform/settings': 'إعدادات المنصة',
@@ -65,6 +89,14 @@ const TITLES: Record<string, string> = {
   '/platform/devices': 'الأجهزة',
   '/platform/admin-control': 'مركز التحكم الإداري',
   '/platform/security-center': 'مركز الأمان',
+  '/platform/analytics': 'التقارير والتحليلات المركزية',
+  '/platform/sync': 'مراقبة المزامنة والأجهزة',
+  '/platform/backups': 'النسخ الاحتياطي السحابي',
+  '/platform/integrations': 'إدارة التكاملات والربط الخارجي',
+  '/platform/notifications': 'مركز الإشعارات وسجل التسليم',
+  '/platform/policies': 'سياسات المنصة والامتثال',
+  '/platform/emergency': 'مركز إجراءات الطوارئ والحماية',
+  '/platform/customer-portal': 'بوابة العملاء المركزية',
 };
 
 export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onLogout }) => {

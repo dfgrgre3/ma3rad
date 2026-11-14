@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  ShieldAlert, Plus, Search, ChevronDown, X,
+  ShieldAlert, Plus, Search, ChevronDown, X, Layers,
 } from 'lucide-react';
 import {
   ProcurementService, SupplierClaimRow, SupplierClaimItem
@@ -41,7 +41,7 @@ export const SupplierClaimsPage: React.FC = () => {
   const [claims, setClaims] = useState<SupplierClaimRow[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [_setSupplierFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);

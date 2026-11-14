@@ -329,6 +329,47 @@ pre, code { overflow-wrap: anywhere; }
    without rewriting each feature page.
    ========================================================================== */
 
+/* ── Win CSS variables on :root so portals (createPortal → document.body) inherit them ── */
+:root {
+  --win-accent: var(--cerami-primary);
+  --win-accent-hover: var(--cerami-primary-hover);
+  --win-accent-pressed: var(--cerami-primary-pressed);
+  --win-accent-text: var(--cerami-primary-text);
+  --win-accent-hover-text: var(--cerami-primary-hover-text);
+  --win-accent-pressed-text: var(--cerami-primary-pressed-text);
+  --win-accent-readable: var(--cerami-primary-readable);
+  --win-accent-soft: var(--cerami-accent-soft);
+  --win-accent-soft-text: var(--cerami-accent-soft-text);
+  --win-accent-border: var(--cerami-accent-border);
+  --win-canvas: var(--cerami-canvas);
+  --win-canvas-text: var(--cerami-canvas-text, var(--cerami-text));
+  --win-surface: var(--cerami-surface);
+  --win-surface-text: var(--cerami-surface-text, var(--cerami-text));
+  --win-surface-alt: var(--cerami-surface-muted);
+  --win-surface-sunken: var(--cerami-surface-sunken);
+  --win-border: var(--cerami-border);
+  --win-border-strong: var(--cerami-border-strong);
+  --win-text: var(--win-canvas-text);
+  --win-text-secondary: var(--cerami-text-secondary);
+  --win-text-muted: var(--cerami-muted);
+  --win-success: var(--cerami-success);
+  --win-success-text: var(--cerami-success-text, var(--cerami-success));
+  --win-success-on-color: var(--cerami-success-on-color);
+  --win-success-soft: var(--cerami-success-soft);
+  --win-success-border: var(--cerami-success-border);
+  --win-danger: var(--cerami-danger);
+  --win-danger-text: var(--cerami-danger-text, var(--cerami-danger));
+  --win-danger-on-color: var(--cerami-danger-on-color);
+  --win-danger-soft: var(--cerami-danger-soft);
+  --win-danger-border: var(--cerami-danger-border);
+  --win-warning: var(--cerami-warning);
+  --win-warning-text: var(--cerami-warning-text, var(--cerami-warning));
+  --win-warning-on-color: var(--cerami-warning-on-color);
+  --win-warning-soft: var(--cerami-warning-soft);
+  --win-warning-border: var(--cerami-warning-border);
+  --win-radius: 6px;
+}
+
 .win-app,
 .win-auth {
   --win-accent: var(--cerami-primary);
@@ -632,10 +673,10 @@ pre, code { overflow-wrap: anywhere; }
   min-height: 32px;
   width: 100%;
   padding: 0 8px;
-  border: 1px solid var(--win-border-strong);
-  border-radius: var(--win-radius);
-  background: var(--win-surface);
-  color: var(--win-text);
+  border: 1px solid var(--win-border-strong, var(--cerami-border-strong, #cdd3db));
+  border-radius: var(--win-radius, 6px);
+  background: var(--win-surface, var(--cerami-surface, #ffffff));
+  color: var(--win-text, var(--cerami-text, #252b36));
   font-size: 12.5px;
 }
 .win-input:hover { border-color: var(--win-text-muted); }

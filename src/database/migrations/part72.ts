@@ -6,8 +6,6 @@ import { DEFAULT_BRANCH_ID } from './support';
  * wildcard, and the initial commercial catalogue (plans, modules, flags,
  * releases and settings). Idempotent so it is safe on existing databases.
  */
-const DEFAULT_PLATFORM_PASSWORD_HASH =
-  '$2a$10$KJzlFD3QCu5JpZHfsS7joO2SSV1HAavbfMlwO8d6q1TmSTv/nh2QO'; // Platform@2026
 
 const PLATFORM_PERMISSIONS = [
   'platform.tenants.view',
@@ -80,14 +78,12 @@ export const MIGRATION_PART_72: Migration = {
       );
     }
 
-    // 3. The single platform-owner account (created once; never overwritten).
-    db.run(
-      `INSERT OR IGNORE INTO users
-         (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id, branch_scope)
-       VALUES ('usr_platform', 'platform', ?, 'مالك المنصة', 'SUPER_ADMIN', NULL, NULL, 1, ?, 'ALL')`,
-      [DEFAULT_PLATFORM_PASSWORD_HASH, DEFAULT_BRANCH_ID]
-    );
-
+    // 3. Platform-owner account is NO LONGER seeded here. Creating a known
+    //    default Super Admin credential in a migration is a security risk.
+    //    The platform owner must be bootstrapped through a secure, one-time
+    //    initialization flow (see PlatformBootstrapService) that sets a
+    //    unique password chosen by the operator. No account is created by
+    //    default migrations.
     // 4. Commercial catalogue.
     for (const [id, code, name, description, cycle, price, seats, branches, devices, sort, modules, features, isDefault] of DEFAULT_PLANS) {
       db.run(

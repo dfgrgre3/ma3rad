@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ClipboardList, Plus, Search, FileText, Loader2, X, Trash2,
-  XCircle, Truck, FileSpreadsheet
+  XCircle, Truck, FileSpreadsheet, Sparkles, CheckCircle2
 } from 'lucide-react';
 import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/domains/purchases/PurchaseRequestService';
 import { ProcurementService, ReorderSuggestion } from '../../../services/domains/procurement/ProcurementService';

@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: CeramiSys Platform Admin API
+  version: 0.1.0
+  description: Central API for Super Admin operations (Phase 0 contract draft).
+servers:
+  - url: https://central.example.com/api/v1
+paths:
+  /admin/tenants:
+    get:
+      summary: List tenants
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+      responses: { '200': { description: OK } }
+    post:
+      summary: Create tenant
+      security: [{ bearerAuth: [] }]
+      responses: { '201': { description: Created } }
+  /admin/plans:
+    get:
+      summary: List plans
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/licenses:
+    get:
+      summary: List licenses
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/licenses/issue:
+    post:
+      summary: Issue license (Ed25519 signed server-side)
+      security: [{ bearerAuth: [] }]
+      responses: { '201': { description: Created } }
+  /admin/invoices:
+    get:
+      summary: List invoices
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/payments:
+    post:
+      summary: Record payment
+      security: [{ bearerAuth: [] }]
+      responses: { '201': { description: Created } }
+  /admin/audit:
+    get:
+      summary: List audit entries
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/settings:
+    get:
+      summary: Get settings
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+    put:
+      summary: Update settings
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

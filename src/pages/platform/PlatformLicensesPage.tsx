@@ -9,6 +9,11 @@ import {
   Cpu,
   Download,
   ShieldX,
+  ShieldAlert,
+  Clock,
+  Users,
+  Settings,
+  Link,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import type {
@@ -16,6 +21,7 @@ import type {
   PlatformLicenseStatus,
   PlatformPlan,
   PlatformTenant,
+  PlatformCouplingMode,
 } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -39,6 +45,12 @@ const LICENSE_STATUS_LABELS: Record<PlatformLicenseStatus, string> = {
   EXPIRED: 'منتهي',
 };
 
+const COUPLING_LABELS: Record<PlatformCouplingMode, string> = {
+  FULL: 'كامل',
+  EXPIRY_ONLY: 'انتهاء الصلاحية فقط',
+  NONE: 'مستقل',
+};
+
 const STATUSES: PlatformLicenseStatus[] = ['ACTIVE', 'ISSUED', 'SUSPENDED', 'EXPIRED', 'REVOKED'];
 
 export const PlatformLicensesPage: React.FC = () => {
@@ -52,7 +64,16 @@ export const PlatformLicensesPage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const [issueOpen, setIssueOpen] = React.useState(false);
-  const [issueForm, setIssueForm] = React.useState({ tenantId: '', planId: '', months: 12, seats: 5, notes: '' });
+  const [issueForm, setIssueForm] = React.useState({
+    tenantId: '',
+    planId: '',
+    months: 12,
+    seats: 5,
+    branchesLimit: 1,
+    offlineGracePeriodDays: 14,
+    couplingMode: 'FULL' as PlatformCouplingMode,
+    notes: '',
+  });
   const [saving, setSaving] = React.useState(false);
 
   const [renewTarget, setRenewTarget] = React.useState<PlatformLicense | null>(null);
@@ -60,6 +81,9 @@ export const PlatformLicensesPage: React.FC = () => {
 
   const [hardwareTarget, setHardwareTarget] = React.useState<PlatformLicense | null>(null);
   const [hardwareId, setHardwareId] = React.useState('');
+  const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
+  const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
+  const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -91,6 +115,9 @@ export const PlatformLicensesPage: React.FC = () => {
       planId: defaultPlan?.id ?? '',
       months: 12,
       seats: defaultPlan?.seatsLimit ?? 5,
+      branchesLimit: defaultPlan?.branchesLimit ?? 1,
+      offlineGracePeriodDays: defaultPlan?.offlineGracePeriodDays ?? 14,
+      couplingMode: 'FULL',
       notes: '',
     });
     setIssueOpen(true);
@@ -106,6 +133,9 @@ export const PlatformLicensesPage: React.FC = () => {
       const license = platformAdminService.issueLicense(issueForm.tenantId, issueForm.planId, {
         months: issueForm.months,
         seats: issueForm.seats,
+        branchesLimit: issueForm.branchesLimit,
+        offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
+        couplingMode: issueForm.couplingMode,
         notes: issueForm.notes,
       });
       toast.success('تم إصدار الترخيص', license.licenseKey);
@@ -142,6 +172,45 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   };
 
+  const detectClones = () => {
+    try {
+      const result = platformAdminService.detectCloneDevices();
+      setCloneAlerts(result.alerts);
+      if (result.alerts.length > 0) {
+        toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
+      } else {
+        toast.success('لا يوجد اشتباه استنساخ');
+      }
+      load();
+    } catch (err) {
+      toast.error('تعذر الكشف عن الاستنساخ', err instanceof Error ? err.message : undefined);
+    }
+  };
+
+  const openDeviceAction = (action: 'suspend' | 'release' | 'revoke', device: { id: string; hardwareId: string; tenantId: string; status: string }) => {
+    setDeviceTarget(device);
+    setDeviceAction(action);
+  };
+
+  const executeDeviceAction = () => {
+    if (!deviceTarget || !deviceAction) return;
+    try {
+      if (deviceAction === 'suspend') {
+        platformAdminService.suspendDevice(deviceTarget.id, 'إيقاف عبر لوحة التحكم');
+      } else if (deviceAction === 'release') {
+        platformAdminService.releaseDevice(deviceTarget.id, 'تحرير عبر لوحة التحكم');
+      } else if (deviceAction === 'revoke') {
+        platformAdminService.revokeDevice(deviceTarget.id, 'إلغاء عبر لوحة التحكم');
+      }
+      toast.success(`تم ${deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'} الجهاز`);
+      setDeviceTarget(null);
+      setDeviceAction(null);
+      load();
+    } catch (err) {
+      toast.error('تعذر تنفيذ الإجراء', err instanceof Error ? err.message : undefined);
+    }
+  };
+
   const bindHardware = () => {
     if (!hardwareTarget) return;
     try {
@@ -154,19 +223,52 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   };
 
+  const exportCompliance = () => {
+    try {
+      const report = platformAdminService.exportLicenseComplianceReport({
+        includeActivations: true,
+        includeChanges: true,
+      });
+      const rows = [
+        ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
+        ...report.licenses.map((license: any) => [
+          license.license_key,
+          license.tenantName,
+          license.planName,
+          license.status,
+          license.issued_at,
+          license.starts_at || '',
+          license.expires_at || '',
+          license.seats,
+          license.device_limit,
+          license.branches_limit,
+          license.hardware_id || '',
+          license.coupling_mode || 'FULL',
+        ]),
+      ];
+      downloadCsv('license-compliance.csv', rows);
+      toast.success(`تم تصدير تقرير الامتثال (${report.summary.totalLicenses} ترخيص)`);
+    } catch (err) {
+      toast.error('تعذر تصدير التقرير', err instanceof Error ? err.message : undefined);
+    }
+  };
+
   const exportRows = () => {
     downloadCsv('platform-licenses.csv', [
-      ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'معرف الجهاز'],
+      ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
       ...licenses.map((license) => [
         license.licenseKey,
         license.tenantName ?? '',
         license.planName ?? '',
         LICENSE_STATUS_LABELS[license.status],
         license.issuedAt,
+        license.startsAt ?? '',
         license.expiresAt ?? '',
         license.seats,
         license.deviceLimit,
+        license.branchesLimit,
         license.hardwareId ?? '',
+        license.couplingMode ?? 'FULL',
       ]),
     ]);
   };
@@ -181,6 +283,12 @@ export const PlatformLicensesPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
               تصدير CSV
+            </Button>
+            <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
+              كشف الاستنساخ
+            </Button>
+            <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={exportCompliance}>
+              تقرير الامتثال
             </Button>
             <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openIssue}>
               إصدار ترخيص
@@ -230,9 +338,12 @@ export const PlatformLicensesPage: React.FC = () => {
                   <th className="px-4 py-2.5 font-semibold">العميل</th>
                   <th className="px-4 py-2.5 font-semibold">الخطة</th>
                   <th className="px-4 py-2.5 font-semibold">الحالة</th>
+                  <th className="px-4 py-2.5 font-semibold">يبدأ من</th>
                   <th className="px-4 py-2.5 font-semibold">ينتهي في</th>
                   <th className="px-4 py-2.5 font-semibold">المستخدمون</th>
-                  <th className="px-4 py-2.5 font-semibold">الجهاز</th>
+                  <th className="px-4 py-2.5 font-semibold">الأجهزة</th>
+                  <th className="px-4 py-2.5 font-semibold">الفروع</th>
+                  <th className="px-4 py-2.5 font-semibold">الربط</th>
                   <th className="px-4 py-2.5 font-semibold">إجراءات</th>
                 </tr>
               </thead>
@@ -246,11 +357,12 @@ export const PlatformLicensesPage: React.FC = () => {
                     <td className="px-4 py-2.5 text-[12px] font-semibold text-slate-700">{license.tenantName || '—'}</td>
                     <td className="px-4 py-2.5 text-[11.5px] text-slate-600">{license.planName || '—'}</td>
                     <td className="px-4 py-2.5"><StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status]} /></td>
+                    <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDate(license.startsAt)}</td>
                     <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDate(license.expiresAt)}</td>
                     <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.seats}</td>
-                    <td className="px-4 py-2.5" dir="ltr">
-                      <span className="block max-w-[130px] truncate font-mono text-[10px] text-slate-500">{license.hardwareId || '—'}</span>
-                    </td>
+                    <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.deviceLimit}</td>
+                    <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.branchesLimit}</td>
+                    <td className="px-4 py-2.5 text-[10px] text-slate-500">{COUPLING_LABELS[license.couplingMode ?? 'FULL']}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1">
                         <button
@@ -269,33 +381,47 @@ export const PlatformLicensesPage: React.FC = () => {
                         >
                           <Cpu className="h-3.5 w-3.5" />
                         </button>
-                        {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
-                          <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
+                            changeStatus(license, next);
+                          }}
+                          className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                          title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
+                        >
+                          {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
+                            <Ban className="h-3.5 w-3.5" />
+                          ) : (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => changeStatus(license, 'REVOKED')}
+                          className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                          title="إلغاء"
+                        >
+                          <ShieldX className="h-3.5 w-3.5" />
+                        </button>
+                          {license.hardwareId && (
                             <button
                               type="button"
-                              onClick={() => changeStatus(license, 'SUSPENDED')}
-                              className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                              title="إيقاف"
+                              onClick={() => openDeviceAction('release', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                              className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                              title="تحرير الجهاز"
                             >
-                              <Ban className="h-3.5 w-3.5" />
+                              <Link className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => changeStatus(license, 'REVOKED')}
-                              className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="إلغاء"
-                            >
-                              <ShieldX className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        ) : (
+                          )}
+                        {license.status === 'ACTIVE' && (
                           <button
                             type="button"
-                            onClick={() => changeStatus(license, 'ACTIVE')}
-                            className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
-                            title="تفعيل"
+                            onClick={() => openDeviceAction('suspend', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                            className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
+                            title="إيقاف الجهاز"
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <ShieldAlert className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
@@ -338,7 +464,7 @@ export const PlatformLicensesPage: React.FC = () => {
               value={issueForm.planId}
               onChange={(event) => {
                 const plan = plans.find((item) => item.id === event.target.value);
-                setIssueForm({ ...issueForm, planId: event.target.value, seats: plan?.seatsLimit ?? issueForm.seats });
+                setIssueForm({ ...issueForm, planId: event.target.value, seats: plan?.seatsLimit ?? issueForm.seats, branchesLimit: plan?.branchesLimit ?? issueForm.branchesLimit, offlineGracePeriodDays: plan?.offlineGracePeriodDays ?? issueForm.offlineGracePeriodDays });
               }}
             >
               <option value="">اختر الخطة</option>
@@ -352,6 +478,19 @@ export const PlatformLicensesPage: React.FC = () => {
           </Field>
           <Field label="عدد المستخدمين">
             <input type="number" min={1} className={inputClass} value={issueForm.seats} onChange={(event) => setIssueForm({ ...issueForm, seats: Number(event.target.value) })} />
+          </Field>
+          <Field label="الفروع المسموح بها">
+            <input type="number" min={1} className={inputClass} value={issueForm.branchesLimit} onChange={(event) => setIssueForm({ ...issueForm, branchesLimit: Number(event.target.value) })} />
+          </Field>
+          <Field label="فترة السماح أوفلاين (أيام)">
+            <input type="number" min={0} className={inputClass} value={issueForm.offlineGracePeriodDays} onChange={(event) => setIssueForm({ ...issueForm, offlineGracePeriodDays: Number(event.target.value) })} />
+          </Field>
+          <Field label="نوع الربط بالاشتراك">
+            <select className={inputClass} value={issueForm.couplingMode} onChange={(event) => setIssueForm({ ...issueForm, couplingMode: event.target.value as PlatformCouplingMode })}>
+              <option value="FULL">كامل (المزامنة التلقائية)</option>
+              <option value="EXPIRY_ONLY">انتهاء الصلاحية فقط</option>
+              <option value="NONE">مستقل تماماً</option>
+            </select>
           </Field>
           <Field label="ملاحظات" className="sm:col-span-2">
             <textarea rows={2} className={inputClass} value={issueForm.notes} onChange={(event) => setIssueForm({ ...issueForm, notes: event.target.value })} />
@@ -408,6 +547,45 @@ export const PlatformLicensesPage: React.FC = () => {
         <p className="mt-3 text-[10.5px] text-slate-500">
           آخر تحديث: {formatDateTime(hardwareTarget?.updatedAt)}
         </p>
+      </Modal>
+
+      {/* Clone alerts */}
+      {cloneAlerts.length > 0 && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h3 className="text-sm font-bold text-amber-800 mb-2">تنبيهات الاستنساخ المكتشفة</h3>
+          <ul className="text-[11px] text-amber-700 space-y-1 list-disc list-inside">
+            {cloneAlerts.map((alert, i) => (
+              <li key={i}>{alert}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Device action modal */}
+      <Modal
+        open={Boolean(deviceTarget)}
+        onClose={() => { setDeviceTarget(null); setDeviceAction(null); }}
+        title={deviceAction === 'suspend' ? 'إيقاف الجهاز' : deviceAction === 'release' ? 'تحرير الجهاز' : 'إلغاء الجهاز'}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
+            <Button variant="danger" onClick={executeDeviceAction}>
+              {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
+            </Button>
+          </div>
+        }
+      >
+        {deviceTarget && (
+          <>
+            <p className="text-[11px] text-slate-600 mb-3">
+              الجهاز: <span className="font-mono text-[10px] text-slate-800" dir="ltr">{deviceTarget.hardwareId}</span>
+            </p>
+            <p className="text-[11px] text-slate-600 mb-1">
+              الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'}
+            </p>
+          </>
+        )}
       </Modal>
     </div>
   );

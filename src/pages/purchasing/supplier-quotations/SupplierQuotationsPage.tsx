@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Plus, Search, TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
-  X, Award,
+  X, Award, FileSpreadsheet,
 } from 'lucide-react';
 import {
   ProcurementService, SupplierRfqRow, SupplierRfqItem,

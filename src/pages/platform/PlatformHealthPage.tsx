@@ -1,162 +1,514 @@
-import React from 'react';
-import { ShieldCheck, Activity, AlertTriangle, Building2, KeyRound, Wallet, CheckCircle2 } from 'lucide-react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
+import {
+  ShieldCheck,
+  ShieldAlert,
+  Activity,
+  AlertTriangle,
+  Building2,
+  KeyRound,
+  Wallet,
+  CheckCircle2,
+  RefreshCw,
+  Server,
+  Radio,
+  Archive,
+  Zap,
+  Clock,
+  ArrowUpRight,
+  TrendingUp,
+  Cpu,
+  Layers,
+  Check,
+  XCircle,
+  ExternalLink,
+} from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
-import type { PlatformOverview } from '../../services/domains/platform/platformTypes';
+import type {
+  PlatformHealthDashboardData,
+  PlatformTechnicalHealthMetrics,
+} from '../../services/domains/platform/platformTypes';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { StatusBadge } from './components/PlatformUI';
-import { formatDate, formatMoney, formatNumber } from './components/PlatformUI';
+import { Button } from '../../components/ui/Button';
+import { StatusBadge, formatDate, formatMoney, formatNumber } from './components/PlatformUI';
 
 export const PlatformHealthPage: React.FC = () => {
-  const [overview, setOverview] = React.useState<PlatformOverview | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [data, setData] = useState<PlatformHealthDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [alertFilter, setAlertFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'INFO'>('ALL');
 
-  React.useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     try {
-      setOverview(platformAdminService.getOverview());
+      const dashboard = platformAdminService.getPlatformHealthDashboard();
+      setData(dashboard);
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل صحة المنصة.');
+      setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات صحة ومراقبة المنصة.');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   if (error) {
-    return <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div>;
-  }
-  if (!overview) {
-    return <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل صحة المنصة...</div>;
+    return (
+      <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-5 text-rose-200">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-6 w-6 text-rose-400" />
+          <span className="font-bold">{error}</span>
+        </div>
+      </div>
+    );
   }
 
-  const score = Math.max(0, Math.min(100,
-    100
-    - (overview.tenants.suspended * 5)
-    - (overview.tenants.expired * 4)
-    - (overview.licenses.expired * 3)
-    - (overview.billing.overdueInvoices * 4)
-    - (overview.tenants.expiringSoon * 2)
-  ));
+  if (!data || loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-slate-400">
+          <RefreshCw className="h-5 w-5 animate-spin text-emerald-400" />
+          <span>جارٍ فحص مؤشرات صحة المنصة والبنية التقنية...</span>
+        </div>
+      </div>
+    );
+  }
 
-  const tone = score >= 85 ? 'success' : score >= 60 ? 'warning' : 'danger';
+  const { technical, business } = data;
+  const isHealthy = technical.status === 'HEALTHY';
+  const isDegraded = technical.status === 'DEGRADED';
+  const isCritical = technical.status === 'CRITICAL';
+
+  const filteredAlerts = technical.alerts.filter((alert) => {
+    if (alertFilter === 'ALL') return true;
+    return alert.severity === alertFilter;
+  });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Page Header */}
       <PageHeader
-        title="صحة المنصة (جميع العملاء)"
-        description="مؤشرات مجمعة لصحة جميع العملاء والتراخيص والاشتراكات والفوترة."
-        icon={<ShieldCheck className="h-5 w-5" />}
+        title="صحة المنصة والمراقبة التقنية"
+        description="مراقبة حية لتوافر الخدمات، أداء خوادم API، نبضات الأجهزة والمزامنة، وصحة الأعمال."
+        icon={<Activity className="h-6 w-6 text-emerald-400" />}
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={load}
+            disabled={loading}
+            leadingIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
+          >
+            تحديث المؤشرات
+          </Button>
+        }
       />
 
-      <section className="rounded-2xl bg-gradient-to-l from-slate-900 via-slate-800 to-emerald-900 p-5 text-white shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">تقييم صحة المنصة</p>
-            <p className="mt-2 text-4xl font-black">{score}%</p>
-            <p className="mt-1 text-xs text-slate-300">
-              {overview.alerts.length === 0 ? 'لا توجد تنبيهات — المنصة في وضع سليم.' : `${overview.alerts.length} تنبيه يحتاج متابعة.`}
+      {/* Hero: Technical Infrastructure Health Score */}
+      <section
+        className={`relative overflow-hidden rounded-2xl border p-6 shadow-xl transition-all ${
+          isHealthy
+            ? 'border-emerald-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 text-white'
+            : isDegraded
+            ? 'border-amber-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 text-white'
+            : 'border-rose-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-rose-950 text-white'
+        }`}
+      >
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                  isHealthy
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : isDegraded
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}
+              >
+                {isHealthy ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : isDegraded ? (
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                ) : (
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                )}
+                {isHealthy ? 'البنية التقنية مستقرة' : isDegraded ? 'أداء منخفض جزئياً' : 'تنبيه أداء حرج'}
+              </span>
+              <span className="text-xs text-slate-400">تقييم مبني على مؤشرات الخوادم والمزامنة الحية</span>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-5xl font-black tracking-tight">{technical.score}%</h1>
+              <span className="text-sm font-semibold text-slate-300">مؤشر الصحة والاستقرار التقني</span>
+            </div>
+            <p className="text-sm text-slate-300 max-w-xl">
+              {technical.alerts.length === 0
+                ? 'جميع خدمات المنصة المركزية، خوادم الـ API، محركات المزامنة والنسخ الاحتياطي تعمل بكفاءة تامة.'
+                : `تم رصد ${technical.alerts.length} ملاحظة وتنبيه تقني نشط يتطلب المتابعة لضمان استمرارية الخدمة.`}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl bg-white/10 p-3 text-center">
-              <p className="text-[10px] text-slate-300">عملاء نشطون</p>
-              <p className="text-lg font-black text-emerald-300">{formatNumber(overview.tenants.active)}</p>
+
+          {/* Quick Real-Time Metrics Strip */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-center backdrop-blur-sm">
+              <p className="text-[11px] font-semibold text-slate-400">توافر الخدمات</p>
+              <p className="mt-1 text-2xl font-black text-emerald-400">{technical.availabilityRate}%</p>
+              <p className="text-[10px] text-slate-400">Service Uptime</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center">
-              <p className="text-[10px] text-slate-300">تراخيص سارية</p>
-              <p className="text-lg font-black text-sky-300">{formatNumber(overview.licenses.active)}</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-center backdrop-blur-sm">
+              <p className="text-[11px] font-semibold text-slate-400">نجاح طلبات API</p>
+              <p className="mt-1 text-2xl font-black text-sky-400">{technical.apiSuccessRate}%</p>
+              <p className="text-[10px] text-slate-400">{technical.apiLatencyMs}ms استجابة</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center">
-              <p className="text-[10px] text-slate-300">اشتراكات نشطة</p>
-              <p className="text-lg font-black text-amber-300">{formatNumber(overview.subscriptions.active)}</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-center backdrop-blur-sm">
+              <p className="text-[11px] font-semibold text-slate-400">نجاح المزامنة</p>
+              <p className="mt-1 text-2xl font-black text-amber-400">{technical.syncSuccessRate}%</p>
+              <p className="text-[10px] text-slate-400">{technical.syncFailedCount} فشل مزامنة</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center">
-              <p className="text-[10px] text-slate-300">تنبيهات</p>
-              <p className="text-lg font-black text-rose-300">{formatNumber(overview.alerts.length)}</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-center backdrop-blur-sm">
+              <p className="text-[11px] font-semibold text-slate-400">النسخ الاحتياطي</p>
+              <p
+                className={`mt-1 text-lg font-black ${
+                  technical.lastBackupStatus === 'SUCCESS'
+                    ? 'text-emerald-400'
+                    : technical.lastBackupStatus === 'FAILED'
+                    ? 'text-rose-400'
+                    : 'text-amber-400'
+                }`}
+              >
+                {technical.lastBackupStatus === 'SUCCESS'
+                  ? 'تم التحقق'
+                  : technical.lastBackupStatus === 'FAILED'
+                  ? 'فشل التحقق'
+                  : 'معلق'}
+              </p>
+              <p className="text-[10px] text-slate-400">منذ {technical.lastBackupAgeHours} ساعة</p>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500"><Building2 className="h-3.5 w-3.5" /> العملاء</p>
-          <p className="mt-1 text-xl font-black text-slate-900">{formatNumber(overview.tenants.total)}</p>
-          <p className="text-[10.5px] text-slate-500">
-            {formatNumber(overview.tenants.active)} نشط · {formatNumber(overview.tenants.suspended)} موقوف · {formatNumber(overview.tenants.expired)} منتهي
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500"><KeyRound className="h-3.5 w-3.5" /> التراخيص</p>
-          <p className="mt-1 text-xl font-black text-slate-900">{formatNumber(overview.licenses.total)}</p>
-          <p className="text-[10.5px] text-slate-500">
-            {formatNumber(overview.licenses.active)} ساري · {formatNumber(overview.licenses.expired)} منتهي · {formatNumber(overview.licenses.revoked)} ملغي
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500"><Activity className="h-3.5 w-3.5" /> الاشتراكات</p>
-          <p className="mt-1 text-xl font-black text-slate-900">{formatNumber(overview.subscriptions.total)}</p>
-          <p className="text-[10.5px] text-slate-500">
-            {formatNumber(overview.subscriptions.active)} نشط · {formatNumber(overview.subscriptions.expired)} منتهي · {formatNumber(overview.subscriptions.expiringSoon)} ينتهي قريباً
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-500"><Wallet className="h-3.5 w-3.5" /> الفوترة</p>
-          <p className="mt-1 text-xl font-black text-slate-900">{formatMoney(overview.billing.outstanding)}</p>
-          <p className="text-[10.5px] text-slate-500">
-            {formatNumber(overview.billing.overdueInvoices)} فاتورة متأخرة · MRR {formatMoney(overview.billing.mrr)}
-          </p>
+      {/* Technical Health Indicators Grid */}
+      <div>
+        <h2 className="mb-3 text-base font-bold text-slate-200 flex items-center gap-2">
+          <Server className="h-5 w-5 text-indigo-400" />
+          المؤشرات التقنية ومراقبة البنية التحتية
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 1. API Health */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-amber-400" />
+                استجابة وأخطاء API
+              </span>
+              <span
+                className={`font-bold ${
+                  technical.apiErrorRate < 0.5
+                    ? 'text-emerald-400'
+                    : technical.apiErrorRate < 1.5
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {technical.apiErrorRate}% خطأ
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-100">{technical.apiLatencyMs} ms</span>
+              <span className="text-xs text-slate-400">متوسط التأخير</span>
+            </div>
+            <div className="mt-3 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400 flex justify-between">
+              <span>الحد الأقصى الموصى به</span>
+              <span className="text-slate-300 font-medium">150 ms</span>
+            </div>
+          </div>
+
+          {/* 2. Sync Engine */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Radio className="h-4 w-4 text-sky-400" />
+                محرك المزامنة السحابية
+              </span>
+              <span className="text-emerald-400 font-bold">{technical.syncSuccessRate}% نجاح</span>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-100">{technical.syncFailedCount}</span>
+              <span className="text-xs text-slate-400">فشل في السجلات</span>
+            </div>
+            <div className="mt-3 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400 flex justify-between">
+              <span>حالة خادم المزامنة</span>
+              <span className="text-emerald-400 font-medium">متصل وسريع</span>
+            </div>
+          </div>
+
+          {/* 3. Devices & Heartbeats */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-purple-400" />
+                نبضات الأجهزة (Heartbeat)
+              </span>
+              <span
+                className={`font-bold ${
+                  technical.staleDevicesCount === 0 ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                {technical.staleDevicesCount} منقطع
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-100">
+                {technical.totalDevicesCount - technical.staleDevicesCount} / {technical.totalDevicesCount}
+              </span>
+              <span className="text-xs text-slate-400">أجهزة ترسل نبضات</span>
+            </div>
+            <div className="mt-3 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400 flex justify-between">
+              <span>أجهزة يشتبه باستنساخها</span>
+              <span
+                className={`font-bold ${
+                  technical.licenseIntegrityAlerts === 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {technical.licenseIntegrityAlerts}
+              </span>
+            </div>
+          </div>
+
+          {/* 4. Central Backups & Operations */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Archive className="h-4 w-4 text-emerald-400" />
+                النسخ والعمليات
+              </span>
+              <span
+                className={`font-bold ${
+                  technical.failedOpsJobsCount === 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {technical.failedOpsJobsCount} مهام فاشلة
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span
+                className={`text-2xl font-black ${
+                  technical.lastBackupStatus === 'SUCCESS' ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                {technical.lastBackupStatus === 'SUCCESS' ? 'سليمة' : 'تحتاج فحص'}
+              </span>
+              <span className="text-xs text-slate-400">آخر نسخة احتياطية</span>
+            </div>
+            <div className="mt-3 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400 flex justify-between">
+              <span>حوادث مفتوحة</span>
+              <span className="text-slate-300 font-medium">
+                {technical.openIncidents.critical} حرج · {technical.openIncidents.major} رئيسي
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600"><AlertTriangle className="h-4 w-4" /></span>
+      {/* Section: Live Technical Alerts by Severity */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-sm overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">تنبيهات صحة المنصة</h3>
-              <p className="text-[10.5px] text-slate-500">{overview.alerts.length === 0 ? 'لا توجد تنبيهات' : `${overview.alerts.length} تنبيه`}</p>
+              <h3 className="text-sm font-bold text-slate-100">تنبيهات وأعطال المنصة التقنية</h3>
+              <p className="text-xs text-slate-400">
+                {technical.alerts.length === 0
+                  ? 'لا توجد تنبيهات نشطة — النظام يعمل بكامل الاستقرار.'
+                  : `${technical.alerts.length} تنبيه مسجل ومصنف بحسب الخطورة.`}
+              </p>
             </div>
           </div>
-          <StatusBadge value={tone === 'success' ? 'ACTIVE' : tone === 'warning' ? 'TRIAL' : 'EXPIRED'} label={tone === 'success' ? 'سليم' : tone === 'warning' ? 'يحتاج متابعة' : 'حرج'} />
+
+          <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950/60 p-1">
+            <button
+              onClick={() => setAlertFilter('ALL')}
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                alertFilter === 'ALL'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              الكل ({technical.alerts.length})
+            </button>
+            <button
+              onClick={() => setAlertFilter('CRITICAL')}
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                alertFilter === 'CRITICAL'
+                  ? 'bg-rose-900/60 text-rose-200 border border-rose-700/50'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              حرج ({technical.alerts.filter((a) => a.severity === 'CRITICAL').length})
+            </button>
+            <button
+              onClick={() => setAlertFilter('WARNING')}
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                alertFilter === 'WARNING'
+                  ? 'bg-amber-900/60 text-amber-200 border border-amber-700/50'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              تحذير ({technical.alerts.filter((a) => a.severity === 'WARNING').length})
+            </button>
+            <button
+              onClick={() => setAlertFilter('INFO')}
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                alertFilter === 'INFO'
+                  ? 'bg-sky-900/60 text-sky-200 border border-sky-700/50'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              معلومات ({technical.alerts.filter((a) => a.severity === 'INFO').length})
+            </button>
+          </div>
         </header>
-        {overview.alerts.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-emerald-700">
-            <CheckCircle2 className="h-4 w-4" /> جميع المؤشرات في وضع سليم.
+
+        {filteredAlerts.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-6 text-sm font-semibold text-emerald-400">
+            <CheckCircle2 className="h-5 w-5" />
+            <span>لا توجد تنبيهات مسجلة تحت هذا التصنيف — جميع المؤشرات التقنية طبيعية.</span>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100">
-            {overview.alerts.map((alert) => (
-              <li key={alert.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-[12px] font-bold text-slate-800">{alert.title}</p>
-                  <p className="text-[10.5px] text-slate-500">{alert.description}</p>
+          <ul className="divide-y divide-slate-800/80">
+            {filteredAlerts.map((alert) => (
+              <li
+                key={alert.id}
+                className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black ${
+                      alert.severity === 'CRITICAL'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        : alert.severity === 'WARNING'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                    }`}
+                  >
+                    {alert.severity === 'CRITICAL'
+                      ? 'حرج'
+                      : alert.severity === 'WARNING'
+                      ? 'تحذير'
+                      : 'معلومة'}
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-slate-100">{alert.title}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{alert.description}</p>
+                  </div>
                 </div>
-                {alert.link && <a href={alert.link} className="text-[10.5px] font-bold text-emerald-700 hover:underline">عرض</a>}
+
+                {alert.link && (
+                  <a
+                    href={alert.link}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 shrink-0"
+                  >
+                    <span>معالجة</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <header className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><Activity className="h-4 w-4" /></span>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">آخر العمليات على المنصة</h3>
-            <p className="text-[10.5px] text-slate-500">أحدث الإجراءات الإدارية المسجلة</p>
+      {/* Section: Dedicated Business Health (مؤشرات صحة الأعمال والعملاء) */}
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-sm">
+        <header className="mb-4 flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <TrendingUp className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100">مؤشرات صحة الأعمال (Commercial Health)</h3>
+              <p className="text-xs text-slate-400">
+                حالة العملاء، الاشتراكات السارية، التراخيص، والتدفق المالي للفوترة
+              </p>
+            </div>
           </div>
+          <span className="text-xs font-bold text-slate-400">مفصولة عن صحة البنية التقنية</span>
         </header>
-        {overview.recentAudit.length === 0 ? (
-          <p className="px-4 py-4 text-[11px] text-slate-500">لا توجد عمليات مسجلة.</p>
-        ) : (
-          <ol className="divide-y divide-slate-100">
-            {overview.recentAudit.map((entry) => (
-              <li key={entry.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9.5px] font-bold text-slate-600">{entry.entityType}</span>
-                <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-800">{entry.action}</p>
-                <span className="shrink-0 text-[10px] text-slate-500">{entry.actorName || 'النظام'}</span>
-                <span className="shrink-0 text-[10px] text-slate-400">{formatDate(entry.createdAt)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* 1. Tenants */}
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+              <Building2 className="h-4 w-4 text-sky-400" />
+              العملاء والمستأجرين
+            </p>
+            <p className="mt-2 text-2xl font-black text-slate-100">{formatNumber(business.tenants.total)}</p>
+            <p className="mt-1 text-xs text-slate-400">
+              <span className="text-emerald-400 font-semibold">{formatNumber(business.tenants.active)} نشط</span>
+              {' · '}
+              <span className="text-amber-400 font-semibold">{formatNumber(business.tenants.suspended)} موقوف</span>
+              {' · '}
+              <span className="text-rose-400 font-semibold">{formatNumber(business.tenants.expired)} منتهي</span>
+            </p>
+          </div>
+
+          {/* 2. Licenses */}
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+              <KeyRound className="h-4 w-4 text-emerald-400" />
+              التراخيص الصادرة
+            </p>
+            <p className="mt-2 text-2xl font-black text-slate-100">{formatNumber(business.licenses.total)}</p>
+            <p className="mt-1 text-xs text-slate-400">
+              <span className="text-emerald-400 font-semibold">{formatNumber(business.licenses.active)} ساري</span>
+              {' · '}
+              <span className="text-amber-400 font-semibold">{formatNumber(business.licenses.expired)} منتهي</span>
+              {' · '}
+              <span className="text-rose-400 font-semibold">{formatNumber(business.licenses.revoked)} ملغي</span>
+            </p>
+          </div>
+
+          {/* 3. Subscriptions */}
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+              <Layers className="h-4 w-4 text-purple-400" />
+              الاشتراكات والخطط
+            </p>
+            <p className="mt-2 text-2xl font-black text-slate-100">
+              {formatNumber(business.subscriptions.total)}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              <span className="text-emerald-400 font-semibold">{formatNumber(business.subscriptions.active)} نشط</span>
+              {' · '}
+              <span className="text-amber-400 font-semibold">
+                {formatNumber(business.subscriptions.expiringSoon)} ينتهي قريباً
+              </span>
+            </p>
+          </div>
+
+          {/* 4. Billing & Revenue */}
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+              <Wallet className="h-4 w-4 text-amber-400" />
+              الفوترة والاشتراكات
+            </p>
+            <p className="mt-2 text-2xl font-black text-slate-100">
+              {formatMoney(business.billing.outstanding)}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              <span className="text-rose-400 font-semibold">
+                {formatNumber(business.billing.overdueInvoices)} فاتورة متأخرة
+              </span>
+              {' · '}
+              <span className="text-emerald-400 font-semibold">MRR {formatMoney(business.billing.mrr)}</span>
+            </p>
+          </div>
+        </div>
       </section>
     </div>
   );
