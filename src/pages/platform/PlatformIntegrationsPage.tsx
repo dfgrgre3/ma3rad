@@ -215,23 +215,13 @@ export const PlatformIntegrationsPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    setPaymentsLoading(true);
-    try {
-      // Persist through the central feature-permissions/settings endpoint so
-      // secrets are stored server-side and never live in browser state.
-      await platformAdminApiClient.setFeaturePermissions({
-        tenantId: null,
-        planId: null,
-        hiddenMenus: [],
-        disabledPermissions: [],
-        featurePermissions: [],
-      });
-      toast.success('تم حفظ إعدادات بوابات الدفع ومزودي الرسائل على السيرفر المركزي.');
-    } catch (err) {
-      toast.error('تعذر حفظ الإعدادات', err instanceof Error ? err.message : undefined);
-    } finally {
-      setPaymentsLoading(false);
-    }
+    // Secrets (payment gateway keys, SMS tokens) must be configured on the
+    // central server/secret store and must never be persisted from browser
+    // state. This UI does not transmit credentials to avoid accidental exposure.
+    toast.info(
+      'حفظ بيانات الاعتماد غير متاح من الواجهة',
+      'يجب تهيئة مفاتيح بوابات الدفع ومزودي الرسائل على الخادم المركزي (Secret Store) عبر قناة إدارية آمنة. لا يتم إرسال الأسرار من المتصفح.',
+    );
   };
 
   // ── SMS Providers State ────────────────────────────────────────────────────

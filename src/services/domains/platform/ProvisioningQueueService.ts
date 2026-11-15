@@ -165,7 +165,7 @@ export class ProvisioningQueueService {
     this.db.run(`UPDATE provisioning_queue SET status=?, updated_at=? WHERE id=?`, [next, nowIso(), id]);
   }
 
-  markFailed(id: string, error: string, retry = true): ProvisioningJobStatus {
+  markFailed(id: string, error: string, retry = true): 'FAILED' | 'RETRYING' {
     this.ensureSchema();
     const row = this.db.query<any>('SELECT attempts FROM provisioning_queue WHERE id = ? LIMIT 1', [id])[0];
     const attempts = Number(row?.attempts || 0) + 1;
@@ -179,7 +179,7 @@ export class ProvisioningQueueService {
     return status;
   }
 
-  markRetrying(id: string, error: string): ProvisioningJobStatus {
+  markRetrying(id: string, error: string): 'FAILED' | 'RETRYING' {
     this.ensureSchema();
     const row = this.db.query<any>('SELECT attempts FROM provisioning_queue WHERE id = ? LIMIT 1', [id])[0];
     const attempts = Number(row?.attempts || 0) + 1;

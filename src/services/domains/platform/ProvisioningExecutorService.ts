@@ -222,7 +222,9 @@ export class ProvisioningExecutorService {
   }
 
   private markFailed(job: ProvisioningJob, message: string, terminal = false): 'FAILED' | 'RETRYING' {
-    const next = provisioningQueueService.markFailed(job.id, message, terminal);
+    // Queue signature takes `retry` (true = may retry later, terminal at cap);
+    // executor's `terminal` is the inverse — map it or every failure goes terminal.
+    const next = provisioningQueueService.markFailed(job.id, message, !terminal);
     if (next === 'FAILED') {
       try {
         this.db.run(

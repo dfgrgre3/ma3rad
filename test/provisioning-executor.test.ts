@@ -188,18 +188,25 @@ test('executor marks FAILED with the endpoint message when the channel rejects t
   };
 
   const jobBefore = Number(queueRowFor(db, result.user.id)?.attempts ?? 0);
-  console.log('job before drains:', JSON.stringify(queueRowFor(db, result.user.id)));
   await provisioningExecutorService.processPending(50);
+
+  const transientJob = queueRowFor(db, result.user.id);
+  assert.equal(transientJob.status, 'RETRYING', 'a transient failure retries rather than going terminal');
+  assert.ok(Number(transientJob.attempts) > jobBefore);
+
+  // Drive the job to the terminal attempt cap.
+  for (let i = 0; i < 6; i += 1) {
+    await provisioningExecutorService.processPending(50);
+  }
   await waitForCondition(() => col(rowFor(DatabaseManager.getInstance(), result.user.id), 'provisioning_status') === 'FAILED');
 
   const row = rowFor(db, result.user.id);
   assert.equal(col(row, 'provisioning_status'), 'FAILED');
-  assert.match(String(col(row,'last_error')), /tenant endpoint said no/);
+  assert.match(String(col(row, 'last_error')), /tenant endpoint said no/);
 
   const job = queueRowFor(db, result.user.id);
-  console.log('job after failure:', JSON.stringify(job));
-  assert.equal(job.status, 'RETRYING', 'a transient failure retries rather than going terminal');
-  assert.ok(Number(job.attempts) > jobBefore);
+  assert.equal(job.status, 'FAILED');
+  assert.ok(Number(job.attempts) >= 5);
 
   delete (globalThis as any).window;
   db.run(`DELETE FROM platform_settings WHERE key = 'platform.provisioningPath'`);

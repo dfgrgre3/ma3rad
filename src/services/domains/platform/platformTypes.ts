@@ -539,9 +539,12 @@ export interface PlatformOverview {
 export type PlatformTenantUserProvisioningStatus =
   | 'NOT_REQUESTED'
   | 'PENDING'
+  | 'PROCESSING'
   | 'INVITED'
   | 'PROVISIONED'
   | 'FAILED'
+  | 'RETRYING'
+  | 'CANCELLED'
   | 'DIRECTORY_ONLY';
 
 export interface PlatformTenantUser {

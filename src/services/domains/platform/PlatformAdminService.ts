@@ -4574,15 +4574,52 @@ export class PlatformAdminService {
       : { id, invoiceId: input.invoiceId || null, tenantId: input.tenantId, amount, method: input.method || 'CASH', paidAt: input.paidAt || nowIso() };
   }
 
-  public voidPayment(id: string): void {
+  public voidPayment(id: string, reason?: string): void {
     PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.delete');
     const payment = this.db.query<any>('SELECT * FROM platform_payments WHERE id = ?', [id])[0];
     if (!payment) throw new Error('الدفعة غير موجودة.');
+    const amount = toNumber(payment.amount);
+    if (amount <= 0) throw new Error('لا يمكن إلغاء قيد عكسي أو دفعة ملغاة بالفعل.');
+    const existingReversal = this.db.query<any>(
+      `SELECT id FROM platform_payments WHERE reference = ? LIMIT 1`,
+      [`REVERSAL_OF:${id}`],
+    )[0];
+    if (existingReversal) throw new Error('تم إنشاء قيد عكسي لهذه الدفعة مسبقًا.');
+    const reversalId = `pay_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const now = nowIso();
+    const note = [
+      `REVERSAL_OF:${id}`,
+      reason ? `reason:${String(reason).trim()}` : null,
+    ]
+      .filter(Boolean)
+      .join(' | ');
     this.db.executeTransaction(() => {
-      this.db.run('DELETE FROM platform_payments WHERE id = ?', [id]);
-      if (payment.invoiceId) this.recalculateInvoice(String(payment.invoiceId));
+      // Financial records are never deleted: record an explicit reversing entry
+      // that preserves the original payment and nets to a zero effect.
+      this.db.run(
+        `INSERT INTO platform_payments (id, invoice_id, tenant_id, amount, method, reference, paid_at, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          reversalId,
+          payment.invoiceId ?? payment.invoice_id ?? null,
+          String(payment.tenantId ?? payment.tenant_id),
+          -Math.abs(amount),
+          String(payment.method || 'OTHER'),
+          `REVERSAL_OF:${id}`,
+          now,
+          note,
+          now,
+        ],
+      );
+      const invoiceId = payment.invoiceId ?? payment.invoice_id;
+      if (invoiceId) this.recalculateInvoice(String(invoiceId));
     });
-    this.audit('إلغاء دفعة', 'PAYMENT', id, { amount: toNumber(payment.amount), invoiceId: payment.invoiceId });
+    this.audit('إلغاء دفعة (قيد عكسي)', 'PAYMENT', reversalId, {
+      originalPaymentId: id,
+      reversedAmount: Math.abs(amount),
+      invoiceId: payment.invoiceId ?? payment.invoice_id ?? null,
+      reason: reason ?? null,
+    });
   }
 
   // ─── Product control ───────────────────────────────────────────────────────

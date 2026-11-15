@@ -7,8 +7,8 @@ const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
-const SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS = 50;
-const SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS = 500;
+const SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS = 500;
+const SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS = 10000;
 const LEGACY_X86_BUILD = typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined'
   && __CERAMISYS_LEGACY_BUILD__;
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;

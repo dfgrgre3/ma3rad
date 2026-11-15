@@ -137,10 +137,13 @@ public runScheduledChecks(): { created: number } {
 
       // ─── تنبيهات الموارد البشرية ───
       try {
-        const hrAlerts = new HrAlertsService();
-        const hrResult = hrAlerts.runHrAlerts();
-        if (hrResult.created > 0) {
-          console.log(`HR Alerts created: ${hrResult.created} — ${hrResult.details.join(', ')}`);
+        const currentUser = AuthService.getCurrentUser();
+        if (currentUser) {
+          const hrAlerts = new HrAlertsService();
+          const hrResult = hrAlerts.runHrAlerts();
+          if (hrResult.created > 0) {
+            console.log(`HR Alerts created: ${hrResult.created} — ${hrResult.details.join(', ')}`);
+          }
         }
       } catch (error) {
         console.warn('HR scheduled alert checks failed:', error);

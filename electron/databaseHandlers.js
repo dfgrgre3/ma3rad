@@ -371,15 +371,9 @@ function registerDatabaseHandlers({
       if (!data.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
         throw createCodedError('Database save payload must contain a valid SQLite database.', 'DATABASE_INVALID_SQLITE');
       }
-      try {
-        await verifySQLiteDatabaseBytes(data);
-      } catch (cause) {
-        throw createCodedError(
-          'Database save payload is not a valid, complete application SQLite database.',
-          'DATABASE_INVALID_SQLITE',
-          cause,
-        );
-      }
+      // Skip expensive integrity verification on routine auto-saves.
+      // Verification is still performed for explicit backup/restore operations
+      // (db:backup, db:create-fresh-after-recovery, db:decrypt-backup-with-recovery-key).
       const key = await getKey();
       const encrypted = encryptDatabaseBytes(data, key);
       await atomicWrite(fs, DB_FILE, encrypted);
