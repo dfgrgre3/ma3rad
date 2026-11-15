@@ -134,7 +134,7 @@ export const PlatformRolesPage: React.FC = () => {
     setDirtyRoles((prev) => new Set(prev).add(role));
   };
 
-  const standardCodesForRole = (role: string) =>
+  const standardCodesForRole = () =>
     (matrix?.sections ?? []).flatMap((section) =>
       section.permissions.filter((permission) => !permission.special).map((permission) => permission.code),
     );
@@ -237,8 +237,8 @@ export const PlatformRolesPage: React.FC = () => {
             <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
               {ROLE_ORDER.filter((r) => r !== 'SUPER_ADMIN').map((role) => (
                 <span key={role} className="hidden xl:flex items-center gap-1.5">
-                  <button className="text-sky-400 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(role), true)}>الكل+</button>
-                  <button className="text-rose-400/80 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(role), false)}>الكل−</button>
+                  <button className="text-sky-400 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), true)}>الكل+</button>
+                  <button className="text-rose-400/80 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), false)}>الكل−</button>
                 </span>
               ))}
             </div>

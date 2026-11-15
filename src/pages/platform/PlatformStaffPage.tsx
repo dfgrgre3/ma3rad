@@ -4,8 +4,6 @@ import {
   Users,
   UserPlus,
   Shield,
-  Mail,
-  Phone,
   Search,
   CheckCircle2,
   XCircle,
@@ -677,12 +675,12 @@ export const PlatformStaffPage: React.FC = () => {
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              {canResetPassword && (
+                              {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
                                 <button onClick={() => { setResetTarget(staff); setResetPassword(''); setResetConfirm(''); }} className="text-violet-400 hover:text-violet-300 p-1" title="إعادة تعيين كلمة المرور">
                                   <KeyRound className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              {canResetPassword && (
+                              {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
                                 <button onClick={() => handleForcePasswordChange(staff)} className={`p-1 ${staff.mustChangePassword ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-300'}`} title={staff.mustChangePassword ? 'إلغاء فرض تغيير كلمة المرور' : 'فرض تغيير كلمة المرور'}>
                                   <Lock className="h-3.5 w-3.5" />
                                 </button>

@@ -108,7 +108,7 @@ test('self-service password change clears the forced-change flag', async () => {
   loginAsOwner(db);
 
   const email = uniqueEmail('selfservice');
-  const staff = platformAdminService.createPlatformStaff({
+  platformAdminService.createPlatformStaff({
     fullName: 'تغيير ذاتي',
     email,
     role: 'SUPPORT_AGENT',

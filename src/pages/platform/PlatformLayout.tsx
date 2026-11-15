@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
@@ -25,6 +25,7 @@ import {
   Bell,
   FileText,
   AlertOctagon,
+  Globe,
 } from 'lucide-react';
 import type { User } from '../../types';
 import { PLATFORM_ROUTE_PERMISSION_MAP, PlatformAuthorizationService } from '../../services/domains/platform/PlatformAuthorizationService';
@@ -106,6 +107,7 @@ const TITLES: Record<string, string> = {
 
 export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onLogout }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const currentTitle = TITLES[location.pathname] || 'منصة مالك النظام';
 
@@ -164,6 +166,15 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
         </div>
         {nav}
         <div className="border-t border-white/10 p-3">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            title="الانتقال إلى التطبيق الرئيسي (موقع المستخدمين)"
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 hover:text-emerald-200"
+          >
+            <Globe className="h-4 w-4" />
+            موقع المستخدمين
+          </button>
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
               <ShieldCheck className="h-4 w-4" />
@@ -199,6 +210,14 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
             <div className="border-t border-white/10 p-3">
               <button
                 type="button"
+                onClick={() => { setMobileOpen(false); navigate('/dashboard'); }}
+                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25"
+              >
+                <Globe className="h-4 w-4" />
+                موقع المستخدمين
+              </button>
+              <button
+                type="button"
                 onClick={onLogout}
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300"
               >
@@ -228,6 +247,16 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              title="الانتقال إلى التطبيق الرئيسي (موقع المستخدمين)"
+              aria-label="الانتقال إلى موقع المستخدمين"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:bg-emerald-700"
+            >
+              <Globe className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">موقع المستخدمين</span>
+            </button>
             <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 sm:inline-flex">
               جلسة مالك المنصة
             </span>
