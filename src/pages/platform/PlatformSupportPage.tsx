@@ -77,7 +77,7 @@ export const PlatformSupportPage: React.FC = () => {
   const [newAssignedTo, setNewAssignedTo] = useState('');
 
   // Remote session form
-  const [technicianName, setTechnicianName] = useState('???? ????? ???????');
+  const [technicianName, setTechnicianName] = useState('فني الدعم الخارجي');
   const [sessionDuration, setSessionDuration] = useState(60);
 
   // Rating form
@@ -93,7 +93,7 @@ export const PlatformSupportPage: React.FC = () => {
       setCannedReplies(platformAdminService.listCannedReplies());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '???? ????? ????? ?????.');
+      setError(err instanceof Error ? err.message : 'تعذر تحميل تذاكر الدعم.');
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,7 @@ export const PlatformSupportPage: React.FC = () => {
       const data = platformAdminService.getSupportTicketDetails(id);
       setDetails(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '???? ????? ?????? ???????.');
+      setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.');
     } finally {
       setDetailsLoading(false);
     }
@@ -140,7 +140,7 @@ export const PlatformSupportPage: React.FC = () => {
     try {
       platformAdminService.addSupportMessage({
         ticketId: selectedTicketId,
-        authorName: '????? ????? (Super Admin)',
+        authorName: 'مالك المنصة (Super Admin)',
         authorRole: 'SUPPORT',
         body: messageBody.trim(),
         isInternal,
@@ -154,7 +154,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '??? ????? ???????.');
+      alert(err instanceof Error ? err.message : 'فشل إرسال الرسالة.');
     } finally {
       setSendingMessage(false);
     }
@@ -169,7 +169,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ???? ???????.');
+      alert(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.');
     }
   };
 
@@ -182,7 +182,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ????????.');
+      alert(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.');
     }
   };
 
@@ -195,7 +195,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ???????.');
+      alert(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.');
     }
   };
 
@@ -208,7 +208,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ??? ?????? ?? ???.');
+      alert(err instanceof Error ? err.message : 'تعذر طلب الوصول عن بُعد للتذكرة.');
     }
   };
 
@@ -220,7 +220,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ?????? ??????.');
+      alert(err instanceof Error ? err.message : 'تعذر الموافقة على الوصول عن بُعد.');
     }
   };
 
@@ -238,19 +238,19 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ??? ???? ??????.');
+      alert(err instanceof Error ? err.message : 'تعذر بدء جلسة الوصول عن بُعد.');
     }
   };
 
   // End Remote Session
   const handleEndRemoteSession = (sessionId: string) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
-    const summary = prompt('???? ???? ????????? ???? ??? ???? ??????:');
+    const summary = prompt('أدخل ملخص إنهاء جلسة الوصول عن بُعد:');
     try {
       platformAdminService.endRemoteSession(sessionId, summary || undefined);
       if (selectedTicketId) loadTicketDetails(selectedTicketId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ??????.');
+      alert(err instanceof Error ? err.message : 'تعذر إنهاء جلسة الوصول.');
     }
   };
 
@@ -258,7 +258,7 @@ export const PlatformSupportPage: React.FC = () => {
   const handleCreateTicket = () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!newTenantId || !newSubject.trim()) {
-      alert('???? ????? ?????? ?????? ????? ???????.');
+      alert('يرجى اختيار العميل وكتابة عنوان التذكرة.');
       return;
     }
     try {
@@ -275,7 +275,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTickets();
       setSelectedTicketId(created.id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ???????.');
+      alert(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.');
     }
   };
 
@@ -289,7 +289,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : '???? ????? ???????.');
+      alert(err instanceof Error ? err.message : 'تعذر تقييم التذكرة.');
     }
   };
 
@@ -302,8 +302,8 @@ export const PlatformSupportPage: React.FC = () => {
     <div className="space-y-4">
       {/* Page Header */}
       <PageHeader
-        title="???? ????? ????? ?????????"
-        description="????? ????? ?????? ?????????? ????????? ????????? ???????? SLA? ?????? ?????? ?? ???."
+        title="مركز الدعم الفني للمنصة"
+        description="إدارة تذاكر الدعم الفني، جلسات الوصول عن بُعد، تقييم رضا العملاء، ومتابعة التزامات SLA داخل لوحة المنصة."
         icon={<LifeBuoy className="h-6 w-6 text-emerald-400" />}
         actions={
           <Button
@@ -312,7 +312,7 @@ export const PlatformSupportPage: React.FC = () => {
             onClick={() => { if(!canManageSupport) return; setIsNewTicketOpen(true); }}
             leadingIcon={<Plus className="h-4 w-4" />}
           >
-            ????? ??? ?????
+            تذكرة دعم جديدة
           </Button>
         }
       />
@@ -337,7 +337,7 @@ export const PlatformSupportPage: React.FC = () => {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="???? ???????? ?? ??????..."
+                placeholder="ابحث برقم التذكرة أو عنوانها..."
                 className={`${inputClass} pr-9 text-xs`}
               />
             </div>
@@ -348,12 +348,12 @@ export const PlatformSupportPage: React.FC = () => {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className={`${inputClass} text-xs`}
               >
-                <option value="">?? ???????</option>
-                <option value="OPEN">??????</option>
-                <option value="IN_PROGRESS">??? ????????</option>
-                <option value="WAITING_CUSTOMER">??????? ??????</option>
-                <option value="RESOLVED">??????</option>
-                <option value="CLOSED">?????</option>
+                <option value="">كل الحالات</option>
+                <option value="OPEN">مفتوحة</option>
+                <option value="IN_PROGRESS">قيد المعالجة</option>
+                <option value="WAITING_CUSTOMER">بانتظار العميل</option>
+                <option value="RESOLVED">تم الحل</option>
+                <option value="CLOSED">مغلقة</option>
               </select>
 
               <select
@@ -361,11 +361,11 @@ export const PlatformSupportPage: React.FC = () => {
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className={`${inputClass} text-xs`}
               >
-                <option value="">?? ?????????</option>
-                <option value="URGENT">???? (Urgent)</option>
-                <option value="HIGH">????? (High)</option>
-                <option value="MEDIUM">?????? (Medium)</option>
-                <option value="LOW">?????? (Low)</option>
+                <option value="">كل الأولويات</option>
+                <option value="URGENT">عاجل (Urgent)</option>
+                <option value="HIGH">مرتفع (High)</option>
+                <option value="MEDIUM">متوسط (Medium)</option>
+                <option value="LOW">منخفض (Low)</option>
               </select>
             </div>
           </div>
@@ -375,13 +375,13 @@ export const PlatformSupportPage: React.FC = () => {
             {loading ? (
               <div className="py-16 text-center text-sm font-semibold text-slate-500">
                 <RefreshCw className="inline-block h-5 w-5 animate-spin mb-2" />
-                <p>???? ????? ????? ?????...</p>
+                <p>جارٍ تحميل التذاكر...</p>
               </div>
             ) : filteredTickets.length === 0 ? (
               <EmptyState
                 icon={<LifeBuoy className="h-6 w-6 text-slate-400" />}
-                title="?? ???? ????? ????? ?????"
-                description="?? ?????? ??????? ?? ????? ????? ??? ?????."
+                title="لا توجد تذاكر دعم لعرضها"
+                description="لا توجد تذاكر مطابقة لعوامل التصفية الحالية. جرّب تعديل البحث أو الفلاتر."
               />
             ) : (
               filteredTickets.map((ticket) => {
@@ -450,14 +450,14 @@ export const PlatformSupportPage: React.FC = () => {
                             }`}
                           >
                             <Monitor className="h-3 w-3" />
-                            {ticket.remoteAccessApproved ? '???? ????' : '????? ????'}
+                            {ticket.remoteAccessApproved ? 'دخول معتمد' : 'بانتظار الموافقة'}
                           </span>
                         )}
                       </div>
 
                       {isSlaBreached ? (
                         <span className="flex items-center gap-1 text-rose-400 font-bold">
-                          <AlertTriangle className="h-3 w-3" /> SLA ?????
+                          <AlertTriangle className="h-3 w-3" /> SLA متجاوز
                         </span>
                       ) : (
                         <span>{formatDateTime(ticket.createdAt)}</span>
@@ -475,9 +475,9 @@ export const PlatformSupportPage: React.FC = () => {
           {!selectedTicketId ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-400">
               <LifeBuoy className="h-12 w-12 text-slate-600 mb-3 animate-pulse" />
-              <h3 className="text-base font-bold text-slate-200">???? ????? ??? ?????????</h3>
+              <h3 className="text-base font-bold text-slate-200">اختر تذكرة لعرض تفاصيلها</h3>
               <p className="mt-1 text-xs text-slate-500 max-w-sm">
-                ????? ?? ??? ??? ???? ?????? ???????? ????? ?????? ?????? ?? ????? ??????? ?????? ????? ?????? ?????? ????? ?????? ?? ???.
+                اختر تذكرة من القائمة لعرض تفاصيلها بالكامل، ومتابعة المحادثة مع العميل، وإدارة جلسات الوصول عن بُعد وتقييم الخدمة.
               </p>
             </div>
           ) : detailsLoading || !details ? (
@@ -497,7 +497,7 @@ export const PlatformSupportPage: React.FC = () => {
                       <span className="text-xs text-slate-400">#{details.ticket.id}</span>
                       {details.ticket.rating && (
                         <span className="flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-2 py-0.5 text-xs font-bold">
-                          <Star className="h-3 w-3 fill-amber-300" /> {details.ticket.rating} ????
+                          <Star className="h-3 w-3 fill-amber-300" /> {details.ticket.rating} نجوم
                         </span>
                       )}
                     </div>
@@ -517,11 +517,11 @@ export const PlatformSupportPage: React.FC = () => {
                       onChange={(e) => handleStatusChange(e.target.value as any)}
                       className={`${inputClass} text-xs py-1 h-8 max-w-[130px] font-bold`}
                     >
-                      <option value="OPEN">??????</option>
-                      <option value="IN_PROGRESS">??? ????????</option>
-                      <option value="WAITING_CUSTOMER">??????? ??????</option>
-                      <option value="RESOLVED">??????</option>
-                      <option value="CLOSED">?????</option>
+                      <option value="OPEN">مفتوحة</option>
+                      <option value="IN_PROGRESS">قيد المعالجة</option>
+                      <option value="WAITING_CUSTOMER">بانتظار العميل</option>
+                      <option value="RESOLVED">تم الحل</option>
+                      <option value="CLOSED">مغلقة</option>
                     </select>
 
                     <select
@@ -530,10 +530,10 @@ export const PlatformSupportPage: React.FC = () => {
                       onChange={(e) => handlePriorityChange(e.target.value as any)}
                       className={`${inputClass} text-xs py-1 h-8 max-w-[110px]`}
                     >
-                      <option value="LOW">??????</option>
-                      <option value="MEDIUM">??????</option>
-                      <option value="HIGH">?????</option>
-                      <option value="URGENT">????</option>
+                      <option value="LOW">منخفض</option>
+                      <option value="MEDIUM">متوسط</option>
+                      <option value="HIGH">مرتفع</option>
+                      <option value="URGENT">عاجل</option>
                     </select>
 
                     {details.ticket.status === 'RESOLVED' && !details.ticket.rating && (
@@ -544,7 +544,7 @@ export const PlatformSupportPage: React.FC = () => {
                         onClick={() => setIsRateModalOpen(true)}
                         leadingIcon={<Star className="h-3.5 w-3.5 text-amber-400" />}
                       >
-                        ?????
+                        تقييم
                       </Button>
                     )}
                   </div>
@@ -555,14 +555,14 @@ export const PlatformSupportPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1">
                       <UserCheck className="h-3.5 w-3.5 text-slate-400" />
-                      ???????:
+                      مسؤول:
                     </span>
                     <input
                       type="text"
                       defaultValue={details.ticket.assignedTo || ''}
                       disabled={!canManageSupport}
                       onBlur={(e) => handleAssignChange(e.target.value)}
-                      placeholder="??? ???? (???? ???????)"
+                      placeholder="اسم الموظف (منصة الدعم)"
                       className="rounded border border-transparent hover:border-slate-700 bg-transparent px-2 py-0.5 text-xs text-slate-200 focus:border-emerald-500 focus:bg-slate-900"
                     />
                   </div>
@@ -570,7 +570,7 @@ export const PlatformSupportPage: React.FC = () => {
                   {details.ticket.slaDueAt && (
                     <div className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      <span>???? ??? SLA:</span>
+                      <span>موعد SLA:</span>
                       <span
                         className={`font-bold ${
                           new Date(details.ticket.slaDueAt).getTime() < Date.now()
@@ -590,16 +590,16 @@ export const PlatformSupportPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Monitor className="h-4 w-4 text-sky-400" />
-                    <span className="text-xs font-bold text-slate-200">?????? ?? ??? ??????:</span>
+                    <span className="text-xs font-bold text-slate-200">الوصول عن بُعد للعميل:</span>
                     <span className="text-xs text-slate-400">
                       {details.ticket.remoteAccessRequested ? (
                         details.ticket.remoteAccessApproved ? (
-                          <span className="text-emerald-400 font-bold">???? ?????? ????</span>
+                          <span className="text-emerald-400 font-bold">معتمد من العميل</span>
                         ) : (
-                          <span className="text-amber-400 font-bold">??????? ?????? ??????</span>
+                          <span className="text-amber-400 font-bold">بانتظار موافقة العميل</span>
                         )
                       ) : (
-                        '?? ?????'
+                        'غير مطلوب'
                       )}
                     </span>
                   </div>
@@ -613,7 +613,7 @@ export const PlatformSupportPage: React.FC = () => {
                         onClick={() => handleToggleRemoteRequest(true)}
                         leadingIcon={<Lock className="h-3 w-3" />}
                       >
-                        ??? ?????? ??????
+                        طلب وصول عن بُعد
                       </Button>
                     ) : (
                       <>
@@ -625,7 +625,7 @@ export const PlatformSupportPage: React.FC = () => {
                             onClick={() => handleApproveRemoteAccess(true)}
                             leadingIcon={<Unlock className="h-3 w-3" />}
                           >
-                            ?????? ?????? ??????
+                            الموافقة على الوصول
                           </Button>
                         ) : (
                           <Button
@@ -635,14 +635,14 @@ export const PlatformSupportPage: React.FC = () => {
                             onClick={() => setIsRemoteSessionOpen(true)}
                             leadingIcon={<Monitor className="h-3 w-3" />}
                           >
-                            ??? ???? ??? ???
+                            بدء جلسة الاتصال
                           </Button>
                         )}
                         {canManageSupport && (<button
                           onClick={() => handleToggleRemoteRequest(false)}
                           className="text-xs text-rose-400 hover:underline"
                         >
-                          ????? ?????
+                          إلغاء الطلب
                         </button>)}
                       </>
                     )}
@@ -652,7 +652,7 @@ export const PlatformSupportPage: React.FC = () => {
                 {/* Active Remote Sessions List */}
                 {details.remoteSessions.length > 0 && (
                   <div className="mt-2.5 space-y-1.5 border-t border-slate-800/60 pt-2">
-                    <p className="text-[11px] font-bold text-slate-400">??? ????? ?????? ?? ???:</p>
+                    <p className="text-[11px] font-bold text-slate-400">جلسات الوصول النشطة:</p>
                     {details.remoteSessions.map((session) => (
                       <div
                         key={session.id}
@@ -661,7 +661,7 @@ export const PlatformSupportPage: React.FC = () => {
                         <div>
                           <span className="font-bold text-slate-200">{session.technicianName}</span>
                           <span className="text-slate-400 text-[11px] mr-2">
-                            {formatDateTime(session.startedAt)} ({session.durationMinutes} ?????)
+                            {formatDateTime(session.startedAt)} ({session.durationMinutes} دقيقة)
                           </span>
                           {session.actionsSummary && (
                             <p className="text-[11px] text-slate-400 mt-0.5">{session.actionsSummary}</p>
@@ -675,10 +675,10 @@ export const PlatformSupportPage: React.FC = () => {
                             disabled={!canManageSupport}
                             onClick={() => handleEndRemoteSession(session.id)}
                           >
-                            ????? ??????
+                            إنهاء الجلسة
                           </Button>
                         ) : (
-                          <span className="text-emerald-400 text-[11px] font-bold">??????</span>
+                          <span className="text-emerald-400 text-[11px] font-bold">منتهية</span>
                         )}
                       </div>
                     ))}
@@ -690,7 +690,7 @@ export const PlatformSupportPage: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-4 space-y-3.5 max-h-[380px]">
                 {details.messages.length === 0 ? (
                   <div className="py-12 text-center text-xs text-slate-500">
-                    ?? ???? ????? ?????. ????? ??? ???????? ?? ????? ?????? ??????.
+                    لا توجد رسائل بعد. ابدأ المحادثة مع العميل من نافذة المحادثة.
                   </div>
                 ) : (
                   details.messages.map((msg) => {
@@ -702,7 +702,7 @@ export const PlatformSupportPage: React.FC = () => {
                       return (
                         <div key={msg.id} className="flex justify-center my-2">
                           <span className="rounded-full bg-slate-800/80 px-3 py-1 text-[11px] text-slate-400 border border-slate-700/50">
-                            {msg.body} � {formatDateTime(msg.createdAt)}
+                            {msg.body} • {formatDateTime(msg.createdAt)}
                           </span>
                         </div>
                       );
@@ -731,7 +731,7 @@ export const PlatformSupportPage: React.FC = () => {
                           <div className="flex items-center justify-between gap-3 text-[10.5px] mb-1.5 opacity-80">
                             <span className="font-bold flex items-center gap-1">
                               {isInternalMsg && <Lock className="h-3 w-3 text-amber-400" />}
-                              {msg.authorName} {isInternalMsg && '(?????? ?????? ????? ???)'}
+                              {msg.authorName} {isInternalMsg && '(رسالة داخلية — لا تظهر للعميل)'}
                             </span>
                             <span>{formatDateTime(msg.createdAt)}</span>
                           </div>
@@ -747,7 +747,7 @@ export const PlatformSupportPage: React.FC = () => {
                                 className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:underline"
                               >
                                 <Paperclip className="h-3 w-3" />
-                                {msg.attachmentName || '??? ??????'}
+                                {msg.attachmentName || 'مرفق'}
                               </a>
                             </div>
                           )}
@@ -763,7 +763,7 @@ export const PlatformSupportPage: React.FC = () => {
                 {/* Canned replies pill list */}
                 {cannedReplies.length > 0 && (
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-                    <span className="text-slate-500 shrink-0 font-semibold">?? ????:</span>
+                    <span className="text-slate-500 shrink-0 font-semibold">ردود جاهزة:</span>
                     {cannedReplies.map((c) => (
                       <button
                         key={c.id}
@@ -784,8 +784,8 @@ export const PlatformSupportPage: React.FC = () => {
                     onChange={(e) => setMessageBody(e.target.value)}
                     placeholder={
                       isInternal
-                        ? '???? ?????? ?????? ????? ????? (?? ????? ??????)...'
-                        : '???? ??? ?????? ???...'
+                        ? 'اكتب ملاحظة داخلية لفريق الدعم فقط (لا تظهر للعميل)...'
+                        : 'اكتب ردًا للعميل...'
                     }
                     className={`${inputClass} text-xs resize-none ${
                       isInternal ? 'border-amber-500/50 focus:border-amber-500' : ''
@@ -804,7 +804,7 @@ export const PlatformSupportPage: React.FC = () => {
                         className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
                       />
                       <span className={isInternal ? 'text-amber-400 font-bold' : ''}>
-                        ?????? ?????? ???
+                        رسالة داخلية فقط
                       </span>
                     </label>
 
@@ -812,7 +812,7 @@ export const PlatformSupportPage: React.FC = () => {
                       type="text"
                       value={attachmentUrl}
                       onChange={(e) => setAttachmentUrl(e.target.value)}
-                      placeholder="???? ???? (???????)"
+                      placeholder="رابط المرفق (اختياري)"
                       className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] text-slate-300 max-w-[160px]"
                     />
                   </div>
@@ -824,7 +824,7 @@ export const PlatformSupportPage: React.FC = () => {
                     variant={isInternal ? 'secondary' : 'primary'}
                     leadingIcon={<Send className="h-3.5 w-3.5" />}
                   >
-                    {isInternal ? '??? ????????' : '????? ????'}
+                    {isInternal ? 'إرسال داخلي' : 'إرسال للعميل'}
                   </Button>
                 </div>
               </div>
@@ -837,17 +837,17 @@ export const PlatformSupportPage: React.FC = () => {
       <Modal
         open={isNewTicketOpen}
         onClose={() => setIsNewTicketOpen(false)}
-        title="????? ????? ??? ??? ?????"
+        title="إنشاء تذكرة دعم جديدة"
       >
         <div className="space-y-3.5 text-right">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">?????? ???????? *</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">العميل / المتجر *</label>
             <select
               value={newTenantId}
               onChange={(e) => setNewTenantId(e.target.value)}
               className={inputClass}
             >
-              <option value="">???? ??????...</option>
+              <option value="">اختر العميل...</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.id})
@@ -857,59 +857,59 @@ export const PlatformSupportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">????? ??????? *</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">عنوان التذكرة *</label>
             <input
               type="text"
               value={newSubject}
               onChange={(e) => setNewSubject(e.target.value)}
-              placeholder="??? ????? ???????..."
+              placeholder="مثال: مشكلة في طباعة الفاتورة..."
               className={inputClass}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">????? ????????</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">الأولوية</label>
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as any)}
                 className={inputClass}
               >
-                <option value="LOW">?????? (SLA: 48h)</option>
-                <option value="MEDIUM">?????? (SLA: 24h)</option>
-                <option value="HIGH">????? (SLA: 8h)</option>
-                <option value="URGENT">???? (SLA: 2h)</option>
+                <option value="LOW">منخفضة (SLA: 48h)</option>
+                <option value="MEDIUM">متوسطة (SLA: 24h)</option>
+                <option value="HIGH">مرتفعة (SLA: 8h)</option>
+                <option value="URGENT">عاجلة (SLA: 2h)</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">????? ??????</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">الموظف المسؤول</label>
               <input
                 type="text"
                 value={newAssignedTo}
                 onChange={(e) => setNewAssignedTo(e.target.value)}
-                placeholder="??? ???? ?????"
+                placeholder="اسم الموظف المكلّف"
                 className={inputClass}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">?????? ??????</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">وصف المشكلة</label>
             <textarea
               rows={3}
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="?????? ??????? ???????? ????????..."
+              placeholder="اشرح المشكلة وخطوات إعادة الإنتاج..."
               className={inputClass}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="secondary" size="sm" onClick={() => setIsNewTicketOpen(false)}>
-              ?????
+              إلغاء
             </Button>
             <Button size="sm" onClick={handleCreateTicket} disabled={!canManageSupport}>
-              ????? ???????
+              إنشاء التذكرة
             </Button>
           </div>
         </div>
@@ -919,15 +919,15 @@ export const PlatformSupportPage: React.FC = () => {
       <Modal
         open={isRemoteSessionOpen}
         onClose={() => setIsRemoteSessionOpen(false)}
-        title="??? ???? ??? ??? ?? ???"
+        title="بدء جلسة وصول عن بُعد"
       >
         <div className="space-y-3.5 text-right">
           <p className="text-xs text-slate-300">
-            ???? ??? ??????? ??? ?????? ?????? ?????? ?? ???. ???? ????? ??? ??? ?????? ?????????? ??????? ?? ??? ???????.
+            سيتم إبلاغ العميل ببدء الجلسة. يجب الحصول على موافقة العميل خطيًا قبل البدء. تُسجَّل كل الجلسات في سجل التدقيق الأمني للمنصة.
           </p>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">??? ????? / ???????</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">اسم الفني / المسؤول</label>
             <input
               type="text"
               value={technicianName}
@@ -937,7 +937,7 @@ export const PlatformSupportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">????? ??????? (????????)</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">مدة الجلسة (بالدقائق)</label>
             <input
               type="number"
               value={sessionDuration}
@@ -950,10 +950,10 @@ export const PlatformSupportPage: React.FC = () => {
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="secondary" size="sm" onClick={() => setIsRemoteSessionOpen(false)}>
-              ?????
+              إلغاء
             </Button>
             <Button size="sm" onClick={handleStartRemoteSession} disabled={!canManageSupport}>
-              ????? ??? ??????
+              بدء جلسة الاتصال
             </Button>
           </div>
         </div>
@@ -963,11 +963,11 @@ export const PlatformSupportPage: React.FC = () => {
       <Modal
         open={isRateModalOpen}
         onClose={() => setIsRateModalOpen(false)}
-        title="????? ???? ????? ?????"
+        title="تقييم رضا العميل"
       >
         <div className="space-y-3.5 text-right">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">????? ?????? (1 - 5)</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">عدد النجوم (1 - 5)</label>
             <div className="flex items-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -987,22 +987,22 @@ export const PlatformSupportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">??????? ??????</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">ملاحظات العميل</label>
             <textarea
               rows={3}
               value={ratingFeedback}
               onChange={(e) => setRatingFeedback(e.target.value)}
-              placeholder="?????? ?????? ?? ???? ????? ????..."
+              placeholder="اكتب ملاحظات العميل أو ملخص ما تم حله..."
               className={inputClass}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="secondary" size="sm" onClick={() => setIsRateModalOpen(false)}>
-              ?????
+              إلغاء
             </Button>
             <Button size="sm" onClick={handleRateTicket} disabled={!canManageSupport}>
-              ??? ???????
+              حفظ التقييم
             </Button>
           </div>
         </div>

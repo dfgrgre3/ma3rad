@@ -37,7 +37,7 @@ import { PlatformNotificationsHubPage } from '../pages/platform/PlatformNotifica
 import { PlatformPoliciesPage } from '../pages/platform/PlatformPoliciesPage';
 import { PlatformEmergencyCenterPage } from '../pages/platform/PlatformEmergencyCenterPage';
 import { PlatformCustomerPortalSimulatorPage } from '../pages/platform/PlatformCustomerPortalSimulatorPage';
-import { PlatformSuperAdminDashboard } from './lazyPages';
+import { PlatformSuperAdminDashboard, PlatformUserPlatformPermissionsPage } from './lazyPages';
 import { PlatformAuthorizationService } from '../services/domains/platform/PlatformAuthorizationService';
 import { PlatformStaffAuthService } from '../services/domains/platform/PlatformStaffAuthService';
 
@@ -86,6 +86,14 @@ const PlatformRoutes: React.FC<AppRouterProps> = ({ currentUser, onLogout }) => 
           element={
             <PlatformRouteGuard currentUser={currentUser} targetModule="super-admin">
               <PlatformSuperAdminDashboard />
+            </PlatformRouteGuard>
+          }
+        />
+        <Route
+          path="user-platform-permissions"
+          element={
+            <PlatformRouteGuard currentUser={currentUser} targetModule="super-admin">
+              <PlatformUserPlatformPermissionsPage />
             </PlatformRouteGuard>
           }
         />

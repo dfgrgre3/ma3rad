@@ -139,6 +139,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
   const [planFilter, setPlanFilter] = React.useState<string>('');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
     business: true,
     customers: true,
@@ -155,6 +156,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       // Use the new method with period and plan filter
       const data = platformAdminService.getOverviewWithPeriod(period as PlatformPeriod, planFilter || undefined);
       setOverview(data);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');
     } finally {
@@ -164,6 +166,14 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
 
   React.useEffect(() => {
     loadOverview();
+  }, [loadOverview]);
+
+  // Auto-refresh every 60 seconds
+  React.useEffect(() => {
+    const id = window.setInterval(() => {
+      loadOverview();
+    }, 60000);
+    return () => window.clearInterval(id);
   }, [loadOverview]);
 
   const toggleSection = (section: string) => {
@@ -231,6 +241,11 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 </option>
               ))}
             </select>
+            {lastUpdated && (
+              <span className="text-[10px] text-slate-400">
+                آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
+              </span>
+            )}
             <button
               onClick={loadOverview}
               disabled={loading}
@@ -743,6 +758,40 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             )}
           </div>
         </div>
+      </Panel>
+
+      {/* Revenue by Plan Section */}
+      <Panel
+        title="الإيراد حسب الخطة"
+        subtitle="إجمالي المدفوعات مجمّعة حسب خطة الاشتراك"
+        icon={<Wallet className="h-4 w-4" />}
+        iconClass="bg-emerald-50 text-emerald-600"
+        className="xl:col-span-2"
+      >
+        {overview.revenueByPlan && overview.revenueByPlan.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead>
+                <tr className="text-[10.5px] text-slate-500">
+                  <th className="px-4 py-2 font-semibold">الخطة</th>
+                  <th className="px-4 py-2 font-semibold">العملاء</th>
+                  <th className="px-4 py-2 font-semibold">الإيراد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.revenueByPlan.map((r, i) => (
+                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-4 py-2 text-[12px] font-semibold text-slate-700">{r.planName}</td>
+                    <td className="px-4 py-2 text-[11px] text-slate-500">{r.tenants}</td>
+                    <td className="px-4 py-2 text-[12px] font-bold text-emerald-700">{formatMoney(r.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد بيانات إيراد" />
+        )}
       </Panel>
 
       {/* Alerts Section */}

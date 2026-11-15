@@ -603,6 +603,18 @@ async function seedPlatformRBAC() {
        (SELECT COUNT(*) FROM platform_roles) AS roles,
        (SELECT COUNT(*) FROM platform_user_roles) AS user_roles`
   );
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS tenant_feature_config (
+      tenant_id TEXT,
+      plan_id TEXT,
+      hidden_menus TEXT NOT NULL DEFAULT '[]',
+      disabled_permissions TEXT NOT NULL DEFAULT '[]',
+      feature_permissions TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (tenant_id, plan_id)
+    );
+  `);
+
   console.log(
     `Platform RBAC seeded: ${counts.permissions} permissions, ${counts.roles} roles, ` +
     `${counts.role_permissions} role→permission grants, ${counts.user_roles} user→role assignments`

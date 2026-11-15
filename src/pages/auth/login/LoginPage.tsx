@@ -18,6 +18,8 @@ import {
 } from '../../../services/domains/auth/AuthService';
 import type { User } from '../../../types';
 import { LoginBrandPanel } from './LoginBrandPanel';
+import { PlatformBootstrapService } from '../../../services/domains/platform/PlatformBootstrapService';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
 
 interface LoginPageProps {
   onSuccess: (user: User) => void;
@@ -64,6 +66,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [guard, setGuard] = useState<LoginGuardStatus>(EMPTY_GUARD);
   const [now, setNow] = useState(() => Date.now());
   const [loginPinLength, setLoginPinLength] = useState(4);
+  // The owner initialization link is only offered while no platform owner exists.
+  const [ownerSetupAvailable, setOwnerSetupAvailable] = useState(false);
+
+  useEffect(() => {
+    try {
+      const service = new PlatformBootstrapService(DatabaseManager.getInstance());
+      setOwnerSetupAvailable(!service.isBootstrapped());
+    } catch {
+      setOwnerSetupAvailable(false);
+    }
+  }, []);
 
   useEffect(() => {
     setLoginPinLength(AuthService.getLoginPinLength());
@@ -649,6 +662,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               <p className="mt-1 text-xs leading-relaxed text-[var(--win-text-muted)]">
                 مالك المنصة يدخل من هذه الصفحة أيضًا باستخدام حساب المنصة المخصص له.
               </p>
+              {ownerSetupAvailable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') window.location.hash = '#/platform-owner-setup';
+                  }}
+                  className="mt-3 w-full rounded-lg border border-[var(--win-border)] px-3 py-2 text-xs font-semibold text-[var(--win-text-secondary)] transition hover:bg-[var(--win-surface-2)]"
+                >
+                  تهيئة حساب مالك المنصة (لمرة واحدة)
+                </button>
+              )}
             </div>
           </div>
 

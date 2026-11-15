@@ -9,6 +9,7 @@ import { platformStaffTwoFactorAuth, deletePlatformStaffTwoFactorRow } from '../
 import { PLATFORM_ROLE_DEFINITIONS, PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { PLATFORM_PERMISSION_SECTIONS, STANDARD_ACTION_LABELS, PLATFORM_PERMISSION_CODES, PLATFORM_ALL_PERMISSION } from './platformPermissionCatalog';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
+import { PlatformBootstrapService, type PlatformOwnerAuditEntry } from './PlatformBootstrapService';
 import type { User } from '../../../types';
 import type {
   PlatformActivationDetails,
@@ -551,6 +552,16 @@ export class PlatformAdminService {
     return PlatformAdminService.owner();
   }
 
+  /**
+   * Owner-only: review every account (ERP + platform staff) that claims the
+   * owner role, and flag the ones that were not created through the secure
+   * initialization procedure.
+   */
+  public auditPlatformOwnerAccounts(): PlatformOwnerAuditEntry[] {
+    PlatformAdminService.requirePlatformOwner();
+    return new PlatformBootstrapService(DatabaseManager.getInstance()).auditOwnerAccounts();
+  }
+
   private static requirePlatformAccess(modules: string | string[], action?: string): User {
     const user = AuthService.getCurrentUser();
     if (!user || !user.isActive) {
@@ -583,6 +594,41 @@ export class PlatformAdminService {
     }
 
     return user;
+  }
+
+  /**
+   * Guard for the platform-owner role (SUPER_ADMIN).
+   *
+   * The owner role is a *root* privilege: it bypasses every granular permission
+   * check (`PlatformAuthorizationService.roleHasPermission` short-circuits on
+   * SUPER_ADMIN). Therefore it must never be handed out by a normal staff
+   * operation — only the owner account itself may grant it, and there can never
+   * be a second owner account.
+   *
+   * @param role    the role that is about to be assigned
+   * @param options.creating true when a *new* account would receive the role
+   */
+  private static assertOwnerRoleGrant(role: string, options: { creating?: boolean } = {}): void {
+    if (String(role) !== 'SUPER_ADMIN') return;
+
+    const actor = AuthService.getCurrentUser();
+    if (!actor || actor.role !== 'SUPER_ADMIN') {
+      throw new Error('منح دور مالك المنصة متاح لمالك المنصة فقط.');
+    }
+
+    if (options.creating) {
+      const db = DatabaseManager.getInstance();
+      const existing = db.query<any>(
+        `SELECT id, full_name FROM platform_staff
+         WHERE role = 'SUPER_ADMIN'
+           AND (deleted_at IS NULL OR deleted_at = '')
+           AND password_hash IS NOT NULL AND password_hash <> ''
+         LIMIT 1`
+      )[0];
+      if (existing) {
+        throw new Error('يوجد حساب مالك منصة بالفعل. لا يمكن إنشاء حساب ثانٍ بدور مالك المنصة.');
+      }
+    }
   }
 
   public audit(
@@ -872,6 +918,21 @@ export class PlatformAdminService {
       currentInstallation = null;
     }
 
+    // Revenue by plan
+    const revenueByPlanRows = this.db.query<any>(`
+      SELECT p.name AS planName, COALESCE(SUM(pay.amount),0) AS revenue, COUNT(DISTINCT t.id) AS tenants
+      FROM platform_plans p
+      LEFT JOIN platform_tenants t ON t.plan_id = p.id
+      LEFT JOIN platform_payments pay ON pay.tenant_id = t.id
+      GROUP BY p.id, p.name
+      ORDER BY revenue DESC
+    `);
+    const revenueByPlan = revenueByPlanRows.map((r:any) => ({
+      planName: String(r.planName),
+      revenue: toNumber(r.revenue),
+      tenants: toNumber(r.tenants),
+    }));
+
     return {
       tenants: {
         total: toNumber(tenantStats.total),
@@ -920,6 +981,7 @@ export class PlatformAdminService {
       },
       releases,
       moduleUsage,
+      revenueByPlan,
       alerts,
       recentTenants,
       expiringLicenses,
@@ -6356,10 +6418,18 @@ export class PlatformAdminService {
 
   // ─── Comprehensive Overview with Period ────────────────────────────────────────
 
+  private overviewCache = new Map<string, { data: PlatformOverview; ts: number }>();
+  private readonly OVERVIEW_TTL_MS = 30_000;
+
   public getOverviewWithPeriod(period: PlatformPeriod = '30d', planId?: string): PlatformOverview {
+    const key = `${period}|${planId || ''}`;
+    const cached = this.overviewCache.get(key);
+    if (cached && Date.now() - cached.ts < this.OVERVIEW_TTL_MS) {
+      return cached.data;
+    }
     const baseOverview = this.getOverview(); // Existing overview
 
-    return {
+    const data = {
       ...baseOverview,
       businessPerformance: this.getBusinessPerformance(period, planId),
       customerMetrics: this.getCustomerMetrics(period, planId),
@@ -6369,6 +6439,8 @@ export class PlatformAdminService {
       alertDetails: this.getAlertDetails(),
       reportFilters: { period, planId },
     };
+    this.overviewCache.set(key, { data, ts: Date.now() });
+    return data;
   }
 
   // ─── Operations Center (Item 10) ──────────────────────────────────────────────
@@ -8105,6 +8177,7 @@ export class PlatformAdminService {
 
     const id = `staff_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     const role = input.role || 'SUPPORT_AGENT';
+    PlatformAdminService.assertOwnerRoleGrant(role, { creating: true });
     const passwordHash = bcrypt.hashSync(password, 10);
     const actor = AuthService.getCurrentUser();
 
@@ -8137,6 +8210,21 @@ export class PlatformAdminService {
     // Protect SUPER_ADMIN account from being demoted or modified arbitrarily
     if (staff.role === 'SUPER_ADMIN' && input.role && input.role !== 'SUPER_ADMIN') {
       throw new Error('لا يمكن خفض رتبة حساب مالك المنصة الرئيسي.');
+    }
+
+    // Promotion to the owner role is owner-only: a PLATFORM_ADMIN (or any other
+    // staff role) must never be able to mint a second platform owner.
+    if (input.role && String(input.role) === 'SUPER_ADMIN' && String(staff.role) !== 'SUPER_ADMIN') {
+      PlatformAdminService.assertOwnerRoleGrant(input.role);
+    }
+
+    // The owner account itself is not editable by other staff: a password reset
+    // or an email change by a non-owner would be a full account takeover.
+    if (String(staff.role) === 'SUPER_ADMIN') {
+      const actor = AuthService.getCurrentUser();
+      if (!actor || actor.role !== 'SUPER_ADMIN') {
+        throw new Error('لا يمكن تعديل حساب مالك المنصة من قبل موظف آخر.');
+      }
     }
 
     const fullName = input.fullName ? input.fullName.trim() : staff.fullName;
@@ -8262,6 +8350,9 @@ export class PlatformAdminService {
     if (fullName.length < 2) throw new Error('اسم الموظف مطلوب.');
     if (!email.includes('@') || email.length < 5) throw new Error('البريد الإلكتروني غير صالح.');
     this.assertKnownPlatformRole(role);
+    // An invitation is a promise of the role: it must not be able to promise
+    // the owner role to a non-owner.
+    PlatformAdminService.assertOwnerRoleGrant(role);
 
     const existingStaff = this.db.query<any>(
       'SELECT id FROM platform_staff WHERE lower(email) = ? AND deleted_at IS NULL LIMIT 1',
@@ -8383,6 +8474,9 @@ export class PlatformAdminService {
     const id = `staff_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     const passwordHash = bcrypt.hashSync(cleanPassword, 10);
     const now = nowIso();
+    // Defence in depth: the invite cannot mint an owner account even if it was
+    // created before this guard existed.
+    PlatformAdminService.assertOwnerRoleGrant(invite.role, { creating: true });
     this.db.executeTransaction(() => {
       this.db.run(
         `INSERT INTO platform_staff
@@ -8634,6 +8728,11 @@ export class PlatformAdminService {
     if (!to) throw new Error('الموظف الهدف غير موجود.');
     if (String(to.role) === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
       throw new Error('نقل الصلاحيات إلى حساب مالك المنصة متاح لمالك المنصة فقط.');
+    }
+    // Copying *from* an owner account would clone the owner role onto another
+    // account — owner-only as well.
+    if (String(from.role) === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('نقل صلاحيات مالك المنصة متاح لمالك المنصة فقط.');
     }
 
     const now = nowIso();

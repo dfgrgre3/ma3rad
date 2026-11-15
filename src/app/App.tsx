@@ -17,6 +17,7 @@ import { DatabasePersistenceStatus } from '../components/shared/DatabasePersiste
 import { AppRouter } from '../router';
 import { LoginPage } from '../pages/auth/login/LoginPage';
 import { PlatformStaffInviteAcceptPage } from '../pages/platform/PlatformStaffInviteAcceptPage';
+import { PlatformOwnerSetupPage } from '../pages/platform/PlatformOwnerSetupPage';
 import { SetupWizard } from '../components/setup/SetupWizard';
 import { ForcePasswordChangeModal } from '../components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from '../contexts/ThemeProvider';
@@ -257,6 +258,13 @@ export const App: React.FC = () => {
     return match?.[1] ?? null;
   }, []);
 
+  // Pre-auth platform owner initialization: /#/platform-owner-setup
+  // The single legitimate path for minting the SUPER_ADMIN role.
+  const ownerSetupRequested = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return /#\/platform-owner-setup/.test(window.location.hash);
+  }, []);
+
   if (licenseBlocked) {
     return (
       <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
@@ -340,6 +348,14 @@ export const App: React.FC = () => {
 
   // Pre-auth platform staff invitation: /#/accept-staff-invite/<token>
   if (!currentUser) {
+    if (ownerSetupRequested) {
+      return (
+        <>
+          <PlatformOwnerSetupPage onSuccess={setCurrentUser} />
+          <UpdateNotification />
+        </>
+      );
+    }
     if (staffInviteToken) {
       return (
         <>

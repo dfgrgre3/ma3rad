@@ -519,6 +519,7 @@ export interface PlatformOverview {
   };
   releases: PlatformRelease[];
   moduleUsage: PlatformModuleUsage[];
+  revenueByPlan: { planName: string; revenue: number; tenants: number }[];
   alerts: PlatformAlert[];
   recentTenants: PlatformTenant[];
   expiringLicenses: PlatformLicense[];
@@ -1355,6 +1356,7 @@ export interface PlatformOverview {
   };
   releases: PlatformRelease[];
   moduleUsage: PlatformModuleUsage[];
+  revenueByPlan: { planName: string; revenue: number; tenants: number }[];
   alerts: PlatformAlert[];
   recentTenants: PlatformTenant[];
   expiringLicenses: PlatformLicense[];

@@ -370,6 +370,9 @@ test('migration assigns existing local users a safe branch and keeps admins cent
     code: 'BR-CASH-TEST',
     isDefault: false,
   });
+  // The simulated session is a configured administrator; complete the first-run setup
+  // so ERP user creation is allowed at the service layer.
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   const branchRegister = db.query<{ branchId: string }>(
     'SELECT branch_id AS branchId FROM cash_registers WHERE branch_id = ?',
     [branch.id]

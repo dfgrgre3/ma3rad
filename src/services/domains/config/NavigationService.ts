@@ -14,10 +14,12 @@ import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
 
 export interface NavOverrides {
   hidden: string[];
+  hiddenGroups: string[];
   labels: Record<string, string>;
   groupsOrder: string[];
   itemsOrder: Record<string, string[]>;
   groupAssignments: Record<string, string>;
+  customGroups?: Array<{ id: string; label: string }>;
 }
 
 const LEGACY_GROUP_IDS: Record<string, string> = {
@@ -209,16 +211,20 @@ export class NavigationService {
           const owner = getModulePathOwner(path);
           return !owner || enabledModules.includes(owner);
         });
+    const hiddenGroups = parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.hiddenGroups), []);
     const hidden = [...new Set(savedHidden.map((path) => LEGACY_PATHS[path] ?? path))];
     const savedLabels = parseJson<Record<string, string>>(SettingsService.getValue(NAV_STORAGE_KEYS.labels), {});
     const savedGroupsOrder = parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.groupsOrder), []);
     const savedItemsOrder = parseJson<Record<string, string[]>>(SettingsService.getValue(NAV_STORAGE_KEYS.itemsOrder), {});
+    const savedCustomGroups = parseJson<Array<{ id: string; label: string }>>(SettingsService.getValue(NAV_STORAGE_KEYS.customGroups), []);
     return {
       hidden,
+      hiddenGroups: [...new Set(hiddenGroups)],
       labels: normalizeLabels(savedLabels),
       groupsOrder: normalizeGroupsOrder(savedGroupsOrder),
       itemsOrder: normalizeItemsOrder(savedItemsOrder),
       groupAssignments: parseGroupAssignments(SettingsService.getValue(NAV_STORAGE_KEYS.groupAssignments)),
+      customGroups: savedCustomGroups,
     };
   }
 
@@ -272,7 +278,8 @@ export class NavigationService {
     source: NavOverrides,
     options: { includeHidden?: boolean } = {}
   ): NavGroupDef[] {
-    const { hidden, labels, groupsOrder, itemsOrder } = source;
+    const { hidden, hiddenGroups, labels, groupsOrder, itemsOrder } = source;
+    const hiddenGroupSet = new Set(hiddenGroups ?? []);
     const groupAssignments = source.groupAssignments ?? {};
     const hiddenSet = new Set(hidden);
     const businessType = ModuleRegistryService.getBusinessType();
@@ -332,7 +339,35 @@ export class NavigationService {
       });
     }
 
-    return appendLegacyGroupAliases(merged, labels);
+    const customGroupsDefs = (source.customGroups ?? []).map((g) => {
+      const order = itemsOrder[g.id] || [];
+      const rank = new Map(order.map((path, index) => [path, index]));
+      const items = assignedItems
+        .filter(({ groupId }) => groupId === g.id)
+        .map(({ item }) => item)
+        .map((item) => {
+          const page = AppConfigService.getPage(item.to);
+          return {
+            ...item,
+            label: labels[item.to] || page.label || (NavigationService.pathTerms[item.to]
+              ? term(NavigationService.pathTerms[item.to]!)
+              : item.label),
+            __enabled: page.enabled,
+            __order: page.order,
+          };
+        })
+        .filter((item) => item.__enabled)
+        .sort((a, b) => {
+          const ra = a.__order ?? (rank.has(a.to) ? rank.get(a.to)! : 9999);
+          const rb = b.__order ?? (rank.has(b.to) ? rank.get(b.to)! : 9999);
+          return ra - rb;
+        })
+        .map(({ __enabled, __order, ...item }) => item);
+      return { id: g.id, label: labels[`group:${g.id}`] || g.label, items };
+    });
+    const allMerged = [...merged, ...customGroupsDefs];
+    const visibleMerged = allMerged.filter((group) => !hiddenGroupSet.has(group.id) || options.includeHidden);
+    return appendLegacyGroupAliases(visibleMerged, labels);
   }
 
   public static saveOverrides(next: NavOverrides, actor?: User | null): void {
@@ -340,10 +375,12 @@ export class NavigationService {
     SettingsService.update(
       {
         [NAV_STORAGE_KEYS.hidden]: JSON.stringify(Array.from(new Set(next.hidden))),
+       [NAV_STORAGE_KEYS.hiddenGroups]: JSON.stringify(Array.from(new Set(next.hiddenGroups ?? []))),
         [NAV_STORAGE_KEYS.labels]: JSON.stringify(next.labels),
         [NAV_STORAGE_KEYS.groupsOrder]: JSON.stringify(next.groupsOrder),
         [NAV_STORAGE_KEYS.itemsOrder]: JSON.stringify(next.itemsOrder),
         [NAV_STORAGE_KEYS.groupAssignments]: JSON.stringify(next.groupAssignments),
+        [NAV_STORAGE_KEYS.customGroups]: JSON.stringify(next.customGroups ?? []),
       },
       actor
     );

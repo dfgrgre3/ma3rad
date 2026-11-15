@@ -89,6 +89,8 @@ test('first-run setup securely customizes the built-in administrator account', a
     phone: '01000000000',
     password: 'NewOwnerPass2026!',
   });
+  // The wizard marks the installation as configured at the end of the first-run flow.
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   assert.equal(updatedAdmin.username, 'owner');
   assert.equal(updatedAdmin.fullName, 'مدير جديد');
   assert.equal(updatedAdmin.mustChangePassword, false);

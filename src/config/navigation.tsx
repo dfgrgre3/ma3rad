@@ -7,8 +7,10 @@ export const NAV_GROUPS: NavGroupDef[] = [...NAV_GROUPS_01, ...NAV_GROUPS_02];
 
 export const NAV_STORAGE_KEYS = {
   hidden: 'nav.hidden.manual',
+  hiddenGroups: 'nav.hiddenGroups.manual',
   labels: 'nav.labels',
   groupsOrder: 'nav.groupsOrder',
   itemsOrder: 'nav.itemsOrder',
   groupAssignments: 'nav.groupAssignments',
+  customGroups: 'nav.customGroups',
 } as const;

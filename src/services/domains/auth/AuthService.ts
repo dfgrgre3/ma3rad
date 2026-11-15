@@ -449,6 +449,21 @@ export class AuthService {
     }
   }
 
+  /**
+   * ERP first-run setup gate. A fresh installation must complete the setup
+   * wizard (which writes `setup_completed = '1'` to system_settings) before ERP
+   * user accounts can be created. Platform owner bootstrap goes through a raw,
+   * purpose-built path (PlatformBootstrapService) and is intentionally exempt.
+   */
+  private static assertSetupCompleted(db: DatabaseManager): void {
+    const value = db.query<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = 'setup_completed'`,
+    )[0]?.value;
+    if (value !== '1') {
+      throw new Error('يجب إكمال إعداد النظام أولًا قبل إنشاء المستخدمين في ERP.');
+    }
+  }
+
   /** Restore a previously authenticated session (survives reloads). */
   public static restoreSession(): User | null {
     let userId: string | null = null;
@@ -944,6 +959,7 @@ export class AuthService {
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'ui.users.users.create');
+    AuthService.assertSetupCompleted(this.db);
     if (user.pinCode && subject.role !== 'ADMIN') {
       throw new Error('تعيين رمز الدخول متاح لمدير النظام فقط.');
     }

@@ -38,6 +38,7 @@ import type {
   PlatformApiKey,
   PlatformTenant,
 } from '../../services/domains/platform/platformTypes';
+import type { PlatformOwnerAuditEntry } from '../../services/domains/platform/PlatformBootstrapService';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -57,6 +58,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ownerAccounts, setOwnerAccounts] = useState<PlatformOwnerAuditEntry[]>([]);
 
   // Filters
   const [loginFilterFailed, setLoginFilterFailed] = useState(false);
@@ -109,6 +111,12 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل مركز الأمان.');
     } finally {
+      // The owner-account audit is owner-only; a non-owner simply does not see it.
+      try {
+        setOwnerAccounts(platformAdminService.auditPlatformOwnerAccounts());
+      } catch {
+        setOwnerAccounts([]);
+      }
       setLoading(false);
     }
   }, []);
@@ -398,6 +406,52 @@ export const PlatformSecurityCenterPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Owner account audit — owner-only review of every account claiming the owner role */}
+      {ownerAccounts.length > 0 && (
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-purple-400" />
+            <h2 className="text-sm font-black text-slate-100">حسابات مالك المنصة</h2>
+            <span className="text-[11px] text-slate-400">
+              مراجعة الحسابات التي تحمل دور مالك المنصة (SUPER_ADMIN) ومصدر اعتمادها.
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-[11px] text-slate-400">
+                  <th className="px-3 py-2 font-semibold">الحساب</th>
+                  <th className="px-3 py-2 font-semibold">المصدر</th>
+                  <th className="px-3 py-2 font-semibold">الحالة</th>
+                  <th className="px-3 py-2 font-semibold">الاعتماد</th>
+                  <th className="px-3 py-2 font-semibold">ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ownerAccounts.map((account) => (
+                  <tr key={`${account.source}:${account.id}`} className="border-b border-slate-800/60">
+                    <td className="px-3 py-2 font-semibold text-slate-200" dir="ltr">{account.label}</td>
+                    <td className="px-3 py-2 text-slate-400">
+                      {account.source === 'platform_staff' ? 'موظفو المنصة' : 'مستخدمو ERP'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge value={account.isActive ? 'success' : 'neutral'} label={account.isActive ? 'مفعّل' : 'غير مفعّل'} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge value={account.approved ? 'success' : 'danger'} label={account.approved ? 'معتمد' : 'غير معتمد'} />
+                    </td>
+                    <td className="px-3 py-2 text-[11px] text-amber-300">
+                      {account.concerns.length > 0 ? account.concerns.join(' • ') : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-800 pb-0">

@@ -57,6 +57,9 @@ test('security-key login stores only a hash, supports key-only login, rejects ba
     admin.id,
   ]);
   db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
+  // This fixture simulates a fully configured system: the built-in admin has
+  // completed the first-run password/security-key setup, so ERP users can be created.
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   db.run(`DELETE FROM login_history WHERE username_attempted IN (?, ?)`, [
     'admin',
     SECURITY_KEY_LOGIN_GUARD_KEY,

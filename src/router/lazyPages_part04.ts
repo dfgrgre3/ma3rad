@@ -53,3 +53,4 @@ export const ApartmentEstimatePage = lazy(() => import('../pages/construction/Ap
 export const OperationsShiftsPage = lazy(() => import('../pages/operations/shifts/OperationsShiftsPage').then(m => ({ default: m.OperationsShiftsPage })));
 
 export const PlatformSuperAdminDashboard = lazy(() => import('../pages/platform/PlatformSuperAdminDashboard').then(m => ({ default: m.PlatformSuperAdminDashboard })));
+export const PlatformUserPlatformPermissionsPage = lazy(() => import('../pages/platform/PlatformUserPlatformPermissionsPage').then(m => ({ default: m.PlatformUserPlatformPermissionsPage })));

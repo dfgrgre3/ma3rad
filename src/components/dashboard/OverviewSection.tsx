@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useDashboardRefresh } from '../../contexts/DashboardRefreshContext';
-import { Activity, AlertTriangle } from 'lucide-react';
+import { Activity, AlertTriangle, RefreshCw } from 'lucide-react';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { AttentionRequiredSection } from './AttentionRequiredSection';
@@ -103,6 +103,17 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
         </div>
       )}
 
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={loadData}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'جاري التحديث...' : 'تحديث البيانات'}
+        </button>
+      </div>
       <AttentionRequiredSection metrics={metrics} />
       <QuickActions />
       <ProfileKpiPanel />
