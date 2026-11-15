@@ -231,6 +231,10 @@ export class PlatformAuthorizationService {
     if (role === 'SUPER_ADMIN') {
       // SUPER_ADMIN always keeps the wildcard; the matrix UI can render it as locked.
       permissionCodes = [PLATFORM_ALL_PERMISSION];
+    } else if (permissionCodes.includes(PLATFORM_ALL_PERMISSION)) {
+      // The wildcard is reserved for the platform-owner role. No other role may
+      // ever hold it, or manage_permissions would become an escalation path.
+      throw new Error('الصلاحية العامة (*) محجوزة حصريًا لدور مالك المنصة ولا يمكن منحها لأي دور آخر.');
     }
     const db = DatabaseManager.getInstance();
     db.run('DELETE FROM platform_role_permissions WHERE role_code = ?', [role]);

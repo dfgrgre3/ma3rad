@@ -1,150 +1,179 @@
-import React, { useState } from 'react';
-import {
-  Bell,
-  Mail,
-  MessageSquare,
-  Send,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Users,
-  Search,
-  Filter,
-} from 'lucide-react';
-import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Bell, Send, CheckCircle2, Clock, XCircle, Filter } from 'lucide-react';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import {
-  formatDateTime,
-  inputClass,
-} from './components/PlatformUI';
+import { formatDateTime, inputClass } from './components/PlatformUI';
+
+type NotificationStatus = 'QUEUED' | 'PROCESSING' | 'SENT' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
+
+interface NotificationDelivery {
+  id: string;
+  notificationId: string;
+  channel: 'EMAIL' | 'SMS' | 'IN_APP';
+  recipient: string;
+  status: NotificationStatus;
+  provider: string | null;
+  externalId: string | null;
+  error: string | null;
+  createdAt: string;
+}
 
 interface NotificationLog {
   id: string;
+  notificationId: string;
   recipient: string;
   tenantName: string;
   channel: 'EMAIL' | 'SMS' | 'IN_APP';
   template: string;
   subject: string;
-  status: 'DELIVERED' | 'PENDING' | 'FAILED';
+  status: NotificationStatus;
   sentAt: string;
 }
 
+const STATUS_LABELS: Record<NotificationStatus, string> = {
+  QUEUED: 'بانتظار',
+  PROCESSING: 'قيد المعالجة',
+  SENT: 'مرسل',
+  DELIVERED: 'تم التسليم',
+  FAILED: 'فشل',
+  CANCELLED: 'ملغي',
+};
+
 export const PlatformNotificationsHubPage: React.FC = () => {
   const canManageNotifications = canPlatform('notifications');
-  const [logs, setLogs] = useState<NotificationLog[]>([
-    {
-      id: 'notif_1',
-      recipient: 'ahmed@ceramics-cairo.com',
-      tenantName: 'معرض سيراميك القاهرة',
-      channel: 'EMAIL',
-      template: 'SUBSCRIPTION_RENEWAL_NOTICE',
-      subject: 'تنبيه: اقتراب موعد تجديد اشتراك باقة برو',
-      status: 'DELIVERED',
-      sentAt: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      id: 'notif_2',
-      recipient: '01012345678',
-      tenantName: 'شركة النور للمقاولات',
-      channel: 'SMS',
-      template: 'ACTIVATION_CODE_SMS',
-      subject: 'كود تفعيل منصتك هو: CS-8821',
-      status: 'DELIVERED',
-      sentAt: new Date(Date.now() - 14400000).toISOString(),
-    },
-    {
-      id: 'notif_3',
-      recipient: 'billing@delta-store.eg',
-      tenantName: 'مؤسسة الدلتا للسيراميك',
-      channel: 'EMAIL',
-      template: 'INVOICE_OVERDUE',
-      subject: 'فاتورة مستحقة متأخرة الدفع #INV-2026-004',
-      status: 'DELIVERED',
-      sentAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ]);
-
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [channelFilter, setChannelFilter] = useState('');
   const [isSendOpen, setIsSendOpen] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [broadcastForm, setBroadcastForm] = useState({
-    channel: 'EMAIL' as const,
-    target: 'ALL',
+    channel: 'IN_APP' as 'EMAIL' | 'SMS' | 'IN_APP',
+    audience: 'ALL',
     subject: '',
     message: '',
   });
 
-  const handleSendBroadcast = () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const notificationsResult = await centralPlatformClient.listNotifications({ limit: 100 });
+      const templateList = await centralPlatformClient.listNotificationTemplates().catch(() => [] as any[]);
+      const mapped: NotificationLog[] = notificationsResult.notifications.map((notification) => ({
+        id: notification.id,
+        notificationId: notification.id,
+        recipient: notification.tenantId ? `عميل: ${notification.tenantId}` : 'النظام العام',
+        tenantName: notification.tenantId ? `عميل ${notification.tenantId}` : 'المنصة',
+        channel: (notification.channel as 'EMAIL' | 'SMS' | 'IN_APP'),
+        template: notification.templateId ? String(notification.templateId) : 'ADMIN_BROADCAST',
+        subject: notification.subject,
+        status: (notification.status as NotificationStatus),
+        sentAt: notification.createdAt,
+      }));
+      setLogs(mapped);
+      setTemplates(templateList);
+      setTemplates(templateList);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'تعذر تحميل سجل الإشعارات من السيرفر المركزي.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredLogs = useMemo(
+    () => logs.filter((log) => (channelFilter ? log.channel === channelFilter : true)),
+    [logs, channelFilter],
+  );
+
+  const deliveredCount = useMemo(
+    () => logs.filter((log) => log.status === 'SENT' || log.status === 'DELIVERED').length,
+    [logs],
+  );
+  const failedCount = useMemo(() => logs.filter((log) => log.status === 'FAILED').length, [logs]);
+  const deliveryRate = logs.length ? Math.round((deliveredCount / logs.length) * 100) : 0;
+
+  const handleSendBroadcast = async () => {
     if (!canManageNotifications) {
-      alert('لا تملك صلاحية إرسال الإشعارات.');
+      setError('لا تملك صلاحية إرسال الإشعارات.');
       return;
     }
     if (!broadcastForm.subject.trim() || !broadcastForm.message.trim()) {
-      alert('الموضوع ومحتوى الرسالة مطلوبان.');
+      setError('الموضوع ومحتوى الرسالة مطلوبان.');
       return;
     }
-    const newEntry: NotificationLog = {
-      id: `notif_${Date.now()}`,
-      recipient: broadcastForm.target === 'ALL' ? 'كافة العملاء النشطين' : 'مستأجر محدد',
-      tenantName: 'إشعار جماعي من الإدارة',
-      channel: broadcastForm.channel,
-      template: 'ADMIN_BROADCAST',
-      subject: broadcastForm.subject,
-      status: 'DELIVERED',
-      sentAt: new Date().toISOString(),
-    };
-    setLogs([newEntry, ...logs]);
-    setIsSendOpen(false);
-    setBroadcastForm({ channel: 'EMAIL', target: 'ALL', subject: '', message: '' });
-    alert('تم إرسال الإشعار المركزي وتوثيقه بسجل التسليم بنجاح.');
+    setSending(true);
+    setSendError(null);
+    try {
+      const result = await centralPlatformClient.sendNotification({
+        audience: broadcastForm.audience,
+        channel: broadcastForm.channel,
+        subject: broadcastForm.subject.trim(),
+        message: broadcastForm.message.trim(),
+      });
+      await load();
+      setIsSendOpen(false);
+      setBroadcastForm({ channel: 'IN_APP', audience: 'ALL', subject: '', message: '' });
+      setError(null);
+    } catch (sendError) {
+      const message = sendError instanceof Error ? sendError.message : 'فشل إرسال الإشعار عبر الخدمة المركزية.';
+      setSendError(message);
+      setError(message);
+    } finally {
+      setSending(false);
+    }
   };
-
-  const filteredLogs = logs.filter((l) => (channelFilter ? l.channel === channelFilter : true));
 
   return (
     <div className="space-y-4 text-right">
       <PageHeader
         title="مركز الإشعارات وسجل التسليم المركزي (Notifications Hub)"
-        description="إرسال التنبيهات الجماعية، البريد الإلكتروني، والرسائل النصية للعملاء ومتابعة سجلات التسليم."
+        description="إرسال التنبيهات عبر البريد الإلكتروني والرسائل النصية والإشعارات الداخلية للعملاء، ومتابعة سجلات التسليم من السيرفر المركزي."
         icon={<Bell className="h-5 w-5" />}
         actions={
           canManageNotifications ? (
-            <Button
-              size="sm"
-              onClick={() => setIsSendOpen(true)}
-              leadingIcon={<Send className="h-4 w-4" />}
-            >
+            <Button size="sm" onClick={() => setIsSendOpen(true)} leadingIcon={<Send className="h-4 w-4" />}>
               إرسال إشعار مركزي جديد
             </Button>
           ) : null
         }
       />
 
+      {error ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
-          <p className="text-[11px] font-semibold text-slate-400">إجمالي الرسائل المرسلة</p>
+          <p className="text-[11px] font-semibold text-slate-400">إجمالي الإشعارات المرسلة</p>
           <p className="text-xl font-black text-slate-100 mt-1">{logs.length}</p>
         </div>
         <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
           <p className="text-[11px] font-semibold text-emerald-400">نسبة التسليم الناجح</p>
-          <p className="text-xl font-black text-emerald-300 mt-1">100%</p>
+          <p className="text-xl font-black text-emerald-300 mt-1">{logs.length ? deliveryRate : 0}%</p>
         </div>
         <div className="p-3 bg-sky-950/20 border border-sky-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-sky-400">القنوات المفعلة</p>
-          <p className="text-xl font-black text-sky-300 mt-1">Email + SMS</p>
+          <p className="text-[11px] font-semibold text-sky-400">القنوات المستخدمة</p>
+          <p className="text-xl font-black text-sky-300 mt-1">{['EMAIL', 'SMS', 'IN_APP'].filter((c) => logs.some((l) => l.channel === c)).join(' + ') || 'لا إشعارات بعد'}</p>
         </div>
       </div>
 
       {/* Filter Bar */}
       <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 shadow-sm">
-        <select
-          value={channelFilter}
-          onChange={(e) => setChannelFilter(e.target.value)}
-          className={`${inputClass} max-w-[200px]`}
-        >
+        <Filter className="h-4 w-4 text-slate-400" />
+        <select value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)} className={`${inputClass} max-w-[200px]`}>
           <option value="">جميع القنوات</option>
           <option value="EMAIL">بريد إلكتروني (Email)</option>
           <option value="SMS">رسائل نصية (SMS)</option>
@@ -158,8 +187,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
           <table className="w-full min-w-[850px] text-right text-xs">
             <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
               <tr>
-                <th className="px-4 py-3">العميل والمستلم</th>
-                <th className="px-4 py-3">القناة</th>
+                <th className="px-4 py-3">القناة / المستلم</th>
                 <th className="px-4 py-3">القالب والموضوع</th>
                 <th className="px-4 py-3">الحالة</th>
                 <th className="px-4 py-3">وقت التسليم</th>
@@ -169,60 +197,60 @@ export const PlatformNotificationsHubPage: React.FC = () => {
               {filteredLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-bold text-slate-100">{log.tenantName}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{log.recipient}</div>
+                    <div className="font-bold text-slate-100">{STATUS_LABELS[log.status] || log.status}</div>
+                    <div className="text-[11px] font-mono text-slate-400">{log.channel}</div>
                   </td>
-
-                  <td className="px-4 py-3">
-                    <span className="font-bold bg-slate-800 px-2 py-0.5 rounded text-[10px] text-sky-300">
-                      {log.channel}
-                    </span>
-                  </td>
-
                   <td className="px-4 py-3">
                     <div className="font-semibold text-slate-200">{log.subject}</div>
                     <div className="text-[10px] font-mono text-slate-500">{log.template}</div>
                   </td>
-
                   <td className="px-4 py-3">
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم
-                    </span>
+                    {log.status === 'SENT' || log.status === 'DELIVERED' ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم
+                      </span>
+                    ) : log.status === 'FAILED' ? (
+                      <span className="text-red-400 font-bold flex items-center gap-1">
+                        <XCircle className="h-3.5 w-3.5" /> فشل التسليم
+                      </span>
+                    ) : (
+                      <span className="text-amber-300 font-bold flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status] || log.status}
+                      </span>
+                    )}
                   </td>
-
                   <td className="px-4 py-3 text-slate-400">{formatDateTime(log.sentAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {!loading && filteredLogs.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">لا توجد إشعارات مسجلة بعد.</div>
+          ) : null}
         </div>
       </div>
 
       {/* Modal: Broadcast */}
-      <Modal
-        open={isSendOpen}
-        onClose={() => setIsSendOpen(false)}
-        title="إرسال إشعار مركزي جديد"
-      >
+      <Modal open={isSendOpen} onClose={() => setIsSendOpen(false)} title="إرسال إشعار مركزي جديد">
         <div className="space-y-3.5 text-right">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">القناة</label>
               <select
                 value={broadcastForm.channel}
-                onChange={(e) => setBroadcastForm({ ...broadcastForm, channel: e.target.value as any })}
+                onChange={(e) => setBroadcastForm({ ...broadcastForm, channel: e.target.value as 'EMAIL' | 'SMS' | 'IN_APP' })}
                 className={inputClass}
               >
+                <option value="IN_APP">داخل التطبيق (In-App)</option>
                 <option value="EMAIL">بريد إلكتروني (Email)</option>
-                <option value="SMS">رسالة نصية قصيرة (SMS)</option>
+                <option value="SMS">رسائل نصية (SMS)</option>
               </select>
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">المستهدفون</label>
               <select
-                value={broadcastForm.target}
-                onChange={(e) => setBroadcastForm({ ...broadcastForm, target: e.target.value })}
+                value={broadcastForm.audience}
+                onChange={(e) => setBroadcastForm({ ...broadcastForm, audience: e.target.value })}
                 className={inputClass}
               >
                 <option value="ALL">كافة العملاء النشطين</option>
@@ -231,35 +259,21 @@ export const PlatformNotificationsHubPage: React.FC = () => {
               </select>
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">عنوان الإشعار / الموضوع *</label>
-            <input
-              type="text"
-              value={broadcastForm.subject}
-              onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
-              placeholder="مثلاً: تنبيه صيانة دورية أو تحديث أمني هام"
-              className={inputClass}
-            />
+            <input type="text" value={broadcastForm.subject} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })} className={inputClass} />
           </div>
-
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">نص الرسالة *</label>
-            <textarea
-              rows={4}
-              value={broadcastForm.message}
-              onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
-              placeholder="اكتب نص الإشعار هنا..."
-              className={inputClass}
-            />
+            <textarea rows={4} value={broadcastForm.message} onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })} className={inputClass} />
           </div>
-
+          {sendError ? <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{sendError}</div> : null}
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="secondary" size="sm" onClick={() => setIsSendOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleSendBroadcast} disabled={!canManageNotifications}>
-              إرسال فوراً
+            <Button size="sm" onClick={() => void handleSendBroadcast()} disabled={sending || !canManageNotifications}>
+              {sending ? 'جارٍ الإرسال…' : 'إرسال عبر الخدمة المركزية'}
             </Button>
           </div>
         </div>

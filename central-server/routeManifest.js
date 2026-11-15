@@ -114,6 +114,55 @@ const ROUTE_MANIFEST = [
     GET: ['platform.audit.view'],
   }),
 
+  // ── Billing ─────────────────────────────────────────────────────────────────
+  route('/api/v1/admin/billing/invoices', ['GET', 'POST'], {
+    GET: ['platform.billing.view', 'platform.billing.manage'],
+    POST: ['platform.billing.create', 'platform.billing.manage'],
+  }),
+
+  // ── Operations ─────────────────────────────────────────────────────────────
+  route('/api/v1/admin/operations/jobs', ['GET'], {
+    GET: ['platform.operations.view'],
+  }),
+
+  // ── Integrations ───────────────────────────────────────────────────────────
+  route('/api/v1/admin/integrations/webhooks', ['GET', 'POST'], {
+    GET: ['platform.integrations.view'],
+    POST: ['platform.integrations.create', 'platform.integrations.manage'],
+  }),
+  route('/api/v1/admin/integrations/webhooks/:id', ['PUT', 'DELETE'], {
+    PUT: ['platform.integrations.update', 'platform.integrations.manage'],
+    DELETE: ['platform.integrations.delete', 'platform.integrations.manage'],
+  }),
+  route('/api/v1/admin/integrations/webhooks/:id/test', ['POST'], {
+    POST: ['platform.integrations.update', 'platform.integrations.manage'],
+  }),
+
+  // ── Notifications ──────────────────────────────────────────────────────────
+  route('/api/v1/admin/notifications/templates', ['GET'], {
+    GET: ['platform.notifications.view'],
+  }),
+  route('/api/v1/admin/notifications', ['GET', 'POST'], {
+    GET: ['platform.notifications.view'],
+    POST: ['platform.notifications.update'],
+  }),
+
+  // ── Backups ─────────────────────────────────────────────────────────────────
+  route('/api/v1/admin/backups', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+
+  // ── Policies ───────────────────────────────────────────────────────────────
+  route('/api/v1/admin/policies', ['GET'], {
+    GET: ['platform.policies.view'],
+  }),
+
+  // ── Feature permissions / dynamic app configuration ─────────────────────────
+  route('/api/v1/admin/config/feature-permissions', ['GET', 'PUT'], {
+    GET: ['platform.app-configuration.view'],
+    PUT: ['platform.app-configuration.update', 'platform.settings.update'],
+  }),
+
   // ── Client-owned endpoints (served by licensing/update services) ──────────
   route('/api/v1/licensing/activate', [], null, ['POST']),
   route('/api/v1/licensing/validate', [], null, ['POST']),

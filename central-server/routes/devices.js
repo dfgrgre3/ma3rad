@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { recordAuditEvent } = require('../lib/audit');
-const { authenticatePlatformUser, requirePlatformPermission } = require('../middleware/auth');
+const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -28,9 +28,22 @@ router.get(
     try {
       const db = getDb();
       const { tenantId, status } = req.query;
+      const scoped = await getScopedTenantIds(req);
+      if (Array.isArray(scoped) && scoped.length === 0) {
+        return res.json([]);
+      }
+      // A scoped staff member may only query their own tenants; asking for
+      // another tenant (or none) must not widen visibility.
+      if (tenantId && Array.isArray(scoped) && !scoped.includes(String(tenantId))) {
+        return res.status(403).json({ error: 'Tenant is outside your data scope' });
+      }
+      const scopePredicate = tenantScopePredicate('tenant_id', scoped);
       let sql = 'SELECT * FROM platform_devices WHERE 1=1';
-      const params = [];
+      const params = [...scopePredicate.params];
 
+      if (scopePredicate.clause) {
+        sql += scopePredicate.clause;
+      }
       if (tenantId) {
         sql += ' AND tenant_id = ?';
         params.push(tenantId);
@@ -61,6 +74,7 @@ router.post(
 
       const device = await db.get('SELECT * FROM platform_devices WHERE id = ?', [id]);
       if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!(await assertTenantAccess(req, res, device.tenant_id))) return;
 
       await db.run(
         `UPDATE platform_devices SET status = 'SUSPENDED', updated_at = ? WHERE id = ?`,
@@ -110,6 +124,7 @@ router.post(
 
       const device = await db.get('SELECT * FROM platform_devices WHERE id = ?', [id]);
       if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!(await assertTenantAccess(req, res, device.tenant_id))) return;
 
       if (device.license_id) {
         await db.run(
@@ -157,6 +172,7 @@ router.post(
 
       const device = await db.get('SELECT * FROM platform_devices WHERE id = ?', [id]);
       if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!(await assertTenantAccess(req, res, device.tenant_id))) return;
 
       await db.run(
         `UPDATE platform_devices SET status = 'REVOKED', clone_suspected = 1, updated_at = ? WHERE id = ?`,
@@ -199,6 +215,12 @@ router.post(
   async (req, res, next) => {
     try {
       const db = getDb();
+      // Cross-tenant clone detection cannot be scoped to a subset of tenants;
+      // scoped staff are denied rather than shown other tenants' devices.
+      const scoped = await getScopedTenantIds(req);
+      if (Array.isArray(scoped)) {
+        return res.status(403).json({ error: 'Clone detection requires full tenant scope' });
+      }
       const alerts = [];
       const flaggedDevices = [];
       const flaggedLicenses = [];

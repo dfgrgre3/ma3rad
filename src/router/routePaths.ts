@@ -142,6 +142,7 @@ export const APP_ROUTE_PATHS = [
   "data-import/types",
   "data-import",
   "settings",
+  "settings/approvals",
   "settings/app-configuration",
   "settings/configuration-studio",
   "users",

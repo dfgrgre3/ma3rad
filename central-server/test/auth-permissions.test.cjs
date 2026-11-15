@@ -42,13 +42,14 @@ after(async () => {
 test('health and public key are available without authentication', async () => {
   const health = await api(server.base, '/api/v1/health');
   assert.equal(health.status, 200);
-  assert.equal(health.body.status, 'ok');
-  assert.match(health.headers.get('x-request-id') || '', /^[a-zA-Z0-9._:-]{8,120}$/);
+  assert.equal(health.body.success, true);
+  assert.equal(health.body.data.status, 'ok');
+  assert.ok(health.body.requestId);
 
   const publicKey = await api(server.base, '/api/v1/configuration/public-key');
   assert.equal(publicKey.status, 200);
-  assert.ok(publicKey.body.publicKey);
-  assert.ok(publicKey.body.keyId);
+  assert.ok(publicKey.body.data.publicKey);
+  assert.ok(publicKey.body.data.keyId);
 });
 
 test('login rejects bad credentials and issues a session token', async () => {
@@ -57,13 +58,13 @@ test('login rejects bad credentials and issues a session token', async () => {
 
   const ok = await login('admin', 'admin-test-pass');
   assert.equal(ok.status, 200);
-  assert.ok(ok.body.token);
-  assert.equal(ok.body.admin.username, 'admin');
-  assert.ok(ok.body.admin.permissions.includes('*'));
+  assert.ok(ok.body.data.token);
+  assert.equal(ok.body.data.admin.username, 'admin');
+  assert.ok(ok.body.data.admin.permissions.includes('*'));
 
-  const me = await api(server.base, '/api/v1/admin/auth/me', { token: ok.body.token });
+  const me = await api(server.base, '/api/v1/admin/auth/me', { token: ok.body.data.token });
   assert.equal(me.status, 200);
-  assert.equal(me.body.admin.username, 'admin');
+  assert.equal(me.body.data.admin.username, 'admin');
 });
 
 test('protected routes require authentication and permissions', async () => {
@@ -71,11 +72,11 @@ test('protected routes require authentication and permissions', async () => {
   assert.equal(anonymous.status, 401);
 
   const admin = await login('admin', 'admin-test-pass');
-  const token = admin.body.token;
+  const token = admin.body.data.token;
 
   const list = await api(server.base, '/api/v1/admin/tenants', { token });
   assert.equal(list.status, 200);
-  assert.deepEqual(list.body, []);
+  assert.deepEqual(list.body.data, []);
 
   const created = await api(server.base, '/api/v1/admin/tenants', {
     method: 'POST',
@@ -83,7 +84,7 @@ test('protected routes require authentication and permissions', async () => {
     body: { name: 'Gallery One', code: 'GALONE' },
   });
   assert.equal(created.status, 201);
-  assert.equal(created.body.code, 'GALONE');
+  assert.equal(created.body.data.code, 'GALONE');
 
   const staff = await api(server.base, '/api/v1/admin/staff', {
     method: 'POST',
@@ -94,7 +95,7 @@ test('protected routes require authentication and permissions', async () => {
 
   const supportLogin = await login('support1', 'support-pass-1');
   assert.equal(supportLogin.status, 200);
-  const supportToken = supportLogin.body.token;
+  const supportToken = supportLogin.body.data.token;
 
   const allowed = await api(server.base, '/api/v1/admin/tenants', { token: supportToken });
   assert.equal(allowed.status, 200, 'support agent can view tenants');
@@ -120,7 +121,7 @@ test('protected routes require authentication and permissions', async () => {
 
 test('permission catalog exposes sections, pages and roles', async () => {
   const admin = await login('admin', 'admin-test-pass');
-  const catalog = await api(server.base, '/api/v1/admin/permissions/catalog', { token: admin.body.token });
+  const catalog = await api(server.base, '/api/v1/admin/permissions/catalog', { token: admin.body.data.token });
 
   assert.equal(catalog.status, 200);
   assert.ok(catalog.body.data.permissions.length > 0);
@@ -131,7 +132,7 @@ test('permission catalog exposes sections, pages and roles', async () => {
 
 test('logout invalidates the session immediately', async () => {
   const admin = await login('admin', 'admin-test-pass');
-  const token = admin.body.token;
+  const token = admin.body.data.token;
 
   const logout = await api(server.base, '/api/v1/admin/auth/logout', { method: 'POST', token });
   assert.equal(logout.status, 200);

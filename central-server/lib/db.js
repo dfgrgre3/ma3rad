@@ -466,6 +466,68 @@ async function createTables() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_roles_code ON platform_roles(code);
     CREATE INDEX IF NOT EXISTS idx_platform_license_changes_license ON platform_license_changes(license_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_platform_subscription_changes_sub ON platform_subscription_changes(subscription_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS platform_invoices (
+      id TEXT PRIMARY KEY,
+      number TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      subscription_id TEXT,
+      issue_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      due_date TEXT,
+      status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK(status IN ('DRAFT','SENT','PARTIAL','PAID','OVERDUE','VOID')),
+      currency TEXT NOT NULL DEFAULT 'EGP',
+      subtotal REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      tax REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL DEFAULT 0,
+      paid_amount REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE,
+      FOREIGN KEY (subscription_id) REFERENCES platform_subscriptions(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON platform_invoices(tenant_id, status);
+
+    CREATE TABLE IF NOT EXISTS platform_ops_jobs (id TEXT PRIMARY KEY, type TEXT, status TEXT DEFAULT 'PENDING', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS platform_webhook_endpoints (id TEXT PRIMARY KEY, url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS platform_notification_templates (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS platform_backups (id TEXT PRIMARY KEY, type TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS platform_policies (id TEXT PRIMARY KEY, slug TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+    CREATE TABLE IF NOT EXISTS platform_notifications (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      audience TEXT NOT NULL DEFAULT 'ALL',
+      channel TEXT NOT NULL,
+      template_id TEXT,
+      subject TEXT NOT NULL,
+      payload TEXT,
+      status TEXT NOT NULL DEFAULT 'QUEUED'
+        CHECK(status IN ('QUEUED','PROCESSING','SENT','FAILED','CANCELLED','DELIVERED')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_notifications_tenant ON platform_notifications(tenant_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_notifications_status ON platform_notifications(status);
+
+    CREATE TABLE IF NOT EXISTS platform_notification_deliveries (
+      id TEXT PRIMARY KEY,
+      notification_id TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING'
+        CHECK(status IN ('PENDING','SENT','FAILED','DELIVERED')),
+      provider TEXT,
+      external_id TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_notification_deliveries_notification ON platform_notification_deliveries(notification_id, created_at);
   `);
 
   console.log('Tables created successfully');

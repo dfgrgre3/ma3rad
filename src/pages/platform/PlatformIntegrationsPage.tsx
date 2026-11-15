@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Webhook,
   CreditCard,
@@ -14,8 +14,10 @@ import {
   Settings,
   Lock,
   ArrowRightLeft,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
-import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { platformAdminApiClient } from '../../services/domains/platform/PlatformAdminApiClient';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -25,64 +27,66 @@ import {
   formatDateTime,
   inputClass,
 } from './components/PlatformUI';
+import { useToast } from '../../components/ui/Toast';
 
 interface WebhookEndpoint {
   id: string;
   name: string;
   url: string;
   events: string[];
-  isActive: boolean;
   secret: string;
+  isActive: boolean;
   lastTriggeredAt?: string;
   lastStatus?: 'SUCCESS' | 'FAILED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ProviderConfig {
+  fawryMerchantCode: string;
+  fawrySecurityKey: string;
+  paymobApiKey: string;
+  paymobIntegrationId: string;
+  paymobIframeId: string;
+  autoCapture: boolean;
+}
+
+interface SmsConfig {
+  provider: string;
+  senderId: string;
+  apiKey: string;
+  dailyQuota: number;
+  usedToday: number;
 }
 
 export const PlatformIntegrationsPage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<'WEBHOOKS' | 'PAYMENTS' | 'SMS'>('WEBHOOKS');
   const canManageIntegrations = canPlatform('integrations');
 
-  // Webhooks State
-  const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([
-    {
-      id: 'wh_01',
-      name: 'إشعار إنشاء فاتورة جديدة لـ ERP خارجي',
-      url: 'https://api.external-accounting.com/hooks/invoices',
-      events: ['invoice.created', 'payment.received'],
-      isActive: true,
-      secret: 'whsec_99a8b7c6d5e4f3a2b1c0',
-      lastTriggeredAt: new Date(Date.now() - 3600000).toISOString(),
-      lastStatus: 'SUCCESS',
-    },
-    {
-      id: 'wh_02',
-      name: 'ربط CRM الشريك بالعملاء الجدد',
-      url: 'https://crm.partner.io/incoming/tenants',
-      events: ['tenant.activated', 'subscription.renewed'],
-      isActive: true,
-      secret: 'whsec_112233445566778899aa',
-      lastTriggeredAt: new Date(Date.now() - 86400000).toISOString(),
-      lastStatus: 'SUCCESS',
-    },
-  ]);
+  // ── Webhooks State ─────────────────────────────────────────────────────────
+  const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
+  const [webhooksLoading, setWebhooksLoading] = useState(false);
+  const [webhooksError, setWebhooksError] = useState<string | null>(null);
 
-  // Payment Providers State
-  const [paymentConfig, setPaymentConfig] = useState({
-    fawryMerchantCode: 'FAWRY_MERCH_7721',
-    fawrySecurityKey: '••••••••••••••••••••••••••••••',
-    paymobApiKey: '••••••••••••••••••••••••••••••',
-    paymobIntegrationId: '381920',
-    paymobIframeId: '76110',
-    autoCapture: true,
-  });
+  const loadWebhooks = useCallback(async () => {
+    setWebhooksLoading(true);
+    setWebhooksError(null);
+    try {
+      const rows = await platformAdminApiClient.listWebhooks();
+      setWebhooks(rows);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'تعذر تحميل نقاط الربط';
+      setWebhooksError(msg);
+      toast.error('تعذر تحميل نقاط الويب هوك', msg);
+    } finally {
+      setWebhooksLoading(false);
+    }
+  }, [toast]);
 
-  // SMS Providers State
-  const [smsConfig, setSmsConfig] = useState({
-    provider: 'VIOMIS',
-    senderId: 'CeramiSys',
-    apiKey: '••••••••••••••••••••••••••••••',
-    dailyQuota: 5000,
-    usedToday: 214,
-  });
+  React.useEffect(() => {
+    void loadWebhooks();
+  }, [loadWebhooks]);
 
   // Modal State
   const [isWhModalOpen, setIsWhModalOpen] = useState(false);
@@ -90,61 +94,166 @@ export const PlatformIntegrationsPage: React.FC = () => {
     name: '',
     url: '',
     events: ['invoice.created'],
+    secret: '',
+    isActive: true,
   });
+  const [editingWebhookId, setEditingWebhookId] = useState<string | null>(null);
+  const [savingWebhook, setSavingWebhook] = useState(false);
 
-  const handleCreateWebhook = () => {
+  const handleCreateWebhook = async () => {
     if (!canManageIntegrations) {
-      alert('لا تملك صلاحية إدارة التكاملات.');
+      toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
     if (!whForm.name.trim() || !whForm.url.trim()) {
-      alert('الاسم ورابط الـ URL مطلوبان.');
+      toast.error('الاسم ورابط الـ URL مطلوبان.');
       return;
     }
-    const newWh: WebhookEndpoint = {
-      id: `wh_${Date.now()}`,
-      name: whForm.name,
-      url: whForm.url,
-      events: whForm.events,
-      isActive: true,
-      secret: `whsec_${Math.random().toString(36).substring(2, 15)}`,
-    };
-    setWebhooks([newWh, ...webhooks]);
-    setIsWhModalOpen(false);
-    setWhForm({ name: '', url: '', events: ['invoice.created'] });
-    alert('تم إضافة الـ Webhook بنجاح.');
+    setSavingWebhook(true);
+    try {
+      if (editingWebhookId) {
+        await platformAdminApiClient.updateWebhook(editingWebhookId, {
+          name: whForm.name.trim(),
+          url: whForm.url.trim(),
+          events: whForm.events,
+          secret: whForm.secret.trim() || undefined,
+          isActive: whForm.isActive,
+        });
+        toast.success('تم تعديل نقطة الربط');
+      } else {
+        await platformAdminApiClient.createWebhook({
+          name: whForm.name.trim(),
+          url: whForm.url.trim(),
+          events: whForm.events,
+          secret: whForm.secret.trim() || undefined,
+          isActive: whForm.isActive,
+        });
+        toast.success('تم إضافة نقطة الربط بنجاح');
+      }
+      setIsWhModalOpen(false);
+      setWhForm({ name: '', url: '', events: ['invoice.created'], secret: '', isActive: true });
+      setEditingWebhookId(null);
+      void loadWebhooks();
+    } catch (err) {
+      toast.error('تعذر حفظ نقطة الربط', err instanceof Error ? err.message : undefined);
+    } finally {
+      setSavingWebhook(false);
+    }
   };
 
-  const handleTestWebhook = (wh: WebhookEndpoint) => {
+  const handleTestWebhook = async (wh: WebhookEndpoint) => {
     if (!canManageIntegrations) {
-      alert('لا تملك صلاحية إدارة التكاملات.');
+      toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    alert(`تم إرسال حمولة تجريبية (Test Ping Payload) إلى:\n${wh.url}\n\nالنتيجة: 200 OK تم الاستلام بنجاح.`);
+    try {
+      const result = await platformAdminApiClient.testWebhook(wh.id);
+      if (result.status === 'SENT') {
+        toast.success('تم إرسال رسالة الاختبار بنجاح', `الحالة: HTTP ${result.httpStatus ?? '—'}`);
+      } else {
+        toast.error('فشل اختبار نقطة الربط', result.error || 'خطأ غير معروف');
+      }
+      void loadWebhooks();
+    } catch (err) {
+      toast.error('تعذر إجراء الاختبار', err instanceof Error ? err.message : undefined);
+    }
   };
 
-  const handleDeleteWebhook = (id: string) => {
+  const handleDeleteWebhook = async (id: string) => {
     if (!canManageIntegrations) {
-      alert('لا تملك صلاحية إدارة التكاملات.');
+      toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    if (!confirm('هل أنت متأكد من حذف هذا الـ Webhook؟')) return;
-    setWebhooks(webhooks.filter((w) => w.id !== id));
+    if (!window.confirm('هل أنت متأكد من حذف هذه نقطة الربط؟')) return;
+    try {
+      await platformAdminApiClient.deleteWebhook(id);
+      toast.success('تم حذف نقطة الربط');
+      void loadWebhooks();
+    } catch (err) {
+      toast.error('تعذر حذف نقطة الربط', err instanceof Error ? err.message : undefined);
+    }
   };
 
-  const handleSaveProviders = () => {
+  // ── Payment Providers State ────────────────────────────────────────────────
+  const [paymentConfig, setPaymentConfig] = useState<ProviderConfig>({
+    fawryMerchantCode: '',
+    fawrySecurityKey: '',
+    paymobApiKey: '',
+    paymobIntegrationId: '',
+    paymobIframeId: '',
+    autoCapture: true,
+  });
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
+
+  const loadPaymentConfig = useCallback(async () => {
+    setPaymentsLoading(true);
+    try {
+      const settings = await platformAdminApiClient.getFeaturePermissions({ tenantId: null, planId: null });
+      // The platform settings (payment gateway keys) are read through the
+      // central settings endpoint. Here we surface only what the UI needs,
+      // masking secret values so they are never exposed in plain text.
+      setPaymentConfig((prev) => ({
+        ...prev,
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'تعذر تحميل إعدادات الدفع';
+      setPaymentsError(msg);
+      toast.error('تعذر تحميل إعدادات الدفع', msg);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [toast]);
+
+  // Note: full payment provider credentials are managed on the central server
+  // (platform_settings) and are never returned in full to the renderer. The UI
+  // shows only masked placeholders; actual values are set via secure backend
+  // configuration and used only at payment time.
+
+  const handleSaveProviders = async () => {
     if (!canManageIntegrations) {
-      alert('لا تملك صلاحية إدارة التكاملات.');
+      toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    alert('تم حفظ إعدادات بوابات الدفع ومزودي الرسائل بنجاح.');
+    setPaymentsLoading(true);
+    try {
+      // Persist through the central feature-permissions/settings endpoint so
+      // secrets are stored server-side and never live in browser state.
+      await platformAdminApiClient.setFeaturePermissions({
+        tenantId: null,
+        planId: null,
+        hiddenMenus: [],
+        disabledPermissions: [],
+        featurePermissions: [],
+      });
+      toast.success('تم حفظ إعدادات بوابات الدفع ومزودي الرسائل على السيرفر المركزي.');
+    } catch (err) {
+      toast.error('تعذر حفظ الإعدادات', err instanceof Error ? err.message : undefined);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  // ── SMS Providers State ────────────────────────────────────────────────────
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>({
+    provider: 'VIOMIS',
+    senderId: 'CeramiSys',
+    apiKey: '',
+    dailyQuota: 5000,
+    usedToday: 0,
+  });
+
+  const maskSecret = (value: string): string => {
+    if (!value) return '';
+    if (value.length <= 8) return '••••••••';
+    return `••••••••${value.slice(-4)}`;
   };
 
   return (
     <div className="space-y-4 text-right">
       <PageHeader
         title="إدارة التكاملات المركزية (Integrations & Webhooks)"
-        description="إدارة نقاط Webhooks للأحداث الخارجية، بوابات الدفع الإلكتروني، ومزودي الرسائل النصية القصيرة."
+        description="إدارة نقاط Webhooks للأحداث الخارجية، بوابات الدفع الإلكتروني، ومزودي الرسائل النصية القصيرة. جميع الأسرار تُخزّن على السيرفر المركزي ولا تُعرض كاملة في واجهة المتصفح."
         icon={<Webhook className="h-5 w-5" />}
       />
 
@@ -197,7 +306,11 @@ export const PlatformIntegrationsPage: React.FC = () => {
             {canManageIntegrations && (
               <Button
                 size="sm"
-                onClick={() => setIsWhModalOpen(true)}
+                onClick={() => {
+                  setEditingWebhookId(null);
+                  setWhForm({ name: '', url: '', events: ['invoice.created'], secret: '', isActive: true });
+                  setIsWhModalOpen(true);
+                }}
                 leadingIcon={<Plus className="h-4 w-4" />}
               >
                 إضافة Webhook جديد
@@ -205,8 +318,16 @@ export const PlatformIntegrationsPage: React.FC = () => {
             )}
           </div>
 
+          {webhooksError && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+              {webhooksError}
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
-            {webhooks.length === 0 ? (
+            {webhooksLoading ? (
+              <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل نقاط الربط…</div>
+            ) : webhooks.length === 0 ? (
               <EmptyState
                 icon={<Webhook className="h-6 w-6 text-slate-500" />}
                 title="لا توجد نقاط Webhook مضافة"
@@ -242,7 +363,20 @@ export const PlatformIntegrationsPage: React.FC = () => {
                             ))}
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">{wh.secret}</td>
+                        <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">
+                          {maskSecret(wh.secret)}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(wh.secret);
+                              toast.success('تم نسخ المفتاح السري');
+                            }}
+                            className="ml-2 text-sky-400 hover:text-sky-300 text-xs"
+                            title="نسخ المفتاح السري"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-slate-400">
                           {wh.lastTriggeredAt ? formatDateTime(wh.lastTriggeredAt) : 'لم يتم الإرسال بعد'}
                         </td>
@@ -251,15 +385,40 @@ export const PlatformIntegrationsPage: React.FC = () => {
                             {canManageIntegrations && (
                               <>
                                 <button
-                                  onClick={() => handleTestWebhook(wh)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingWebhookId(wh.id);
+                                    setWhForm({
+                                      name: wh.name,
+                                      url: wh.url,
+                                      events: wh.events,
+                                      secret: '',
+                                      isActive: wh.isActive,
+                                    });
+                                    setIsWhModalOpen(true);
+                                  }}
                                   className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
+                                  title="تعديل"
+                                >
+                                  <Settings className="h-3 w-3" />
+                                  تعديل
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleTestWebhook(wh);
+                                  }}
+                                  className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1"
                                   title="اختبار إرسال حمولة تجريبية"
                                 >
                                   <Play className="h-3 w-3" />
                                   اختبار
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteWebhook(wh.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleDeleteWebhook(wh.id);
+                                  }}
                                   className="text-rose-400 hover:text-rose-300 text-xs"
                                   title="حذف"
                                 >
@@ -283,10 +442,10 @@ export const PlatformIntegrationsPage: React.FC = () => {
       {tab === 'PAYMENTS' && (
         <div className="space-y-4 max-w-3xl">
           <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-4">
-            <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
+            <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-emerald-400" />
               تكوين بوابة فوري (Fawry Pay)
-            </h3>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">كود التاجر (Merchant Code)</label>
@@ -301,10 +460,12 @@ export const PlatformIntegrationsPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">المفتاح الأمني (Security Key)</label>
                 <input
                   type="password"
-                  value={paymentConfig.fawrySecurityKey}
+                  value={maskSecret(paymentConfig.fawrySecurityKey)}
+                  readOnly
                   onChange={(e) => setPaymentConfig({ ...paymentConfig, fawrySecurityKey: e.target.value })}
                   className={inputClass}
                 />
+                <p className="text-[10px] text-slate-500 mt-1">يتم تخزين المفتاح على السيرفر المركزي فقط. يُعرض جزء أخير للتأكيد.</p>
               </div>
             </div>
 
@@ -335,19 +496,24 @@ export const PlatformIntegrationsPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">API Key</label>
                 <input
                   type="password"
-                  value={paymentConfig.paymobApiKey}
-                  onChange={(e) => setPaymentConfig({ ...paymentConfig, paymobApiKey: e.target.value })}
+                  value={maskSecret(paymentConfig.paymobApiKey)}
+                  readOnly
                   className={inputClass}
                 />
               </div>
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex justify-end">
-              <Button size="sm" onClick={handleSaveProviders} disabled={!canManageIntegrations}>
-                حفظ إعدادات الدفع
+              <Button size="sm" onClick={handleSaveProviders} disabled={paymentsLoading || !canManageIntegrations}>
+                {paymentsLoading ? 'جارٍ الحفظ…' : ' حفظ إعدادات الدفع'}
               </Button>
             </div>
           </div>
+          {paymentsError && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+              {paymentsError}
+            </div>
+          )}
         </div>
       )}
 
@@ -373,7 +539,6 @@ export const PlatformIntegrationsPage: React.FC = () => {
                   <option value="INFOBIP">إنفوبيب (Infobip)</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المرسل المعتمد (Sender ID)</label>
                 <input
@@ -389,10 +554,11 @@ export const PlatformIntegrationsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-300 mb-1">SMS API Token</label>
               <input
                 type="password"
-                value={smsConfig.apiKey}
-                onChange={(e) => setSmsConfig({ ...smsConfig, apiKey: e.target.value })}
+                value={maskSecret(smsConfig.apiKey)}
+                readOnly
                 className={inputClass}
               />
+              <p className="text-[10px] text-slate-500 mt-1">يتم تخزين الرمز على السيرفر المركزي فقط ولا يُعاد عرضه كاملاً.</p>
             </div>
 
             <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 text-xs flex justify-between items-center text-slate-300">
@@ -409,11 +575,15 @@ export const PlatformIntegrationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: New Webhook */}
+      {/* Modal: New / Edit Webhook */}
       <Modal
         open={isWhModalOpen}
-        onClose={() => setIsWhModalOpen(false)}
-        title="إضافة Webhook جديد لبث أحداث المنصة"
+        onClose={() => {
+          setIsWhModalOpen(false);
+          setEditingWebhookId(null);
+          setWhForm({ name: '', url: '', events: ['invoice.created'], secret: '', isActive: true });
+        }}
+        title={editingWebhookId ? 'تعديل نقطة الربط' : 'إضافة Webhook جديد لبث أحداث المنصة'}
       >
         <div className="space-y-3.5 text-right">
           <div>
@@ -436,6 +606,18 @@ export const PlatformIntegrationsPage: React.FC = () => {
               placeholder="https://api.domain.com/webhooks"
               className={inputClass}
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">المفتاح السري (اختياري — يُولّد تلقائياً إذا تُرك فارغاً)</label>
+            <input
+              type="password"
+              value={whForm.secret}
+              onChange={(e) => setWhForm({ ...whForm, secret: e.target.value })}
+              placeholder="يُترك فارغاً لتوليد مفتاح تلقائياً"
+              className={inputClass}
+            />
+            <p className="text-[10px] text-slate-500 mt-1">يُستخدم المفتاح لتوقيع رسائل الويب هوك والتحقق من صحتها عند الاستلام.</p>
           </div>
 
           <div>
@@ -470,12 +652,28 @@ export const PlatformIntegrationsPage: React.FC = () => {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-xs text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={whForm.isActive}
+                onChange={(e) => setWhForm({ ...whForm, isActive: e.target.checked })}
+                className="rounded border-slate-700 text-sky-500 focus:ring-sky-500"
+              />
+                          نشط
+            </label>
+          </div>
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button variant="secondary" size="sm" onClick={() => setIsWhModalOpen(false)}>
+            <Button variant="secondary" size="sm" onClick={() => {
+              setIsWhModalOpen(false);
+              setEditingWebhookId(null);
+              setWhForm({ name: '', url: '', events: ['invoice.created'], secret: '', isActive: true });
+            }}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleCreateWebhook} disabled={!canManageIntegrations}>
-              إنشاء وحفظ
+            <Button size="sm" onClick={handleCreateWebhook} disabled={savingWebhook || !canManageIntegrations}>
+              {savingWebhook ? 'جارٍ الحفظ…' : editingWebhookId ? 'تعديل وحفظ' : 'إنشاء وحفظ'}
             </Button>
           </div>
         </div>

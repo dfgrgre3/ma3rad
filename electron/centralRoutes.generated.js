@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 39 allowlisted endpoint pattern(s).
+ * 49 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -199,6 +199,71 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/audit/:id",
     "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/invoices",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/jobs",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/integrations/webhooks",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/integrations/webhooks/:id",
+    "methods": [
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/integrations/webhooks/:id/test",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/notifications/templates",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/notifications",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/backups",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/config/feature-permissions",
+    "methods": [
+      "GET",
+      "PUT"
     ]
   },
   {

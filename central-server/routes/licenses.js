@@ -10,7 +10,7 @@ const {
   generateActivationCode,
 } = require('../lib/signing');
 const { recordAuditEvent } = require('../lib/audit');
-const { authenticatePlatformUser, requirePlatformPermission } = require('../middleware/auth');
+const { authenticatePlatformUser, requirePlatformPermission, requireTenantScope, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -33,14 +33,19 @@ router.get(
     try {
       const db = getDb();
       const { search = '', status = '' } = req.query;
+      const scoped = await getScopedTenantIds(req);
+      if (Array.isArray(scoped) && scoped.length === 0) {
+        return res.json([]);
+      }
+      const scopePredicate = tenantScopePredicate('l.tenant_id', scoped);
       let sql = `
         SELECT l.*, t.name AS tenantName, p.name AS planName
         FROM platform_licenses l
         JOIN platform_tenants t ON t.id = l.tenant_id
         LEFT JOIN platform_plans p ON p.id = l.plan_id
-        WHERE 1=1
+        WHERE 1=1${scopePredicate.clause}
       `;
-      const params = [];
+      const params = [...scopePredicate.params];
 
       if (search) {
         sql += " AND (t.name LIKE ? OR l.license_key LIKE ? OR COALESCE(l.hardware_id,'') LIKE ?)";
@@ -64,6 +69,7 @@ router.post(
   '/issue',
   authenticatePlatformUser,
   requirePlatformPermission(['platform.licenses.create', 'platform.licenses.manage']),
+  requireTenantScope(),
   async (req, res, next) => {
     try {
       const db = getDb();
@@ -232,6 +238,7 @@ router.post(
 
       const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
       const base = license.expires_at && new Date(license.expires_at) > new Date()
         ? new Date(license.expires_at)
@@ -309,6 +316,7 @@ router.post(
 
       const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
       await db.run(
         `UPDATE platform_licenses SET status = 'SUSPENDED', updated_at = ? WHERE id = ?`,
@@ -353,6 +361,7 @@ router.post(
 
       const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
       await db.run(
         `UPDATE platform_licenses SET status = 'REVOKED', updated_at = ? WHERE id = ?`,
@@ -401,6 +410,7 @@ router.post(
 
       const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
       await db.run(
         `UPDATE platform_licenses SET hardware_id = ?, transfer_count = transfer_count + 1, updated_at = ? WHERE id = ?`,
@@ -473,6 +483,7 @@ router.post(
 
       const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
       const previousMode = license.coupling_mode || 'FULL';
       await db.run(

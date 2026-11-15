@@ -46,6 +46,29 @@ router.post(
         return res.status(400).json({ error: 'Username and password are required' });
       }
 
+      const actorRole = req.platformUser?.role;
+      const isOwner = actorRole === 'SUPER_ADMIN' || actorRole === 'OWNER';
+      if ((role === 'SUPER_ADMIN' || role === 'OWNER') && !isOwner) {
+        return res.status(403).json({ error: 'Only the platform owner can create or upgrade to a super admin account' });
+      }
+      if (role === 'SUPER_ADMIN' || role === 'OWNER') {
+        // There can only ever be one platform owner account; minting a
+        // second one — even by the owner — is blocked at the API layer.
+        const existingOwner = await db.get(
+          `SELECT id FROM platform_users
+           WHERE role IN ('SUPER_ADMIN','OWNER') AND deleted_at IS NULL AND is_active = 1
+           LIMIT 1`
+        );
+        if (existingOwner) {
+          return res.status(409).json({ error: 'A platform owner account already exists; a second owner cannot be created' });
+        }
+      }
+      // Never allow granting wildcard permission via API except by an existing owner
+      const requestedPerms = Array.isArray(permissions) ? permissions : [];
+      if (requestedPerms.includes('*') && !isOwner) {
+        return res.status(403).json({ error: 'Wildcard permission cannot be granted' });
+      }
+
       const existing = await db.get('SELECT 1 FROM platform_users WHERE username = ?', [String(username).trim()]);
       if (existing) {
         return res.status(400).json({ error: 'Username already exists' });

@@ -214,6 +214,8 @@ export const PLATFORM_PERMISSION_SECTIONS: PlatformPermissionSection[] = [
       std('backups', 'create', 'إنشاء نسخة احتياطية'),
       std('backups', 'approve', 'اعتماد الاستعادة'),
       std('backups', 'export', 'تصدير / تنزيل نسخة'),
+      std('backups', 'delete', 'حذف نسخة احتياطية'),
+      special('backups', 'restore', 'استعادة نسخة احتياطية'),
     ],
   },
   {

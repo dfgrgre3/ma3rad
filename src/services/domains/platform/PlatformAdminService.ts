@@ -10,6 +10,8 @@ import { PLATFORM_ROLE_DEFINITIONS, PlatformAuthorizationService } from './Platf
 import { PLATFORM_PERMISSION_SECTIONS, STANDARD_ACTION_LABELS, PLATFORM_PERMISSION_CODES, PLATFORM_ALL_PERMISSION } from './platformPermissionCatalog';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformBootstrapService, type PlatformOwnerAuditEntry } from './PlatformBootstrapService';
+import { provisioningQueueService } from './ProvisioningQueueService';
+import { provisioningExecutorService } from './ProvisioningExecutorService';
 import type { User } from '../../../types';
 import type {
   PlatformActivationDetails,
@@ -311,8 +313,10 @@ function mapTenantUser(row: any): PlatformTenantUser {
     provisioningMode: row.provisioningMode ?? row.provisioning_mode ?? null,
     identityUserId: row.identityUserId ?? row.identity_user_id ?? null,
     scope: row.scope ?? null,
-    inviteCode: row.inviteCode ?? row.invite_code ?? null,
-    temporaryPassword: row.temporaryPassword ?? row.temporary_password ?? null,
+    // Never leak the stored bcrypt hashes through the mapped user. Plaintext
+    // activation secrets are returned exactly once by the create/reset calls.
+    inviteCode: null,
+    temporaryPassword: null,
     inviteExpiresAt: row.inviteExpiresAt ?? row.invite_expires_at ?? null,
     provisionedAt: row.provisionedAt ?? row.provisioned_at ?? null,
     lastError: row.lastError ?? row.last_error ?? null,
@@ -550,6 +554,38 @@ export class PlatformAdminService {
 
   public static requirePlatformOwner(): User {
     return PlatformAdminService.owner();
+  }
+
+  // ─── Central-admin migration switch ────────────────────────────────────────
+  // `platform.dataSource` controls whether Super Admin screens read/write through
+  // the local PlatformAdminService ('local') or the central server ('central').
+  // Defaults to 'local' for backward compatibility until each center is migrated.
+  public getDataSource(): 'local' | 'central' {
+    const value = this.setting('platform.dataSource', 'local');
+    return value === 'central' ? 'central' : 'local';
+  }
+
+  public setDataSource(value: 'local' | 'central'): void {
+    PlatformAdminService.requirePlatformOwner();
+    const normalized: 'local' | 'central' = value === 'central' ? 'central' : 'local';
+    const existing = this.db.query<{ value: string }>(
+      'SELECT value FROM platform_settings WHERE key = ?',
+      ['platform.dataSource']
+    )[0];
+    if (existing) {
+      this.db.run(
+        'UPDATE platform_settings SET value = ?, updated_at = ? WHERE key = ?',
+        [normalized, nowIso(), 'platform.dataSource']
+      );
+    } else {
+      this.db.run(
+        'INSERT INTO platform_settings (key, value, updated_at) VALUES (?, ?, ?)',
+        ['platform.dataSource', normalized, nowIso()]
+      );
+    }
+    this.audit('تغيير مصدر بيانات المنصة', 'PLATFORM_SETTING', 'platform.dataSource', {
+      value: normalized,
+    });
   }
 
   /**
@@ -1013,7 +1049,8 @@ export class PlatformAdminService {
       );
       return new Set(rows.map((r) => String(r.tenantId)));
     } catch {
-      return null;
+      // Fail closed: empty set means no tenants accessible.
+      return new Set();
     }
   }
 
@@ -2934,7 +2971,9 @@ export class PlatformAdminService {
     const username = this.uniqueTenantUsername(tenantId, preferredUsername);
 
     const id = `tusr_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const identityUserId = provisionIdentity ? `ident_${uuidv4().replace(/-/g, '').slice(0, 16)}` : null;
+    // The identity user id belongs to the tenant's identity system, never to
+    // us to invent — it is filled in only when provisioning actually succeeds.
+    const identityUserId = null;
     const inviteCode = provisionIdentity ? generateActivationCode() : null;
     const temporaryPassword = provisionIdentity
       ? (input.password?.trim() || generateTemporaryPassword())
@@ -2944,12 +2983,16 @@ export class PlatformAdminService {
     }
     const inviteExpiresAt = provisionIdentity ? addDays(new Date(), 14).toISOString() : null;
     const now = nowIso();
+    // Store only hashed forms of activation secrets; plaintext is returned once.
+    const storedInviteCode = inviteCode ? bcrypt.hashSync(inviteCode, 10) : null;
+    const storedTemporaryPassword = temporaryPassword ? bcrypt.hashSync(temporaryPassword, 10) : null;
+    // DIRECT_CREATE no longer claims PROVISIONED without a real identity account.
     const provisioningStatus = provisionIdentity
-      ? (provisioningMode === 'DIRECT_CREATE' ? 'PROVISIONED' : 'INVITED')
+      ? (provisioningMode === 'DIRECT_CREATE' ? 'PENDING' : 'INVITED')
       : 'DIRECTORY_ONLY';
-    const provisionedAt = provisioningMode === 'DIRECT_CREATE' && provisionIdentity ? now : null;
+    const provisionedAt = null;
     const status = provisionIdentity
-      ? (provisioningMode === 'DIRECT_CREATE' ? 'ACTIVE' : 'INVITED')
+      ? 'INVITED'
       : requestedStatus;
 
     // Reliable provisioning record: persist identity linkage + invite/create intent
@@ -2975,8 +3018,8 @@ export class PlatformAdminService {
         provisionIdentity ? provisioningMode : null,
         identityUserId,
         scope,
-        inviteCode,
-        temporaryPassword,
+        storedInviteCode,
+        storedTemporaryPassword,
         inviteExpiresAt,
         provisionedAt,
         now,
@@ -3016,7 +3059,7 @@ export class PlatformAdminService {
       : provisioningMode === 'DIRECT_CREATE'
         ? 'تم إنشاء طلب حساب الهوية الفعلي وربطه بالعميل مع الدور والنطاق.'
         : 'تم إنشاء دعوة حساب هوية فعلية للعميل وربطها بالعميل مع الدور والنطاق. شارك كود الدعوة وكلمة المرور المؤقتة لإكمال التفعيل.';
-    return { user, inviteCode, temporaryPassword, provisioned: provisioningStatus === 'PROVISIONED', message };
+    return { user, inviteCode, temporaryPassword, provisioned: false, message };
   }
 
   public updateTenantUser(id: string, input: PlatformTenantUserInput): PlatformTenantUser {
@@ -3140,7 +3183,7 @@ export class PlatformAdminService {
        SET provisioning_status = 'INVITED', provisioning_mode = COALESCE(provisioning_mode, 'INVITE'),
            invite_code = ?, temporary_password = ?, invite_expires_at = ?, last_error = NULL, updated_at = ?
        WHERE id = ?`,
-      [inviteCode, temporaryPassword, inviteExpiresAt, now, id]
+      [bcrypt.hashSync(inviteCode, 10), bcrypt.hashSync(temporaryPassword, 10), inviteExpiresAt, now, id]
     );
     this.recordTenantUserProvisioningEvent(existing.tenantId, id, 'INVITE_RESENT', {
       identityUserId: existing.identityUserId ?? null,
@@ -3204,6 +3247,14 @@ export class PlatformAdminService {
     } catch {
       // Audit/provisioning event recording must not block core persistence.
     }
+    // Enqueue a real execution job so provisioning is not only an audit entry.
+    try {
+      provisioningQueueService.enqueue(tenantId, tenantUserId, event, payload);
+    } catch {
+      // Queueing must not block core persistence.
+    }
+    // Kick the executor (fire-and-forget, internally guarded against re-entry).
+    provisioningExecutorService.requestDrain();
   }
 
   // ─── Licenses ──────────────────────────────────────────────────────────────
@@ -4236,12 +4287,25 @@ export class PlatformAdminService {
     };
   } {
     PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.export');
+    // Exports are read operations too: a LIMITED staff member may never pull
+    // other tenants' compliance data, even without a tenantId filter.
+    const scoped = this.getScopedTenantIds();
+    if (scoped && filters.tenantId) {
+      this.assertTenantScope(filters.tenantId);
+    }
+    const scopeClause = !filters.tenantId && scoped
+      ? (scoped.size === 0
+          ? ' AND 1=0'
+          : ` AND l.tenant_id IN (${[...scoped].map(() => '?').join(',')})`)
+      : '';
+    const scopeParams = !filters.tenantId && scoped && scoped.size > 0 ? [...scoped] : [];
 
     const tenantFilter = filters.tenantId ? ` AND l.tenant_id = ?` : '';
     const dateFilter = filters.dateFrom ? ` AND l.created_at >= ?` : '';
     const dateFilterTo = filters.dateTo ? ` AND l.created_at <= ?` : '';
     const params: any[] = [];
     if (filters.tenantId) params.push(filters.tenantId);
+    params.push(...scopeParams);
     if (filters.dateFrom) params.push(filters.dateFrom);
     if (filters.dateTo) params.push(filters.dateTo);
 
@@ -4250,7 +4314,7 @@ export class PlatformAdminService {
       FROM platform_licenses l
       JOIN platform_tenants t ON t.id = l.tenant_id
       LEFT JOIN platform_plans p ON p.id = l.plan_id
-      WHERE 1=1 ${tenantFilter} ${dateFilter} ${dateFilterTo}
+      WHERE 1=1 ${tenantFilter} ${scopeClause} ${dateFilter} ${dateFilterTo}
       ORDER BY l.created_at DESC
     `, params);
 
@@ -4261,7 +4325,7 @@ export class PlatformAdminService {
         FROM platform_license_activations la
         JOIN platform_licenses l ON l.id = la.license_id
         JOIN platform_tenants t ON t.id = la.tenant_id
-        WHERE 1=1 ${tenantFilter} ${dateFilter} ${dateFilterTo}
+        WHERE 1=1 ${tenantFilter} ${scopeClause} ${dateFilter} ${dateFilterTo}
         ORDER BY la.created_at DESC
       `, params);
     }
@@ -4273,7 +4337,7 @@ export class PlatformAdminService {
         FROM platform_license_changes lc
         JOIN platform_licenses l ON l.id = lc.license_id
         JOIN platform_tenants t ON t.id = l.tenant_id
-        WHERE 1=1 ${tenantFilter} ${dateFilter} ${dateFilterTo}
+        WHERE 1=1 ${tenantFilter} ${scopeClause} ${dateFilter} ${dateFilterTo}
         ORDER BY lc.created_at DESC
       `, params);
     }
@@ -7737,7 +7801,9 @@ export class PlatformAdminService {
   }
 
   public async triggerCentralBackup(): Promise<PlatformCentralBackup> {
-    PlatformAdminService.requirePlatformAccess('backups', 'platform.backups.view');
+    // Creating a backup is a write operation — it requires the create
+    // permission, not merely the ability to view the backup list.
+    PlatformAdminService.requirePlatformAccess('backups', 'platform.backups.create');
     const createBackup = typeof window !== 'undefined' ? window.ceramisys?.db?.backup : undefined;
     if (!createBackup) {
       throw new Error('إنشاء نسخة احتياطية للمنصة يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
@@ -7805,6 +7871,27 @@ export class PlatformAdminService {
       createdAt: now,
       verifiedAt: integrityCheckPassed ? now : undefined,
     };
+  }
+
+  /**
+   * Delete the central backup *record*. The backup file itself lives on the
+   * storage target (local/offsite) and is intentionally not unlinked here —
+   * file deletion on the offsite target is an operator action, recorded in
+   * the audit log either way.
+   */
+  public deleteCentralBackup(id: string): void {
+    PlatformAdminService.requirePlatformAccess('backups', 'platform.backups.delete');
+    const row = this.db.query<any>('SELECT * FROM platform_central_backups WHERE id = ?', [id])[0];
+    if (!row) throw new Error('سجل النسخة الاحتياطية غير موجود.');
+
+    this.db.run('DELETE FROM platform_central_backups WHERE id = ?', [id]);
+    this.audit(
+      'حذف سجل نسخة احتياطية مركزية',
+      'CENTRAL_BACKUP',
+      id,
+      { filename: row.filename, storageLocation: row.storage_location, fileRemoved: false },
+      { severity: 'WARNING' },
+    );
   }
 
   public listServiceIncidents(status?: 'OPEN' | 'RESOLVED'): PlatformServiceIncident[] {

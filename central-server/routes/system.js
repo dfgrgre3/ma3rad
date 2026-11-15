@@ -10,7 +10,7 @@ const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { getVerifyingKey, getKeyId } = require('../lib/signing');
 const { verifyAuditChain } = require('../lib/audit');
-const { authenticatePlatformUser, requirePlatformPermission } = require('../middleware/auth');
+const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -134,6 +134,17 @@ router.get(
 
       const clauses = [];
       const params = [];
+      const scoped = await getScopedTenantIds(req);
+      if (Array.isArray(scoped)) {
+        if (scoped.length === 0) {
+          return res.json({ data: [], meta: { total: 0, page, limit }, requestId: req.requestId });
+        }
+        if (tenantId && !scoped.includes(String(tenantId))) {
+          return res.status(403).json({ error: 'Tenant is outside your data scope' });
+        }
+        clauses.push(`tenant_id IN (${scoped.map(() => '?').join(',')})`);
+        params.push(...scoped);
+      }
       if (action) { clauses.push('action = ?'); params.push(action); }
       if (actorId) { clauses.push('actor_id = ?'); params.push(actorId); }
       if (tenantId) { clauses.push('tenant_id = ?'); params.push(tenantId); }
@@ -173,6 +184,12 @@ router.get(
   requirePlatformPermission(['platform.audit.view']),
   async (req, res, next) => {
     try {
+      // Cross-tenant integrity check cannot be limited to a subset of
+      // tenants; scoped staff are denied rather than shown global state.
+      const scoped = await getScopedTenantIds(req);
+      if (Array.isArray(scoped)) {
+        return res.status(403).json({ error: 'Audit verification requires full tenant scope' });
+      }
       const fromSequence = Math.max(1, Number(req.query.fromSequence) || 1);
       const limit = req.query.limit ? Math.min(100000, Math.max(1, Number(req.query.limit))) : null;
       const result = await verifyAuditChain({ fromSequence, limit });
@@ -192,6 +209,7 @@ router.get(
       const db = getDb();
       const row = await db.get('SELECT * FROM platform_audit_events WHERE id = ?', [req.params.id]);
       if (!row) return res.status(404).json({ error: 'Audit event not found' });
+      if (!(await assertTenantAccess(req, res, row.tenant_id))) return;
       res.json({ data: mapAuditRow(row), requestId: req.requestId });
     } catch (err) {
       next(err);

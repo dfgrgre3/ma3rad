@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { identityLinkService } from './IdentityLinkService';
 
 /**
  * One-time secure bootstrap for the platform owner account.
@@ -240,6 +241,7 @@ export class PlatformBootstrapService {
       );
     });
 
+    identityLinkService.link({ platformStaffId: staffId, erpUserId: userId, linkType: 'PLATFORM_OWNER' });
     return { staffId, userId, username, email, claimedSeededRow: Boolean(seeded) };
   }
 

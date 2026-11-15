@@ -1,67 +1,156 @@
 import React from 'react';
-import { GRANULAR_PERMISSIONS, PAGE_VIEW_PERMISSIONS } from '../../config/permissionMatrix';
+import { GRANULAR_PERMISSIONS } from '../../config/permissionMatrix';
 import { ROUTE_PERMISSIONS } from '../../config/routePermissions';
-import { readCachedCentralConfig } from '../../services/domains/licensing/centralConfigStore';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import type { TenantFeaturePermissions } from '../../services/domains/platform/PlatformAdminApiClient';
 
-function setHiddenMenus(menus: string[]) {
-  try {
-    const cfg = readCachedCentralConfig() || {};
-    cfg.config = cfg.config || {};
-    cfg.config.hiddenMenus = menus;
-    localStorage.setItem('central_cached_config', JSON.stringify(cfg));
-  } catch {}
-}
-
+/**
+ * منصة المستخدمين — الصفحات والصلاحيات.
+ *
+ * The hide/show rules configured here are persisted on the **central server**
+ * (tenant_feature_config) through the Electron bridge — never in localStorage.
+ * Enforcement does not stop at hiding a menu entry:
+ *   - Tenant ERPs consume hiddenMenus / disabledPermissions / featurePermissions
+ *     from the cached central licence config at activation/validation time.
+ *   - The platform console enforces its own RBAC on the central server
+ *     (requirePlatformPermission / requireTenantScope) and locally in
+ *     PlatformAdminService (granular permission matrix, deny-by-default).
+ *   - Per-user grants/denies are stored on the staff account
+ *     (permissionsOverride) and enforced by PlatformAuthorizationService.
+ */
 export const PlatformUserPlatformPermissionsPage: React.FC = () => {
   const [tenantKey, setTenantKey] = React.useState<string>('global');
-  const storageKey = `hiddenMenus:${tenantKey}`;
-  const [hidden, setHidden] = React.useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; }
+  const [featurePermissions, setFeaturePermissions] = React.useState<TenantFeaturePermissions>({
+    hiddenMenus: [],
+    disabledPermissions: [],
+    featurePermissions: [],
   });
+  const [disabledPermissionsText, setDisabledPermissionsText] = React.useState('');
+  const [featurePermissionsText, setFeaturePermissionsText] = React.useState('[]');
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
+
+  const scope = React.useMemo(() => {
+    const value = tenantKey.trim();
+    if (!value || value === 'global') return { tenantId: null as string | null, planId: null as string | null };
+    if (value.startsWith('plan:')) return { tenantId: null, planId: value.slice(5) };
+    return { tenantId: value, planId: null };
+  }, [tenantKey]);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await centralPlatformClient.getFeaturePermissions(scope);
+      setFeaturePermissions(data);
+      setDisabledPermissionsText(data.disabledPermissions.join('\n'));
+      setFeaturePermissionsText(JSON.stringify(data.featurePermissions, null, 2));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'تعذر قراءة إعدادات الصلاحيات من السيرفر المركزي.');
+    } finally {
+      setLoading(false);
+    }
+  }, [scope]);
+
   React.useEffect(() => {
-    try { setHidden(JSON.parse(localStorage.getItem(storageKey) || '[]')); } catch { setHidden([]); }
-  }, [storageKey]);
-  const toggleHide = (path: string) => {
-    const next = hidden.includes(path) ? hidden.filter((p) => p !== path) : [...hidden, path];
-    setHidden(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
-    if (tenantKey === 'global') setHiddenMenus(next);
+    void load();
+  }, [load]);
+
+  const toggleHidden = (path: string) => {
+    setFeaturePermissions((prev) => {
+      const next = prev.hiddenMenus.includes(path)
+        ? prev.hiddenMenus.filter((p) => p !== path)
+        : [...prev.hiddenMenus, path];
+      return { ...prev, hiddenMenus: next };
+    });
   };
 
-  // Group granular permissions by their route/page.
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const parsedFeature = (() => {
+        try {
+          const parsed = JSON.parse(featurePermissionsText || '[]');
+          return Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          throw new Error('صيغة featurePermissions ليست JSON صالحة.');
+        }
+      })();
+      const disabledPermissions = disabledPermissionsText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+      await centralPlatformClient.setFeaturePermissions({
+        ...scope,
+        hiddenMenus: featurePermissions.hiddenMenus,
+        disabledPermissions,
+        featurePermissions: parsedFeature,
+      });
+      setNotice('تم حفظ إعدادات صلاحيات العميل/الخطة على السيرفر المركزي.');
+      await load();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'تعذر حفظ الإعدادات على السيرفر المركزي.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hiddenRouteRules = React.useMemo(
+    () => ROUTE_PERMISSIONS.map((rule) => ({ rule, hidden: featurePermissions.hiddenMenus.includes(rule.path) })),
+    [featurePermissions.hiddenMenus],
+  );
+
   const byRoute = React.useMemo(() => {
-    const map = new Map<string, { module: string; label: string; perms: typeof GRANULAR_PERMISSIONS[number][] }>();
+    const map = new Map<string, { module: string; perms: typeof GRANULAR_PERMISSIONS[number][] }>();
     for (const p of GRANULAR_PERMISSIONS) {
       const key = p.route || '(بدون مسار)';
-      if (!map.has(key)) map.set(key, { module: p.module, label: key, perms: [] });
+      if (!map.has(key)) map.set(key, { module: p.module, perms: [] });
       map.get(key)!.perms.push(p);
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ar'));
   }, []);
-
-  const routeRules = React.useMemo(() => ROUTE_PERMISSIONS, []);
 
   return (
     <div className="space-y-6" dir="rtl">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-bold text-slate-900">منصة المستخدمين — صفحات وصلاحيات</h1>
         <p className="mt-1 text-sm text-slate-600">
-          عرض كامل لجميع صفحات منصة المستخدمين وكل الصلاحيات (صفحة/إجراء/قسم/حقل) على كل صفحة. متاح لمالك المنصة فقط.
+          عرض كامل لجميع صفحات المنصة وكل الصلاحيات على كل صفحة، مع التحكم الفعلي في ظهور القوائم
+          وتعطيل الصلاحيات على مستوى العميل أو الخطة — محفوظ على السيرفر المركزي، وليس على هذا الجهاز.
         </p>
-        <div className="mt-3 flex items-center gap-2 text-sm">
+        <p className="mt-1 text-xs text-slate-500">
+          الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين» (grant/deny لكل حساب)، وعلى مستوى
+          الدور من مصفوفة الصلاحيات. الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي
+          (requirePlatformPermission / requireTenantScope) وفي خدمة التفويض المحلية.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <label className="font-semibold text-slate-700">مفتاح عميل/خطة:</label>
           <input
             value={tenantKey}
             onChange={(e) => setTenantKey(e.target.value || 'global')}
             className="rounded border border-slate-300 px-2 py-1 text-xs"
-            placeholder="global أو tenantId أو planId"
+            placeholder="global أو tenantId أو plan:<planId>"
           />
-          <span className="text-xs text-slate-500">(تجريبي: يُخزَّن محليًا؛ للمركزي لازم backend)</span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {loading ? 'جارٍ التحميل…' : 'إعادة التحميل'}
+          </button>
         </div>
+        {error && <div role="alert" className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</div>}
+        {notice && <div role="status" className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{notice}</div>}
         <div className="mt-3 flex gap-4 text-xs text-slate-500">
-          <span>صفحات (مسارات): {byRoute.length}</span>
-          <span>صلاحيات: {GRANULAR_PERMISSIONS.length}</span>
-          <span>قواعد مسار: {routeRules.length}</span>
+          <span>مسارات مخفية لهذا النطاق: {featurePermissions.hiddenMenus.length}</span>
+          <span>صلاحيات معطلة: {featurePermissions.disabledPermissions.length}</span>
+          <span>صلاحيات (featurePermissions): {featurePermissions.featurePermissions.length}</span>
         </div>
       </header>
 
@@ -78,18 +167,61 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {routeRules.map((r, i) => (
+              {hiddenRouteRules.map(({ rule, hidden }, i) => (
                 <tr key={i} className="border-t border-slate-100">
                   <td className="px-3 py-1 text-center">
-                    <input type="checkbox" checked={!hidden.includes(r.path)} onChange={() => toggleHide(r.path)} />
+                    <input type="checkbox" checked={!hidden} onChange={() => toggleHidden(rule.path)} aria-label={`إظهار ${rule.path}`} />
                   </td>
-                  <td className="px-3 py-1 font-mono">{r.path}</td>
-                  <td className="px-3 py-1">{(r.all || []).join(', ')}</td>
-                  <td className="px-3 py-1">{(r.any || []).join(', ')}</td>
+                  <td className="px-3 py-1 font-mono">{rule.path}</td>
+                  <td className="px-3 py-1">{(rule.all || []).join(', ')}</td>
+                  <td className="px-3 py-1">{(rule.any || []).join(', ')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="disabled-permissions" className="mb-1 block text-xs font-semibold text-slate-700">
+              الصلاحيات المعطلة (كود صلاحية في كل سطر)
+            </label>
+            <textarea
+              id="disabled-permissions"
+              value={disabledPermissionsText}
+              onChange={(e) => setDisabledPermissionsText(e.target.value)}
+              rows={6}
+              dir="ltr"
+              className="w-full rounded border border-slate-300 p-2 font-mono text-xs"
+              placeholder={'sales.create\ninventory.view'}
+            />
+          </div>
+          <div>
+            <label htmlFor="feature-permissions" className="mb-1 block text-xs font-semibold text-slate-700">
+              featurePermissions (JSON)
+            </label>
+            <textarea
+              id="feature-permissions"
+              value={featurePermissionsText}
+              onChange={(e) => setFeaturePermissionsText(e.target.value)}
+              rows={6}
+              dir="ltr"
+              className="w-full rounded border border-slate-300 p-2 font-mono text-xs"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] text-slate-500">
+            يحفظ إلى tenant_feature_config على السيرفر المركزي (PUT /api/v1/admin/config/feature-permissions).
+            يتطلب صلاحية platform.app-configuration.update — إخفاء القائمة وحده ليس حماية للـ API.
+          </p>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving || loading}
+            className="shrink-0 rounded bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {saving ? 'جارٍ الحفظ…' : 'حفظ على السيرفر المركزي'}
+          </button>
         </div>
       </section>
 

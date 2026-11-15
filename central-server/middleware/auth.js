@@ -117,6 +117,59 @@ function requirePlatformPermission(requiredPermission) {
 const requireAnyPermission = (codes) => requirePlatformPermission(codes);
 
 /**
+ * Returns null when the caller is unrestricted (ALL scope or legacy full
+ * access), otherwise the explicit list of tenant ids the staff member may
+ * touch. An empty array means LIMITED scope with no tenants assigned — the
+ * caller must see nothing (fail closed), never everything.
+ */
+async function getScopedTenantIds(req) {
+  if (!req.platformUser) return [];
+  const db = getDb();
+  const scopes = await getTenantScopes(db, req.platformUser.id);
+  if (scopes.dataScope === 'ALL' || scopes.tenantIds.includes('*')) return null;
+  return scopes.tenantIds.map(String);
+}
+
+/**
+ * Assert the caller may access a specific tenant. Sends the 403 response and
+ * records TENANT_SCOPE_DENIED when access is denied; returns true when access
+ * is allowed. Every read/write path that touches tenant data must call this
+ * (or filter with getScopedTenantIds) — failing closed, never open.
+ */
+async function assertTenantAccess(req, res, tenantId) {
+  const scoped = await getScopedTenantIds(req);
+  if (!scoped) return true;
+  const normalized = tenantId == null ? '' : String(tenantId);
+  if (normalized && scoped.includes(normalized)) return true;
+  await recordAuditEvent({
+    actorId: req.platformUser.id,
+    actorName: req.platformUser.full_name,
+    tenantId: normalized || null,
+    action: 'TENANT_SCOPE_DENIED',
+    resourceType: 'platform_tenants',
+    resourceId: normalized || null,
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+  res.status(403).json({ error: 'Tenant is outside your data scope' });
+  return false;
+}
+
+/**
+ * Append a tenant scope predicate to a SQL WHERE clause.
+ * Returns { clause, params } where clause is either '' (unrestricted) or
+ * 'AND <column> IN (...)' with matching params. Callers must pass the tenant
+ * column they are querying. When scope is LIMITED and empty, `deny: true`
+ * is returned so the handler can short-circuit with an empty result set.
+ */
+function tenantScopePredicate(column, scoped) {
+  if (!scoped) return { clause: '', params: [], deny: false };
+  if (scoped.length === 0) return { clause: '', params: [], deny: true };
+  const placeholders = scoped.map(() => '?').join(',');
+  return { clause: ` AND ${column} IN (${placeholders})`, params: [...scoped], deny: false };
+}
+
+/**
  * Limit a staff member with data_scope=LIMITED to the tenant ids in
  * platform_scopes. Tenant id is read from params, body or query.
  */
@@ -124,26 +177,15 @@ function requireTenantScope(options = {}) {
   const param = options.param || 'tenantId';
   return async (req, res, next) => {
     if (!req.platformUser) return res.status(401).json({ error: 'Authentication required' });
-    const db = getDb();
-    const scopes = await getTenantScopes(db, req.platformUser.id);
-    if (scopes.dataScope === 'ALL' || scopes.tenantIds.includes('*')) return next();
+    const scoped = await getScopedTenantIds(req);
+    if (!scoped) return next();
 
     const tenantId = req.params?.[param] || req.body?.[param] || req.query?.[param];
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant id is required for scoped staff' });
     }
-    if (!scopes.tenantIds.includes(String(tenantId))) {
-      await recordAuditEvent({
-        actorId: req.platformUser.id,
-        actorName: req.platformUser.full_name,
-        tenantId: String(tenantId),
-        action: 'TENANT_SCOPE_DENIED',
-        resourceType: 'platform_tenants',
-        resourceId: String(tenantId),
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-      return res.status(403).json({ error: 'Tenant is outside your data scope' });
+    if (!scoped.includes(String(tenantId))) {
+      return assertTenantAccess(req, res, tenantId);
     }
     return next();
   };
@@ -157,5 +199,8 @@ module.exports = {
   requirePlatformPermission,
   requireAnyPermission,
   requireTenantScope,
+  getScopedTenantIds,
+  assertTenantAccess,
+  tenantScopePredicate,
   hasAnyPermission,
 };
