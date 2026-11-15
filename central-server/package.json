@@ -5,17 +5,20 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "generate:catalog": "node scripts/generate-catalog.mjs",
+    "generate:routes": "node scripts/generate-routes.mjs",
+    "test": "node --test test"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0",
-    "sqlite3": "^5.1.6",
-    "uuid": "^9.0.0",
     "bcryptjs": "^2.4.3",
-    "node-ed25519": "^1.1.0",
-    "cron": "^3.1.6",
-    "dotenv": "^16.3.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.0.0",
+    "node-cron": "^3.0.3",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
+    "uuid": "^9.0.0"
   }
 }

@@ -16,6 +16,26 @@ test('central IPC uses only the configured HTTPS origin and exact endpoint metho
     path: '/api/v1/licensing/validate',
     method: 'POST',
   }).origin, trusted, 'renderer-provided server URLs are ignored');
+  assert.equal(resolveCentralRequest(trusted, {
+    path: '/api/v1/admin/tenants?search=foo&status=ACTIVE',
+    method: 'GET',
+  }).href, `${trusted}/api/v1/admin/tenants?search=foo&status=ACTIVE`);
+
+  assert.equal(resolveCentralRequest(trusted, {
+    path: '/api/v1/admin/tenants',
+    method: 'POST',
+  }).href, `${trusted}/api/v1/admin/tenants`);
+
+  assert.equal(resolveCentralRequest(trusted, {
+    path: '/api/v1/admin/licenses/lic_123/renew',
+    method: 'POST',
+  }).href, `${trusted}/api/v1/admin/licenses/lic_123/renew`);
+
+  assert.throws(() => resolveCentralRequest(trusted, {
+    path: '/api/v1/admin/licenses/lic_123/renew',
+    method: 'GET',
+  }), /endpoint or method/i);
+
   assert.throws(() => resolveCentralRequest(trusted, {
     path: '/api/v1/licensing/validate?deviceCredential=secret',
     method: 'POST',
@@ -31,9 +51,12 @@ test('central IPC uses only the configured HTTPS origin and exact endpoint metho
 });
 
 test('central IPC rejects credential-bearing origins and unapproved headers', () => {
-  assert.throws(() => sanitizeCentralHeaders({ Authorization: 'not-allowed' }), /header is not allowed/i);
   assert.throws(() => sanitizeCentralHeaders({ 'X-Device-Credential': 'credential' }), /header is not allowed/i);
-  assert.deepEqual(sanitizeCentralHeaders({ 'X-Device-Id': 'device' }), { 'X-Device-Id': 'device' });
+  assert.throws(() => sanitizeCentralHeaders({ 'Cookie': 'session=abc' }), /header is not allowed/i);
+  assert.deepEqual(sanitizeCentralHeaders({ 'X-Device-Id': 'device', 'Authorization': 'Bearer token' }), {
+    'X-Device-Id': 'device',
+    'Authorization': 'Bearer token'
+  });
 });
 
 test('plain HTTP central API is accepted only on loopback in development', () => {

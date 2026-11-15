@@ -1,38 +1,33 @@
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-const CENTRAL_ENDPOINTS = new Map([
-  // ── Licensing / configuration / telemetry (existing) ─────────────────────
-  ['/api/v1/licensing/activate', 'POST'],
-  ['/api/v1/licensing/validate', 'POST'],
-  ['/api/v1/licensing/heartbeat', 'POST'],
-  ['/api/v1/configuration/establishment', 'GET'],
-  ['/api/v1/configuration/current', 'GET'],
-  ['/api/v1/configuration/public-key', 'GET'],
-  ['/api/v1/telemetry/errors', 'POST'],
-  ['/api/v1/releases', 'GET'],
-  // ── Platform admin (Phase 4 cutover; allowlisted now for Phase 0/2) ──────
-  ['/api/v1/admin/tenants', 'GET'],
-  ['/api/v1/admin/tenants', 'POST'],
-  ['/api/v1/admin/plans', 'GET'],
-  ['/api/v1/admin/licenses', 'GET'],
-  ['/api/v1/admin/licenses/issue', 'POST'],
-  ['/api/v1/admin/licenses/:id/renew', 'POST'],
-  ['/api/v1/admin/licenses/:id/suspend', 'POST'],
-  ['/api/v1/admin/licenses/:id/revoke', 'POST'],
-  ['/api/v1/admin/licenses/:id/transfer', 'POST'],
-  ['/api/v1/admin/licenses/:id/coupling', 'POST'],
-  ['/api/v1/admin/invoices', 'GET'],
-  ['/api/v1/admin/payments', 'POST'],
-  ['/api/v1/admin/audit', 'GET'],
-  ['/api/v1/admin/settings', 'GET'],
-  ['/api/v1/admin/settings', 'PUT'],
-  // ── Device management ────────────────────────────────────────────────────
-  ['/api/v1/admin/devices', 'GET'],
-  ['/api/v1/admin/devices/:id/suspend', 'POST'],
-  ['/api/v1/admin/devices/:id/release', 'POST'],
-  ['/api/v1/admin/devices/:id/revoke', 'POST'],
-  ['/api/v1/admin/devices/detect-clones', 'POST'],
-]);
+/**
+ * Route definitions are generated from the central server route manifest by
+ * `node central-server/scripts/generate-routes.mjs`. Do not hand-edit the
+ * generated file: add routes in central-server/routeManifest.js and regenerate.
+ *
+ * Pattern matching converts :param segments into a single URL segment matcher ([^/]+).
+ */
+const { ROUTE_DEFINITIONS } = require('./centralRoutes.generated');
+
+// Compiled routes with RegExp and Set of methods
+const COMPILED_ROUTES = ROUTE_DEFINITIONS.map(route => {
+  const regexStr = '^' + route.pattern.replace(/:[a-zA-Z0-9_]+/g, '([^/]+)') + '$';
+  return {
+    pattern: route.pattern,
+    regex: new RegExp(regexStr),
+    methods: new Set(route.methods.map(m => m.toUpperCase()))
+  };
+});
+
+// Backward compatibility map for existing consumers expecting CENTRAL_ENDPOINTS
+const CENTRAL_ENDPOINTS = new Map();
+for (const route of ROUTE_DEFINITIONS) {
+  for (const method of route.methods) {
+    CENTRAL_ENDPOINTS.set(`${method} ${route.pattern}`, method);
+    // Also store path alone with primary/last method if required
+    CENTRAL_ENDPOINTS.set(route.pattern, method);
+  }
+}
 
 function normalizeOrigin(value, allowLocalHttp) {
   let url;
@@ -43,19 +38,54 @@ function normalizeOrigin(value, allowLocalHttp) {
   return null;
 }
 
+/**
+ * Validates and matches a route against defined patterns.
+ * @param {string} pathname
+ * @param {string} method
+ * @returns {boolean}
+ */
+function isAllowedEndpoint(pathname, method) {
+  const upperMethod = String(method || 'GET').toUpperCase();
+  for (const route of COMPILED_ROUTES) {
+    if (route.regex.test(pathname) && route.methods.has(upperMethod)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function resolveCentralRequest(configuredUrl, request, allowLocalHttp = false) {
   const trustedOrigin = normalizeOrigin(configuredUrl, allowLocalHttp);
   if (!trustedOrigin) {
     throw new Error('Central API origin is not configured.');
   }
 
-  const path = request?.path;
+  const rawPath = request?.path;
   const method = String(request?.method || 'GET').toUpperCase();
-  if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('?') || path.includes('#') || path.includes('\\')) {
+  if (typeof rawPath !== 'string' || !rawPath.startsWith('/') || rawPath.startsWith('//') || rawPath.includes('#') || rawPath.includes('\\')) {
     throw new Error('Invalid central API path.');
   }
-  if (CENTRAL_ENDPOINTS.get(path) !== method) throw new Error('Central API endpoint or method is not allowed.');
-  return new URL(path, trustedOrigin);
+
+  // Parse path and query parameters safely
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(rawPath, trustedOrigin);
+  } catch {
+    throw new Error('Invalid central API path format.');
+  }
+
+  const pathname = parsedUrl.pathname;
+
+  // Protect sensitive endpoints from leaking credentials or arguments via query string
+  if (parsedUrl.search && pathname.startsWith('/api/v1/licensing/')) {
+    throw new Error('Licensing endpoints do not accept query parameters in path.');
+  }
+
+  if (!isAllowedEndpoint(pathname, method)) {
+    throw new Error('Central API endpoint or method is not allowed.');
+  }
+
+  return parsedUrl;
 }
 
 /** @returns {Record<string, string>} */
@@ -70,10 +100,17 @@ function sanitizeCentralHeaders(headers = {}) {
       throw new Error('Central API header is not allowed.');
     }
     if (normalized === 'content-type') safe['Content-Type'] = value;
-else if (normalized === 'x-device-id') safe['X-Device-Id'] = value;
-else if (normalized === 'authorization') safe['Authorization'] = value;
+    else if (normalized === 'x-device-id') safe['X-Device-Id'] = value;
+    else if (normalized === 'authorization') safe['Authorization'] = value;
   }
   return safe;
 }
 
-module.exports = { CENTRAL_ENDPOINTS, normalizeOrigin, resolveCentralRequest, sanitizeCentralHeaders };
+module.exports = {
+  CENTRAL_ENDPOINTS,
+  ROUTE_DEFINITIONS,
+  normalizeOrigin,
+  isAllowedEndpoint,
+  resolveCentralRequest,
+  sanitizeCentralHeaders
+};
