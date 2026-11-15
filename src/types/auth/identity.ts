@@ -1,6 +1,6 @@
 // Database Domain Types & Interfaces
 
-export type BuiltInUserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT';
+export type BuiltInUserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT';
 // `(string & {})` preserves autocomplete for the built-ins while allowing
 // admin-defined custom roles without a code change.
 export type UserRole = BuiltInUserRole | (string & {});

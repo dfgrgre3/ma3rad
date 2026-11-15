@@ -18,6 +18,7 @@ import {
   Monitor,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformBrandingConfig,
   PlatformBrandingVersion,
@@ -33,6 +34,7 @@ type PreviewMode = 'login' | 'invoice' | 'app';
 
 export const PlatformBrandingSettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<BrandingTab>('theme');
+  const canManageBranding = canPlatform('branding');
   const [previewMode, setPreviewMode] = useState<PreviewMode>('login');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>(''); // empty = master platform
@@ -125,6 +127,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   // Handle Save
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
     setSaving(true);
     setSavedSuccess(false);
     try {
@@ -168,6 +171,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
 
   // Handle Rollback
   const handleRollback = (ver: number) => {
+    if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع إعدادات الهوية للإصدار #${ver}؟`)) return;
     try {
       platformAdminService.rollbackTenantBranding(selectedTenantId || null, ver);
@@ -189,7 +193,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={saving || loading}
+              disabled={saving || loading || !canManageBranding}
             >
               <Save className="w-4 h-4 ml-2" />
               {saving ? 'جاري الحفظ...' : 'حفظ الهوية والتطبيق'}
@@ -596,15 +600,15 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
                           <div className="text-zinc-400 text-[11px] mt-0.5">{ver.changeSummary}</div>
                           <div className="text-zinc-500 text-[10px]">{formatDateTime(ver.createdAt)}</div>
                         </div>
-                        {ver.version !== currentVersion && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleRollback(ver.version)}
-                          >
-                            <RotateCcw className="w-3.5 h-3.5 ml-1" />
-                            استرجاع
-                          </Button>
+                        {ver.version !== currentVersion && canManageBranding && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleRollback(ver.version)}
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 ml-1" />
+                              استرجاع
+                            </Button>
                         )}
                       </div>
                     ))}

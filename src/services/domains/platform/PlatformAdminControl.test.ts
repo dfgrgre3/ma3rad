@@ -58,6 +58,10 @@ describe('Platform Admin Control & Staff RBAC Separation (Item 18)', () => {
       email: 'm.abdelrahim@gold-ceramics.com',
       role: 'ACCOUNTANT',
       status: 'ACTIVE',
+      provisioningStatus: 'INVITED',
+      provisioningMode: 'INVITE',
+      identityUserId: 'ident_tusr_101',
+      scope: 'BRANCH:main',
       createdAt: '2026-11-14T20:00:00Z',
       updatedAt: '2026-11-14T20:00:00Z',
     };
@@ -65,5 +69,7 @@ describe('Platform Admin Control & Staff RBAC Separation (Item 18)', () => {
     expect(tenantUser.tenantId).toBe('tenant_gold_ceramics');
     expect(tenantUser.role).toBe('ACCOUNTANT');
     expect(tenantUser.status).toBe('ACTIVE');
+    expect(tenantUser.provisioningStatus).toBe('INVITED');
+    expect(tenantUser.identityUserId).toBeTruthy();
   });
 });

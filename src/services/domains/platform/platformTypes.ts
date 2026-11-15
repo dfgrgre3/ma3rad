@@ -535,6 +535,14 @@ export interface PlatformOverview {
   } | null;
 }
 
+export type PlatformTenantUserProvisioningStatus =
+  | 'NOT_REQUESTED'
+  | 'PENDING'
+  | 'INVITED'
+  | 'PROVISIONED'
+  | 'FAILED'
+  | 'DIRECTORY_ONLY';
+
 export interface PlatformTenantUser {
   id: string;
   tenantId: string;
@@ -545,6 +553,16 @@ export interface PlatformTenantUser {
   role: string;
   status: 'ACTIVE' | 'SUSPENDED' | 'INVITED';
   notes?: string | null;
+  /** Directory/provisioning record is not a real tenant identity account until provisioned. */
+  provisioningStatus: PlatformTenantUserProvisioningStatus;
+  provisioningMode?: 'INVITE' | 'DIRECT_CREATE' | null;
+  identityUserId?: string | null;
+  scope?: string | null;
+  inviteCode?: string | null;
+  temporaryPassword?: string | null;
+  inviteExpiresAt?: string | null;
+  provisionedAt?: string | null;
+  lastError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -557,6 +575,22 @@ export interface PlatformTenantUserInput {
   role?: string;
   status?: 'ACTIVE' | 'SUSPENDED' | 'INVITED';
   notes?: string;
+  /** Provision/invite into tenant's actual identity system (default: true). */
+  provisionIdentity?: boolean;
+  /** INVITE = issue invite code/temp password; DIRECT_CREATE = create active account now. */
+  provisioningMode?: 'INVITE' | 'DIRECT_CREATE';
+  /** Role/scope in tenant identity system (e.g. branch scope or JSON). */
+  scope?: string;
+  /** Optional initial password for DIRECT_CREATE; otherwise generated. */
+  password?: string;
+}
+
+export interface PlatformTenantUserProvisioningResult {
+  user: PlatformTenantUser;
+  inviteCode?: string | null;
+  temporaryPassword?: string | null;
+  provisioned: boolean;
+  message: string;
 }
 
 export interface PlatformLicenseActivation {
@@ -1800,6 +1834,20 @@ export interface PlatformServerTelemetry {
   recordedAt: string;
 }
 
+export interface PlatformPolicyRetention {
+  auditRetentionDays: number;
+  backupRetentionDays: number;
+  syncLogRetentionDays: number;
+  softDeleteGraceDays: number;
+}
+
+export interface PlatformPolicySettings {
+  terms: string;
+  privacy: string;
+  retention: PlatformPolicyRetention;
+  updatedAt: string | null;
+}
+
 export interface PlatformCentralBackup {
   id: string;
   filename: string;
@@ -1901,6 +1949,10 @@ export interface PlatformStaff {
   permissionsOverride?: string[];
   isActive: boolean;
   lastLoginAt?: string | null;
+  mustChangePassword?: boolean;
+  dataScope?: 'ALL' | 'LIMITED';
+  deletedAt?: string | null;
+  invitedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1910,6 +1962,7 @@ export interface PlatformStaffInput {
   email: string;
   phone?: string;
   role: PlatformStaffRole;
+  password?: string;
   permissionsOverride?: string[];
   isActive?: boolean;
 }
@@ -1988,4 +2041,73 @@ export interface PlatformCentralSecurityOverview {
   recentLogins: PlatformStaffLogin[];
   incidents: PlatformCentralSecurityIncident[];
   signingKeys: PlatformSigningKey[];
+}
+
+// ─── Platform Staff Security & RBAC v2 ───────────────────────────────────────
+
+export type PlatformStaffInviteStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+
+export interface PlatformStaffInvite {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string | null;
+  role: PlatformStaffRole;
+  status: PlatformStaffInviteStatus;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  invitedBy?: string | null;
+  invitedByName?: string | null;
+  createdAt: string;
+}
+
+export interface PlatformStaffInviteInput {
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: PlatformStaffRole;
+  /** Hours until the invite link expires (default 72). */
+  expiresInHours?: number;
+}
+
+export interface PlatformStaffInviteCreated {
+  invite: PlatformStaffInvite;
+  /** Plaintext token — shown ONCE to the inviter; only its hash is stored. */
+  token: string;
+  /** Ready-to-share invite link (embeds the token). */
+  link: string;
+}
+
+export interface PlatformTrustedDevice {
+  id: string;
+  staffId: string;
+  staffName?: string | null;
+  deviceName?: string | null;
+  fingerprint: string;
+  lastSeenAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+}
+
+export type PlatformStaffDataScope = 'ALL' | 'LIMITED';
+
+export interface PlatformStaffDataScopeState {
+  staffId: string;
+  scope: PlatformStaffDataScope;
+  tenantIds: string[];
+}
+
+export interface PlatformRoleMatrix {
+  /** role code → granted permission codes */
+  matrix: Record<string, string[]>;
+  /** flat catalog grouped by section for rendering the matrix */
+  sections: Array<{
+    module: string;
+    title: string;
+    standardActions: string[];
+    permissions: Array<{ code: string; action: string; name: string; special?: boolean }>;
+  }>;
+  standardActionLabels: Record<string, string>;
+  fetchedAt: string;
 }

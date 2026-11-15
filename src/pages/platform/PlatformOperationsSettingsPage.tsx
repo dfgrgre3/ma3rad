@@ -25,6 +25,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformOpsJob,
   PlatformOpsJobStatus,
@@ -44,6 +45,7 @@ type OperationsTab = 'jobs' | 'scheduled' | 'sync' | 'approvals' | 'maintenance'
 
 export const PlatformOperationsSettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<OperationsTab>('jobs');
+  const canManageOperations = canPlatform('operations');
   const [loading, setLoading] = useState<boolean>(true);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
 
@@ -128,6 +130,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
   // Actions
   const handleRetryJob = (id: string) => {
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     try {
       platformAdminService.retryOpsJob(id);
       loadData();
@@ -137,6 +143,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   };
 
   const handleCancelJob = (id: string) => {
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من إلغاء هذه العملية؟')) return;
     try {
       platformAdminService.cancelOpsJob(id);
@@ -148,6 +158,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
   const handleCreateJob = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     try {
       platformAdminService.createOpsJob({
         type: newJobType,
@@ -163,6 +177,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
   const handleCreateMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     if (!newMaintTitle || !newMaintStart || !newMaintEnd) return;
     try {
       platformAdminService.createMaintenanceWindow({
@@ -182,6 +200,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   };
 
   const handleCancelMaintenance = (id: string) => {
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من إلغاء نافذة الصيانة؟')) return;
     try {
       platformAdminService.cancelMaintenanceWindow(id);
@@ -193,6 +215,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
   const handleConfirmApprovalAction = () => {
     if (!approvalActionModal) return;
+    if (!canManageOperations) {
+      alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
     try {
       if (approvalActionModal.type === 'approve') {
         platformAdminService.approveOp(approvalActionModal.id, approvalNotes);
@@ -275,13 +301,13 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               <RefreshCw className="w-4 h-4 ml-2" />
               تحديث
             </Button>
-            {activeTab === 'jobs' && (
+            {activeTab === 'jobs' && canManageOperations && (
               <Button variant="primary" onClick={() => setNewJobModalOpen(true)}>
                 <Plus className="w-4 h-4 ml-2" />
                 إنشاء مهمة تشغيل
               </Button>
             )}
-            {activeTab === 'maintenance' && (
+            {activeTab === 'maintenance' && canManageOperations && (
               <Button variant="primary" onClick={() => setNewMaintModalOpen(true)}>
                 <Plus className="w-4 h-4 ml-2" />
                 جدولة صيانة
@@ -469,7 +495,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-left">
                         <div className="flex items-center justify-end gap-1.5">
-                          {(job.status === 'FAILED' || job.status === 'CANCELLED') && (
+                          {canManageOperations && (job.status === 'FAILED' || job.status === 'CANCELLED') && (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -480,7 +506,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                               إعادة
                             </Button>
                           )}
-                          {(job.status === 'PENDING' || job.status === 'RUNNING') && (
+                          {canManageOperations && (job.status === 'PENDING' || job.status === 'RUNNING') && (
                             <Button
                               variant="danger"
                               size="sm"
@@ -627,7 +653,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                       <td className="py-3 px-4 text-xs font-mono text-zinc-400">{appr.approvedBy || '—'}</td>
                       <td className="py-3 px-4 text-xs text-zinc-400 max-w-xs truncate">{appr.notes || '—'}</td>
                       <td className="py-3 px-4 text-left">
-                        {appr.status === 'PENDING' && (
+                        {appr.status === 'PENDING' && canManageOperations && (
                           <div className="flex items-center justify-end gap-1.5">
                             <Button
                               variant="success"
@@ -690,7 +716,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  {mw.status === 'SCHEDULED' && (
+                  {mw.status === 'SCHEDULED' && canManageOperations && (
                     <div className="pt-2 border-t border-zinc-800/60 flex justify-end">
                       <Button variant="danger" size="sm" onClick={() => handleCancelMaintenance(mw.id)}>
                         <X className="w-3.5 h-3.5 ml-1" />
@@ -761,7 +787,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 <Button variant="secondary" type="button" onClick={() => setNewJobModalOpen(false)}>
                   إلغاء
                 </Button>
-                <Button variant="primary" type="submit">
+                <Button variant="primary" type="submit" disabled={!canManageOperations}>
                   إدراج في الطابور
                 </Button>
               </div>
@@ -837,7 +863,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 <Button variant="secondary" type="button" onClick={() => setNewMaintModalOpen(false)}>
                   إلغاء
                 </Button>
-                <Button variant="primary" type="submit">
+                <Button variant="primary" type="submit" disabled={!canManageOperations}>
                   تأكيد الجدولة
                 </Button>
               </div>
@@ -876,6 +902,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 variant={approvalActionModal.type === 'approve' ? 'success' : 'danger'}
                 type="button"
                 onClick={handleConfirmApprovalAction}
+                disabled={!canManageOperations}
               >
                 {approvalActionModal.type === 'approve' ? 'تأكيد الموافقة' : 'تأكيد الرفض'}
               </Button>

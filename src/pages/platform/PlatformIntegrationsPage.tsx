@@ -16,6 +16,7 @@ import {
   ArrowRightLeft,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -38,6 +39,7 @@ interface WebhookEndpoint {
 
 export const PlatformIntegrationsPage: React.FC = () => {
   const [tab, setTab] = useState<'WEBHOOKS' | 'PAYMENTS' | 'SMS'>('WEBHOOKS');
+  const canManageIntegrations = canPlatform('integrations');
 
   // Webhooks State
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([
@@ -91,6 +93,10 @@ export const PlatformIntegrationsPage: React.FC = () => {
   });
 
   const handleCreateWebhook = () => {
+    if (!canManageIntegrations) {
+      alert('لا تملك صلاحية إدارة التكاملات.');
+      return;
+    }
     if (!whForm.name.trim() || !whForm.url.trim()) {
       alert('الاسم ورابط الـ URL مطلوبان.');
       return;
@@ -110,15 +116,27 @@ export const PlatformIntegrationsPage: React.FC = () => {
   };
 
   const handleTestWebhook = (wh: WebhookEndpoint) => {
+    if (!canManageIntegrations) {
+      alert('لا تملك صلاحية إدارة التكاملات.');
+      return;
+    }
     alert(`تم إرسال حمولة تجريبية (Test Ping Payload) إلى:\n${wh.url}\n\nالنتيجة: 200 OK تم الاستلام بنجاح.`);
   };
 
   const handleDeleteWebhook = (id: string) => {
+    if (!canManageIntegrations) {
+      alert('لا تملك صلاحية إدارة التكاملات.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من حذف هذا الـ Webhook؟')) return;
     setWebhooks(webhooks.filter((w) => w.id !== id));
   };
 
   const handleSaveProviders = () => {
+    if (!canManageIntegrations) {
+      alert('لا تملك صلاحية إدارة التكاملات.');
+      return;
+    }
     alert('تم حفظ إعدادات بوابات الدفع ومزودي الرسائل بنجاح.');
   };
 
@@ -176,13 +194,15 @@ export const PlatformIntegrationsPage: React.FC = () => {
             <p className="text-xs text-slate-400">
               إرسال إشعارات فورية لخدمات الطرف الثالث عند وقوع أحداث بالمنصة (فواتير، تفعيل اشتراكات، ترقيات).
             </p>
-            <Button
-              size="sm"
-              onClick={() => setIsWhModalOpen(true)}
-              leadingIcon={<Plus className="h-4 w-4" />}
-            >
-              إضافة Webhook جديد
-            </Button>
+            {canManageIntegrations && (
+              <Button
+                size="sm"
+                onClick={() => setIsWhModalOpen(true)}
+                leadingIcon={<Plus className="h-4 w-4" />}
+              >
+                إضافة Webhook جديد
+              </Button>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
@@ -228,21 +248,25 @@ export const PlatformIntegrationsPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleTestWebhook(wh)}
-                              className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                              title="اختبار إرسال حمولة تجريبية"
-                            >
-                              <Play className="h-3 w-3" />
-                              اختبار
-                            </button>
-                            <button
-                              onClick={() => handleDeleteWebhook(wh.id)}
-                              className="text-rose-400 hover:text-rose-300 text-xs"
-                              title="حذف"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            {canManageIntegrations && (
+                              <>
+                                <button
+                                  onClick={() => handleTestWebhook(wh)}
+                                  className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
+                                  title="اختبار إرسال حمولة تجريبية"
+                                >
+                                  <Play className="h-3 w-3" />
+                                  اختبار
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteWebhook(wh.id)}
+                                  className="text-rose-400 hover:text-rose-300 text-xs"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -319,7 +343,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex justify-end">
-              <Button size="sm" onClick={handleSaveProviders}>
+              <Button size="sm" onClick={handleSaveProviders} disabled={!canManageIntegrations}>
                 حفظ إعدادات الدفع
               </Button>
             </div>
@@ -377,7 +401,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex justify-end">
-              <Button size="sm" onClick={handleSaveProviders}>
+              <Button size="sm" onClick={handleSaveProviders} disabled={!canManageIntegrations}>
                 حفظ إعدادات الرسائل
               </Button>
             </div>
@@ -450,7 +474,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsWhModalOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleCreateWebhook}>
+            <Button size="sm" onClick={handleCreateWebhook} disabled={!canManageIntegrations}>
               إنشاء وحفظ
             </Button>
           </div>

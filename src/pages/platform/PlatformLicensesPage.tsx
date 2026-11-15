@@ -16,6 +16,7 @@ import {
   Link,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformLicense,
   PlatformLicenseStatus,
@@ -55,6 +56,7 @@ const STATUSES: PlatformLicenseStatus[] = ['ACTIVE', 'ISSUED', 'SUSPENDED', 'EXP
 
 export const PlatformLicensesPage: React.FC = () => {
   const toast = useToast();
+  const canManageLicenses = canPlatform('licenses');
   const [licenses, setLicenses] = React.useState<PlatformLicense[]>([]);
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
@@ -124,6 +126,10 @@ export const PlatformLicensesPage: React.FC = () => {
   };
 
   const issue = () => {
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     if (!issueForm.tenantId || !issueForm.planId) {
       toast.error('اختر العميل والخطة');
       return;
@@ -149,6 +155,10 @@ export const PlatformLicensesPage: React.FC = () => {
   };
 
   const changeStatus = (license: PlatformLicense, next: PlatformLicenseStatus) => {
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     const verb = next === 'REVOKED' ? 'إلغاء' : next === 'SUSPENDED' ? 'إيقاف' : 'تفعيل';
     if (!window.confirm(`${verb} الترخيص ${license.licenseKey}؟`)) return;
     try {
@@ -162,6 +172,10 @@ export const PlatformLicensesPage: React.FC = () => {
 
   const renew = () => {
     if (!renewTarget) return;
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     try {
       platformAdminService.renewLicense(renewTarget.id, renewMonths);
       toast.success('تم تجديد الترخيص');
@@ -173,6 +187,10 @@ export const PlatformLicensesPage: React.FC = () => {
   };
 
   const detectClones = () => {
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     try {
       const result = platformAdminService.detectCloneDevices();
       setCloneAlerts(result.alerts);
@@ -194,6 +212,10 @@ export const PlatformLicensesPage: React.FC = () => {
 
   const executeDeviceAction = () => {
     if (!deviceTarget || !deviceAction) return;
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     try {
       if (deviceAction === 'suspend') {
         platformAdminService.suspendDevice(deviceTarget.id, 'إيقاف عبر لوحة التحكم');
@@ -213,6 +235,10 @@ export const PlatformLicensesPage: React.FC = () => {
 
   const bindHardware = () => {
     if (!hardwareTarget) return;
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     try {
       platformAdminService.bindLicenseHardware(hardwareTarget.id, hardwareId);
       toast.success('تم ربط الترخيص بالجهاز');
@@ -224,6 +250,10 @@ export const PlatformLicensesPage: React.FC = () => {
   };
 
   const exportCompliance = () => {
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     try {
       const report = platformAdminService.exportLicenseComplianceReport({
         includeActivations: true,
@@ -254,6 +284,10 @@ export const PlatformLicensesPage: React.FC = () => {
   };
 
   const exportRows = () => {
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
     downloadCsv('platform-licenses.csv', [
       ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
       ...licenses.map((license) => [
@@ -281,18 +315,24 @@ export const PlatformLicensesPage: React.FC = () => {
         icon={<KeyRound className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
-              تصدير CSV
-            </Button>
-            <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
-              كشف الاستنساخ
-            </Button>
-            <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={exportCompliance}>
-              تقرير الامتثال
-            </Button>
-            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openIssue}>
-              إصدار ترخيص
-            </Button>
+            {canManageLicenses && (
+              <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
+                تصدير CSV
+              </Button>
+            )}
+            {canManageLicenses && (
+              <>
+                <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
+                  كشف الاستنساخ
+                </Button>
+                <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={exportCompliance}>
+                  تقرير الامتثال
+                </Button>
+                <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openIssue}>
+                  إصدار ترخيص
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -365,64 +405,68 @@ export const PlatformLicensesPage: React.FC = () => {
                     <td className="px-4 py-2.5 text-[10px] text-slate-500">{COUPLING_LABELS[license.couplingMode ?? 'FULL']}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => { setRenewTarget(license); setRenewMonths(12); }}
-                          className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
-                          title="تجديد"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }}
-                          className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
-                          title="ربط جهاز"
-                        >
-                          <Cpu className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
-                            changeStatus(license, next);
-                          }}
-                          className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                          title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
-                        >
-                          {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
-                            <Ban className="h-3.5 w-3.5" />
-                          ) : (
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => changeStatus(license, 'REVOKED')}
-                          className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                          title="إلغاء"
-                        >
-                          <ShieldX className="h-3.5 w-3.5" />
-                        </button>
-                          {license.hardwareId && (
+                        {canManageLicenses && (
+                          <>
                             <button
                               type="button"
-                              onClick={() => openDeviceAction('release', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
-                              className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-                              title="تحرير الجهاز"
+                              onClick={() => { setRenewTarget(license); setRenewMonths(12); }}
+                              className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+                              title="تجديد"
                             >
-                              <Link className="h-3.5 w-3.5" />
+                              <RefreshCw className="h-3.5 w-3.5" />
                             </button>
-                          )}
-                        {license.status === 'ACTIVE' && (
-                          <button
-                            type="button"
-                            onClick={() => openDeviceAction('suspend', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
-                            className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
-                            title="إيقاف الجهاز"
-                          >
-                            <ShieldAlert className="h-3.5 w-3.5" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }}
+                              className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
+                              title="ربط جهاز"
+                            >
+                              <Cpu className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
+                                changeStatus(license, next);
+                              }}
+                              className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                              title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
+                            >
+                              {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
+                                <Ban className="h-3.5 w-3.5" />
+                              ) : (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => changeStatus(license, 'REVOKED')}
+                              className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="إلغاء"
+                            >
+                              <ShieldX className="h-3.5 w-3.5" />
+                            </button>
+                            {license.hardwareId && (
+                              <button
+                                type="button"
+                                onClick={() => openDeviceAction('release', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                                className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                                title="تحرير الجهاز"
+                              >
+                                <Link className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {license.status === 'ACTIVE' && (
+                              <button
+                                type="button"
+                                onClick={() => openDeviceAction('suspend', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                                className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
+                                title="إيقاف الجهاز"
+                              >
+                                <ShieldAlert className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -445,7 +489,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setIssueOpen(false)} disabled={saving}>إلغاء</Button>
-            <Button variant="primary" onClick={issue} loading={saving}>إصدار الترخيص</Button>
+            <Button variant="primary" onClick={issue} loading={saving} disabled={!canManageLicenses}>إصدار الترخيص</Button>
           </div>
         }
       >
@@ -508,7 +552,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setRenewTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={renew}>تجديد</Button>
+            <Button variant="primary" onClick={renew} disabled={!canManageLicenses}>تجديد</Button>
           </div>
         }
       >
@@ -532,7 +576,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setHardwareTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={bindHardware}>حفظ الربط</Button>
+            <Button variant="primary" onClick={bindHardware} disabled={!canManageLicenses}>حفظ الربط</Button>
           </div>
         }
       >
@@ -570,7 +614,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
-            <Button variant="danger" onClick={executeDeviceAction}>
+            <Button variant="danger" onClick={executeDeviceAction} disabled={!canManageLicenses}>
               {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
             </Button>
           </div>

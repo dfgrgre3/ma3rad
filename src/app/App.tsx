@@ -16,6 +16,7 @@ import { APP_VERSION } from '../config/appVersion';
 import { DatabasePersistenceStatus } from '../components/shared/DatabasePersistenceStatus';
 import { AppRouter } from '../router';
 import { LoginPage } from '../pages/auth/login/LoginPage';
+import { PlatformStaffInviteAcceptPage } from '../pages/platform/PlatformStaffInviteAcceptPage';
 import { SetupWizard } from '../components/setup/SetupWizard';
 import { ForcePasswordChangeModal } from '../components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from '../contexts/ThemeProvider';
@@ -248,6 +249,14 @@ export const App: React.FC = () => {
     }
   }, [currentUser?.id, currentUser]);
 
+  // Pre-auth platform staff invitation: /#/accept-staff-invite/<token>
+  // Declared before any conditional return so the hook order stays stable.
+  const staffInviteToken = React.useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const match = window.location.hash.match(/#\/accept-staff-invite\/([A-Za-z0-9]+)/);
+    return match?.[1] ?? null;
+  }, []);
+
   if (licenseBlocked) {
     return (
       <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
@@ -329,7 +338,22 @@ export const App: React.FC = () => {
     );
   }
 
+  // Pre-auth platform staff invitation: /#/accept-staff-invite/<token>
   if (!currentUser) {
+    if (staffInviteToken) {
+      return (
+        <>
+          <PlatformStaffInviteAcceptPage
+            token={staffInviteToken}
+            onSuccess={(user) => {
+              if (typeof window !== 'undefined') window.location.hash = '#/platform';
+              setCurrentUser(user);
+            }}
+          />
+          <UpdateNotification />
+        </>
+      );
+    }
     return (
       <>
         <LoginPage onSuccess={setCurrentUser} />
@@ -338,11 +362,17 @@ export const App: React.FC = () => {
     );
   }
 
+  // Platform staff have their own forced-password-change flow (PlatformLayout),
+  // because the ERP ForcePasswordChangeModal targets the `users` table only.
+  const isPlatformStaffRole = Boolean(currentUser) && [
+    'SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUPPORT_AGENT', 'OPERATIONS_ENGINEER', 'BILLING_SPECIALIST', 'LICENSE_MANAGER',
+  ].includes(String(currentUser!.role));
+
   return (
     <ThemeProvider ready={dbReady}>
       <ToastProvider>
         <ErrorBoundary>
-          {!BYPASS_FIRST_RUN_SETUP && !showSetup && (currentUser?.mustChangePassword || currentUser?.securityKeySetupRequired) && (
+          {!BYPASS_FIRST_RUN_SETUP && !showSetup && !isPlatformStaffRole && (currentUser?.mustChangePassword || currentUser?.securityKeySetupRequired) && (
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
           <UpdateNotification />

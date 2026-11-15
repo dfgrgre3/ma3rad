@@ -23,6 +23,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
   PlatformConfigTemplate,
@@ -40,6 +41,7 @@ type ConfigTab = 'editor' | 'templates' | 'rollout' | 'diff' | 'history' | 'tele
 
 export const PlatformAppConfigurationPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ConfigTab>('editor');
+  const canManageAppConfig = canPlatform('app-configuration');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [templates, setTemplates] = useState<PlatformConfigTemplate[]>([]);
@@ -124,6 +126,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Save & Sign
   const handleSaveConfig = () => {
+    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
@@ -157,6 +160,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Apply Template
   const handleApplyTemplate = (tmpl: PlatformConfigTemplate) => {
+    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!confirm(`هل تريد تطبيق قالب "${tmpl.name}" على هذا العميل؟ سيتم استبدال التكوين الحالي وإعادة توقيعه.`)) return;
     setJsonText(JSON.stringify(tmpl.configPayload, null, 2));
     setJsonError(null);
@@ -164,6 +168,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Rollback
   const handleRollback = (ver: number) => {
+    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع التكوين للإصدار #${ver} وتطبيقه فورياً؟`)) return;
     try {
       platformAdminService.rollbackTenantConfig(selectedTenantId, ver);
@@ -177,6 +182,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   // Handle Create Rollout
   const handleCreateRollout = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!rolloutTitle) return;
     try {
       let payload: Record<string, unknown>;
@@ -241,7 +247,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={handleSaveConfig}
-              disabled={saving || loading || !selectedTenantId}
+              disabled={saving || loading || !selectedTenantId || !canManageAppConfig}
             >
               <Save className="w-4 h-4 ml-2" />
               {saving ? 'جاري التوقيع والحفظ...' : 'توقيع التكوين وحفظه'}
@@ -415,6 +421,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   className="w-full mt-3"
+                  disabled={!canManageAppConfig}
                   onClick={() => handleApplyTemplate(tmpl)}
                 >
                   استيراد هذا القالب إلى المحرر
@@ -486,7 +493,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               </div>
 
               <div className="flex justify-end pt-2">
-                <Button variant="primary" type="submit">
+                <Button variant="primary" type="submit" disabled={!canManageAppConfig}>
                   <Play className="w-3.5 h-3.5 ml-1.5" />
                   بدء النشر الآن
                 </Button>
@@ -643,6 +650,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleRollback(ver.version)}
+                      disabled={!canManageAppConfig}
                     >
                       <RotateCcw className="w-3.5 h-3.5 ml-1" />
                       استرجاع وتطبيق

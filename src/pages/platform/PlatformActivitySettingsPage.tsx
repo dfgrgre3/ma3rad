@@ -16,6 +16,7 @@ import {
   Info,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
   PlatformTenantActivityConfig,
@@ -40,6 +41,7 @@ import { EmptyState, inputClass, formatDateTime } from './components/PlatformUI'
 
 export const PlatformActivitySettingsPage: React.FC = () => {
   const toast = useToast();
+  const canManageActivity = canPlatform('activity', 'platform.activity.update');
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = React.useState<string>('');
   const [loading, setLoading] = React.useState(true);
@@ -112,6 +114,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   };
 
   const handleSaveActivity = () => {
+    if (!canManageActivity) { toast.error('لا تملك صلاحية إدارة الأنشطة'); return; }
     if (!selectedTenantId || !selectedActivityId) return;
     setSaving(true);
     try {
@@ -136,6 +139,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   };
 
   const handleRollback = (ver: number) => {
+    if (!canManageActivity) { toast.error('لا تملك صلاحية إدارة الأنشطة'); return; }
     if (!window.confirm(`هل أنت متأكد من استرجاع إعدادات النشاط إلى الإصدار #${ver}؟`)) {
       return;
     }
@@ -187,7 +191,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               size="sm"
               leadingIcon={<Save className="h-3.5 w-3.5" />}
               onClick={handleSaveActivity}
-              disabled={saving || !selectedTenantId}
+              disabled={saving || !selectedTenantId || !canManageActivity}
             >
               {saving ? 'جارٍ الحفظ...' : 'حفظ نشاط العميل'}
             </Button>
@@ -393,6 +397,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                       type="checkbox"
                       checked={isEnabled}
                       onChange={() => toggleModule(mod.id)}
+                      disabled={!canManageActivity}
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     <div className="min-w-0 flex-1">
@@ -509,15 +514,17 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                           {formatDateTime(ver.createdAt)}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            leadingIcon={<RotateCcw className="h-3 w-3 text-amber-600" />}
-                            onClick={() => handleRollback(ver.version)}
-                            className="text-xs"
-                          >
-                            استرجاع
-                          </Button>
+                          {canManageActivity && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              leadingIcon={<RotateCcw className="h-3 w-3 text-amber-600" />}
+                              onClick={() => handleRollback(ver.version)}
+                              className="text-xs"
+                            >
+                              استرجاع
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))}

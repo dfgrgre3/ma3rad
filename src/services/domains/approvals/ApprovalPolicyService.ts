@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 
@@ -80,7 +80,7 @@ export class ApprovalPolicyService {
     if (!definition) throw new Error('Unknown approval operation.');
     PermissionService.require(actor, definition.permission);
     const policy = this.getPolicy(operationCode);
-    if (actor.role === 'ADMIN') return policy;
+    if (actor.role === 'ADMIN' || actor.role === 'SUPER_ADMIN') return policy;
     if (policy.mode === 'DISABLED') throw new Error('تم تعطيل هذه العملية بواسطة سياسة الموافقات.');
     if (policy.executorRoles.length && !policy.executorRoles.includes(actor.role)) throw new Error('دور المستخدم غير مخول بتنفيذ هذه العملية.');
     if (policy.mode === 'APPROVAL') PermissionService.require(actor, 'approvals.create');

@@ -18,6 +18,7 @@ import {
   Search,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
   PlatformUiProfile,
@@ -74,6 +75,7 @@ const SYSTEM_FIELDS = [
 
 export const PlatformCustomizationSettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CustomizationTab>('pages');
+  const canManageCustomization = canPlatform('customization');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [profiles, setProfiles] = useState<PlatformUiProfile[]>([]);
@@ -165,6 +167,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   };
 
   const handleApplyProfile = (profile: PlatformUiProfile) => {
+    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!confirm(`هل تريد تطبيق قالب "${profile.name}" على هذا العميل؟ سيتم استبدال تخصيصات الصفحات والأزرار الحالية.`)) return;
     setHiddenPages(profile.hiddenPages);
     setHiddenActions(profile.hiddenActions);
@@ -174,6 +177,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   };
 
   const handleSave = () => {
+    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
@@ -200,6 +204,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   };
 
   const handleRollback = (ver: number) => {
+    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع تخصيصات الواجهة للإصدار #${ver}؟`)) return;
     try {
       platformAdminService.rollbackTenantUi(selectedTenantId, ver);
@@ -230,7 +235,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={saving || loading || !selectedTenantId}
+              disabled={saving || loading || !selectedTenantId || !canManageCustomization}
             >
               <Save className="w-4 h-4 ml-2" />
               {saving ? 'جاري الحفظ...' : 'حفظ التخصيصات وتطبيقها'}
@@ -481,13 +486,15 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-4 text-left">
-                        <Button
-                          variant={rule.visible ? 'danger' : 'success'}
-                          size="sm"
-                          onClick={() => handleToggleField(field.id)}
-                        >
-                          {rule.visible ? 'إخفاء الحقل' : 'إظهار الحقل'}
-                        </Button>
+                        {canManageCustomization && (
+                          <Button
+                            variant={rule.visible ? 'danger' : 'success'}
+                            size="sm"
+                            onClick={() => handleToggleField(field.id)}
+                          >
+                            {rule.visible ? 'إخفاء الحقل' : 'إظهار الحقل'}
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -531,6 +538,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   className="w-full mt-3"
+                  disabled={!canManageCustomization}
                   onClick={() => handleApplyProfile(prof)}
                 >
                   تطبيق هذا القالب على العميل
@@ -564,7 +572,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                     <div className="text-zinc-400 text-[11px] mt-0.5">{ver.changeSummary}</div>
                     <div className="text-zinc-500 text-[10px]">{formatDateTime(ver.createdAt)}</div>
                   </div>
-                  {ver.version !== currentVersion && (
+                  {ver.version !== currentVersion && canManageCustomization && (
                     <Button
                       variant="secondary"
                       size="sm"

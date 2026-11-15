@@ -24,6 +24,7 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformStaff,
   PlatformStaffInput,
@@ -79,6 +80,7 @@ export const PlatformAdminControlPage: React.FC = () => {
     email: '',
     phone: '',
     role: 'SUPPORT_AGENT',
+    password: '',
     isActive: true,
   });
 
@@ -155,6 +157,7 @@ export const PlatformAdminControlPage: React.FC = () => {
         email: staff.email,
         phone: staff.phone || '',
         role: staff.role,
+        password: '',
         isActive: staff.isActive,
       });
     } else {
@@ -164,19 +167,40 @@ export const PlatformAdminControlPage: React.FC = () => {
         email: '',
         phone: '',
         role: 'SUPPORT_AGENT',
+        password: '',
         isActive: true,
       });
     }
     setIsStaffModalOpen(true);
   };
 
+  const canManageStaff = canPlatform('staff');
+  const canDeleteStaff = canPlatform('staff', 'staff.delete_owner');
+  const canManageTenantUsers = canPlatform('admin-control');
+
   // Save Staff
   const handleSaveStaff = () => {
+    if (!canManageStaff) {
+      alert('لا تملك صلاحية إدارة موظفي المنصة.');
+      return;
+    }
+    if (!editingStaff && (!staffForm.password || staffForm.password.length < 8)) {
+      alert('كلمة مرور موظف المنصة مطلوبة ويجب أن تكون 8 أحرف على الأقل.');
+      return;
+    }
+    if (editingStaff && staffForm.password && staffForm.password.length > 0 && staffForm.password.length < 8) {
+      alert('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+      return;
+    }
     try {
+      const payload = { ...staffForm };
+      if (editingStaff && !payload.password) {
+        delete payload.password;
+      }
       if (editingStaff) {
-        platformAdminService.updatePlatformStaff(editingStaff.id, staffForm);
+        platformAdminService.updatePlatformStaff(editingStaff.id, payload);
       } else {
-        platformAdminService.createPlatformStaff(staffForm);
+        platformAdminService.createPlatformStaff(payload);
       }
       setIsStaffModalOpen(false);
       loadStaff();
@@ -187,6 +211,10 @@ export const PlatformAdminControlPage: React.FC = () => {
 
   // Toggle Staff Active
   const handleToggleStaffActive = (staff: PlatformStaff) => {
+    if (!canManageStaff) {
+      alert('لا تملك صلاحية إدارة موظفي المنصة.');
+      return;
+    }
     try {
       platformAdminService.setPlatformStaffActive(staff.id, !staff.isActive);
       loadStaff();
@@ -197,6 +225,10 @@ export const PlatformAdminControlPage: React.FC = () => {
 
   // Delete Staff
   const handleDeleteStaff = (staff: PlatformStaff) => {
+    if (!canDeleteStaff) {
+      alert('لا تملك صلاحية حذف موظفي المنصة.');
+      return;
+    }
     if (!confirm(`هل أنت متأكد من حذف موظف المنصة (${staff.fullName})؟`)) return;
     try {
       platformAdminService.deletePlatformStaff(staff.id);
@@ -235,11 +267,24 @@ export const PlatformAdminControlPage: React.FC = () => {
   // Save Tenant User
   const handleSaveTenantUser = () => {
     if (!selectedTenantId) return;
+    if (!canManageTenantUsers) {
+      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      return;
+    }
     try {
       if (editingTenantUser) {
         platformAdminService.updateTenantUser(editingTenantUser.id, tenantUserForm);
       } else {
-        platformAdminService.createTenantUser(selectedTenantId, tenantUserForm);
+        const result = platformAdminService.createTenantUser(selectedTenantId, {
+          ...tenantUserForm,
+          provisionIdentity: true,
+          provisioningMode: 'INVITE',
+        });
+        const parts = [result.message];
+        if (result.inviteCode) parts.push(`كود الدعوة: ${result.inviteCode}`);
+        if (result.temporaryPassword) parts.push(`كلمة المرور المؤقتة: ${result.temporaryPassword}`);
+        if (result.user.identityUserId) parts.push(`معرّف الهوية: ${result.user.identityUserId}`);
+        alert(parts.join('\n'));
       }
       setIsTenantUserModalOpen(false);
       loadTenantUsers(selectedTenantId);
@@ -250,6 +295,10 @@ export const PlatformAdminControlPage: React.FC = () => {
 
   // Toggle Tenant User Active
   const handleToggleTenantUserActive = (user: PlatformTenantUser) => {
+    if (!canManageTenantUsers) {
+      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      return;
+    }
     try {
       platformAdminService.setTenantUserActive(user.id, user.status !== 'ACTIVE');
       if (selectedTenantId) loadTenantUsers(selectedTenantId);
@@ -260,6 +309,10 @@ export const PlatformAdminControlPage: React.FC = () => {
 
   // Delete Tenant User
   const handleDeleteTenantUser = (user: PlatformTenantUser) => {
+    if (!canManageTenantUsers) {
+      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      return;
+    }
     if (!confirm(`هل أنت متأكد من حذف مستخدم العميل (${user.fullName})؟`)) return;
     try {
       platformAdminService.deleteTenantUser(user.id);
@@ -346,13 +399,15 @@ export const PlatformAdminControlPage: React.FC = () => {
               </select>
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => openStaffModal()}
-              leadingIcon={<UserPlus className="h-4 w-4" />}
-            >
-              إضافة موظف منصة جديد
-            </Button>
+            {canManageStaff && (
+              <Button
+                size="sm"
+                onClick={() => openStaffModal()}
+                leadingIcon={<UserPlus className="h-4 w-4" />}
+              >
+                إضافة موظف منصة جديد
+              </Button>
+            )}
           </div>
 
           {/* Platform Staff Table */}
@@ -454,15 +509,17 @@ export const PlatformAdminControlPage: React.FC = () => {
 
                           <td className="px-4 py-3.5">
                             <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => openStaffModal(staff)}
-                                title="تعديل الموظف"
-                                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
+                              {canManageStaff && (
+                                <button
+                                  onClick={() => openStaffModal(staff)}
+                                  title="تعديل الموظف"
+                                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              )}
 
-                              {!isOwner && (
+                              {!isOwner && canManageStaff && (
                                 <>
                                   <button
                                     onClick={() => handleToggleStaffActive(staff)}
@@ -480,13 +537,15 @@ export const PlatformAdminControlPage: React.FC = () => {
                                     )}
                                   </button>
 
-                                  <button
-                                    onClick={() => handleDeleteStaff(staff)}
-                                    title="حذف الموظف"
-                                    className="rounded p-1 text-rose-400 hover:bg-rose-950/40 transition-colors"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  {canDeleteStaff && (
+                                    <button
+                                      onClick={() => handleDeleteStaff(staff)}
+                                      title="حذف الموظف"
+                                      className="rounded p-1 text-rose-400 hover:bg-rose-950/40 transition-colors"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -544,14 +603,16 @@ export const PlatformAdminControlPage: React.FC = () => {
               </div>
             </div>
 
-            <Button
-              size="sm"
-              disabled={!selectedTenantId}
-              onClick={() => openTenantUserModal()}
-              leadingIcon={<UserPlus className="h-4 w-4" />}
-            >
-              إضافة مستخدم للعميل
-            </Button>
+            {canManageTenantUsers && (
+              <Button
+                size="sm"
+                disabled={!selectedTenantId}
+                onClick={() => openTenantUserModal()}
+                leadingIcon={<UserPlus className="h-4 w-4" />}
+              >
+                إضافة مستخدم للعميل
+              </Button>
+            )}
           </div>
 
           {/* Tenant Users Table */}
@@ -623,37 +684,41 @@ export const PlatformAdminControlPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => openTenantUserModal(user)}
-                              title="تعديل المستخدم"
-                              className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
+                            {canManageTenantUsers && (
+                              <>
+                                <button
+                                  onClick={() => openTenantUserModal(user)}
+                                  title="تعديل المستخدم"
+                                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
 
-                            <button
-                              onClick={() => handleToggleTenantUserActive(user)}
-                              title={user.status === 'ACTIVE' ? 'تعطيل الحساب' : 'تنشيط الحساب'}
-                              className={`rounded p-1 ${
-                                user.status === 'ACTIVE'
-                                  ? 'text-amber-400 hover:bg-amber-950/40'
-                                  : 'text-emerald-400 hover:bg-emerald-950/40'
-                              }`}
-                            >
-                              {user.status === 'ACTIVE' ? (
-                                <Lock className="h-3.5 w-3.5" />
-                              ) : (
-                                <Unlock className="h-3.5 w-3.5" />
-                              )}
-                            </button>
+                                <button
+                                  onClick={() => handleToggleTenantUserActive(user)}
+                                  title={user.status === 'ACTIVE' ? 'تعطيل الحساب' : 'تنشيط الحساب'}
+                                  className={`rounded p-1 ${
+                                    user.status === 'ACTIVE'
+                                      ? 'text-amber-400 hover:bg-amber-950/40'
+                                      : 'text-emerald-400 hover:bg-emerald-950/40'
+                                  }`}
+                                >
+                                  {user.status === 'ACTIVE' ? (
+                                    <Lock className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <Unlock className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
 
-                            <button
-                              onClick={() => handleDeleteTenantUser(user)}
-                              title="حذف المستخدم"
-                              className="rounded p-1 text-rose-400 hover:bg-rose-950/40"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                                <button
+                                  onClick={() => handleDeleteTenantUser(user)}
+                                  title="حذف المستخدم"
+                                  className="rounded p-1 text-rose-400 hover:bg-rose-950/40"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -725,11 +790,24 @@ export const PlatformAdminControlPage: React.FC = () => {
             </p>
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              {editingStaff ? 'كلمة مرور جديدة (اختياري)' : 'كلمة المرور الأولية *'}
+            </label>
+            <input
+              type="password"
+              value={staffForm.password || ''}
+              onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+              placeholder={editingStaff ? 'اتركها فارغة للإبقاء على الحالية' : '8 أحرف على الأقل'}
+              className={inputClass}
+            />
+          </div>
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="secondary" size="sm" onClick={() => setIsStaffModalOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleSaveStaff}>
+            <Button size="sm" onClick={handleSaveStaff} disabled={!canManageStaff}>
               حفظ الموظف
             </Button>
           </div>
@@ -805,7 +883,7 @@ export const PlatformAdminControlPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsTenantUserModalOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleSaveTenantUser}>
+            <Button size="sm" onClick={handleSaveTenantUser} disabled={!canManageTenantUsers}>
               حفظ المستخدم
             </Button>
           </div>

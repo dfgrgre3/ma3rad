@@ -61,7 +61,7 @@ export const AdminUsersTab: React.FC = () => {
   const load = () => {
     try {
       setUsers(auth.getAllUsers());
-      setRoles(PermissionService.getRoles());
+      setRoles(PermissionService.getRoles().filter((r) => r.code !== 'SUPER_ADMIN'));
       const currentUser = AuthService.getCurrentUser();
       if (currentUser?.role === 'ADMIN') {
         setLoginPins(null);

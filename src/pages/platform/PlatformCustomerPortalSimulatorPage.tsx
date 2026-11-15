@@ -47,6 +47,13 @@ export const PlatformCustomerPortalSimulatorPage: React.FC = () => {
 
   return (
     <div className="space-y-4 text-right">
+      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 mb-4">
+        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+        <p className="leading-relaxed">
+          <span className="font-bold">تنبيه هندسي:</span> هذه الصفحة ل simulator بوداعة العملاء، وليست بوابة عملاء إنتاجية. البيانات والمنطق المعروض في الواجهة ليست بواجهة مستخدم حقيقية قادرة على تسجيل الدخول والتفاعل مع البوابة الإنتاجية للمستخدم. لا تعتمد عليها في مراحل الإعداد البري أو في الإنتاج.
+        </p>
+      </div>
+
       <PageHeader
         title="بوابة العملاء المركزية (Customer Portal Experience)"
         description="الواجهة المخصصة للعميل النهائي للاطلاع على تفاصيل اشتراكه، تحميل فواتيره، والتحقق من التراخيص."

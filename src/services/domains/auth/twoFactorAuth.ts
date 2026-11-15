@@ -23,7 +23,11 @@ const TOTP_DRIFT_STEPS = 1;
 
 class TwoFactorAuthService {
   private static instance: TwoFactorAuthService;
-  private readonly repository = new TwoFactorAuthRepository();
+  private readonly repository: TwoFactorAuthRepository;
+
+  constructor(tableName = 'user_2fa') {
+    this.repository = new TwoFactorAuthRepository(tableName);
+  }
 
   static getInstance(): TwoFactorAuthService {
     if (!TwoFactorAuthService.instance) {
@@ -217,3 +221,15 @@ class TwoFactorAuthService {
 }
 
 export const twoFactorAuth = TwoFactorAuthService.getInstance();
+
+/**
+ * Platform staff 2FA — same algorithms and recovery-code handling as ERP
+ * users, stored in `platform_staff_2fa` (platform staff are not rows in
+ * `users`, and the staff table has no FK to it).
+ */
+export const platformStaffTwoFactorAuth = new TwoFactorAuthService('platform_staff_2fa');
+
+/** Owner emergency reset: drop a staff member's 2FA row (re-enrollment required). */
+export function deletePlatformStaffTwoFactorRow(userId: string): void {
+  new TwoFactorAuthRepository('platform_staff_2fa').deleteRow(userId);
+}

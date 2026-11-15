@@ -14,6 +14,7 @@ import {
   Boxes,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
   PlatformApiKey,
@@ -50,6 +51,8 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
     onExecute: () => {},
   });
 
+  const canManageEmergency = canPlatform('emergency');
+
   const loadData = useCallback(() => {
     setLoading(true);
     try {
@@ -74,6 +77,10 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
     keyword: string,
     action: () => void
   ) => {
+    if (!canManageEmergency) {
+      alert('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
+      return;
+    }
     setConfirmModal({
       open: true,
       title,
@@ -161,6 +168,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
             size="sm"
             variant="danger"
             onClick={handleEmergencyRevokeAllStaffSessions}
+            disabled={!canManageEmergency}
             leadingIcon={<Ban className="h-3.5 w-3.5" />}
           >
             إنهاء وتسجيل خروج كافة الموظفين فوراً
@@ -178,7 +186,14 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => alert('تم إرسال إشعار الصيانة الطارئة وتحديث حالة السيرفرات.')}
+            onClick={() => {
+              if (!canManageEmergency) {
+                alert('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
+                return;
+              }
+              alert('تم إرسال إشعار الصيانة الطارئة وتحديث حالة السيرفرات.');
+            }}
+            disabled={!canManageEmergency}
             leadingIcon={<AlertTriangle className="h-3.5 w-3.5" />}
           >
             إعلان نافذة صيانة أمنية طارئة
@@ -206,12 +221,14 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
               </div>
 
               {t.status !== 'SUSPENDED' ? (
-                <button
-                  onClick={() => handleEmergencySuspendTenant(t)}
-                  className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded font-bold text-[11px]"
-                >
-                  إيقاف وتجميد العميل فوراً
-                </button>
+                canManageEmergency ? (
+                  <button
+                    onClick={() => handleEmergencySuspendTenant(t)}
+                    className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded font-bold text-[11px]"
+                  >
+                    إيقاف وتجميد العميل فوراً
+                  </button>
+                ) : null
               ) : (
                 <span className="text-rose-400 font-bold text-[11px]">موقوف حالياً</span>
               )}
@@ -241,12 +258,14 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
                       ({k.keyPrefix}...)
                     </span>
                   </div>
-                  <button
-                    onClick={() => handleEmergencyRevokeKey(k)}
-                    className="text-rose-400 hover:text-rose-300 font-bold text-[11px]"
-                  >
-                    إلغاء فوري
-                  </button>
+                  {canManageEmergency && (
+                    <button
+                      onClick={() => handleEmergencyRevokeKey(k)}
+                      className="text-rose-400 hover:text-rose-300 font-bold text-[11px]"
+                    >
+                      إلغاء فوري
+                    </button>
+                  )}
                 </div>
               ))
           )}
@@ -290,7 +309,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              disabled={confirmModal.inputVal.trim() !== confirmModal.confirmationKeyword}
+              disabled={!canManageEmergency || confirmModal.inputVal.trim() !== confirmModal.confirmationKeyword}
               onClick={confirmModal.onExecute}
             >
               تنفيذ الإجراء الطارئ

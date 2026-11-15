@@ -24,6 +24,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformSupportTicket,
   PlatformSupportTicketDetails,
@@ -41,6 +42,7 @@ import {
 } from './components/PlatformUI';
 
 export const PlatformSupportPage: React.FC = () => {
+  const canManageSupport = canPlatform('support', 'platform.support.update');
   const [tickets, setTickets] = useState<PlatformSupportTicket[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -132,6 +134,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Handle send message
   const handleSendMessage = () => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId || !messageBody.trim()) return;
     setSendingMessage(true);
     try {
@@ -159,6 +162,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Status Change
   const handleStatusChange = (newStatus: PlatformSupportTicket['status']) => {
+    if (!canManageSupport) return;
     if (!selectedTicketId) return;
     try {
       platformAdminService.setSupportTicketStatus(selectedTicketId, newStatus);
@@ -171,6 +175,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Priority Change
   const handlePriorityChange = (priority: PlatformSupportTicket['priority']) => {
+    if (!canManageSupport) return;
     if (!selectedTicketId) return;
     try {
       platformAdminService.setSupportTicketPriority(selectedTicketId, priority);
@@ -183,6 +188,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Assignee Change
   const handleAssignChange = (assignee: string) => {
+    if (!canManageSupport) return;
     if (!selectedTicketId) return;
     try {
       platformAdminService.assignSupportTicket(selectedTicketId, assignee || null);
@@ -195,6 +201,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Remote Access Toggle / Approve
   const handleToggleRemoteRequest = (requested: boolean) => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.requestRemoteAccess(selectedTicketId, requested, 60);
@@ -206,6 +213,7 @@ export const PlatformSupportPage: React.FC = () => {
   };
 
   const handleApproveRemoteAccess = (approved: boolean) => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.approveRemoteAccess(selectedTicketId, approved);
@@ -218,6 +226,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Start Remote Session
   const handleStartRemoteSession = () => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.startRemoteSession({
@@ -235,6 +244,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // End Remote Session
   const handleEndRemoteSession = (sessionId: string) => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     const summary = prompt('???? ???? ????????? ???? ??? ???? ??????:');
     try {
       platformAdminService.endRemoteSession(sessionId, summary || undefined);
@@ -246,6 +256,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Create Ticket
   const handleCreateTicket = () => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!newTenantId || !newSubject.trim()) {
       alert('???? ????? ?????? ?????? ????? ???????.');
       return;
@@ -270,6 +281,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Rate Ticket
   const handleRateTicket = () => {
+    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.rateSupportTicket(selectedTicketId, ratingStars, ratingFeedback);
@@ -296,7 +308,8 @@ export const PlatformSupportPage: React.FC = () => {
         actions={
           <Button
             size="sm"
-            onClick={() => setIsNewTicketOpen(true)}
+            disabled={!canManageSupport}
+            onClick={() => { if(!canManageSupport) return; setIsNewTicketOpen(true); }}
             leadingIcon={<Plus className="h-4 w-4" />}
           >
             ????? ??? ?????
@@ -500,6 +513,7 @@ export const PlatformSupportPage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <select
                       value={details.ticket.status}
+                      disabled={!canManageSupport}
                       onChange={(e) => handleStatusChange(e.target.value as any)}
                       className={`${inputClass} text-xs py-1 h-8 max-w-[130px] font-bold`}
                     >
@@ -512,6 +526,7 @@ export const PlatformSupportPage: React.FC = () => {
 
                     <select
                       value={details.ticket.priority}
+                      disabled={!canManageSupport}
                       onChange={(e) => handlePriorityChange(e.target.value as any)}
                       className={`${inputClass} text-xs py-1 h-8 max-w-[110px]`}
                     >
@@ -525,6 +540,7 @@ export const PlatformSupportPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="secondary"
+                        disabled={!canManageSupport}
                         onClick={() => setIsRateModalOpen(true)}
                         leadingIcon={<Star className="h-3.5 w-3.5 text-amber-400" />}
                       >
@@ -544,6 +560,7 @@ export const PlatformSupportPage: React.FC = () => {
                     <input
                       type="text"
                       defaultValue={details.ticket.assignedTo || ''}
+                      disabled={!canManageSupport}
                       onBlur={(e) => handleAssignChange(e.target.value)}
                       placeholder="??? ???? (???? ???????)"
                       className="rounded border border-transparent hover:border-slate-700 bg-transparent px-2 py-0.5 text-xs text-slate-200 focus:border-emerald-500 focus:bg-slate-900"
@@ -592,6 +609,7 @@ export const PlatformSupportPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="secondary"
+                        disabled={!canManageSupport}
                         onClick={() => handleToggleRemoteRequest(true)}
                         leadingIcon={<Lock className="h-3 w-3" />}
                       >
@@ -603,6 +621,7 @@ export const PlatformSupportPage: React.FC = () => {
                           <Button
                             size="sm"
                             variant="primary"
+                            disabled={!canManageSupport}
                             onClick={() => handleApproveRemoteAccess(true)}
                             leadingIcon={<Unlock className="h-3 w-3" />}
                           >
@@ -612,18 +631,19 @@ export const PlatformSupportPage: React.FC = () => {
                           <Button
                             size="sm"
                             variant="primary"
+                            disabled={!canManageSupport}
                             onClick={() => setIsRemoteSessionOpen(true)}
                             leadingIcon={<Monitor className="h-3 w-3" />}
                           >
                             ??? ???? ??? ???
                           </Button>
                         )}
-                        <button
+                        {canManageSupport && (<button
                           onClick={() => handleToggleRemoteRequest(false)}
                           className="text-xs text-rose-400 hover:underline"
                         >
                           ????? ?????
-                        </button>
+                        </button>)}
                       </>
                     )}
                   </div>
@@ -652,6 +672,7 @@ export const PlatformSupportPage: React.FC = () => {
                           <Button
                             size="sm"
                             variant="danger"
+                            disabled={!canManageSupport}
                             onClick={() => handleEndRemoteSession(session.id)}
                           >
                             ????? ??????
@@ -681,7 +702,7 @@ export const PlatformSupportPage: React.FC = () => {
                       return (
                         <div key={msg.id} className="flex justify-center my-2">
                           <span className="rounded-full bg-slate-800/80 px-3 py-1 text-[11px] text-slate-400 border border-slate-700/50">
-                            {msg.body} � {formatDateTime(msg.createdAt)}
+                            {msg.body} � {formatDateTime(msg.createdAt)}
                           </span>
                         </div>
                       );
@@ -887,7 +908,7 @@ export const PlatformSupportPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsNewTicketOpen(false)}>
               ?????
             </Button>
-            <Button size="sm" onClick={handleCreateTicket}>
+            <Button size="sm" onClick={handleCreateTicket} disabled={!canManageSupport}>
               ????? ???????
             </Button>
           </div>
@@ -931,7 +952,7 @@ export const PlatformSupportPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsRemoteSessionOpen(false)}>
               ?????
             </Button>
-            <Button size="sm" onClick={handleStartRemoteSession}>
+            <Button size="sm" onClick={handleStartRemoteSession} disabled={!canManageSupport}>
               ????? ??? ??????
             </Button>
           </div>
@@ -980,7 +1001,7 @@ export const PlatformSupportPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsRateModalOpen(false)}>
               ?????
             </Button>
-            <Button size="sm" onClick={handleRateTicket}>
+            <Button size="sm" onClick={handleRateTicket} disabled={!canManageSupport}>
               ??? ???????
             </Button>
           </div>

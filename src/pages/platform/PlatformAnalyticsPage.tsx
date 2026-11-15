@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3,
-  TrendingUp,
-  DollarSign,
   Users,
   CalendarClock,
-  KeyRound,
   ShieldCheck,
   RefreshCw,
   Download,
@@ -96,13 +93,14 @@ export const PlatformAnalyticsPage: React.FC = () => {
     if (!businessPerf || !customerMetrics || !subMetrics) return;
     downloadCsv(`platform-analytics-${period}.csv`, [
       ['المؤشر', 'القيمة الحالية', 'الفترة السابقة', 'نسبة التغير %'],
-      ['الإيرادات المحصلة', businessPerf.revenue.current, businessPerf.revenue.previous, businessPerf.revenue.percentChange],
-      ['MRR الإيراد الشهري المتكرر', businessPerf.mrr.current, businessPerf.mrr.previous, businessPerf.mrr.percentChange],
-      ['ARR الإيراد السنوي المتوقع', businessPerf.arr.current, businessPerf.arr.previous, businessPerf.arr.percentChange],
-      ['إجمالي العملاء', customerMetrics.totalCustomers.current, customerMetrics.totalCustomers.previous, customerMetrics.totalCustomers.percentChange],
-      ['العملاء النشطون', customerMetrics.activeCustomers.current, customerMetrics.activeCustomers.previous, customerMetrics.activeCustomers.percentChange],
-      ['الاشتراكات النشطة', subMetrics.activeSubscriptions.current, subMetrics.activeSubscriptions.previous, subMetrics.activeSubscriptions.percentChange],
-      ['معدل فقدان العملاء Churn Rate', `${customerMetrics.churnRate.current}%`, `${customerMetrics.churnRate.previous}%`, customerMetrics.churnRate.percentChange],
+      ['الإيرادات المحصلة', businessPerf.revenue.total.current, businessPerf.revenue.total.previous, businessPerf.revenue.total.changePercent],
+      ['MRR الإيراد الشهري المتكرر', businessPerf.revenue.mrr.current, businessPerf.revenue.mrr.previous, businessPerf.revenue.mrr.changePercent],
+      ['ARR الإيراد السنوي المتوقع', businessPerf.revenue.arr.current, businessPerf.revenue.arr.previous, businessPerf.revenue.arr.changePercent],
+      ['العملاء النشطون', customerMetrics.activeCustomers.current, customerMetrics.activeCustomers.previous, customerMetrics.activeCustomers.changePercent],
+      ['عملاء جدد', customerMetrics.newCustomers.current, customerMetrics.newCustomers.previous, customerMetrics.newCustomers.changePercent],
+      ['متوسط قيمة العميل ARPU', customerMetrics.averageRevenuePerCustomer.current, customerMetrics.averageRevenuePerCustomer.previous, customerMetrics.averageRevenuePerCustomer.changePercent],
+      ['تجديدات قادمة', subMetrics.upcomingRenewals.current, subMetrics.upcomingRenewals.previous, subMetrics.upcomingRenewals.changePercent],
+      ['معدل فقدان العملاء Churn Rate', `${customerMetrics.churnRate.current}%`, `${customerMetrics.churnRate.previous}%`, customerMetrics.churnRate.changePercent],
     ]);
   };
 
@@ -144,7 +142,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                 { id: '7d', label: '7 أيام' },
                 { id: '30d', label: '30 يوماً' },
                 { id: '90d', label: 'ربع سنوي' },
-                { id: '1y', label: 'سنة كاملة' },
+                { id: '365d', label: 'سنة كاملة' },
               ] as const
             ).map((p) => (
               <button
@@ -194,52 +192,52 @@ export const PlatformAnalyticsPage: React.FC = () => {
             <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-semibold text-slate-400">الإيراد المحصل بالفترة</p>
-                {renderDelta(businessPerf?.revenue.percentChange)}
+                {renderDelta(businessPerf?.revenue.total.changePercent)}
               </div>
               <p className="text-2xl font-black text-slate-100 mt-2">
-                {formatMoney(businessPerf?.revenue.current || 0)}
+                {formatMoney(businessPerf?.revenue.total.current || 0)}
               </p>
               <p className="text-[10px] text-slate-500 mt-1">
-                الفترة السابقة: {formatMoney(businessPerf?.revenue.previous || 0)}
+                الفترة السابقة: {formatMoney(businessPerf?.revenue.total.previous || 0)}
               </p>
             </div>
 
             <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-semibold text-emerald-400">MRR (الإيراد المتكرر شهرياً)</p>
-                {renderDelta(businessPerf?.mrr.percentChange)}
+                {renderDelta(businessPerf?.revenue.mrr.changePercent)}
               </div>
               <p className="text-2xl font-black text-emerald-300 mt-2">
-                {formatMoney(businessPerf?.mrr.current || 0)}
+                {formatMoney(businessPerf?.revenue.mrr.current || 0)}
               </p>
               <p className="text-[10px] text-emerald-500/70 mt-1">
-                الفترة السابقة: {formatMoney(businessPerf?.mrr.previous || 0)}
+                الفترة السابقة: {formatMoney(businessPerf?.revenue.mrr.previous || 0)}
               </p>
             </div>
 
             <div className="p-4 bg-sky-950/20 border border-sky-500/20 rounded-xl">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-semibold text-sky-400">ARR (الإيراد السنوي المتوقع)</p>
-                {renderDelta(businessPerf?.arr.percentChange)}
+                {renderDelta(businessPerf?.revenue.arr.changePercent)}
               </div>
               <p className="text-2xl font-black text-sky-300 mt-2">
-                {formatMoney(businessPerf?.arr.current || 0)}
+                {formatMoney(businessPerf?.revenue.arr.current || 0)}
               </p>
               <p className="text-[10px] text-sky-500/70 mt-1">
-                الفترة السابقة: {formatMoney(businessPerf?.arr.previous || 0)}
+                الفترة السابقة: {formatMoney(businessPerf?.revenue.arr.previous || 0)}
               </p>
             </div>
 
             <div className="p-4 bg-purple-950/20 border border-purple-500/20 rounded-xl">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-semibold text-purple-400">متوسط قيمة العميل (ARPU)</p>
-                {renderDelta(businessPerf?.arpu.percentChange)}
+                {renderDelta(customerMetrics?.averageRevenuePerCustomer.changePercent)}
               </div>
               <p className="text-2xl font-black text-purple-300 mt-2">
-                {formatMoney(businessPerf?.arpu.current || 0)}
+                {formatMoney(customerMetrics?.averageRevenuePerCustomer.current || 0)}
               </p>
               <p className="text-[10px] text-purple-500/70 mt-1">
-                الفترة السابقة: {formatMoney(businessPerf?.arpu.previous || 0)}
+                الفترة السابقة: {formatMoney(customerMetrics?.averageRevenuePerCustomer.previous || 0)}
               </p>
             </div>
           </div>
@@ -258,7 +256,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                   <p className="text-lg font-black text-slate-100 mt-0.5">
                     {formatNumber(customerMetrics?.activeCustomers.current || 0)}
                   </p>
-                  {renderDelta(customerMetrics?.activeCustomers.percentChange)}
+                  {renderDelta(customerMetrics?.activeCustomers.changePercent)}
                 </div>
 
                 <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
@@ -266,7 +264,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                   <p className="text-lg font-black text-emerald-400 mt-0.5">
                     +{formatNumber(customerMetrics?.newCustomers.current || 0)}
                   </p>
-                  {renderDelta(customerMetrics?.newCustomers.percentChange)}
+                  {renderDelta(customerMetrics?.newCustomers.changePercent)}
                 </div>
 
                 <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
@@ -274,7 +272,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                   <p className="text-lg font-black text-rose-400 mt-0.5">
                     {customerMetrics?.churnRate.current || 0}%
                   </p>
-                  {renderDelta(customerMetrics?.churnRate.percentChange)}
+                  {renderDelta(customerMetrics?.churnRate.changePercent)}
                 </div>
               </div>
             </div>
@@ -287,19 +285,19 @@ export const PlatformAnalyticsPage: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">اشتراكات سارية</p>
+                  <p className="text-[11px] text-slate-400">تجديدات قادمة</p>
                   <p className="text-lg font-black text-slate-100 mt-0.5">
-                    {formatNumber(subMetrics?.activeSubscriptions.current || 0)}
+                    {formatNumber(subMetrics?.upcomingRenewals.current || 0)}
                   </p>
-                  {renderDelta(subMetrics?.activeSubscriptions.percentChange)}
+                  {renderDelta(subMetrics?.upcomingRenewals.changePercent)}
                 </div>
 
                 <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">فترة تجريبية (Trial)</p>
+                  <p className="text-[11px] text-slate-400">فترات تجريبية منتهية</p>
                   <p className="text-lg font-black text-amber-400 mt-0.5">
-                    {formatNumber(subMetrics?.trialSubscriptions.current || 0)}
+                    {formatNumber(subMetrics?.expiredTrials.current || 0)}
                   </p>
-                  {renderDelta(subMetrics?.trialSubscriptions.percentChange)}
+                  {renderDelta(subMetrics?.expiredTrials.changePercent)}
                 </div>
 
                 <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
@@ -307,7 +305,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                   <p className="text-lg font-black text-sky-400 mt-0.5">
                     {subMetrics?.trialConversionRate.current || 0}%
                   </p>
-                  {renderDelta(subMetrics?.trialConversionRate.percentChange)}
+                  {renderDelta(subMetrics?.trialConversionRate.changePercent)}
                 </div>
               </div>
             </div>
@@ -322,20 +320,19 @@ export const PlatformAnalyticsPage: React.FC = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
               <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">التراخيص النشطة</p>
+                <p className="text-[11px] text-slate-400">الأجهزة المنشطة</p>
                 <p className="text-lg font-black text-slate-100 mt-1">
-                  {formatNumber(licenseMetrics?.activeLicenses.current || 0)}
+                  {formatNumber(licenseMetrics?.activatedDevices.current || 0)}
                 </p>
+                {renderDelta(licenseMetrics?.activatedDevices.changePercent)}
               </div>
 
               <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">أجهزة ومقاعد مستخدمة</p>
-                <p className="text-lg font-black text-slate-100 mt-1">
-                  {formatNumber(licenseMetrics?.deviceUtilization.usedDevices || 0)} / {formatNumber(licenseMetrics?.deviceUtilization.totalDevices || 0)}
+                <p className="text-[11px] text-slate-400">نسبة استخدام التراخيص</p>
+                <p className="text-lg font-black text-sky-400 mt-1">
+                  {licenseMetrics?.utilizationRate.current || 0}%
                 </p>
-                <p className="text-[10px] text-sky-400 mt-0.5">
-                  نسبة الاستخدام: {licenseMetrics?.deviceUtilization.percentUsed || 0}%
-                </p>
+                {renderDelta(licenseMetrics?.utilizationRate.changePercent)}
               </div>
 
               <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
@@ -343,17 +340,15 @@ export const PlatformAnalyticsPage: React.FC = () => {
                 <p className="text-lg font-black text-amber-400 mt-1">
                   {formatNumber(opsMetrics?.syncErrors.current || 0)}
                 </p>
-                {renderDelta(opsMetrics?.syncErrors.percentChange)}
+                {renderDelta(opsMetrics?.syncErrors.changePercent)}
               </div>
 
               <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">تذاكر الدعم المفتوحة</p>
-                <p className="text-lg font-black text-rose-400 mt-1">
-                  {formatNumber(opsMetrics?.supportTickets.open || 0)}
+                <p className="text-[11px] text-slate-400">صحة واجهات API</p>
+                <p className="text-lg font-black text-emerald-400 mt-1">
+                  {opsMetrics?.apiHealth.current || 0}%
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  إجمالي التذاكر: {formatNumber(opsMetrics?.supportTickets.total || 0)}
-                </p>
+                {renderDelta(opsMetrics?.apiHealth.changePercent)}
               </div>
             </div>
           </div>

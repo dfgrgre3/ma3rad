@@ -21,7 +21,7 @@ export class BranchAccessService {
   }
 
   public getAccessibleBranchIds(user = this.actor()): string[] | null {
-    if (user.role === 'ADMIN') return null;
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') return null;
     const scope = this.db.query<{ branchScope: string }>(
       'SELECT branch_scope AS branchScope FROM users WHERE id = ? AND is_active = 1',
       [user.id]

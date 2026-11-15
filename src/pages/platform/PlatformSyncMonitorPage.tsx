@@ -39,7 +39,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
   const loadData = useCallback(() => {
     setLoading(true);
     try {
-      const logList = platformAdminService.listSyncLogs({
+      const logList = platformAdminService.listSyncStatus({
         status: statusFilter as PlatformSyncStatus || undefined,
         limit: 100,
       });
@@ -58,19 +58,44 @@ export const PlatformSyncMonitorPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // Trigger simulated sync event / retry
-  const handleTriggerTestSync = (tenantId?: string) => {
+  // Run a real pull through the configured sync client and log its actual result.
+  const handleRunSync = async (tenantId?: string) => {
+    const sync = typeof window !== 'undefined' ? window.ceramisys?.sync : undefined;
+    if (!sync?.pullEvents) {
+      alert('تنفيذ المزامنة يتطلب تطبيق سطح المكتب مع عميل مزامنة مهيأ.');
+      return;
+    }
     try {
+      const status = await sync.status?.();
+      if (!status?.clientConfigured) {
+        alert('لا يوجد عميل مزامنة مهيأ على هذا الجهاز. أعد تهيئة المزامنة من إعدادات المزامنة أولاً.');
+        return;
+      }
+      const result = await sync.pullEvents('all', null, 100);
+      const pulledCount = result?.events?.length ?? 0;
       platformAdminService.logSyncEvent({
         tenantId: tenantId || tenants[0]?.id,
-        syncType: 'RETRY_PUSH',
+        syncType: 'MANUAL_PULL',
         status: 'SUCCESS',
-        recordsSynced: Math.floor(Math.random() * 50) + 1,
+        recordsSynced: pulledCount,
       });
-      alert('تم إرسال أمر إعادة المزامنة بنجاح.');
+      alert(`تم تنفيذ المزامنة وسحب ${pulledCount} حدثاً.`);
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت إعادة المزامنة.');
+      const message = err instanceof Error ? err.message : 'فشلت المزامنة.';
+      try {
+        platformAdminService.logSyncEvent({
+          tenantId: tenantId || tenants[0]?.id,
+          syncType: 'MANUAL_PULL',
+          status: 'FAIL',
+          recordsSynced: 0,
+          errorDetail: message,
+        });
+      } catch {
+        // Logging can fail when the platform console is not in an owner session.
+      }
+      alert(message);
+      loadData();
     }
   };
 
@@ -80,8 +105,8 @@ export const PlatformSyncMonitorPage: React.FC = () => {
   });
 
   const successCount = filteredLogs.filter((l) => l.status === 'SUCCESS').length;
-  const failedCount = filteredLogs.filter((l) => l.status === 'FAILED' || l.status === 'CONFLICT').length;
-  const pendingCount = filteredLogs.filter((l) => l.status === 'PENDING' || l.status === 'PARTIAL').length;
+  const failedCount = filteredLogs.filter((l) => l.status === 'FAIL').length;
+  const pendingCount = filteredLogs.filter((l) => l.status === 'PARTIAL').length;
 
   return (
     <div className="space-y-4 text-right">
@@ -94,10 +119,10 @@ export const PlatformSyncMonitorPage: React.FC = () => {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => handleTriggerTestSync()}
+              onClick={() => void handleRunSync()}
               leadingIcon={<Play className="h-4 w-4" />}
             >
-              تشغيل فحص مزامنة فوري
+              تشغيل مزامنة الآن
             </Button>
             <Button
               size="sm"
@@ -139,10 +164,8 @@ export const PlatformSyncMonitorPage: React.FC = () => {
         >
           <option value="">جميع الحالات</option>
           <option value="SUCCESS">ناجحة (Success)</option>
-          <option value="FAILED">فاشلة (Failed)</option>
-          <option value="CONFLICT">تعارض بيانات (Conflict)</option>
-          <option value="PENDING">قيد الانتظار (Pending)</option>
-          <option value="PARTIAL">مزامنة جزئية (Partial)</option>
+          <option value="FAIL">فاشلة (Failed)</option>
+          <option value="PARTIAL">مزامنة جزئية / تعارض (Partial)</option>
         </select>
 
         <select
@@ -217,9 +240,9 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                           className={`font-bold inline-flex items-center gap-1 ${
                             log.status === 'SUCCESS'
                               ? 'text-emerald-400'
-                              : log.status === 'FAILED'
+                              : log.status === 'FAIL'
                               ? 'text-rose-400'
-                              : log.status === 'CONFLICT'
+                              : log.status === 'PARTIAL'
                               ? 'text-amber-400 font-black'
                               : 'text-sky-400'
                           }`}
@@ -228,11 +251,11 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                             <>
                               <CheckCircle2 className="h-3 w-3" /> نجاح
                             </>
-                          ) : log.status === 'FAILED' ? (
+                          ) : log.status === 'FAIL' ? (
                             <>
                               <XCircle className="h-3 w-3" /> فشل
                             </>
-                          ) : log.status === 'CONFLICT' ? (
+                          ) : log.status === 'PARTIAL' ? (
                             <>
                               <AlertTriangle className="h-3 w-3" /> تعارض بيانات
                             </>
@@ -258,9 +281,9 @@ export const PlatformSyncMonitorPage: React.FC = () => {
 
                       <td className="px-4 py-3 text-center">
                         <button
-                          onClick={() => handleTriggerTestSync(log.tenantId)}
+                          onClick={() => void handleRunSync(log.tenantId)}
                           className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1 mx-auto"
-                          title="إعادة المحاولة فوراً"
+                          title="إعادة المزامنة فوراً"
                         >
                           <RotateCcw className="h-3 w-3" />
                           إعادة

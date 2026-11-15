@@ -8,6 +8,7 @@ import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService'
 import { BranchAccessService } from './BranchAccessService';
 import { twoFactorAuth } from './twoFactorAuth';
 import { getConfiguredPasswordPolicy } from './passwordPolicy';
+import { PlatformStaffAuthService } from '../platform/PlatformStaffAuthService';
 
 /** Raised when the password was correct but a second factor is required. */
 export class TwoFactorRequiredError extends Error {
@@ -80,7 +81,10 @@ export class AuthService {
   }
 
   public static touchSession(): void {
-    if (!AuthService.currentSessionId) return;
+    if (!AuthService.currentSessionId) {
+      try { PlatformStaffAuthService.touchCurrentSession(); } catch { /* ignore */ }
+      return;
+    }
     try {
       DatabaseManager.getInstance().run(
         `UPDATE user_sessions SET last_seen_at = ? WHERE id = ? AND is_active = 1`,
@@ -89,6 +93,7 @@ export class AuthService {
     } catch {
       // ignore
     }
+    try { PlatformStaffAuthService.touchCurrentSession(); } catch { /* ignore */ }
   }
 
   private static endSession(reason: 'LOGOUT' | 'EXPIRED' | 'REVOKED' | 'CRASH'): void {
@@ -210,16 +215,16 @@ export class AuthService {
   public static logout(): void {
     const currentUser = authSession.getCurrentUser();
     if (currentUser) PermissionService.invalidate(currentUser);
+    try { PlatformStaffAuthService.endCurrentSession(); } catch { /* ignore */ }
     AuthService.endSession('LOGOUT');
     authSession.setCurrentUser(null);
     try {
       localStorage.removeItem(SESSION_KEY);
     } catch {
-      // localStorage unavailable (e.g. node test harness) — session stays in memory only
+      // localStorage unavailable (e.g. node test harness) - session stays in memory only
     }
   }
 
-  /** Clear any session left by a previous app run instead of restoring it. */
   public static clearPersistedSession(): void {
     const currentUser = authSession.getCurrentUser();
     if (currentUser) PermissionService.invalidate(currentUser);
@@ -450,54 +455,99 @@ export class AuthService {
     try {
       userId = localStorage.getItem(SESSION_KEY);
     } catch {
-      return null;
+      userId = null;
     }
-    if (!userId) return null;
 
-    const rows = DatabaseManager.getInstance().query<any>(
-      `SELECT id, username, password_hash, full_name, role, phone, is_active, created_at, updated_at,
-              security_key_hash
-       FROM users WHERE id = ? AND is_active = 1`,
-      [userId]
-    );
-    if (rows.length === 0) {
-      try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    if (userId) {
+      const rows = DatabaseManager.getInstance().query<any>(
+        `SELECT id, username, password_hash, full_name, role, phone, is_active, created_at, updated_at,
+                security_key_hash
+         FROM users WHERE id = ? AND is_active = 1`,
+        [userId]
+      );
+      if (rows.length === 0) {
+        try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+      } else {
+        const u = rows[0];
+        const isDefaultAdmin = u.username === 'admin' && bcrypt.compareSync('admin123', u.passwordHash);
+        const user: User = {
+          id: u.id,
+          username: u.username,
+          fullName: u.fullName,
+          role: u.role,
+          phone: u.phone,
+          isActive: Boolean(u.isActive),
+          mustChangePassword: isDefaultAdmin,
+          securityKeySetupRequired: u.id === 'usr_admin' && !u.securityKeyHash,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+        };
+        authSession.setCurrentUser(user);
+        try {
+          const sessionId = localStorage.getItem(SESSION_ID_KEY);
+          const active = sessionId
+            ? DatabaseManager.getInstance().query<any>(
+                `SELECT id FROM user_sessions WHERE id = ? AND user_id = ? AND is_active = 1`,
+                [sessionId, user.id]
+              )
+            : [];
+          if (active.length > 0 && sessionId) {
+            AuthService.currentSessionId = sessionId;
+          } else {
+            AuthService.startSession(user.id);
+          }
+        } catch {
+          AuthService.startSession(user.id);
+        }
+        return user;
+      }
+    }
+
+    try {
+      const staffSessionId = localStorage.getItem(PlatformStaffAuthService.SESSION_KEY);
+      if (!staffSessionId) return null;
+      const row = DatabaseManager.getInstance().query<any>(
+        `SELECT s.id AS sessionId, s.staff_id AS staffId, s.is_current AS isCurrent, s.expires_at AS expiresAt,
+                st.full_name AS fullName, st.email AS email, st.phone AS phone, st.role AS role,
+                st.is_active AS isActive, st.must_change_password AS mustChangePassword,
+                st.created_at AS createdAt, st.updated_at AS updatedAt
+         FROM platform_staff_sessions s
+         JOIN platform_staff st ON st.id = s.staff_id
+         WHERE s.id = ?
+           AND (st.deleted_at IS NULL OR st.deleted_at = '')
+         LIMIT 1`,
+        [staffSessionId]
+      )[0];
+      if (!row || !row.isActive || !row.isCurrent) {
+        try { localStorage.removeItem(PlatformStaffAuthService.SESSION_KEY); } catch { /* ignore */ }
+        return null;
+      }
+      if (row.expiresAt && new Date(String(row.expiresAt)).getTime() < Date.now()) {
+        try { localStorage.removeItem(PlatformStaffAuthService.SESSION_KEY); } catch { /* ignore */ }
+        return null;
+      }
+      const user: User = {
+        id: String(row.staffId),
+        username: String(row.email || ''),
+        fullName: String(row.fullName || row.email || ''),
+        role: String(row.role || 'SUPPORT_AGENT') as User['role'],
+        phone: row.phone ?? undefined,
+        isActive: true,
+        mustChangePassword: Boolean(row.mustChangePassword),
+        createdAt: String(row.createdAt || new Date().toISOString()),
+        updatedAt: String(row.updatedAt || new Date().toISOString()),
+      };
+      authSession.setCurrentUser(user);
+      try {
+        DatabaseManager.getInstance().run(
+          `UPDATE platform_staff_sessions SET last_activity_at = ? WHERE id = ? AND is_current = 1`,
+          [new Date().toISOString(), String(row.sessionId)]
+        );
+      } catch { /* ignore */ }
+      return user;
+    } catch {
       return null;
     }
-    const u = rows[0];
-    const isDefaultAdmin = u.username === 'admin' && bcrypt.compareSync('admin123', u.passwordHash);
-    const user: User = {
-      id: u.id,
-      username: u.username,
-      fullName: u.fullName,
-      role: u.role,
-      phone: u.phone,
-      isActive: Boolean(u.isActive),
-      mustChangePassword: isDefaultAdmin,
-      securityKeySetupRequired: u.id === 'usr_admin' && !u.securityKeyHash,
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-    };
-    authSession.setCurrentUser(user);
-    try {
-      const sessionId = localStorage.getItem(SESSION_ID_KEY);
-      const active = sessionId
-        ? DatabaseManager.getInstance().query<any>(
-            `SELECT id FROM user_sessions WHERE id = ? AND user_id = ? AND is_active = 1`,
-            [sessionId, user.id]
-          )
-        : [];
-      if (active.length > 0 && sessionId) {
-        AuthService.currentSessionId = sessionId;
-        // Do not mutate the SQLite database while restoring the app. The
-        // regular session heartbeat updates last_seen_at after startup.
-      } else {
-        AuthService.startSession(user.id);
-      }
-    } catch {
-      AuthService.startSession(user.id);
-    }
-    return user;
   }
 
   public static loginByPin(pin: string): User {
@@ -749,22 +799,56 @@ export class AuthService {
   }
 
   public static login(username: string, passwordAttempt: string, twoFactorCode?: string): User {
-    const userRecord = AuthService.getLoginRecord(username);
+    const normalizedUsername = String(username || '').trim();
+    const db = DatabaseManager.getInstance();
+    const userRows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [normalizedUsername]);
+    if (userRows.length === 0) {
+      AuthService.recordLogin(null, normalizedUsername, false, 'USER_NOT_FOUND');
+      throw new Error('بيانات الدخول غير صحيحة أو الحساب غير موجود.');
+    }
+
+    const userRecord = userRows[0];
+    const guard = AuthService.getLoginGuardStatus(normalizedUsername);
+    if (guard.isLocked) {
+      AuthService.recordLogin(userRecord.id, normalizedUsername, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
+    }
+
     const isValid = bcrypt.compareSync(passwordAttempt, userRecord.passwordHash);
-    if (!isValid) AuthService.rejectInvalidPassword(userRecord, username);
+    if (!isValid) AuthService.rejectInvalidPassword(userRecord, normalizedUsername);
 
     const isDefaultAdmin = userRecord.username === 'admin' && bcrypt.compareSync('admin123', userRecord.passwordHash);
-    return AuthService.finishLogin(userRecord, username, isDefaultAdmin, twoFactorCode);
+    return AuthService.finishLogin(userRecord, normalizedUsername, isDefaultAdmin, twoFactorCode);
   }
 
   public static async loginAsync(username: string, passwordAttempt: string, twoFactorCode?: string): Promise<User> {
-    const userRecord = AuthService.getLoginRecord(username);
+    const normalizedUsername = String(username || '').trim();
+    const db = DatabaseManager.getInstance();
+    const userRows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [normalizedUsername]);
+
+    if (userRows.length === 0) {
+      const platformUser = await PlatformStaffAuthService.login(normalizedUsername, passwordAttempt, twoFactorCode);
+      if (platformUser) {
+        AuthService.recordLogin(platformUser.id, platformUser.username, true);
+        return platformUser;
+      }
+      AuthService.recordLogin(null, normalizedUsername, false, 'USER_NOT_FOUND');
+      throw new Error('بيانات الدخول غير صحيحة أو الحساب غير موجود.');
+    }
+
+    const userRecord = userRows[0];
+    const guard = AuthService.getLoginGuardStatus(normalizedUsername);
+    if (guard.isLocked) {
+      AuthService.recordLogin(userRecord.id, normalizedUsername, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
+    }
+
     const isValid = await bcrypt.compare(passwordAttempt, userRecord.passwordHash);
-    if (!isValid) AuthService.rejectInvalidPassword(userRecord, username);
+    if (!isValid) AuthService.rejectInvalidPassword(userRecord, normalizedUsername);
 
     const isDefaultAdmin = userRecord.username === 'admin'
       && await bcrypt.compare('admin123', userRecord.passwordHash);
-    return AuthService.finishLogin(userRecord, username, isDefaultAdmin, twoFactorCode);
+    return AuthService.finishLogin(userRecord, normalizedUsername, isDefaultAdmin, twoFactorCode);
   }
 
   public getAllUsers(): User[] {
@@ -865,6 +949,11 @@ export class AuthService {
     }
     AuthService.validatePasswordPolicy(user.password, user.username);
     CentralUsageLimitService.assertWithin('maxUsers');
+
+    if (user.role === 'SUPER_ADMIN') {
+      throw new Error('لا يمكن إنشاء مستخدم بدور مالك المنصة (SUPER_ADMIN) من إدارة المستخدمين.');
+    }
+
     const roleExists = this.db.query('SELECT code FROM roles WHERE code = ?', [user.role]);
     if (roleExists.length === 0) {
       throw new Error('الدور المحدد غير موجود.');
@@ -950,7 +1039,7 @@ export class AuthService {
   }
 
   public checkPermission(user: User, requiredRole: UserRole[]): boolean {
-    if (user.role === 'ADMIN') return true;
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') return true;
     return requiredRole.includes(user.role);
   }
 
@@ -992,6 +1081,9 @@ export class AuthService {
     }
     if (existing.id === subject.id && patch.role && patch.role !== 'ADMIN' && existing.role === 'ADMIN') {
       throw new Error('لا يمكنك إزالة صلاحية مدير النظام عن حسابك الحالي.');
+    }
+    if (patch.role === 'SUPER_ADMIN' && existing.role !== 'SUPER_ADMIN') {
+      throw new Error('لا يمكن ترقية أي مستخدم إلى دور مالك المنصة (SUPER_ADMIN) من إدارة المستخدمين.');
     }
     const pinHash = patch.pinCode === undefined
       ? record.pinHash

@@ -171,10 +171,12 @@ export class CentralAuditService {
     const actorType = payload.actorType || (actor.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'SYSTEM');
 
     // Retrieve previous hash from the latest audit record
-    const latestRow = this.db.query<{ record_hash: string }>(
-      'SELECT record_hash FROM platform_audit_logs ORDER BY created_at DESC, id DESC LIMIT 1'
+    // DatabaseManager normalizes snake_case columns to camelCase; accept both
+    // shapes so the chain links regardless of the driver's key convention.
+    const latestRow = this.db.query<any>(
+      'SELECT record_hash AS recordHash FROM platform_audit_logs ORDER BY created_at DESC, id DESC LIMIT 1'
     )[0];
-    const prevHash = latestRow?.record_hash || 'GENESIS_ZERO_HASH_00000000000000000000000000000000';
+    const prevHash = latestRow?.recordHash ?? latestRow?.record_hash ?? 'GENESIS_ZERO_HASH_00000000000000000000000000000000';
 
     // Sanitize values
     const sanitizedDetails = payload.details !== undefined ? JSON.stringify(this.sanitize(payload.details)) : null;
@@ -347,26 +349,26 @@ export class CentralAuditService {
 
     const entries: PlatformAuditEntry[] = rows.map((row) => ({
       id: String(row.id),
-      actorId: row.actor_id ?? null,
-      actorName: row.actor_name ?? null,
-      actorType: (row.actor_type as AuditActorType) ?? 'SUPER_ADMIN',
-      tenantId: row.tenant_id ?? null,
-      deviceId: row.device_id ?? null,
-      deviceName: row.device_name ?? null,
-      ipAddress: row.ip_address ?? null,
-      userAgent: row.user_agent ?? null,
+      actorId: (row.actorId ?? row.actor_id) ?? null,
+      actorName: (row.actorName ?? row.actor_name) ?? null,
+      actorType: ((row.actorType ?? row.actor_type) as AuditActorType) ?? 'SUPER_ADMIN',
+      tenantId: (row.tenantId ?? row.tenant_id) ?? null,
+      deviceId: (row.deviceId ?? row.device_id) ?? null,
+      deviceName: (row.deviceName ?? row.device_name) ?? null,
+      ipAddress: (row.ipAddress ?? row.ip_address) ?? null,
+      userAgent: (row.userAgent ?? row.user_agent) ?? null,
       action: String(row.action),
-      entityType: String(row.entity_type),
-      entityId: row.entity_id ?? null,
-      severity: (row.severity as AuditSeverity) ?? 'INFO',
-      status: (row.status as AuditStatus) ?? 'SUCCESS',
+      entityType: String(row.entityType ?? row.entity_type),
+      entityId: (row.entityId ?? row.entity_id) ?? null,
+      severity: ((row.severity as AuditSeverity) ?? 'INFO'),
+      status: ((row.status as AuditStatus) ?? 'SUCCESS'),
       details: row.details ?? null,
-      oldValues: row.old_values ?? null,
-      newValues: row.new_values ?? null,
-      errorMessage: row.error_message ?? null,
-      prevHash: row.prev_hash ?? null,
-      recordHash: row.record_hash ?? null,
-      createdAt: String(row.created_at),
+      oldValues: (row.oldValues ?? row.old_values) ?? null,
+      newValues: (row.newValues ?? row.new_values) ?? null,
+      errorMessage: (row.errorMessage ?? row.error_message) ?? null,
+      prevHash: (row.prevHash ?? row.prev_hash) ?? null,
+      recordHash: (row.recordHash ?? row.record_hash) ?? null,
+      createdAt: String(row.createdAt ?? row.created_at),
     }));
 
     return {
@@ -399,11 +401,13 @@ export class CentralAuditService {
     let lastKnownHash = 'GENESIS_ZERO_HASH_00000000000000000000000000000000';
 
     for (const row of rows) {
-      if (row.prev_hash && row.prev_hash !== lastKnownHash && lastKnownHash !== 'GENESIS_ZERO_HASH_00000000000000000000000000000000') {
+      const prevHash = row.prevHash ?? row.prev_hash;
+      const recordHash = row.recordHash ?? row.record_hash;
+      if (prevHash && prevHash !== lastKnownHash && lastKnownHash !== 'GENESIS_ZERO_HASH_00000000000000000000000000000000') {
         return { isValid: false, checkedCount: rows.length, brokenAtId: String(row.id) };
       }
-      if (row.record_hash) {
-        lastKnownHash = row.record_hash;
+      if (recordHash) {
+        lastKnownHash = recordHash;
       }
     }
 

@@ -49,8 +49,8 @@ export class PermissionChecker {
       return PermissionChecker.cache.get(user.id)!;
     }
 
-    // ADMIN always has everything and cannot be locked out.
-    if (user.role === 'ADMIN') {
+    // ADMIN and SUPER_ADMIN always have everything and cannot be locked out.
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
       const sets = { grants: new Set<string>(ALL), denies: new Set<string>() };
       PermissionChecker.cache = PermissionChecker.cache || new Map();
       PermissionChecker.cache.set(user.id, sets);

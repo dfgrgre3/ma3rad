@@ -14,6 +14,7 @@ import {
   platformAdminService,
   PLATFORM_INVOICE_STATUS_LABELS,
 } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformInvoice,
   PlatformInvoiceInput,
@@ -64,6 +65,7 @@ const emptyInvoice: PlatformInvoiceInput = {
 
 export const PlatformBillingPage: React.FC = () => {
   const toast = useToast();
+  const canManageBilling = canPlatform('billing');
   const [tab, setTab] = React.useState<'invoices' | 'payments'>('invoices');
   const [invoices, setInvoices] = React.useState<PlatformInvoice[]>([]);
   const [payments, setPayments] = React.useState<PlatformPayment[]>([]);
@@ -156,6 +158,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const saveInvoice = () => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!invoiceForm.tenantId) {
       toast.error('اختر العميل أولاً');
       return;
@@ -183,6 +186,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const sendInvoice = (invoice: PlatformInvoice) => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     try {
       platformAdminService.setInvoiceStatus(invoice.id, 'SENT');
       toast.success('تم إرسال الفاتورة', invoice.number);
@@ -193,6 +197,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const voidInvoice = (invoice: PlatformInvoice) => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm(`إلغاء الفاتورة ${invoice.number}؟ لن يمكن التراجع.`)) return;
     try {
       platformAdminService.voidInvoice(invoice.id);
@@ -226,6 +231,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const savePayment = () => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!payForm.tenantId) {
       toast.error('اختر العميل أولاً');
       return;
@@ -254,6 +260,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const voidPayment = (payment: PlatformPayment) => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm('إلغاء هذه الدفعة؟ سيُعاد احتساب الفاتورة المرتبطة.')) return;
     try {
       platformAdminService.voidPayment(payment.id);
@@ -265,6 +272,7 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const exportInvoices = () => {
+    if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     downloadCsv('platform-invoices.csv', [
       ['الرقم', 'العميل', 'الحالة', 'الإجمالي', 'المدفوع', 'المتبقي', 'تاريخ الاستحقاق'],
       ...invoices.map((invoice) => [
@@ -293,15 +301,19 @@ export const PlatformBillingPage: React.FC = () => {
         icon={<ReceiptText className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportInvoices}>
-              تصدير الفواتير
-            </Button>
-            <Button variant="secondary" size="sm" leadingIcon={<Wallet className="h-3.5 w-3.5" />} onClick={() => openPayment()}>
-              تسجيل دفعة
-            </Button>
-            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreateInvoice}>
-              فاتورة جديدة
-            </Button>
+            {canManageBilling && (
+              <>
+                <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportInvoices}>
+                  تصدير الفواتير
+                </Button>
+                <Button variant="secondary" size="sm" leadingIcon={<Wallet className="h-3.5 w-3.5" />} onClick={() => openPayment()}>
+                  تسجيل دفعة
+                </Button>
+                <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreateInvoice}>
+                  فاتورة جديدة
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -386,17 +398,17 @@ export const PlatformBillingPage: React.FC = () => {
                             <button type="button" onClick={() => openDetail(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="عرض">
                               <Eye className="h-3.5 w-3.5" />
                             </button>
-                            {invoice.status === 'DRAFT' && (
+                            {canManageBilling && invoice.status === 'DRAFT' && (
                               <button type="button" onClick={() => sendInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700" title="إرسال">
                                 <Send className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {invoice.status !== 'VOID' && invoice.status !== 'PAID' && remaining > 0 && (
+                            {canManageBilling && invoice.status !== 'VOID' && invoice.status !== 'PAID' && remaining > 0 && (
                               <button type="button" onClick={() => openPayment(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تسجيل دفعة">
                                 <Wallet className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {invoice.status !== 'VOID' && (
+                            {canManageBilling && invoice.status !== 'VOID' && (
                               <button type="button" onClick={() => voidInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء">
                                 <Ban className="h-3.5 w-3.5" />
                               </button>
@@ -436,9 +448,11 @@ export const PlatformBillingPage: React.FC = () => {
                     <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-500" dir="ltr">{payment.reference || '—'}</td>
                     <td className="px-4 py-2.5 text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</td>
                     <td className="px-4 py-2.5">
-                      <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الدفعة">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canManageBilling && (
+                        <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الدفعة">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -461,7 +475,7 @@ export const PlatformBillingPage: React.FC = () => {
             <span className="text-[12px] font-bold text-slate-700">الإجمالي: {formatMoney(total)}</span>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setInvoiceOpen(false)} disabled={savingInvoice}>إلغاء</Button>
-              <Button variant="primary" onClick={saveInvoice} loading={savingInvoice}>إنشاء الفاتورة</Button>
+              <Button variant="primary" onClick={saveInvoice} loading={savingInvoice} disabled={!canManageBilling}>إنشاء الفاتورة</Button>
             </div>
           </div>
         }
@@ -557,10 +571,10 @@ export const PlatformBillingPage: React.FC = () => {
         footer={
           detail && (
             <div className="flex flex-wrap justify-end gap-2">
-              {detail.status !== 'VOID' && detail.total - detail.paidAmount > 0 && (
+              {canManageBilling && detail.status !== 'VOID' && detail.total - detail.paidAmount > 0 && (
                 <Button variant="success" leadingIcon={<Wallet className="h-3.5 w-3.5" />} onClick={() => openPayment(detail)}>تسجيل دفعة</Button>
               )}
-              {detail.status !== 'VOID' && (
+              {canManageBilling && detail.status !== 'VOID' && (
                 <Button variant="danger" leadingIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => voidInvoice(detail)}>إلغاء الفاتورة</Button>
               )}
             </div>
@@ -614,7 +628,7 @@ export const PlatformBillingPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setPayOpen(false)}>إلغاء</Button>
-            <Button variant="primary" onClick={savePayment}>تسجيل الدفعة</Button>
+            <Button variant="primary" onClick={savePayment} disabled={!canManageBilling}>تسجيل الدفعة</Button>
           </div>
         }
       >

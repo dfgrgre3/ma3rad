@@ -331,7 +331,7 @@ export class CashierService {
     )[0];
     if (!shift) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
     this.branchAccess.requireShiftAccess(shiftId, actor, shift.registerId);
-    if (actor.id !== shift.userId && actor.role !== 'ADMIN') {
+    if (actor.id !== shift.userId && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
       PermissionService.require(actor, 'ui.cashier.cashier.manage');
     }
     return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, actor.id, false);

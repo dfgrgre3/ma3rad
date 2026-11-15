@@ -21,6 +21,7 @@ import {
   Check,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformComprehensiveHealth,
   PlatformCentralBackup,
@@ -33,6 +34,7 @@ import { EmptyState, formatDateTime, formatNumber } from './components/PlatformU
 type HealthViewMode = 'cloud_server' | 'local_client';
 
 export const PlatformSystemHealthPage: React.FC = () => {
+  const canManageSystemHealth = canPlatform('system-health', 'platform.system-health.update');
   const [viewMode, setViewMode] = useState<HealthViewMode>('cloud_server');
   const [health, setHealth] = useState<PlatformComprehensiveHealth | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -58,13 +60,17 @@ export const PlatformSystemHealthPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadHealth]);
 
-  const handleTriggerBackup = () => {
+  const handleTriggerBackup = async () => {
+    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
     setTriggeringBackup(true);
     setBackupSuccess(false);
     try {
-      platformAdminService.triggerCentralBackup();
+      const created = await platformAdminService.triggerCentralBackup();
       setBackupSuccess(true);
       setTimeout(() => setBackupSuccess(false), 3000);
+      if (!created.integrityCheckPassed) {
+        alert('تم إنشاء نسخة احتياطية محلية مشفرة، لكن لم يتم التحقق من نسخة خارج الموقع.');
+      }
       loadHealth();
     } catch (e) {
       alert((e as Error).message);
@@ -74,6 +80,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
   };
 
   const handleResolveIncident = (id: string) => {
+    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
     try {
       platformAdminService.resolveServiceIncident(id);
       loadHealth();

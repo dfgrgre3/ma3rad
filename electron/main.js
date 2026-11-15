@@ -728,14 +728,15 @@ ipcMain.handle('central:request', async (event, request) => {
   if (request.body !== undefined && (typeof request.body !== 'string' || Buffer.byteLength(request.body, 'utf8') > 256 * 1024)) {
     throw new Error('Central API request body is invalid or too large.');
   }
+  const targetPathname = target.pathname;
   const requiresCredential = new Set([
     '/api/v1/licensing/validate',
     '/api/v1/licensing/heartbeat',
     '/api/v1/configuration/establishment',
     '/api/v1/configuration/current',
     '/api/v1/telemetry/errors',
-  ]).has(request.path);
-  const usesCredential = requiresCredential || request.path === '/api/v1/releases';
+  ]).has(targetPathname);
+  const usesCredential = requiresCredential || targetPathname === '/api/v1/releases';
   const credential = usesCredential ? await loadCentralCredential() : null;
   if (requiresCredential && !credential) throw new Error('This device is not activated with the central platform.');
   let requestBody = request.body;
@@ -746,12 +747,12 @@ ipcMain.handle('central:request', async (event, request) => {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.hasOwn(parsed, 'deviceCredential')) {
       throw new Error('Central API request body contains unsupported credential data.');
     }
-    if (credential && ['/api/v1/licensing/validate', '/api/v1/licensing/heartbeat', '/api/v1/telemetry/errors'].includes(request.path)) {
+    if (credential && ['/api/v1/licensing/validate', '/api/v1/licensing/heartbeat', '/api/v1/telemetry/errors'].includes(targetPathname)) {
       parsed.deviceCredential = credential;
       requestBody = JSON.stringify(parsed);
     }
   }
-  if (credential && ['/api/v1/configuration/establishment', '/api/v1/configuration/current', '/api/v1/releases'].includes(request.path)) {
+  if (credential && ['/api/v1/configuration/establishment', '/api/v1/configuration/current', '/api/v1/releases'].includes(targetPathname)) {
     headers['X-Device-Credential'] = credential;
   }
   const controller = new AbortController();
@@ -771,7 +772,7 @@ ipcMain.handle('central:request', async (event, request) => {
       try { body = JSON.parse(text); }
       catch { throw new Error('Central API returned a malformed JSON response.'); }
     }
-    if (request.path === '/api/v1/licensing/activate' && response.ok) {
+    if (targetPathname === '/api/v1/licensing/activate' && response.ok) {
       if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.deviceCredential !== 'string') {
         throw new Error('Central API activation response did not contain a device credential.');
       }

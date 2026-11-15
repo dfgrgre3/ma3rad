@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import { AuthService } from '../../services/domains/auth/AuthService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformSettingsMap } from '../../services/domains/platform/platformTypes';
 import type { User } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -33,6 +34,7 @@ type SettingsTab = 'identity' | 'legal' | 'communications' | 'payments' | 'netwo
 
 export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ currentUser }) => {
   const toast = useToast();
+  const canManageSettings = canPlatform('settings');
   const [activeTab, setActiveTab] = React.useState<SettingsTab>('identity');
   const [settings, setSettings] = React.useState<PlatformSettingsMap | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -65,6 +67,10 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
 
   const saveSettings = () => {
     if (!settings) return;
+    if (!canManageSettings) {
+      toast.error('لا تملك صلاحية تعديل إعدادات المنصة');
+      return;
+    }
     setSaving(true);
     try {
       const updated = platformAdminService.updateSettings({
@@ -81,6 +87,10 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
   };
 
   const handleRotateEncryptionKeys = () => {
+    if (!canManageSettings) {
+      toast.error('لا تملك صلاحية إدارة إعدادات الأمان');
+      return;
+    }
     if (!window.confirm('هل أنت متأكد من تدوير مفاتيح التشفير المركزية للمنصة؟ سيتم تسجيل الحدث كعملية أمنية عالية الخطورة.')) {
       return;
     }
@@ -159,7 +169,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 size="sm"
                 leadingIcon={<Save className="h-3.5 w-3.5" />}
                 onClick={saveSettings}
-                disabled={saving}
+                disabled={saving || !canManageSettings}
               >
                 {saving ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
               </Button>
@@ -635,7 +645,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   size="sm"
                   leadingIcon={<RotateCw className={`h-3.5 w-3.5 ${rotatingKey ? 'animate-spin' : ''}`} />}
                   onClick={handleRotateEncryptionKeys}
-                  disabled={rotatingKey}
+                  disabled={rotatingKey || !canManageSettings}
                 >
                   تدوير المفاتيح الآن
                 </Button>

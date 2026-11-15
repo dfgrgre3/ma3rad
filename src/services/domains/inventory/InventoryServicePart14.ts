@@ -112,9 +112,9 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     PermissionService.require(actor, 'inventory.adjust');
     this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
     const policy = new ApprovalPolicyService().assertCanExecute('inventory.adjustment.create', actor);
-    if (actor.role !== 'ADMIN' && policy.mode === 'APPROVAL') ModuleRegistryService.assertModuleEnabled('approvals');
+    if (actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN' && policy.mode === 'APPROVAL') ModuleRegistryService.assertModuleEnabled('approvals');
     if (policy.mode === 'DISABLED') throw new Error('تم تعطيل إنشاء تسويات المخزون بواسطة سياسة الموافقات.');
-    const requiresApproval = actor.role !== 'ADMIN' && (
+    const requiresApproval = actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN' && (
       policy.mode === 'APPROVAL' || (policy.maxValue != null && input.quantity > policy.maxValue)
     );
 
@@ -188,7 +188,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     const current = this.getAdjustmentHeader(db, adjustmentId);
     if (!current || current.status !== 'PENDING_APPROVAL' || current.approvalStatus !== 'PENDING') throw new Error('حالة التسوية لا تسمح بالاعتماد أو الترحيل.');
     this.branchAccess.requireWarehouseAccess(current.warehouseId, actor);
-    if (approve && !trustedDirectExecution && current.createdBy === actor.id && actor.role !== 'ADMIN') throw new Error('لا يمكن لمنشئ التسوية اعتمادها.');
+    if (approve && !trustedDirectExecution && current.createdBy === actor.id && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') throw new Error('لا يمكن لمنشئ التسوية اعتمادها.');
     if (!approve) {
       db.run(`UPDATE stock_adjustments SET approval_status = 'REJECTED', status = 'REJECTED' WHERE id = ? AND approval_status = 'PENDING'`, [adjustmentId]);
       this.recordPostedAdjustmentAudit(db, actor.id, actor.fullName, adjustmentId, 'REJECT', null, { approvalStatus: 'REJECTED' });

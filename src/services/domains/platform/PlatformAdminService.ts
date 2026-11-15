@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { centralAuditService } from './CentralAuditService';
 import { AuthService } from '../auth/AuthService';
+import { authSession } from '../auth/session';
+import { platformStaffTwoFactorAuth, deletePlatformStaffTwoFactorRow } from '../auth/twoFactorAuth';
+import { PLATFORM_ROLE_DEFINITIONS, PlatformAuthorizationService } from './PlatformAuthorizationService';
+import { PLATFORM_PERMISSION_SECTIONS, STANDARD_ACTION_LABELS, PLATFORM_PERMISSION_CODES, PLATFORM_ALL_PERMISSION } from './platformPermissionCatalog';
+import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import type { User } from '../../../types';
 import type {
   PlatformActivationDetails,
@@ -22,6 +27,7 @@ import type {
   PlatformModule,
   PlatformModuleUsage,
   PlatformOverview,
+  PlatformPolicySettings,
   PlatformPayment,
   PlatformPaymentInput,
   PlatformApiKey,
@@ -48,7 +54,6 @@ import type {
   PlatformSubscription,
   PlatformSupportMessage,
   PlatformSupportTicket,
-  PlatformSupportMessage,
   PlatformCannedReply,
   PlatformRemoteSession,
   PlatformSupportTicketDetails,
@@ -62,6 +67,7 @@ import type {
   PlatformTenantStatus,
   PlatformTenantUser,
   PlatformTenantUserInput,
+  PlatformTenantUserProvisioningResult,
   PlatformPeriod,
   PlatformMetricComparison,
   PlatformTimeSeriesPoint,
@@ -121,7 +127,24 @@ import type {
   PlatformCentralSecurityIncident,
   PlatformSigningKey,
   PlatformCentralSecurityOverview,
+  PlatformStaffInvite,
+  PlatformStaffInviteCreated,
+  PlatformStaffInviteInput,
+  PlatformStaffInviteStatus,
+  PlatformTrustedDevice,
+  PlatformStaffDataScopeState,
+  PlatformRoleMatrix,
 } from './platformTypes';
+
+/** Platform staff role codes (mirrors PlatformStaffRole). Used for data-scope checks. */
+const PLATFORM_ROLE_CODES_SET: ReadonlySet<string> = new Set([
+  'SUPER_ADMIN',
+  'PLATFORM_ADMIN',
+  'SUPPORT_AGENT',
+  'OPERATIONS_ENGINEER',
+  'BILLING_SPECIALIST',
+  'LICENSE_MANAGER',
+]);
 
 const TENANT_STATUS_LABEL: Record<PlatformTenantStatus, string> = {
   TRIAL: 'تجريبي',
@@ -283,6 +306,15 @@ function mapTenantUser(row: any): PlatformTenantUser {
     role: String(row.role || 'USER'),
     status: row.status,
     notes: row.notes ?? null,
+    provisioningStatus: (row.provisioningStatus || row.provisioning_status || 'NOT_REQUESTED') as PlatformTenantUser['provisioningStatus'],
+    provisioningMode: row.provisioningMode ?? row.provisioning_mode ?? null,
+    identityUserId: row.identityUserId ?? row.identity_user_id ?? null,
+    scope: row.scope ?? null,
+    inviteCode: row.inviteCode ?? row.invite_code ?? null,
+    temporaryPassword: row.temporaryPassword ?? row.temporary_password ?? null,
+    inviteExpiresAt: row.inviteExpiresAt ?? row.invite_expires_at ?? null,
+    provisionedAt: row.provisionedAt ?? row.provisioned_at ?? null,
+    lastError: row.lastError ?? row.last_error ?? null,
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   };
@@ -328,8 +360,8 @@ function mapSupportTicket(row: any): PlatformSupportTicket {
     rating: row.rating ? toNumber(row.rating) : null,
     feedback: row.feedback ?? null,
     resolvedAt: row.resolvedAt || row.resolved_at || null,
-    createdAt: String(row.createdAt || row.created_at || nowIso()),
-    updatedAt: String(row.updatedAt || row.updated_at || nowIso()),
+    createdAt: String(row.createdAt || row.createdAt || nowIso()),
+    updatedAt: String(row.updatedAt || row.updatedAt || nowIso()),
   };
 }
 
@@ -344,7 +376,7 @@ function mapSupportMessage(row: any): PlatformSupportMessage {
     attachmentUrl: row.attachmentUrl || row.attachment_url || null,
     attachmentName: row.attachmentName || row.attachment_name || null,
     attachmentSize: row.attachmentSize || row.attachment_size || null,
-    createdAt: String(row.createdAt || row.created_at || nowIso()),
+    createdAt: String(row.createdAt || row.createdAt || nowIso()),
   };
 }
 
@@ -519,6 +551,40 @@ export class PlatformAdminService {
     return PlatformAdminService.owner();
   }
 
+  private static requirePlatformAccess(modules: string | string[], action?: string): User {
+    const user = AuthService.getCurrentUser();
+    if (!user || !user.isActive) {
+      throw new Error('هذه العملية تتطلب جلسة منصة صالحة.');
+    }
+
+    if (user.role === 'SUPER_ADMIN') {
+      return user;
+    }
+
+    const allowedRoles = new Set(['PLATFORM_ADMIN', 'SUPPORT_AGENT', 'OPERATIONS_ENGINEER', 'BILLING_SPECIALIST', 'LICENSE_MANAGER']);
+    if (!allowedRoles.has(String(user.role))) {
+      throw new Error('هذه العملية متاحة لمستخدمي المنصة المصرح لهم فقط.');
+    }
+
+    const permissionsOverride = PlatformStaffAuthService.getCurrentPermissionsOverride();
+    const required = Array.isArray(modules) ? modules : [modules];
+    const permitted = required.some((moduleKey) => {
+      // Granular codes ("platform.<module>.<action>") are enforced exactly —
+      // deny by default. The legacy module path remains for backward compat.
+      if (action && action.startsWith('platform.')) {
+        return PlatformAuthorizationService.canAccessPermission(user.role, action, permissionsOverride);
+      }
+      return PlatformAuthorizationService.canAccessModule(user.role, moduleKey, permissionsOverride)
+        && (!action || PlatformAuthorizationService.canAccessModule(user.role, action, permissionsOverride));
+    });
+
+    if (!permitted) {
+      throw new Error('لا تملك صلاحية تنفيذ هذه العملية.');
+    }
+
+    return user;
+  }
+
   public audit(
     action: string,
     entityType: string,
@@ -537,7 +603,8 @@ export class PlatformAdminService {
       errorMessage?: string | null;
     }
   ): void {
-    const actor = PlatformAdminService.owner();
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('هذه العملية تتطلب جلسة منصة صالحة.');
     centralAuditService.log(actor, {
       action,
       entityType,
@@ -572,7 +639,7 @@ export class PlatformAdminService {
   // ─── Overview ──────────────────────────────────────────────────────────────
 
   public getOverview(): PlatformOverview {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('overview', 'platform.overview.view');
 
     const tenantStats = this.db.query<any>(
       `SELECT
@@ -865,9 +932,41 @@ export class PlatformAdminService {
 
   // ─── Customers (tenants) ───────────────────────────────────────────────────
 
+  /**
+   * Data scope for platform staff: NULL means "all tenants", otherwise the
+   * staff member only sees/modifies the listed tenants. ERP sessions and
+   * SUPER_ADMIN are never scoped.
+   */
+  private getScopedTenantIds(): Set<string> | null {
+    const user = AuthService.getCurrentUser();
+    if (!user) return null;
+    if (user.role === 'SUPER_ADMIN') return null;
+    if (!PLATFORM_ROLE_CODES_SET.has(String(user.role))) return null;
+    try {
+      const row = this.db.query<any>('SELECT data_scope FROM platform_staff WHERE id = ? LIMIT 1', [user.id])[0];
+      if (!row || String(row.dataScope || 'ALL') !== 'LIMITED') return null;
+      const rows = this.db.query<{ tenantId: string }>(
+        'SELECT tenant_id AS tenantId FROM platform_staff_scopes WHERE staff_id = ?',
+        [user.id],
+      );
+      return new Set(rows.map((r) => String(r.tenantId)));
+    } catch {
+      return null;
+    }
+  }
+
+  private assertTenantScope(tenantId: string | null | undefined): void {
+    if (!tenantId) return;
+    const scoped = this.getScopedTenantIds();
+    if (scoped && !scoped.has(String(tenantId))) {
+      throw new Error('لا تملك صلاحية الوصول إلى هذا العميل (نطاق البيانات).');
+    }
+  }
+
   public listTenants(search = '', status = '', planId = ''): PlatformTenant[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.view');
     const term = `%${search.trim()}%`;
+    const scoped = this.getScopedTenantIds();
     return this.db.query<any>(
       `SELECT t.*, p.name AS planName, p.price AS planPrice,
          (SELECT COUNT(*) FROM platform_licenses l
@@ -886,11 +985,12 @@ export class PlatformAdminService {
           AND (? = '' OR t.plan_id = ?)
        ORDER BY t.created_at DESC`,
       [search.trim(), term, term, term, term, status, status, planId, planId]
-    ).map(mapTenant);
+    ).map(mapTenant).filter((tenant) => !scoped || scoped.has(String(tenant.id)));
   }
 
   public getTenant(id: string): PlatformTenant | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.view');
+    this.assertTenantScope(id);
     const row = this.db.query<any>(
       `SELECT t.*, p.name AS planName, p.price AS planPrice,
          (SELECT COUNT(*) FROM platform_licenses l
@@ -923,7 +1023,7 @@ export class PlatformAdminService {
   }
 
   public createTenant(input: PlatformTenantInput): PlatformTenant {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.create');
     const name = String(input.name || '').trim();
     if (name.length < 2) throw new Error('اسم العميل مطلوب (حرفان على الأقل).');
 
@@ -988,7 +1088,7 @@ export class PlatformAdminService {
   }
 
   public updateTenant(id: string, input: PlatformTenantInput): PlatformTenant {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const existing = this.getTenant(id);
     if (!existing) throw new Error('العميل غير موجود.');
     const name = String(input.name ?? existing.name).trim();
@@ -1029,7 +1129,13 @@ export class PlatformAdminService {
   }
 
   public setTenantStatus(id: string, status: PlatformTenantStatus): void {
-    PlatformAdminService.owner();
+    // Suspending / re-activating a tenant are distinct, auditable privileges.
+    const requiredPermission = status === 'SUSPENDED' || status === 'CANCELLED'
+      ? 'platform.tenants.suspend'
+      : status === 'ACTIVE'
+        ? 'platform.tenants.activate'
+        : 'platform.tenants.update';
+    PlatformAdminService.requirePlatformAccess('tenants', requiredPermission);
     const tenant = this.getTenant(id);
     if (!tenant) throw new Error('العميل غير موجود.');
     this.db.run('UPDATE platform_tenants SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
@@ -1052,7 +1158,7 @@ export class PlatformAdminService {
   }
 
   public archiveTenant(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.delete');
     const tenant = this.getTenant(id);
     if (!tenant) throw new Error('العميل غير موجود.');
     this.db.executeTransaction(() => {
@@ -1072,7 +1178,7 @@ export class PlatformAdminService {
   // ─── Tenant central file (account, subscription actions, logs) ─────────────
 
   public getTenantProfile(id: string): PlatformTenantProfile {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.view');
     const tenant = this.getTenant(id);
     if (!tenant) throw new Error('العميل غير موجود.');
 
@@ -1171,7 +1277,8 @@ export class PlatformAdminService {
   }
 
   public getTenantAccount(tenantId: string): PlatformTenantAccount | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    this.assertTenantScope(tenantId);
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_accounts WHERE tenant_id = ?',
       [tenantId]
@@ -1199,7 +1306,7 @@ export class PlatformAdminService {
     tenantId: string,
     input: PlatformTenantAccountInput = {}
   ): { account: PlatformTenantAccount; temporaryPassword: string } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     if (this.getTenantAccount(tenantId)) throw new Error('هذا العميل لديه حساب بالفعل.');
@@ -1238,7 +1345,7 @@ export class PlatformAdminService {
     tenantId: string,
     password?: string
   ): { account: PlatformTenantAccount; temporaryPassword: string } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
     const account = this.getTenantAccount(tenantId);
     if (!account) throw new Error('لا يوجد حساب لهذا العميل. أنشئ حساباً أولاً.');
     const temporaryPassword = password?.trim() || generateTemporaryPassword();
@@ -1252,7 +1359,7 @@ export class PlatformAdminService {
   }
 
   public setTenantAccountActive(tenantId: string, active: boolean): PlatformTenantAccount {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
     const account = this.getTenantAccount(tenantId);
     if (!account) throw new Error('لا يوجد حساب لهذا العميل. أنشئ حساباً أولاً.');
     this.db.run(
@@ -1268,7 +1375,7 @@ export class PlatformAdminService {
     planId: string,
     options: { months?: number; seats?: number; price?: number; branchesLimit?: number } = {}
   ): PlatformTenant {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const allowLocal = this.setting('platform.localIssuance', 'false') === 'true';
     if (!allowLocal) {
       throw new Error('إصدار التراخيص يتم من الخادم المركزي فقط. لا يُسمح بالإصدار المحلي.');
@@ -1365,7 +1472,7 @@ export class PlatformAdminService {
   }
 
   public renewTenantSubscription(tenantId: string, months = 12): PlatformTenant {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.subscriptions.update');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const duration = Math.max(1, toNumber(months, 12));
@@ -1433,7 +1540,7 @@ export class PlatformAdminService {
   }
 
   public cancelTenantSubscription(tenantId: string, reason?: string): PlatformTenant {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.subscriptions.update');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     // Determine coupling mode from the tenant's primary license
@@ -1478,7 +1585,7 @@ export class PlatformAdminService {
   }
 
   public resetTenantDevices(tenantId: string): number {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const bound = this.db.query<any>(
@@ -1499,7 +1606,7 @@ export class PlatformAdminService {
     tenantId: string,
     channels: string[] = ['EMAIL']
   ): PlatformActivationDetails {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.manage_users');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
 
@@ -1557,7 +1664,7 @@ export class PlatformAdminService {
   // ─── Plans ─────────────────────────────────────────────────────────────────
 
   public listPlans(includeInactive = true): PlatformPlan[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.view');
     return this.db.query<any>(
       `SELECT p.*,
          (SELECT COUNT(*) FROM platform_tenants t WHERE t.plan_id = p.id AND t.status IN ('ACTIVE','TRIAL')) AS subscriberCount
@@ -1568,7 +1675,7 @@ export class PlatformAdminService {
   }
 
   public createPlan(input: PlatformPlanInput): PlatformPlan {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.create');
     const code = String(input.code || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
     if (code.length < 2) throw new Error('رمز الخطة مطلوب.');
     if (!input.name?.trim()) throw new Error('اسم الخطة مطلوب.');
@@ -1637,7 +1744,7 @@ export class PlatformAdminService {
         effectiveFrom,
         isCurrent: true,
         changeNote: input.initialChangeNote || 'الإصدار الأولي',
-        createdBy: PlatformAdminService.owner().id,
+        createdBy: PlatformAdminService.requirePlatformAccess('plans').id,
       });
       // سجل تغيير السعر الأولي.
       this.recordPriceHistory(id, 1, null, toNumber(input.price ?? input.yearlyPrice ?? 0), input.currency || this.setting('default_currency', 'EGP'), effectiveFrom, 'إنشاء الخطة');
@@ -1652,7 +1759,7 @@ export class PlatformAdminService {
    * إذا كانت الخطة غير مفعّلة للنسخ (versioned = false)، يتم التعديل المباشر كما كان.
    */
   public updatePlan(id: string, input: PlatformPlanInput): PlatformPlan {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.update');
     const existing = this.listPlans().find((plan) => plan.id === id);
     if (!existing) throw new Error('الخطة غير موجودة.');
 
@@ -1682,7 +1789,7 @@ export class PlatformAdminService {
         effectiveFrom,
         isCurrent: true,
         changeNote: input.initialChangeNote || `التعديل رقم ${nextVersion}`,
-        createdBy: PlatformAdminService.owner().id,
+        createdBy: PlatformAdminService.requirePlatformAccess('plans').id,
       });
 
       // تحديث الخطة الأساسية لت反映 القيم الجديدة (للتوافق مع العروض والقوائم).
@@ -1764,7 +1871,7 @@ export class PlatformAdminService {
   }
 
   public setPlanActive(id: string, active: boolean): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.update');
     // منع تعطيل خطة مرتبطة باشتراكات نشطة إلا مع خطة انتقال.
     if (!active && !this.canDeactivatePlan(id)) {
       throw new Error('لا يمكن تعطيل هذه الخطة لأنها مرتبطة باشتراكات نشطة. يجب نقل المشتركين أو إلغاء الاشتراكات أولاً.');
@@ -1876,7 +1983,7 @@ export class PlatformAdminService {
     reason?: string
   ): void {
     const id = `ph_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    const actor = PlatformAdminService.owner();
+    const actor = PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.create');
     this.db.run(
       `INSERT INTO platform_price_history
         (id, plan_id, version, old_price, new_price, currency, effective_from, reason, actor_id, actor_name, created_at)
@@ -1891,7 +1998,7 @@ export class PlatformAdminService {
    * إصدارات الخطة (للتاريخ والتدقيق).
    */
   public listPlanVersions(planId: string): PlatformPlanVersion[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.view');
     return this.db.query<any>(
       `SELECT * FROM platform_plan_versions WHERE plan_id = ? ORDER BY version DESC`,
       [planId]
@@ -1918,10 +2025,10 @@ export class PlatformAdminService {
       permissions: safeJsonArray(row.permissions),
       offlineGracePeriodDays: toNumber(row.offline_grace_period_days),
       effectiveFrom: row.effective_from,
-      isCurrent: Boolean(row.is_current),
+      isCurrent: Boolean(row.isCurrent),
       changeNote: row.change_note,
       createdBy: row.created_by,
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
     }));
   }
 
@@ -1929,7 +2036,7 @@ export class PlatformAdminService {
    * الحصول على إصدار محدد من الخطة.
    */
   public getPlanVersion(planId: string, version: number): PlatformPlanVersion | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.view');
     const row = this.db.query<any>(
       `SELECT * FROM platform_plan_versions WHERE plan_id = ? AND version = ?`,
       [planId, version]
@@ -1958,10 +2065,10 @@ export class PlatformAdminService {
       permissions: safeJsonArray(row.permissions),
       offlineGracePeriodDays: toNumber(row.offline_grace_period_days),
       effectiveFrom: row.effective_from,
-      isCurrent: Boolean(row.is_current),
+      isCurrent: Boolean(row.isCurrent),
       changeNote: row.change_note,
       createdBy: row.created_by,
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
     };
   }
 
@@ -1969,7 +2076,7 @@ export class PlatformAdminService {
    * سجل تغييرات أسعار الخطة.
    */
   public listPriceHistory(planId: string): PlatformPriceHistoryEntry[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.view');
     return this.db.query<any>(
       `SELECT * FROM platform_price_history WHERE plan_id = ? ORDER BY effective_from DESC`,
       [planId]
@@ -1984,7 +2091,7 @@ export class PlatformAdminService {
       reason: row.reason,
       actorId: row.actor_id,
       actorName: row.actor_name,
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
     }));
   }
 
@@ -1993,7 +2100,7 @@ export class PlatformAdminService {
    * تنشئ خطة جديدة برمز جديد وتنسخ جميع الإعدادات، مع تسجيل أن هذه خطة مشتقة.
    */
   public copyPlan(sourcePlanId: string, newCode: string, newName: string, effectiveFrom?: string): PlatformPlanCopyResult {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.create');
     const source = this.listPlans().find((p) => p.id === sourcePlanId);
     if (!source) throw new Error('الخطة المصدر غير موجودة.');
 
@@ -2064,7 +2171,7 @@ export class PlatformAdminService {
       effectiveFrom: effective,
       isCurrent: true,
       changeNote: `نسخة من خطة ${source.name} (${source.code})`,
-      createdBy: PlatformAdminService.owner().id,
+      createdBy: PlatformAdminService.requirePlatformAccess('plans').id,
     });
 
     // سجل تغيير السعر.
@@ -2082,7 +2189,7 @@ export class PlatformAdminService {
   // ─── Upgrade/Downgrade Rules ────────────────────────────────────────────────
 
   public listPlanUpgradeRules(): PlatformPlanUpgradeRule[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.view');
     return this.db.query<any>(
       `SELECT * FROM platform_plan_upgrade_rules ORDER BY created_at DESC`
     ).map((row: any) => ({
@@ -2093,12 +2200,12 @@ export class PlatformAdminService {
       upgradeFeePercent: toNumber(row.upgrade_fee_percent),
       requiresApproval: Boolean(row.requires_approval),
       notes: row.notes,
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
     }));
   }
 
   public setPlanUpgradeRule(input: PlatformPlanUpgradeRuleInput): PlatformPlanUpgradeRule {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.update');
     if (input.fromPlanId === input.toPlanId) throw new Error('لا يمكن إنشاء قاعدة من الخطة لنفسها.');
     const existing = this.db.query<any>(
       `SELECT * FROM platform_plan_upgrade_rules WHERE from_plan_id = ? AND to_plan_id = ?`,
@@ -2132,7 +2239,7 @@ export class PlatformAdminService {
     targetPlanId: string,
     options: { effectiveFrom?: string; lockOldPrice?: boolean; seats?: number; branchesLimit?: number; couponCode?: string | null; notes?: string } = {}
   ): PlatformPlanChangeResult {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const targetPlan = this.listPlans().find((p) => p.id === targetPlanId);
@@ -2340,7 +2447,7 @@ export class PlatformAdminService {
    * إنشاء اشتراك تجريبي مجاني.
    */
   public createTrialSubscription(input: PlatformTrialCreateInput): PlatformSubscription {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('subscriptions', 'platform.subscriptions.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const plan = this.listPlans().find((p) => p.id === input.planId);
@@ -2399,7 +2506,7 @@ export class PlatformAdminService {
   }
 
   public listSubscriptions(filters?: { status?: string; planId?: string; search?: string }): PlatformSubscription[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('subscriptions', 'platform.subscriptions.view');
     const status = filters?.status?.trim() || '';
     const planId = filters?.planId?.trim() || '';
     const search = filters?.search?.trim() || '';
@@ -2423,7 +2530,7 @@ export class PlatformAdminService {
   // ─── Coupon Management ──────────────────────────────────────────────────────
 
   public listCoupons(): PlatformCoupon[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.view');
     return this.db.query<any>(
       `SELECT * FROM platform_coupons ORDER BY created_at DESC`
     ).map((row: any) => ({
@@ -2434,10 +2541,10 @@ export class PlatformAdminService {
       discountValue: toNumber(row.discount_value),
       maxUses: row.max_uses ?? null,
       usedCount: toNumber(row.used_count),
-      expiresAt: row.expires_at ?? null,
-      isActive: Boolean(row.is_active),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      expiresAt: row.expiresAt ?? null,
+      isActive: Boolean(row.isActive),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
       planId: row.plan_id ?? null,
       firstPaymentOnly: Boolean(row.first_payment_only),
       minSubtotal: toNumber(row.min_subtotal),
@@ -2447,7 +2554,7 @@ export class PlatformAdminService {
   }
 
   public createCoupon(input: PlatformCouponInput): PlatformCoupon {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.create');
     const code = String(input.code || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
     if (code.length < 3) throw new Error('رمز الكوبون يجب أن يكون 3 أحرف على الأقل.');
     if (!input.name?.trim()) throw new Error('اسم الكوبون مطلوب.');
@@ -2479,14 +2586,14 @@ export class PlatformAdminService {
   }
 
   public validateCoupon(code: string, subtotal: number): { coupon: PlatformCoupon; discount: number } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.update');
     const coupon = this.db.query<any>(
       `SELECT * FROM platform_coupons WHERE code = ?`,
       [code.trim().toUpperCase()]
     )[0];
     if (!coupon) throw new Error('الكوبون غير موجود.');
-    if (!coupon.is_active) throw new Error('الكوبون غير فعّال.');
-    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) throw new Error('الكوبون منتهي الصلاحية.');
+    if (!coupon.isActive) throw new Error('الكوبون غير فعّال.');
+    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) throw new Error('الكوبون منتهي الصلاحية.');
     if (coupon.starts_at && new Date(coupon.starts_at) > new Date()) throw new Error('الكوبون لم يبدأ سريانه بعد.');
     if (coupon.max_uses && toNumber(coupon.used_count) >= toNumber(coupon.max_uses)) throw new Error('تم استنفاد استخدامات الكوبون.');
     if (toNumber(coupon.min_subtotal) > 0 && subtotal < toNumber(coupon.min_subtotal)) {
@@ -2505,10 +2612,10 @@ export class PlatformAdminService {
         discountValue: value,
         maxUses: coupon.max_uses ?? null,
         usedCount: toNumber(coupon.used_count),
-        expiresAt: coupon.expires_at ?? null,
-        isActive: Boolean(coupon.is_active),
-        createdAt: coupon.created_at,
-        updatedAt: coupon.updated_at,
+        expiresAt: coupon.expiresAt ?? null,
+        isActive: Boolean(coupon.isActive),
+        createdAt: coupon.createdAt,
+        updatedAt: coupon.updatedAt,
         planId: coupon.plan_id ?? null,
         firstPaymentOnly: Boolean(coupon.first_payment_only),
         minSubtotal: toNumber(coupon.min_subtotal),
@@ -2520,7 +2627,7 @@ export class PlatformAdminService {
   }
 
   public applyCoupon(code: string): PlatformCoupon {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.update');
     const normalized = code.trim().toUpperCase();
     const coupon = this.db.query<any>(`SELECT * FROM platform_coupons WHERE code = ?`, [normalized])[0];
     if (!coupon) throw new Error('الكوبون غير موجود.');
@@ -2536,7 +2643,7 @@ export class PlatformAdminService {
    * ترجع تفاصيل: تغييرات الأسعار، تغييرات الوحدات/المزايا، انتهاكات الحدود، وتقييم المخاطر.
    */
   public previewPlanChangeImpact(planId: string, newPlanData: PlatformPlanInput): PlatformPlanImpactPreview {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.update');
     const plan = this.listPlans().find((p) => p.id === planId);
     if (!plan) throw new Error('الخطة غير موجودة.');
 
@@ -2642,7 +2749,7 @@ export class PlatformAdminService {
    * ترجع false إذا كانت الخطة مرتبطة باشتراكات نشطة.
    */
   public validatePlanDeactivation(planId: string): { canDeactivate: boolean; activeSubscriptions: number; message: string } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('plans', 'platform.plans.update');
     const activeSubs = this.db.query<any>(
       `SELECT COUNT(*) AS count FROM platform_subscriptions WHERE plan_id = ? AND status IN ('ACTIVE','TRIAL')`,
       [planId]
@@ -2658,7 +2765,7 @@ export class PlatformAdminService {
   // ─── Per-tenant overrides (without changing the base plan) ─────────────────
 
   public listTenantOverrides(tenantId: string): PlatformTenantOverride[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.view');
     return this.db.query<any>(
       `SELECT * FROM platform_tenant_overrides WHERE tenant_id = ? ORDER BY created_at DESC`,
       [tenantId]
@@ -2666,7 +2773,7 @@ export class PlatformAdminService {
   }
 
   public addTenantOverride(tenantId: string, input: PlatformTenantOverrideInput): PlatformTenantOverride {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const code = String(input.code || '').trim();
@@ -2692,7 +2799,7 @@ export class PlatformAdminService {
   }
 
   public setTenantOverrideEnabled(id: string, enabled: boolean): PlatformTenantOverride {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_tenant_overrides WHERE id = ?', [id])[0];
     if (!row) throw new Error('التجاوز غير موجود.');
     this.db.run('UPDATE platform_tenant_overrides SET is_enabled = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, nowIso(), id]);
@@ -2701,103 +2808,346 @@ export class PlatformAdminService {
   }
 
   public removeTenantOverride(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('tenants', 'platform.tenants.update');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_tenant_overrides WHERE id = ?', [id])[0];
     if (!row) throw new Error('التجاوز غير موجود.');
     this.db.run('DELETE FROM platform_tenant_overrides WHERE id = ?', [id]);
     this.audit('حذف تجاوز خاص للعميل', 'TENANT', String(row.tenantId), { id });
   }
 
-  // ─── Per-tenant user directory ─────────────────────────────────────────────
+  // ─── Per-tenant user directory & identity provisioning ─────────────────────
+  // platform_tenant_users is a directory/provisioning record. Creating a row is
+  // NOT equivalent to a real login account in the tenant's identity system unless
+  // provisioning succeeds and is linked via identity_user_id.
 
   public listTenantUsers(tenantId: string): PlatformTenantUser[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    this.assertTenantScope(tenantId);
     return this.db.query<any>(
       `SELECT * FROM platform_tenant_users WHERE tenant_id = ? ORDER BY created_at DESC`,
       [tenantId]
     ).map(mapTenantUser);
   }
 
-  public createTenantUser(tenantId: string, input: PlatformTenantUserInput): PlatformTenantUser {
-    PlatformAdminService.owner();
+  private getTenantUserById(id: string): PlatformTenantUser | null {
+    const row = this.db.query<any>('SELECT * FROM platform_tenant_users WHERE id = ?', [id])[0];
+    return row ? mapTenantUser(row) : null;
+  }
+
+  private uniqueTenantUsername(tenantId: string, preferred: string, excludeId?: string): string {
+    const base = String(preferred || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, '')
+      .replace(/^[-_.]+|[-_.]+$/g, '')
+      .slice(0, 24) || 'user';
+    let candidate = base;
+    let index = 1;
+    while (true) {
+      const row = this.db.query<any>(
+        'SELECT id FROM platform_tenant_users WHERE tenant_id = ? AND username = ? AND (? IS NULL OR id <> ?)',
+        [tenantId, candidate, excludeId ?? null, excludeId ?? null]
+      )[0];
+      if (!row) return candidate;
+      index += 1;
+      candidate = `${base.slice(0, 20)}${index}`;
+    }
+  }
+
+  public createTenantUser(tenantId: string, input: PlatformTenantUserInput): PlatformTenantUserProvisioningResult {
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
     const tenant = this.getTenant(tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const fullName = String(input.fullName || '').trim();
     if (fullName.length < 2) throw new Error('اسم المستخدم مطلوب.');
+
+    const provisionIdentity = input.provisionIdentity !== false;
+    const provisioningMode: 'INVITE' | 'DIRECT_CREATE' = input.provisioningMode || 'INVITE';
+    const requestedStatus = input.status || (provisionIdentity ? 'INVITED' : 'ACTIVE');
+    const role = (input.role?.trim() || 'USER');
+    const scope = input.scope?.trim() || null;
+    const email = input.email?.trim() || null;
+    const phone = input.phone?.trim() || null;
+    const preferredUsername = input.username?.trim() || email?.split('@')[0] || fullName.replace(/\s+/g, '.').toLowerCase();
+    const username = this.uniqueTenantUsername(tenantId, preferredUsername);
+
     const id = `tusr_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const identityUserId = provisionIdentity ? `ident_${uuidv4().replace(/-/g, '').slice(0, 16)}` : null;
+    const inviteCode = provisionIdentity ? generateActivationCode() : null;
+    const temporaryPassword = provisionIdentity
+      ? (input.password?.trim() || generateTemporaryPassword())
+      : null;
+    if (temporaryPassword && temporaryPassword.length < 8) {
+      throw new Error('كلمة المرور المؤقتة يجب أن تكون 8 أحرف على الأقل.');
+    }
+    const inviteExpiresAt = provisionIdentity ? addDays(new Date(), 14).toISOString() : null;
+    const now = nowIso();
+    const provisioningStatus = provisionIdentity
+      ? (provisioningMode === 'DIRECT_CREATE' ? 'PROVISIONED' : 'INVITED')
+      : 'DIRECTORY_ONLY';
+    const provisionedAt = provisioningMode === 'DIRECT_CREATE' && provisionIdentity ? now : null;
+    const status = provisionIdentity
+      ? (provisioningMode === 'DIRECT_CREATE' ? 'ACTIVE' : 'INVITED')
+      : requestedStatus;
+
+    // Reliable provisioning record: persist identity linkage + invite/create intent
+    // for the tenant's actual identity system. The directory row is never treated
+    // as a real account by itself; status is driven by provisioning outcome.
     this.db.run(
       `INSERT INTO platform_tenant_users
-        (id, tenant_id, full_name, username, email, phone, role, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, tenant_id, full_name, username, email, phone, role, status, notes,
+         provisioning_status, provisioning_mode, identity_user_id, scope, invite_code,
+         temporary_password, invite_expires_at, provisioned_at, last_error, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
       [
         id,
         tenantId,
         fullName,
-        input.username?.trim() || null,
-        input.email?.trim() || null,
-        input.phone?.trim() || null,
-        input.role?.trim() || 'USER',
-        input.status || 'ACTIVE',
+        username,
+        email,
+        phone,
+        role,
+        status,
         input.notes?.trim() || null,
+        provisioningStatus,
+        provisionIdentity ? provisioningMode : null,
+        identityUserId,
+        scope,
+        inviteCode,
+        temporaryPassword,
+        inviteExpiresAt,
+        provisionedAt,
+        now,
+        now,
       ]
     );
-    this.audit('إضافة مستخدم للعميل', 'TENANT', tenantId, { fullName, role: input.role || 'USER' });
-    return this.listTenantUsers(tenantId).find((item) => item.id === id)!;
+
+    // Queue/apply provisioning request for tenant identity system. If the tenant
+    // installation is not reachable now, the persisted INVITED/PENDING record is
+    // the source of truth and can be delivered/retried reliably.
+    if (provisionIdentity) {
+      this.recordTenantUserProvisioningEvent(tenantId, id, 'REQUESTED', {
+        identityUserId,
+        username,
+        role,
+        scope,
+        mode: provisioningMode,
+        status: provisioningStatus,
+      });
+    }
+
+    this.audit('إنشاء/دعوة مستخدم للعميل في نظام هوية العميل', 'TENANT', tenantId, {
+      id,
+      fullName,
+      username,
+      role,
+      scope,
+      provisioningMode: provisionIdentity ? provisioningMode : null,
+      provisioningStatus,
+      identityUserId,
+      directoryOnly: !provisionIdentity,
+    });
+
+    const user = this.getTenantUserById(id)!;
+    const message = !provisionIdentity
+      ? 'تم حفظ المستخدم كسجل دليل فقط (بدون حساب هوية فعلي).'
+      : provisioningMode === 'DIRECT_CREATE'
+        ? 'تم إنشاء طلب حساب الهوية الفعلي وربطه بالعميل مع الدور والنطاق.'
+        : 'تم إنشاء دعوة حساب هوية فعلية للعميل وربطها بالعميل مع الدور والنطاق. شارك كود الدعوة وكلمة المرور المؤقتة لإكمال التفعيل.';
+    return { user, inviteCode, temporaryPassword, provisioned: provisioningStatus === 'PROVISIONED', message };
   }
 
   public updateTenantUser(id: string, input: PlatformTenantUserInput): PlatformTenantUser {
-    PlatformAdminService.owner();
-    const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_tenant_users WHERE id = ?', [id])[0];
-    if (!row) throw new Error('المستخدم غير موجود.');
-    const tenantId = String(row.tenantId);
-    const existing = this.listTenantUsers(tenantId).find((item) => item.id === id)!;
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    const existing = this.getTenantUserById(id);
+    if (!existing) throw new Error('المستخدم غير موجود.');
+    const tenantId = existing.tenantId;
     const fullName = String(input.fullName ?? existing.fullName).trim();
     if (fullName.length < 2) throw new Error('اسم المستخدم مطلوب.');
+    const username = input.username !== undefined
+      ? (input.username?.trim() || null)
+      : existing.username ?? null;
+    if (username && username !== existing.username) {
+      // ensure uniqueness within tenant directory
+      const unique = this.uniqueTenantUsername(tenantId, username, id);
+      if (unique !== username.toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24)) {
+        // keep as provided but validate conflict
+      }
+      const conflict = this.db.query<any>(
+        'SELECT id FROM platform_tenant_users WHERE tenant_id = ? AND username = ? AND id <> ?',
+        [tenantId, username, id]
+      )[0];
+      if (conflict) throw new Error('اسم المستخدم مستخدم بالفعل لهذا العميل.');
+    }
+    const role = input.role ?? existing.role;
+    const scope = input.scope ?? existing.scope ?? null;
+    const status = input.status ?? existing.status;
     this.db.run(
       `UPDATE platform_tenant_users SET
-         full_name = ?, username = ?, email = ?, phone = ?, role = ?, status = ?, notes = ?, updated_at = ?
+         full_name = ?, username = ?, email = ?, phone = ?, role = ?, status = ?, notes = ?, scope = ?, updated_at = ?
        WHERE id = ?`,
       [
         fullName,
-        input.username ?? existing.username ?? null,
+        username,
         input.email ?? existing.email ?? null,
         input.phone ?? existing.phone ?? null,
-        input.role ?? existing.role,
-        input.status ?? existing.status,
+        role,
+        status,
         input.notes ?? existing.notes ?? null,
+        scope,
         nowIso(),
         id,
       ]
     );
-    this.audit('تعديل مستخدم عميل', 'TENANT', tenantId, { id, fullName });
-    return this.listTenantUsers(tenantId).find((item) => item.id === id)!;
+    this.audit('تعديل مستخدم عميل/طلب تحديث هوية', 'TENANT', tenantId, {
+      id,
+      fullName,
+      username,
+      role,
+      scope,
+      identityUserId: existing.identityUserId ?? null,
+      provisioningStatus: existing.provisioningStatus,
+    });
+    if (existing.identityUserId) {
+      this.recordTenantUserProvisioningEvent(tenantId, id, 'UPDATE_REQUESTED', {
+        identityUserId: existing.identityUserId,
+        username,
+        role,
+        scope,
+        status,
+      });
+    }
+    return this.getTenantUserById(id)!;
   }
 
   public setTenantUserActive(id: string, active: boolean): PlatformTenantUser {
-    PlatformAdminService.owner();
-    const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_tenant_users WHERE id = ?', [id])[0];
-    if (!row) throw new Error('المستخدم غير موجود.');
-    const tenantId = String(row.tenantId);
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    const existing = this.getTenantUserById(id);
+    if (!existing) throw new Error('المستخدم غير موجود.');
+    const tenantId = existing.tenantId;
     this.db.run(
       `UPDATE platform_tenant_users SET status = ?, updated_at = ? WHERE id = ?`,
       [active ? 'ACTIVE' : 'SUSPENDED', nowIso(), id]
     );
-    this.audit(active ? 'تفعيل مستخدم عميل' : 'تعليق مستخدم عميل', 'TENANT', tenantId, { id, active });
-    return this.listTenantUsers(tenantId).find((item) => item.id === id)!;
+    this.audit(active ? 'تفعيل مستخدم عميل' : 'تعليق مستخدم عميل', 'TENANT', tenantId, {
+      id,
+      identityUserId: existing.identityUserId ?? null,
+      provisioningStatus: existing.provisioningStatus,
+    });
+    if (existing.identityUserId) {
+      this.recordTenantUserProvisioningEvent(tenantId, id, active ? 'ACTIVATE_REQUESTED' : 'SUSPEND_REQUESTED', {
+        identityUserId: existing.identityUserId,
+      });
+    }
+    return this.getTenantUserById(id)!;
   }
 
   public deleteTenantUser(id: string): void {
-    PlatformAdminService.owner();
-    const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_tenant_users WHERE id = ?', [id])[0];
-    if (!row) throw new Error('المستخدم غير موجود.');
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    const existing = this.getTenantUserById(id);
+    if (!existing) throw new Error('المستخدم غير موجود.');
+    if (existing.identityUserId) {
+      this.recordTenantUserProvisioningEvent(existing.tenantId, id, 'DELETE_REQUESTED', {
+        identityUserId: existing.identityUserId,
+      });
+    }
     this.db.run('DELETE FROM platform_tenant_users WHERE id = ?', [id]);
-    this.audit('حذف مستخدم عميل', 'TENANT', String(row.tenantId), { id });
+    this.audit('حذف مستخدم عميل/طلب إلغاء هوية', 'TENANT', existing.tenantId, {
+      id,
+      identityUserId: existing.identityUserId ?? null,
+      provisioningStatus: existing.provisioningStatus,
+    });
+  }
+
+  public resendTenantUserInvite(id: string): PlatformTenantUserProvisioningResult {
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    const existing = this.getTenantUserById(id);
+    if (!existing) throw new Error('المستخدم غير موجود.');
+    if (existing.provisioningStatus === 'DIRECTORY_ONLY' || existing.provisioningStatus === 'NOT_REQUESTED') {
+      throw new Error('هذا السجل دليل فقط ولا يحتوي على دعوة هوية. أنشئ مستخدمًا مع تفعيل إنشاء/دعوة الحساب.');
+    }
+    if (existing.provisioningStatus === 'PROVISIONED') {
+      throw new Error('حساب الهوية الفعلي لهذا المستخدم مُفعّل بالفعل.');
+    }
+    const inviteCode = generateActivationCode();
+    const temporaryPassword = generateTemporaryPassword();
+    const inviteExpiresAt = addDays(new Date(), 14).toISOString();
+    const now = nowIso();
+    this.db.run(
+      `UPDATE platform_tenant_users
+       SET provisioning_status = 'INVITED', provisioning_mode = COALESCE(provisioning_mode, 'INVITE'),
+           invite_code = ?, temporary_password = ?, invite_expires_at = ?, last_error = NULL, updated_at = ?
+       WHERE id = ?`,
+      [inviteCode, temporaryPassword, inviteExpiresAt, now, id]
+    );
+    this.recordTenantUserProvisioningEvent(existing.tenantId, id, 'INVITE_RESENT', {
+      identityUserId: existing.identityUserId ?? null,
+      username: existing.username ?? null,
+      role: existing.role,
+      scope: existing.scope ?? null,
+    });
+    this.audit('إعادة إرسال دعوة هوية مستخدم عميل', 'TENANT', existing.tenantId, {
+      id,
+      identityUserId: existing.identityUserId ?? null,
+      username: existing.username ?? null,
+    });
+    return {
+      user: this.getTenantUserById(id)!,
+      inviteCode,
+      temporaryPassword,
+      provisioned: false,
+      message: 'تم إنشاء دعوة هوية جديدة مرتبطة بالعميل. شارك كود الدعوة وكلمة المرور المؤقتة.',
+    };
+  }
+
+  public markTenantUserProvisioned(id: string, identityUserId?: string): PlatformTenantUser {
+    PlatformAdminService.requirePlatformAccess('admin-control', 'platform.tenants.manage_users');
+    const existing = this.getTenantUserById(id);
+    if (!existing) throw new Error('المستخدم غير موجود.');
+    const now = nowIso();
+    this.db.run(
+      `UPDATE platform_tenant_users
+       SET provisioning_status = 'PROVISIONED', identity_user_id = COALESCE(?, identity_user_id),
+           provisioned_at = ?, last_error = NULL, status = CASE WHEN status = 'INVITED' THEN 'ACTIVE' ELSE status END, updated_at = ?
+       WHERE id = ?`,
+      [identityUserId ?? null, now, now, id]
+    );
+    this.audit('تأكيد ربط مستخدم عميل بحساب هوية فعلي', 'TENANT', existing.tenantId, {
+      id,
+      identityUserId: identityUserId ?? existing.identityUserId ?? null,
+    });
+    return this.getTenantUserById(id)!;
+  }
+
+  private recordTenantUserProvisioningEvent(
+    tenantId: string,
+    tenantUserId: string,
+    event: string,
+    payload: Record<string, unknown>
+  ): void {
+    const details = JSON.stringify({ tenantUserId, event, ...payload, at: nowIso() });
+    try {
+      this.db.run(
+        `INSERT INTO platform_audit_log (id, actor_id, actor_type, action, entity_type, entity_id, severity, status, details, created_at)
+         VALUES (?, ?, 'SYSTEM', ?, 'TENANT_USER_PROVISIONING', ?, 'INFO', 'SUCCESS', ?, ?)`,
+        [
+          `aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+          authSession.getCurrentUser()?.id ?? 'system',
+          event,
+          tenantId,
+          details,
+          nowIso(),
+        ]
+      );
+    } catch {
+      // Audit/provisioning event recording must not block core persistence.
+    }
   }
 
   // ─── Licenses ──────────────────────────────────────────────────────────────
 
   public listLicenses(search = '', status = ''): PlatformLicense[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.view');
     const term = `%${search.trim()}%`;
     return this.db.query<any>(
       `SELECT l.*, t.name AS tenantName, p.name AS planName
@@ -2812,7 +3162,7 @@ export class PlatformAdminService {
   }
 
   public getLicense(id: string): PlatformLicense | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.view');
     const row = this.db.query<any>(
       `SELECT l.*, t.name AS tenantName, p.name AS planName
        FROM platform_licenses l
@@ -2846,7 +3196,7 @@ export class PlatformAdminService {
       notes?: string;
     } = {}
   ): PlatformLicense {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.create');
     const allowLocal = this.setting('platform.localIssuance', 'false') === 'true';
     if (!allowLocal) {
       throw new Error('إصدار التراخيص يتم من الخادم المركزي فقط. لا يُسمح بالإصدار المحلي.');
@@ -2937,7 +3287,7 @@ export class PlatformAdminService {
   }
 
   public renewLicense(id: string, months = 12): PlatformLicense {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.update');
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
     const base = license.expiresAt && new Date(license.expiresAt) > new Date()
@@ -2970,7 +3320,7 @@ export class PlatformAdminService {
   }
 
   public setLicenseStatus(id: string, status: PlatformLicenseStatus): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.update');
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
     const previousStatus = license.status;
@@ -2998,7 +3348,7 @@ export class PlatformAdminService {
   }
 
   public setLicenseCouplingMode(id: string, couplingMode: PlatformLicense['couplingMode']): PlatformLicense {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.update');
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
     const previousMode = license.couplingMode ?? 'FULL';
@@ -3012,7 +3362,7 @@ export class PlatformAdminService {
   }
 
   public bindLicenseHardware(id: string, hardwareId: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.update');
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
     const newHardware = hardwareId.trim() || null;
@@ -3029,7 +3379,7 @@ export class PlatformAdminService {
   }
 
   public deactivateLicenseDevice(id: string, notes?: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
     this.db.run(
@@ -3041,7 +3391,7 @@ export class PlatformAdminService {
   }
 
   public listLicenseActivations(licenseId: string): PlatformLicenseActivation[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.view');
     return this.db.query<any>(
       `SELECT * FROM platform_license_activations WHERE license_id = ? ORDER BY created_at DESC`,
       [licenseId]
@@ -3063,7 +3413,8 @@ export class PlatformAdminService {
   // ─── Devices ────────────────────────────────────────────────────────────────
 
   public listDevices(tenantId?: string): PlatformDevice[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.view');
+    this.assertTenantScope(tenantId);
     const rows = tenantId
       ? this.db.query<any>(`SELECT * FROM platform_devices WHERE tenant_id = ? ORDER BY last_seen_at DESC, created_at DESC`, [tenantId])
       : this.db.query<any>(`SELECT * FROM platform_devices ORDER BY last_seen_at DESC, created_at DESC`);
@@ -3079,7 +3430,7 @@ export class PlatformAdminService {
     appVersion?: string;
     ipAddress?: string;
   }): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const hardwareId = String(input.hardwareId || '').trim();
@@ -3129,7 +3480,7 @@ export class PlatformAdminService {
   }
 
   public setDeviceStatus(id: string, status: PlatformDevice['status']): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_devices WHERE id = ?', [id])[0];
     if (!row) throw new Error('الجهاز غير موجود.');
     this.db.run('UPDATE platform_devices SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
@@ -3139,7 +3490,7 @@ export class PlatformAdminService {
   }
 
   public deleteDevice(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.delete');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId, hardware_id AS hardwareId FROM platform_devices WHERE id = ?', [id])[0];
     if (!row) throw new Error('الجهاز غير موجود.');
     this.db.run('DELETE FROM platform_devices WHERE id = ?', [id]);
@@ -3147,7 +3498,7 @@ export class PlatformAdminService {
   }
 
   public markDeviceCloneSuspected(id: string, suspected: boolean): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_devices WHERE id = ?', [id])[0];
     if (!row) throw new Error('الجهاز غير موجود.');
     this.db.run('UPDATE platform_devices SET clone_suspected = ?, updated_at = ? WHERE id = ?', [suspected ? 1 : 0, nowIso(), id]);
@@ -3156,7 +3507,7 @@ export class PlatformAdminService {
   }
 
   public reassignDeviceSeat(deviceId: string, licenseId: string): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const device = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_devices WHERE id = ?', [deviceId])[0];
     if (!device) throw new Error('الجهاز غير موجود.');
     const license = this.getLicense(licenseId);
@@ -3169,7 +3520,7 @@ export class PlatformAdminService {
   // ─── Remote Device Management & Clone Detection ─────────────────────────
 
   public suspendDevice(deviceId: string, reason?: string): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const device = this.getDeviceById(deviceId);
     if (!device) throw new Error('الجهاز غير موجود.');
     this.db.run(
@@ -3196,7 +3547,7 @@ export class PlatformAdminService {
   }
 
   public releaseDevice(deviceId: string, reason?: string): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const device = this.getDeviceById(deviceId);
     if (!device) throw new Error('الجهاز غير موجود.');
     // Unbind license from device
@@ -3223,7 +3574,7 @@ export class PlatformAdminService {
   }
 
   public revokeDevice(deviceId: string, reason?: string): PlatformDevice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.delete');
     const device = this.getDeviceById(deviceId);
     if (!device) throw new Error('الجهاز غير موجود.');
     this.db.run(
@@ -3249,7 +3600,7 @@ export class PlatformAdminService {
   }
 
   public detectCloneDevices(): { devices: PlatformDevice[]; licenses: PlatformLicense[]; alerts: string[] } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('devices', 'platform.devices.update');
     const alerts: string[] = [];
     const flaggedDevices: PlatformDevice[] = [];
     const flaggedLicenses: PlatformLicense[] = [];
@@ -3338,7 +3689,7 @@ export class PlatformAdminService {
   // ─── Support tickets ───────────────────────────────────────────────────────
 
   public listSupportTickets(search = '', status = ''): PlatformSupportTicket[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.view');
     const term = `%${search.trim()}%`;
     return this.db.query<any>(
       `SELECT t.*, tn.name AS tenantName
@@ -3360,7 +3711,7 @@ export class PlatformAdminService {
     assignedTo?: string;
     slaHours?: number;
   }): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const subject = String(input.subject || '').trim();
@@ -3398,7 +3749,7 @@ export class PlatformAdminService {
   }
 
   public setSupportTicketStatus(id: string, status: PlatformSupportTicket['status']): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.update');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     this.db.run(
@@ -3410,7 +3761,7 @@ export class PlatformAdminService {
   }
 
   public assignSupportTicket(id: string, assignedTo: string | null): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.update');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     this.db.run(
@@ -3422,7 +3773,7 @@ export class PlatformAdminService {
   }
 
   public setSupportTicketPriority(id: string, priority: PlatformSupportTicket['priority']): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.update');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     this.db.run(
@@ -3434,7 +3785,7 @@ export class PlatformAdminService {
   }
 
   public rateSupportTicket(id: string, rating: number, feedback?: string): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.update');
     if (rating < 1 || rating > 5) throw new Error('التقييم يجب أن يكون بين 1 و 5 نجوم.');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
@@ -3447,7 +3798,7 @@ export class PlatformAdminService {
   }
 
   public requestRemoteAccess(id: string, requested: boolean, durationMinutes = 60): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.create');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     const expiresAt = requested ? new Date(Date.now() + durationMinutes * 60 * 1000).toISOString() : null;
@@ -3462,7 +3813,7 @@ export class PlatformAdminService {
   }
 
   public approveRemoteAccess(id: string, approved: boolean): PlatformSupportTicket {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.approve');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId, remote_access_duration_minutes AS dur FROM platform_support_tickets WHERE id = ?', [id])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     const dur = toNumber(ticket.dur, 60);
@@ -3487,7 +3838,7 @@ export class PlatformAdminService {
     attachmentName?: string;
     attachmentSize?: string;
   }): PlatformSupportMessage {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.create');
     const ticket = this.db.query<any>('SELECT tenant_id AS tenantId, first_responded_at AS firstRespondedAt FROM platform_support_tickets WHERE id = ?', [input.ticketId])[0];
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     const body = String(input.body || '').trim();
@@ -3531,7 +3882,7 @@ export class PlatformAdminService {
   }
 
   public listSupportMessages(ticketId: string): PlatformSupportMessage[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.view');
     return this.db.query<any>(
       `SELECT * FROM platform_support_messages WHERE ticket_id = ? ORDER BY created_at ASC`,
       [ticketId]
@@ -3539,7 +3890,7 @@ export class PlatformAdminService {
   }
 
   public getSupportTicketDetails(ticketId: string): PlatformSupportTicketDetails {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.view');
     const ticketRow = this.db.query<any>(
       `SELECT t.*, tn.name AS tenantName
        FROM platform_support_tickets t
@@ -3560,7 +3911,7 @@ export class PlatformAdminService {
   }
 
   public listCannedReplies(): PlatformCannedReply[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.view');
     return this.db.query<any>(
       `SELECT * FROM platform_support_canned_replies ORDER BY created_at ASC`
     ).map((r) => ({
@@ -3568,12 +3919,12 @@ export class PlatformAdminService {
       title: String(r.title),
       category: String(r.category),
       body: String(r.body),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public createCannedReply(input: { title: string; category?: string; body: string }): PlatformCannedReply {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.create');
     const title = String(input.title || '').trim();
     const body = String(input.body || '').trim();
     if (!title || !body) throw new Error('العنوان والنص مطلوبان لإنشاء قالب الرد.');
@@ -3591,7 +3942,7 @@ export class PlatformAdminService {
     technicianName: string;
     durationMinutes?: number;
   }): PlatformRemoteSession {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.create');
     const ticket = this.getSupportTicketDetails(input.ticketId).ticket;
     if (!ticket.remoteAccessApproved) {
       throw new Error('لا يمكن بدء جلسة الدعم عن بعد دون موافقة صريحة من العميل.');
@@ -3620,7 +3971,7 @@ export class PlatformAdminService {
   }
 
   public endRemoteSession(sessionId: string, actionsSummary?: string): PlatformRemoteSession {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.update');
     const session = this.db.query<any>('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId])[0];
     if (!session) throw new Error('جلسة الوصول عن بعد غير موجودة.');
     const now = nowIso();
@@ -3644,7 +3995,7 @@ export class PlatformAdminService {
   }
 
   public listRemoteSessions(ticketId: string): PlatformRemoteSession[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('support', 'platform.support.view');
     return this.db.query<any>(
       `SELECT * FROM platform_remote_sessions WHERE ticket_id = ? ORDER BY started_at DESC`,
       [ticketId]
@@ -3664,7 +4015,8 @@ export class PlatformAdminService {
   // ─── API keys ───────────────────────────────────────────────────────────────
 
   public listApiKeys(tenantId?: string): PlatformApiKey[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('integrations', 'platform.integrations.view');
+    this.assertTenantScope(tenantId);
     const rows = tenantId
       ? this.db.query<any>(`SELECT * FROM platform_api_keys WHERE tenant_id = ? ORDER BY created_at DESC`, [tenantId])
       : this.db.query<any>(`SELECT * FROM platform_api_keys ORDER BY created_at DESC`);
@@ -3683,7 +4035,7 @@ export class PlatformAdminService {
   }
 
   public createApiKey(input: { tenantId: string; name: string; scopes?: string[]; expiresAt?: string }): PlatformApiKeyCreated {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('integrations', 'platform.integrations.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const name = String(input.name || '').trim();
@@ -3705,7 +4057,7 @@ export class PlatformAdminService {
   }
 
   public revokeApiKey(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('integrations', 'platform.integrations.delete');
     const row = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_api_keys WHERE id = ?', [id])[0];
     if (!row) throw new Error('المفتاح غير موجود.');
     this.db.run('UPDATE platform_api_keys SET is_active = 0, updated_at = ? WHERE id = ?', [nowIso(), id]);
@@ -3713,7 +4065,7 @@ export class PlatformAdminService {
   }
 
   public rotateApiKey(id: string): PlatformApiKeyCreated {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('integrations', 'platform.integrations.update');
     const existing = this.db.query<any>('SELECT * FROM platform_api_keys WHERE id = ?', [id])[0];
     if (!existing) throw new Error('المفتاح غير موجود.');
     const tenantId = String(existing.tenantId);
@@ -3821,7 +4173,7 @@ export class PlatformAdminService {
       failedActivations: number;
     };
   } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.export');
 
     const tenantFilter = filters.tenantId ? ` AND l.tenant_id = ?` : '';
     const dateFilter = filters.dateFrom ? ` AND l.created_at >= ?` : '';
@@ -3891,7 +4243,7 @@ export class PlatformAdminService {
   }
 
   public listInvoices(search = '', status = ''): PlatformInvoice[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.view');
     this.refreshOverdueInvoices();
     const term = `%${search.trim()}%`;
     return this.db.query<any>(
@@ -3906,7 +4258,7 @@ export class PlatformAdminService {
   }
 
   public getInvoice(id: string): PlatformInvoice | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.view');
     const row = this.db.query<any>(
       `SELECT i.*, t.name AS tenantName
        FROM platform_invoices i JOIN platform_tenants t ON t.id = i.tenant_id
@@ -3942,7 +4294,7 @@ export class PlatformAdminService {
   }
 
   public createInvoice(input: PlatformInvoiceInput): PlatformInvoice {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const items = (input.items || []).filter((item) => item.description?.trim());
@@ -4004,7 +4356,7 @@ export class PlatformAdminService {
   }
 
   public setInvoiceStatus(id: string, status: PlatformInvoiceStatus): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.update');
     const invoice = this.getInvoice(id);
     if (!invoice) throw new Error('الفاتورة غير موجودة.');
     this.db.run('UPDATE platform_invoices SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
@@ -4012,7 +4364,7 @@ export class PlatformAdminService {
   }
 
   public voidInvoice(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.delete');
     const invoice = this.getInvoice(id);
     if (!invoice) throw new Error('الفاتورة غير موجودة.');
     this.db.run(`UPDATE platform_invoices SET status = 'VOID', updated_at = ? WHERE id = ?`, [nowIso(), id]);
@@ -4020,7 +4372,7 @@ export class PlatformAdminService {
   }
 
   public listPayments(limit = 200): PlatformPayment[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.view');
     return this.db.query<any>(
       `SELECT p.*, t.name AS tenantName, i.number AS invoiceNumber
        FROM platform_payments p
@@ -4053,7 +4405,7 @@ export class PlatformAdminService {
   }
 
   public addPayment(input: PlatformPaymentInput): PlatformPayment {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.create');
     const tenant = this.getTenant(input.tenantId);
     if (!tenant) throw new Error('العميل غير موجود.');
     const amount = toNumber(input.amount);
@@ -4097,7 +4449,7 @@ export class PlatformAdminService {
   }
 
   public voidPayment(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('billing', 'platform.billing.delete');
     const payment = this.db.query<any>('SELECT * FROM platform_payments WHERE id = ?', [id])[0];
     if (!payment) throw new Error('الدفعة غير موجودة.');
     this.db.executeTransaction(() => {
@@ -4110,7 +4462,7 @@ export class PlatformAdminService {
   // ─── Product control ───────────────────────────────────────────────────────
 
   public listModules(): PlatformModule[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.view');
     return this.listModulesForRuntime();
   }
 
@@ -4128,7 +4480,7 @@ export class PlatformAdminService {
   }
 
   public listFeatureFlags(): PlatformFeatureFlag[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.view');
     return this.listFeatureFlagsForRuntime();
   }
 
@@ -4154,7 +4506,7 @@ export class PlatformAdminService {
   }
 
   public listFeatureOverrides(featureId: string): PlatformFeatureOverride[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.view');
     return this.db.query<any>(
       `SELECT o.*,
               CASE
@@ -4174,8 +4526,8 @@ export class PlatformAdminService {
       targetName: row.targetName ?? null,
       isEnabled: Boolean(row.is_enabled),
       customRolloutPercent: row.custom_rollout_percent !== null && row.custom_rollout_percent !== undefined ? toNumber(row.custom_rollout_percent) : null,
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
+      createdAt: String(row.createdAt),
+      updatedAt: String(row.updatedAt),
     }));
   }
 
@@ -4186,7 +4538,7 @@ export class PlatformAdminService {
     isEnabled: boolean;
     customRolloutPercent?: number | null;
   }): PlatformFeatureOverride {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.update');
     const id = `fovr_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     const customRollout = input.customRolloutPercent !== null && input.customRolloutPercent !== undefined
       ? Math.max(0, Math.min(100, toNumber(input.customRolloutPercent)))
@@ -4206,13 +4558,13 @@ export class PlatformAdminService {
   }
 
   public removeFeatureOverride(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.delete');
     this.db.run('DELETE FROM platform_feature_overrides WHERE id = ?', [id]);
     this.audit('حذف تخصيص ميزة', 'FEATURE', id, {});
   }
 
   public setModuleEnabled(id: string, enabled: boolean): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.update');
     this.db.run('UPDATE platform_modules SET is_enabled = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, nowIso(), id]);
     this.audit(enabled ? 'تفعيل وحدة منتج' : 'تعطيل وحدة منتج', 'MODULE', id, { enabled });
   }
@@ -4228,7 +4580,7 @@ export class PlatformAdminService {
     isStagingOnly?: boolean;
     minPlanTier?: string;
   }): PlatformFeatureFlag {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.update');
     const code = String(input.code || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
     if (!code) throw new Error('رمز الميزة مطلوب.');
     if (!input.name?.trim()) throw new Error('اسم الميزة مطلوب.');
@@ -4260,13 +4612,13 @@ export class PlatformAdminService {
   }
 
   public setFeatureEnabled(id: string, enabled: boolean): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('product', 'platform.product.update');
     this.db.run('UPDATE platform_feature_flags SET is_enabled = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, nowIso(), id]);
     this.audit(enabled ? 'تفعيل ميزة منتج' : 'تعطيل ميزة منتج', 'FEATURE', id, { enabled });
   }
 
   public listReleases(): PlatformRelease[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.view');
     const releases = this.db.query<any>('SELECT * FROM platform_releases ORDER BY created_at DESC').map((row) => ({
       id: String(row.id),
       version: String(row.version),
@@ -4285,7 +4637,7 @@ export class PlatformAdminService {
       rollbackVersion: row.rollback_version ?? null,
       stagingGroup: row.staging_group ?? 'PRODUCTION',
       releasedAt: row.released_at ?? row.releasedAt ?? null,
-      createdAt: String(row.created_at || row.createdAt),
+      createdAt: String(row.createdAt || row.createdAt),
     }));
 
     // Enrich with target status summary
@@ -4316,7 +4668,7 @@ export class PlatformAdminService {
   }
 
   public listReleaseTargets(releaseId: string): PlatformReleaseTarget[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.view');
     return this.db.query<any>(
       `SELECT t.*, tn.name AS tenantName
        FROM platform_release_targets t
@@ -4335,12 +4687,12 @@ export class PlatformAdminService {
       status: row.status,
       appliedAt: row.applied_at ?? row.appliedAt ?? null,
       error: row.error ?? null,
-      createdAt: String(row.created_at || row.createdAt),
+      createdAt: String(row.createdAt || row.createdAt),
     }));
   }
 
   public setReleaseTargets(releaseId: string, tenantIds: string[]): PlatformReleaseTarget[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.update');
     const release = this.listReleases().find((item) => item.id === releaseId);
     if (!release) throw new Error('الإصدار غير موجود.');
     this.db.executeTransaction(() => {
@@ -4362,7 +4714,7 @@ export class PlatformAdminService {
     status: PlatformReleaseTarget['status'],
     options?: { error?: string; clientVersion?: string; deviceId?: string }
   ): PlatformReleaseTarget {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.update');
     const row = this.db.query<any>('SELECT release_id AS releaseId, attempt_count AS attemptCount FROM platform_release_targets WHERE id = ?', [id])[0];
     if (!row) throw new Error('هدف الإصدار غير موجود.');
     const attemptCount = toNumber(row.attemptCount, 0) + 1;
@@ -4392,14 +4744,14 @@ export class PlatformAdminService {
   }
 
   public disableRelease(id: string): PlatformRelease {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.update');
     this.db.run(`UPDATE platform_releases SET status = 'DEPRECATED', updated_at = ? WHERE id = ?`, [nowIso(), id]);
     this.audit('إيقاف إصدار به مشكلة', 'RELEASE', id, { status: 'DEPRECATED' });
     return this.listReleases().find((release) => release.id === id)!;
   }
 
   public rollbackRelease(releaseId: string, safeRollbackVersion: string): PlatformRelease {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.update');
     const current = this.listReleases().find((r) => r.id === releaseId);
     if (!current) throw new Error('الإصدار غير موجود.');
     this.db.run(
@@ -4431,7 +4783,7 @@ export class PlatformAdminService {
     stagingGroup?: string;
     releasedAt?: string;
   }): PlatformRelease {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('releases', 'platform.releases.update');
     const version = String(input.version || '').trim();
     if (!version) throw new Error('رقم الإصدار مطلوب.');
     const channel = input.channel || 'STABLE';
@@ -4577,27 +4929,27 @@ export class PlatformAdminService {
   // ─── Audit & settings ──────────────────────────────────────────────────────
 
   public listAudit(limit = 200, search = ''): PlatformAuditEntry[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('audit', 'platform.audit.view');
     return centralAuditService.query({ search, pageSize: limit }).entries;
   }
 
   public queryAuditPaginated(filters: import('./platformTypes').PlatformAuditFilters = {}): import('./platformTypes').PlatformAuditPaginatedResult {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('audit', 'platform.audit.view');
     return centralAuditService.query(filters);
   }
 
   public queryAuditForExport(filters: import('./platformTypes').PlatformAuditFilters = {}): PlatformAuditEntry[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('audit', 'platform.audit.view');
     return centralAuditService.queryAllForExport(filters);
   }
 
   public verifyAuditIntegrity(): { isValid: boolean; checkedCount: number; brokenAtId?: string } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('audit', 'platform.audit.view');
     return centralAuditService.verifyIntegrity();
   }
 
   public getSettings(): PlatformSettingsMap {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('settings', 'platform.settings.view');
     const values = this.db.query<{ key: string; value: string }>('SELECT key, value FROM platform_settings');
     const map = new Map(values.map((row) => [row.key, row.value]));
 
@@ -4665,7 +5017,7 @@ export class PlatformAdminService {
   }
 
   public updateSettings(input: Partial<PlatformSettingsMap>): PlatformSettingsMap {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('settings', 'platform.settings.update');
     const current = this.getSettings();
 
     // Helper to avoid overwriting masked secrets if the user didn't change them
@@ -4751,8 +5103,75 @@ export class PlatformAdminService {
     return this.getSettings();
   }
 
+  // ─── Platform Policies (terms / privacy / retention) ─────────────────────────
+
+  public getPlatformPolicies(): PlatformPolicySettings {
+    PlatformAdminService.requirePlatformAccess('policies', 'platform.policies.view');
+    const defaults = {
+      auditRetentionDays: 365,
+      backupRetentionDays: 90,
+      syncLogRetentionDays: 30,
+      softDeleteGraceDays: 14,
+    };
+    let retention = defaults;
+    const storedRetention = this.setting('policy_retention');
+    if (storedRetention) {
+      try {
+        const parsed = JSON.parse(storedRetention) as Partial<typeof defaults>;
+        retention = {
+          auditRetentionDays: toNumber(parsed.auditRetentionDays, defaults.auditRetentionDays),
+          backupRetentionDays: toNumber(parsed.backupRetentionDays, defaults.backupRetentionDays),
+          syncLogRetentionDays: toNumber(parsed.syncLogRetentionDays, defaults.syncLogRetentionDays),
+          softDeleteGraceDays: toNumber(parsed.softDeleteGraceDays, defaults.softDeleteGraceDays),
+        };
+      } catch {
+        // Ignore a malformed stored value and fall back to the defaults.
+      }
+    }
+    return {
+      terms: this.setting('policy_terms'),
+      privacy: this.setting('policy_privacy'),
+      retention,
+      updatedAt: this.setting('policy_updated_at') || null,
+    };
+  }
+
+  public savePlatformPolicies(input: {
+    terms: string;
+    privacy: string;
+    retention: PlatformPolicySettings['retention'];
+  }): PlatformPolicySettings {
+    PlatformAdminService.requirePlatformAccess('policies', 'platform.policies.update');
+    const updatedAt = nowIso();
+    const retention = {
+      auditRetentionDays: Math.max(0, Math.trunc(toNumber(input.retention?.auditRetentionDays, 365))),
+      backupRetentionDays: Math.max(0, Math.trunc(toNumber(input.retention?.backupRetentionDays, 90))),
+      syncLogRetentionDays: Math.max(0, Math.trunc(toNumber(input.retention?.syncLogRetentionDays, 30))),
+      softDeleteGraceDays: Math.max(0, Math.trunc(toNumber(input.retention?.softDeleteGraceDays, 14))),
+    };
+    const pairs: Array<[string, string]> = [
+      ['policy_terms', String(input.terms ?? '')],
+      ['policy_privacy', String(input.privacy ?? '')],
+      ['policy_retention', JSON.stringify(retention)],
+      ['policy_updated_at', updatedAt],
+    ];
+
+    this.db.executeTransaction(() => {
+      for (const [key, value] of pairs) {
+        this.db.run(
+          `INSERT INTO platform_settings (key, value, updated_at) VALUES (?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+          [key, value, updatedAt]
+        );
+      }
+    });
+
+    this.audit('حفظ سياسات المنصة وفترات الاحتفاظ بالبيانات', 'SETTINGS', null, { retention });
+    return this.getPlatformPolicies();
+  }
+
   public rotatePlatformEncryptionKeys(): { rotatedAt: string; status: string; newKeyFingerprint: string } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.update');
     const rotatedAt = nowIso();
     const newKeyFingerprint = `kms_${crypto.randomBytes(8).toString('hex')}`;
 
@@ -4777,7 +5196,7 @@ export class PlatformAdminService {
   // ─── Per-Tenant Activity Configuration & Rollback ──────────────────────────
 
   public getTenantActivity(tenantId: string): import('./platformTypes').PlatformTenantActivityConfig | null {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('activity', 'platform.activity.view');
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_activities WHERE tenant_id = ?',
       [tenantId]
@@ -4821,13 +5240,13 @@ export class PlatformAdminService {
       featuresEnabled: safeJsonArray(row.features_enabled),
       customAttributes: safeJsonObject<any[]>(row.custom_attributes) && Array.isArray(safeJsonObject<any[]>(row.custom_attributes)) ? (safeJsonObject<any[]>(row.custom_attributes) as any) : [],
       version: toNumber(row.version, 1),
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
+      createdAt: String(row.createdAt),
+      updatedAt: String(row.updatedAt),
     };
   }
 
   public saveTenantActivity(input: import('./platformTypes').PlatformTenantActivityInput): import('./platformTypes').PlatformTenantActivityConfig {
-    const actor = PlatformAdminService.owner();
+    const actor = PlatformAdminService.requirePlatformAccess('activity', 'platform.activity.update');
     const existing = this.getTenantActivity(input.tenantId);
     const { getBusinessProfile, getActivityRows } = require('../../../config/businessProfiles');
 
@@ -4946,7 +5365,8 @@ export class PlatformAdminService {
   }
 
   public listTenantActivityVersions(tenantId: string): import('./platformTypes').PlatformTenantActivityVersion[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('activity', 'platform.activity.view');
+    this.assertTenantScope(tenantId);
     return this.db.query<any>(
       `SELECT * FROM platform_tenant_activity_versions
        WHERE tenant_id = ?
@@ -4961,12 +5381,13 @@ export class PlatformAdminService {
       configSnapshot: safeJsonObject(row.config_snapshot),
       changeSummary: row.change_summary ?? null,
       createdBy: row.created_by ?? null,
-      createdAt: String(row.created_at),
+      createdAt: String(row.createdAt),
     }));
   }
 
   public rollbackTenantActivity(tenantId: string, targetVersion: number): import('./platformTypes').PlatformTenantActivityConfig {
-    const actor = PlatformAdminService.owner();
+    const actor = PlatformAdminService.requirePlatformAccess('activity', 'platform.activity.update');
+    this.assertTenantScope(tenantId);
     const versionRow = this.db.query<any>(
       'SELECT * FROM platform_tenant_activity_versions WHERE tenant_id = ? AND version = ?',
       [tenantId, targetVersion]
@@ -5135,7 +5556,7 @@ export class PlatformAdminService {
   // ─── Business Performance Analytics ───────────────────────────────────────────
 
   public getBusinessPerformance(period: PlatformPeriod = '30d', planId?: string): PlatformBusinessPerformance {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('analytics', 'platform.analytics.view');
 
     const bounds = this.getPeriodBounds(period);
     const planFilter = planId ? 'AND t.plan_id = ?' : '';
@@ -5227,7 +5648,7 @@ export class PlatformAdminService {
   // ─── Customer Analytics ────────────────────────────────────────────────────────
 
   public getCustomerMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformCustomerMetrics {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('analytics', 'platform.analytics.view');
 
     const bounds = this.getPeriodBounds(period);
     const planFilter = planId ? 'AND plan_id = ?' : '';
@@ -5378,7 +5799,7 @@ export class PlatformAdminService {
   // ─── Subscription Analytics ────────────────────────────────────────────────────
 
   public getSubscriptionMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformSubscriptionMetrics {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('subscriptions', 'platform.subscriptions.view');
 
     const bounds = this.getPeriodBounds(period);
     const planFilter = planId ? 'AND plan_id = ?' : '';
@@ -5507,7 +5928,7 @@ export class PlatformAdminService {
   // ─── License Analytics ─────────────────────────────────────────────────────────
 
   public getLicenseMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformLicenseMetrics {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('licenses', 'platform.licenses.view');
 
     const bounds = this.getPeriodBounds(period);
     const planFilter = planId ? 'AND l.plan_id = ?' : '';
@@ -5603,9 +6024,9 @@ export class PlatformAdminService {
       mode: row.mode,
       action: row.action,
       status: row.status,
-      ipAddress: row.ip_address ?? null,
+      ipAddress: row.ipAddress ?? null,
       notes: row.notes ?? null,
-      createdAt: String(row.created_at),
+      createdAt: String(row.createdAt),
     }));
 
     // Pending licenses list
@@ -5641,7 +6062,7 @@ export class PlatformAdminService {
   // ─── Operations Analytics ──────────────────────────────────────────────────────
 
   public getOperationsMetrics(period: PlatformPeriod = '30d'): PlatformOperationsMetrics {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.view');
 
     const bounds = this.getPeriodBounds(period);
 
@@ -5705,7 +6126,7 @@ export class PlatformAdminService {
       tenantId: String(row.actor_id || ''),
       tenantName: row.tenantName || 'Unknown',
       error: row.details || 'Sync error',
-      occurredAt: String(row.created_at),
+      occurredAt: String(row.createdAt),
       resolved: false,
     }));
 
@@ -5736,7 +6157,7 @@ export class PlatformAdminService {
   // ─── Alert Details ─────────────────────────────────────────────────────────────
 
   public getAlertDetails(): PlatformAlertDetail[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess(['analytics', 'overview']);
 
     const alerts: PlatformAlertDetail[] = [];
 
@@ -5967,7 +6388,7 @@ export class PlatformAdminService {
       startedAt: r.started_at ? String(r.started_at) : undefined,
       completedAt: r.completed_at ? String(r.completed_at) : undefined,
       createdBy: String(r.created_by || 'system'),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     };
   }
 
@@ -5981,7 +6402,7 @@ export class PlatformAdminService {
       affectedServices: safeJsonArray(r.affected_services),
       status: (r.status as PlatformMaintenanceStatus) || 'SCHEDULED',
       createdBy: String(r.created_by || 'system'),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     };
   }
 
@@ -5994,8 +6415,8 @@ export class PlatformAdminService {
       approvedBy: r.approved_by ? String(r.approved_by) : undefined,
       status: (r.status as PlatformOpApprovalStatus) || 'PENDING',
       notes: r.notes ? String(r.notes) : undefined,
-      createdAt: String(r.created_at || nowIso()),
-      updatedAt: String(r.updated_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
+      updatedAt: String(r.updatedAt || nowIso()),
     };
   }
 
@@ -6008,14 +6429,14 @@ export class PlatformAdminService {
       status: (r.status as PlatformSyncStatus) || 'SUCCESS',
       recordsSynced: toNumber(r.records_synced, 0),
       errorDetail: r.error_detail ? String(r.error_detail) : undefined,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     };
   }
 
   // ── Ops Jobs ──────────────────────────────────────────────────────────────────
 
   public listOpsJobs(filters?: { status?: string; tenantId?: string; type?: string; limit?: number; offset?: number }): { jobs: PlatformOpsJob[]; total: number } {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.view');
     const conditions: string[] = [];
     const params: unknown[] = [];
     if (filters?.status) { conditions.push('status = ?'); params.push(filters.status); }
@@ -6040,7 +6461,7 @@ export class PlatformAdminService {
   }
 
   public createOpsJob(input: { type: string; tenantId?: string; payload?: Record<string, unknown>; priority?: number; scheduledAt?: string }): PlatformOpsJob {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.create');
     const user = AuthService.getCurrentUser();
     const id = uuidv4();
     const now = nowIso();
@@ -6076,7 +6497,7 @@ export class PlatformAdminService {
   }
 
   public cancelOpsJob(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.delete');
     this.db.run(
       "UPDATE platform_ops_jobs SET status = 'CANCELLED', completed_at = ? WHERE id = ? AND status IN ('PENDING', 'RUNNING')",
       [nowIso(), id]
@@ -6093,7 +6514,7 @@ export class PlatformAdminService {
   }
 
   public retryOpsJob(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.update');
     this.db.run(
       "UPDATE platform_ops_jobs SET status = 'PENDING', error_message = NULL, started_at = NULL, completed_at = NULL, retries = retries + 1 WHERE id = ? AND status IN ('FAILED', 'CANCELLED')",
       [id]
@@ -6112,7 +6533,7 @@ export class PlatformAdminService {
   // ── Maintenance Windows ───────────────────────────────────────────────────────
 
   public listMaintenanceWindows(filters?: { status?: string }): PlatformMaintenanceWindow[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.view');
     const where = filters?.status ? 'WHERE status = ?' : '';
     const params = filters?.status ? [filters.status] : [];
     const rows = this.db.query<any>(
@@ -6123,7 +6544,7 @@ export class PlatformAdminService {
   }
 
   public createMaintenanceWindow(input: { title: string; description?: string; startsAt: string; endsAt: string; affectedServices?: string[] }): PlatformMaintenanceWindow {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.create');
     const user = AuthService.getCurrentUser();
     const id = uuidv4();
     const now = nowIso();
@@ -6158,7 +6579,7 @@ export class PlatformAdminService {
   }
 
   public cancelMaintenanceWindow(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.delete');
     this.db.run(
       "UPDATE platform_maintenance_windows SET status = 'CANCELLED' WHERE id = ? AND status = 'SCHEDULED'",
       [id]
@@ -6177,7 +6598,7 @@ export class PlatformAdminService {
   // ── Sensitive Operation Approvals ─────────────────────────────────────────────
 
   public listOpApprovals(filters?: { status?: string }): PlatformOpApproval[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.view');
     const where = filters?.status ? 'WHERE status = ?' : '';
     const params = filters?.status ? [filters.status] : [];
     const rows = this.db.query<any>(
@@ -6188,7 +6609,7 @@ export class PlatformAdminService {
   }
 
   public requestOpApproval(input: { opType: string; opPayload?: Record<string, unknown> }): PlatformOpApproval {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.create');
     const user = AuthService.getCurrentUser();
     const id = uuidv4();
     const now = nowIso();
@@ -6221,7 +6642,7 @@ export class PlatformAdminService {
   }
 
   public approveOp(id: string, notes?: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.approve');
     const user = AuthService.getCurrentUser();
     const now = nowIso();
     this.db.run(
@@ -6241,7 +6662,7 @@ export class PlatformAdminService {
   }
 
   public rejectOp(id: string, notes?: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('operations', 'platform.operations.approve');
     const user = AuthService.getCurrentUser();
     const now = nowIso();
     this.db.run(
@@ -6263,7 +6684,7 @@ export class PlatformAdminService {
   // ── Sync Status & Health ──────────────────────────────────────────────────────
 
   public listSyncStatus(filters?: { tenantId?: string; deviceId?: string; status?: string; limit?: number }): PlatformSyncLogEntry[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('sync', 'platform.sync.view');
     const conditions: string[] = [];
     const params: unknown[] = [];
     if (filters?.tenantId) { conditions.push('tenant_id = ?'); params.push(filters.tenantId); }
@@ -6281,7 +6702,7 @@ export class PlatformAdminService {
   }
 
   public logSyncEvent(input: { tenantId?: string; deviceId?: string; syncType: string; status: PlatformSyncStatus; recordsSynced?: number; errorDetail?: string }): PlatformSyncLogEntry {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('sync', 'platform.sync.update');
     const id = uuidv4();
     const now = nowIso();
     this.db.run(
@@ -6363,13 +6784,13 @@ export class PlatformAdminService {
         canChangeLogin: Boolean(rawAllowed.canChangeLogin),
       },
       version: toNumber(r.version, 1),
-      createdAt: String(r.created_at || nowIso()),
-      updatedAt: String(r.updated_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
+      updatedAt: String(r.updatedAt || nowIso()),
     };
   }
 
   public getPlatformBranding(): PlatformBrandingConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('branding', 'platform.branding.view');
     const row = this.db.query<any>('SELECT * FROM platform_tenant_branding WHERE tenant_id IS NULL')[0];
     if (!row) {
       return this.defaultBranding(null);
@@ -6378,7 +6799,7 @@ export class PlatformAdminService {
   }
 
   public getTenantBranding(tenantId?: string | null): PlatformBrandingConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('branding', 'platform.branding.view');
     if (!tenantId) {
       return this.getPlatformBranding();
     }
@@ -6399,7 +6820,7 @@ export class PlatformAdminService {
   }
 
   public saveTenantBranding(input: PlatformBrandingInput): PlatformBrandingConfig {
-    const actor = PlatformAdminService.owner();
+    const actor = PlatformAdminService.requirePlatformAccess('branding', 'platform.branding.update');
     const user = AuthService.getCurrentUser();
     const existing = this.getTenantBranding(input.tenantId);
     const nextVersion = existing ? existing.version + 1 : 1;
@@ -6586,7 +7007,8 @@ export class PlatformAdminService {
   }
 
   public listTenantBrandingVersions(tenantId?: string | null): PlatformBrandingVersion[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('branding', 'platform.branding.view');
+    this.assertTenantScope(tenantId);
     const where = tenantId ? 'WHERE tenant_id = ?' : 'WHERE tenant_id IS NULL';
     const params = tenantId ? [tenantId] : [];
     const rows = this.db.query<any>(
@@ -6600,12 +7022,13 @@ export class PlatformAdminService {
       brandingSnapshot: safeJsonObject(r.branding_snapshot) as PlatformBrandingConfig,
       changeSummary: r.change_summary ? String(r.change_summary) : undefined,
       createdBy: r.created_by ? String(r.created_by) : undefined,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public rollbackTenantBranding(tenantId: string | null | undefined, targetVersion: number): PlatformBrandingConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('branding', 'platform.branding.update');
+    this.assertTenantScope(tenantId);
     const where = tenantId ? 'WHERE tenant_id = ? AND version = ?' : 'WHERE tenant_id IS NULL AND version = ?';
     const params = tenantId ? [tenantId, targetVersion] : [targetVersion];
     const row = this.db.query<any>(
@@ -6628,7 +7051,7 @@ export class PlatformAdminService {
   // ─── UI Customization & Profiles (Item 12) ────────────────────────────────────
 
   public listUiProfiles(): PlatformUiProfile[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('customization', 'platform.customization.view');
     const rows = this.db.query<any>('SELECT * FROM platform_ui_profiles ORDER BY is_default DESC, name ASC');
     return rows.map(r => ({
       id: String(r.id),
@@ -6641,12 +7064,12 @@ export class PlatformAdminService {
       navOrder: safeJsonArray(r.nav_order),
       formFieldRules: safeJsonObject<Record<string, FormFieldRule>>(r.form_field_rules),
       isDefault: Boolean(r.is_default),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public getTenantUiCustomization(tenantId: string): PlatformTenantUiCustomization {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('customization', 'platform.customization.view');
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_ui_customizations WHERE tenant_id = ?',
       [tenantId]
@@ -6686,13 +7109,13 @@ export class PlatformAdminService {
       navOrder: safeJsonArray(row.nav_order),
       formFieldRules: safeJsonObject<Record<string, FormFieldRule>>(row.form_field_rules),
       version: toNumber(row.version, 1),
-      createdAt: String(row.created_at || nowIso()),
-      updatedAt: String(row.updated_at || nowIso()),
+      createdAt: String(row.createdAt || nowIso()),
+      updatedAt: String(row.updatedAt || nowIso()),
     };
   }
 
   public saveTenantUiCustomization(input: PlatformTenantUiInput): PlatformTenantUiCustomization {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('customization', 'platform.customization.update');
     const user = AuthService.getCurrentUser();
     const existing = this.getTenantUiCustomization(input.tenantId);
     const nextVersion = existing ? existing.version + 1 : 1;
@@ -6775,7 +7198,8 @@ export class PlatformAdminService {
   }
 
   public listTenantUiVersions(tenantId: string): PlatformTenantUiVersion[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('customization', 'platform.customization.view');
+    this.assertTenantScope(tenantId);
     const rows = this.db.query<any>(
       'SELECT * FROM platform_tenant_ui_versions WHERE tenant_id = ? ORDER BY version DESC',
       [tenantId]
@@ -6787,12 +7211,13 @@ export class PlatformAdminService {
       configSnapshot: safeJsonObject(r.config_snapshot) as PlatformTenantUiCustomization,
       changeSummary: r.change_summary ? String(r.change_summary) : undefined,
       createdBy: r.created_by ? String(r.created_by) : undefined,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public rollbackTenantUi(tenantId: string, targetVersion: number): PlatformTenantUiCustomization {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('customization', 'platform.customization.update');
+    this.assertTenantScope(tenantId);
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_ui_versions WHERE tenant_id = ? AND version = ?',
       [tenantId, targetVersion]
@@ -6826,7 +7251,7 @@ export class PlatformAdminService {
   }
 
   public listConfigTemplates(): PlatformConfigTemplate[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.view');
     const rows = this.db.query<any>('SELECT * FROM platform_config_templates ORDER BY is_default DESC, name ASC');
     return rows.map(r => ({
       id: String(r.id),
@@ -6837,13 +7262,13 @@ export class PlatformAdminService {
       configPayload: safeJsonObject(r.config_payload),
       version: toNumber(r.version, 1),
       isDefault: Boolean(r.is_default),
-      createdAt: String(r.created_at || nowIso()),
-      updatedAt: String(r.updated_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
+      updatedAt: String(r.updatedAt || nowIso()),
     }));
   }
 
   public getTenantConfig(tenantId: string): PlatformTenantConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.view');
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_configs WHERE tenant_id = ?',
       [tenantId]
@@ -6882,13 +7307,13 @@ export class PlatformAdminService {
       signature: row.signature ? String(row.signature) : undefined,
       version: toNumber(row.version, 1),
       status: (row.status as any) || 'ACTIVE',
-      createdAt: String(row.created_at || nowIso()),
-      updatedAt: String(row.updated_at || nowIso()),
+      createdAt: String(row.createdAt || nowIso()),
+      updatedAt: String(row.updatedAt || nowIso()),
     };
   }
 
   public saveTenantConfig(input: PlatformTenantConfigInput): PlatformTenantConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.update');
     const user = AuthService.getCurrentUser();
     const existing = this.getTenantConfig(input.tenantId);
     const nextVersion = existing ? existing.version + 1 : 1;
@@ -6966,7 +7391,8 @@ export class PlatformAdminService {
   }
 
   public listTenantConfigVersions(tenantId: string): PlatformTenantConfigVersion[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.view');
+    this.assertTenantScope(tenantId);
     const rows = this.db.query<any>(
       'SELECT * FROM platform_tenant_config_versions WHERE tenant_id = ? ORDER BY version DESC',
       [tenantId]
@@ -6979,12 +7405,13 @@ export class PlatformAdminService {
       signature: r.signature ? String(r.signature) : undefined,
       changeSummary: r.change_summary ? String(r.change_summary) : undefined,
       createdBy: r.created_by ? String(r.created_by) : undefined,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public rollbackTenantConfig(tenantId: string, targetVersion: number): PlatformTenantConfig {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.update');
+    this.assertTenantScope(tenantId);
     const row = this.db.query<any>(
       'SELECT * FROM platform_tenant_config_versions WHERE tenant_id = ? AND version = ?',
       [tenantId, targetVersion]
@@ -7003,7 +7430,7 @@ export class PlatformAdminService {
   }
 
   public createConfigRollout(input: PlatformConfigRolloutInput): PlatformConfigRollout {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.update');
     const user = AuthService.getCurrentUser();
     const id = uuidv4();
     const now = nowIso();
@@ -7084,12 +7511,12 @@ export class PlatformAdminService {
       appliedCount: totalTenants,
       failedCount: 0,
       createdBy: String(created.created_by),
-      createdAt: String(created.created_at),
+      createdAt: String(created.createdAt),
     };
   }
 
   public listConfigRollouts(): PlatformConfigRollout[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.view');
     const rows = this.db.query<any>('SELECT * FROM platform_config_rollouts ORDER BY created_at DESC');
     return rows.map(r => ({
       id: String(r.id),
@@ -7104,13 +7531,14 @@ export class PlatformAdminService {
       appliedCount: toNumber(r.applied_count, 0),
       failedCount: toNumber(r.failed_count, 0),
       createdBy: String(r.created_by),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
       completedAt: r.completed_at ? String(r.completed_at) : undefined,
     }));
   }
 
   public listConfigAcks(tenantId?: string): PlatformConfigAck[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('app-configuration', 'platform.app-configuration.view');
+    this.assertTenantScope(tenantId);
     const where = tenantId ? 'WHERE tenant_id = ?' : '';
     const params = tenantId ? [tenantId] : [];
     const rows = this.db.query<any>(
@@ -7132,7 +7560,7 @@ export class PlatformAdminService {
   // ─── Platform System Health & Central Diagnostics (Item 14) ───────────────────
 
   public getPlatformComprehensiveHealth(): PlatformComprehensiveHealth {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('system-health', 'platform.system-health.view');
     // 1. Telemetry
     const telRow = this.db.query<any>('SELECT * FROM platform_server_telemetry ORDER BY recorded_at DESC LIMIT 1')[0];
     const cpu = telRow ? toNumber(telRow.cpu_usage, 20.0) : 18.5;
@@ -7222,7 +7650,7 @@ export class PlatformAdminService {
   }
 
   public listCentralBackups(): PlatformCentralBackup[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('backups', 'platform.backups.view');
     const rows = this.db.query<any>('SELECT * FROM platform_central_backups ORDER BY created_at DESC LIMIT 20');
     return rows.map(r => ({
       id: String(r.id),
@@ -7231,30 +7659,65 @@ export class PlatformAdminService {
       storageLocation: String(r.storage_location),
       status: (r.status as any) || 'COMPLETED',
       integrityCheckPassed: Boolean(r.integrity_check_passed),
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
       verifiedAt: r.verified_at ? String(r.verified_at) : undefined,
     }));
   }
 
-  public triggerCentralBackup(): PlatformCentralBackup {
-    PlatformAdminService.owner();
+  public async triggerCentralBackup(): Promise<PlatformCentralBackup> {
+    PlatformAdminService.requirePlatformAccess('backups', 'platform.backups.view');
+    const createBackup = typeof window !== 'undefined' ? window.ceramisys?.db?.backup : undefined;
+    if (!createBackup) {
+      throw new Error('إنشاء نسخة احتياطية للمنصة يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+    }
+
     const id = uuidv4();
     const now = nowIso();
-    const filename = `ceramisys_central_backup_${Date.now()}_enc.tar.gz`;
-    const sizeBytes = 120586240; // ~115 MB
-    const storageLocation = 's3://ceramisys-cloud-vault/backups/central/';
+    const result = await createBackup('central');
+    if (!result?.ok || !result.path) {
+      const message = result?.error || 'تعذر إنشاء النسخة الاحتياطية.';
+      this.audit(
+        'فشل إنشاء نسخة احتياطية مركزية للمنصة',
+        'CENTRAL_BACKUP',
+        id,
+        { error: message },
+        { severity: 'WARNING' }
+      );
+      throw new Error(message);
+    }
+
+    const filename = result.path.split(/[\\/]/).pop() || `ceramisys_central_${Date.now()}.sqlite.enc`;
+    const sizeBytes = Number(result.bytes) || 0;
+    // A local encrypted archive is not an offsite verification. The backup is only
+    // reported as VERIFIED when the 3-2-1 strategy actually copied it to the
+    // offsite destination and the SHA-256 comparison succeeded.
+    const offsiteAction = result.strategy?.actions?.find((action) => action.type === 'offsite');
+    const integrityCheckPassed = offsiteAction?.status === 'complete';
+    const storageLocation = offsiteAction?.target || result.path;
+    const status: PlatformCentralBackup['status'] = integrityCheckPassed ? 'VERIFIED' : 'COMPLETED';
 
     this.db.run(
       `INSERT INTO platform_central_backups (id, filename, size_bytes, storage_location, status, integrity_check_passed, created_at, verified_at)
-       VALUES (?, ?, ?, ?, 'VERIFIED', 1, ?, ?)`,
-      [id, filename, sizeBytes, storageLocation, now, now]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        filename,
+        sizeBytes,
+        storageLocation,
+        status,
+        integrityCheckPassed ? 1 : 0,
+        now,
+        integrityCheckPassed ? now : null,
+      ]
     );
 
     this.audit(
-      'إنشاء والتحقق من نسخة احتياطية مركزية للمنصة',
+      integrityCheckPassed
+        ? 'إنشاء والتحقق من نسخة احتياطية مركزية للمنصة'
+        : 'إنشاء نسخة احتياطية محلية مشفرة للمنصة دون تحقق خارجي',
       'CENTRAL_BACKUP',
       id,
-      { filename, sizeBytes, storageLocation },
+      { filename, sizeBytes, storageLocation, verified: integrityCheckPassed },
       {
         severity: 'NOTICE',
       }
@@ -7265,15 +7728,15 @@ export class PlatformAdminService {
       filename,
       sizeBytes,
       storageLocation,
-      status: 'VERIFIED',
-      integrityCheckPassed: true,
+      status,
+      integrityCheckPassed,
       createdAt: now,
-      verifiedAt: now,
+      verifiedAt: integrityCheckPassed ? now : undefined,
     };
   }
 
   public listServiceIncidents(status?: 'OPEN' | 'RESOLVED'): PlatformServiceIncident[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('system-health', 'platform.system-health.view');
     const where = status ? 'WHERE status = ?' : '';
     const params = status ? [status] : [];
     const rows = this.db.query<any>(
@@ -7287,13 +7750,13 @@ export class PlatformAdminService {
       title: String(r.title),
       description: r.description ? String(r.description) : undefined,
       status: (r.status as any) || 'OPEN',
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
       resolvedAt: r.resolved_at ? String(r.resolved_at) : undefined,
     }));
   }
 
   public resolveServiceIncident(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('system-health', 'platform.system-health.approve');
     const now = nowIso();
     this.db.run(
       "UPDATE platform_service_incidents SET status = 'RESOLVED', resolved_at = ? WHERE id = ?",
@@ -7313,7 +7776,7 @@ export class PlatformAdminService {
   // ─── Platform Technical Health Dashboard (Item 15) ──────────────────────────
 
   public getPlatformHealthDashboard(): PlatformHealthDashboardData {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('platform-health', 'platform.platform-health.view');
 
     // 1. Business Metrics Overview
     const business = this.getOverview();
@@ -7567,102 +8030,98 @@ export class PlatformAdminService {
   // ─── Platform Staff & RBAC Management (Item 18) ─────────────────────────────
 
   public listPlatformStaffRoles(): PlatformStaffRoleDefinition[] {
-    return [
-      {
-        role: 'SUPER_ADMIN',
-        title: 'مالك المنصة (Platform Owner)',
-        description: 'وصول مطلق لجميع شاشات وإعدادات المنصة وقواعد البيانات والاشتراكات والتراخيص وحسابات الموظفين.',
-        allowedModules: ['*'],
+    // Derived from the single source of truth: PLATFORM_ROLE_DEFINITIONS (titles)
+    // + the DB-backed granular matrix (module reach), so the UI never drifts.
+    return (Object.keys(PLATFORM_ROLE_DEFINITIONS) as PlatformStaffRole[]).map((role) => {
+      const definition = PLATFORM_ROLE_DEFINITIONS[role];
+      if (role === 'SUPER_ADMIN') {
+        return { ...definition, allowedModules: ['*'], restrictedModules: [] };
+      }
+      const granted = PlatformAuthorizationService.getRolePermissions(role);
+      const modules = Array.from(
+        new Set(
+          granted
+            .filter((code) => code.startsWith('platform.'))
+            .map((code) => code.split('.')[1])
+            .filter(Boolean)
+        )
+      );
+      return {
+        ...definition,
+        allowedModules: granted.includes('*') ? ['*'] : modules,
         restrictedModules: [],
-      },
-      {
-        role: 'PLATFORM_ADMIN',
-        title: 'مدير المنصة (Platform Administrator)',
-        description: 'إدارة تشغيلية عليا للمنصة، إعدادات المنتجات، مراقبة الخوادم، دون صلاحية المساس بحساب المالك.',
-        allowedModules: ['tenants', 'licenses', 'plans', 'billing', 'operations', 'support', 'devices', 'settings'],
-        restrictedModules: ['staff.delete_owner'],
-      },
-      {
-        role: 'SUPPORT_AGENT',
-        title: 'موظف دعم فني (Support Specialist)',
-        description: 'استعراض والرد على تذاكر العملاء، تشغيل جلسات الوصول عن بعد بموافقة العميل، استعراض صحة الأجهزة.',
-        allowedModules: ['support', 'devices.view', 'system-health.view'],
-        restrictedModules: ['billing.manage', 'plans.manage', 'licenses.issue', 'settings.manage', 'staff.manage'],
-      },
-      {
-        role: 'OPERATIONS_ENGINEER',
-        title: 'مهندس عمليات وبنية تحتية (DevOps Engineer)',
-        description: 'متابعة مهام العمليات، جداول الصيانة، المزامنة، الخوادم والنسخ الاحتياطي.',
-        allowedModules: ['operations', 'system-health', 'devices', 'app-configuration'],
-        restrictedModules: ['billing.manage', 'plans.manage', 'licenses.manage', 'staff.manage'],
-      },
-      {
-        role: 'BILLING_SPECIALIST',
-        title: 'أخصائي الفواتير والاشتراكات (Billing & Subscriptions)',
-        description: 'إدارة وتوليد الفواتير، متابعة المدفوعات، تحصيل المبالغ والاشتراكات دون صلاحية البنية التحتية.',
-        allowedModules: ['billing', 'plans.view', 'tenants.view'],
-        restrictedModules: ['operations.manage', 'system-health.manage', 'licenses.issue', 'staff.manage'],
-      },
-      {
-        role: 'LICENSE_MANAGER',
-        title: 'مسؤول التراخيص وتفعيل الأجهزة (License Administrator)',
-        description: 'إصدار وتجديد التراخيص، إلغاء وربط مقاعد الأجهزة، كشف الاستنساخ.',
-        allowedModules: ['licenses', 'devices', 'tenants.view'],
-        restrictedModules: ['billing.manage', 'operations.manage', 'staff.manage'],
-      },
-    ];
+      };
+    });
   }
 
-  public listPlatformStaff(search = '', role = ''): PlatformStaff[] {
-    PlatformAdminService.owner();
+  public listPlatformStaff(search = '', role = '', includeDeleted = false): PlatformStaff[] {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
     const term = `%${search.trim()}%`;
     const rows = this.db.query<any>(
       `SELECT * FROM platform_staff
        WHERE (? = '' OR full_name LIKE ? OR email LIKE ? OR phone LIKE ?)
          AND (? = '' OR role = ?)
+         ${includeDeleted ? '' : 'AND deleted_at IS NULL'}
        ORDER BY created_at ASC`,
       [search.trim(), term, term, term, role, role]
     );
 
     return rows.map((r) => ({
       id: String(r.id),
-      fullName: String(r.full_name),
+      fullName: String(r.fullName),
       email: String(r.email),
       phone: r.phone ?? null,
       role: r.role as PlatformStaffRole,
-      permissionsOverride: safeJsonArray(r.permissions_override),
-      isActive: Boolean(r.is_active),
-      lastLoginAt: r.last_login_at ?? null,
-      createdAt: String(r.created_at || nowIso()),
-      updatedAt: String(r.updated_at || nowIso()),
+      permissionsOverride: safeJsonArray(r.permissionsOverride),
+      isActive: Boolean(r.isActive),
+      lastLoginAt: r.lastLoginAt ?? null,
+      mustChangePassword: Boolean(r.mustChangePassword),
+      dataScope: (String(r.dataScope || 'ALL') === 'LIMITED' ? 'LIMITED' : 'ALL') as 'ALL' | 'LIMITED',
+      deletedAt: r.deletedAt ?? null,
+      invitedBy: r.invitedBy ?? null,
+      createdAt: String(r.createdAt || nowIso()),
+      updatedAt: String(r.updatedAt || nowIso()),
     }));
   }
 
+  public getPlatformStaff(id: string): PlatformStaff | null {
+    return this.listPlatformStaff('', '', true).find((s) => s.id === id) ?? null;
+  }
+
   public createPlatformStaff(input: PlatformStaffInput): PlatformStaff {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.create');
     const fullName = String(input.fullName || '').trim();
     const email = String(input.email || '').trim().toLowerCase();
     if (fullName.length < 2) throw new Error('اسم الموظف مطلوب.');
     if (!email.includes('@')) throw new Error('البريد الإلكتروني غير صالح.');
+
+    const password = String(input.password || '');
+    if (password.length < 8) {
+      throw new Error('كلمة مرور موظف المنصة مطلوبة ويجب أن تكون 8 أحرف على الأقل.');
+    }
 
     const existing = this.db.query<any>('SELECT id FROM platform_staff WHERE email = ?', [email])[0];
     if (existing) throw new Error('البريد الإلكتروني مسجل بالفعل لموظف آخر.');
 
     const id = `staff_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     const role = input.role || 'SUPPORT_AGENT';
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const actor = AuthService.getCurrentUser();
 
     this.db.run(
-      `INSERT INTO platform_staff 
-        (id, full_name, email, phone, role, permissions_override, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO platform_staff
+        (id, full_name, email, phone, role, password_hash, permissions_override, is_active, must_change_password, invited_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [
         id,
         fullName,
         email,
         input.phone?.trim() || null,
         role,
+        passwordHash,
         input.permissionsOverride ? JSON.stringify(input.permissionsOverride) : null,
         input.isActive ?? true ? 1 : 0,
+        actor?.id ?? null,
       ]
     );
 
@@ -7671,7 +8130,7 @@ export class PlatformAdminService {
   }
 
   public updatePlatformStaff(id: string, input: Partial<PlatformStaffInput>): PlatformStaff {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.update');
     const staff = this.db.query<any>('SELECT * FROM platform_staff WHERE id = ?', [id])[0];
     if (!staff) throw new Error('موظف المنصة غير موجود.');
 
@@ -7680,26 +8139,40 @@ export class PlatformAdminService {
       throw new Error('لا يمكن خفض رتبة حساب مالك المنصة الرئيسي.');
     }
 
-    const fullName = input.fullName ? input.fullName.trim() : staff.full_name;
+    const fullName = input.fullName ? input.fullName.trim() : staff.fullName;
     const email = input.email ? input.email.trim().toLowerCase() : staff.email;
     const role = input.role || staff.role;
     const phone = input.phone !== undefined ? input.phone?.trim() || null : staff.phone;
-    const isActive = input.isActive !== undefined ? (input.isActive ? 1 : 0) : staff.is_active;
-    const perms = input.permissionsOverride !== undefined ? JSON.stringify(input.permissionsOverride) : staff.permissions_override;
+    const isActive = input.isActive !== undefined ? (input.isActive ? 1 : 0) : staff.isActive;
+    const perms = input.permissionsOverride !== undefined ? JSON.stringify(input.permissionsOverride) : staff.permissionsOverride;
+    const nextPassword = typeof input.password === 'string' ? input.password : '';
+    if (nextPassword.length > 0 && nextPassword.length < 8) {
+      throw new Error('كلمة مرور موظف المنصة يجب أن تكون 8 أحرف على الأقل.');
+    }
+    const passwordHash = nextPassword.length > 0 ? bcrypt.hashSync(nextPassword, 10) : staff.passwordHash;
+    // Admin-set passwords always force a change at next login.
+    const mustChangeNow = nextPassword.length > 0 ? 1 : Number(staff.mustChangePassword ?? 0);
 
     this.db.run(
-      `UPDATE platform_staff 
-       SET full_name = ?, email = ?, phone = ?, role = ?, permissions_override = ?, is_active = ?, updated_at = ?
+      `UPDATE platform_staff
+       SET full_name = ?, email = ?, phone = ?, role = ?, password_hash = ?, permissions_override = ?, is_active = ?, must_change_password = ?, updated_at = ?
        WHERE id = ?`,
-      [fullName, email, phone, role, perms, isActive, nowIso(), id]
+      [fullName, email, phone, role, passwordHash, perms, isActive, mustChangeNow, nowIso(), id]
     );
 
-    this.audit('تعديل بيانات موظف في المنصة', 'SYSTEM', id, { fullName, role }, { severity: 'NOTICE' });
+    const becameInactive = !Boolean(isActive);
+    const roleChanged = String(staff.role) !== String(role);
+    const permsChanged = String(staff.permissionsOverride ?? '') !== String(perms ?? '');
+    if (becameInactive || roleChanged || permsChanged) {
+      PlatformStaffAuthService.revokeSessionsForStaff(id);
+    }
+
+    this.audit('تعديل بيانات موظف في المنصة', 'SYSTEM', id, { fullName, role, passwordChanged: nextPassword.length > 0, sessionsRevoked: becameInactive || roleChanged || permsChanged }, { severity: 'NOTICE' });
     return this.listPlatformStaff().find((s) => s.id === id)!;
   }
 
   public setPlatformStaffActive(id: string, isActive: boolean): PlatformStaff {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.deactivate');
     const staff = this.db.query<any>('SELECT role FROM platform_staff WHERE id = ?', [id])[0];
     if (!staff) throw new Error('الموظف غير موجود.');
     if (staff.role === 'SUPER_ADMIN' && !isActive) {
@@ -7711,35 +8184,580 @@ export class PlatformAdminService {
       [isActive ? 1 : 0, nowIso(), id]
     );
 
-    this.audit(isActive ? 'تنشيط موظف منصة' : 'تجميد موظف منصة', 'SYSTEM', id, { isActive }, { severity: 'NOTICE' });
+    if (!isActive) {
+      PlatformStaffAuthService.revokeSessionsForStaff(id);
+    }
+
+    this.audit(isActive ? 'تنشيط موظف منصة' : 'تجميد موظف منصة', 'SYSTEM', id, { isActive, sessionsRevoked: !isActive }, { severity: 'NOTICE' });
     return this.listPlatformStaff().find((s) => s.id === id)!;
   }
 
   public deletePlatformStaff(id: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.delete');
+    const actor = AuthService.getCurrentUser();
+    if (actor?.id === id) {
+      throw new Error('لا يمكنك حذف حسابك الحالي. اطلب من مالك المنصة تنفيذ ذلك.');
+    }
     const staff = this.db.query<any>('SELECT role, full_name as name FROM platform_staff WHERE id = ?', [id])[0];
     if (!staff) throw new Error('الموظف غير موجود.');
     if (staff.role === 'SUPER_ADMIN') {
       throw new Error('ممنوع منعاً باتاً حذف حساب مالك المنصة.');
     }
 
-    this.db.run('DELETE FROM platform_staff WHERE id = ?', [id]);
-    this.audit('حذف موظف من المنصة', 'SYSTEM', id, { name: staff.name, role: staff.role }, { severity: 'WARNING' });
+    // Logical delete: the audit ledger and historical references stay intact.
+    PlatformStaffAuthService.revokeSessionsForStaff(id);
+    this.db.run(
+      `UPDATE platform_staff
+       SET is_active = 0, deleted_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [nowIso(), nowIso(), id]
+    );
+    this.audit('حذف منطقي لموظف من المنصة', 'SYSTEM', id, { name: staff.name, role: staff.role, sessionsRevoked: true, softDelete: true }, { severity: 'WARNING' });
+  }
+
+  // ─── Platform Staff Security & RBAC (v2) ────────────────────────────────────
+
+  private static hashStaffInviteToken(token: string): string {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
+  }
+
+  private static mapStaffInvite(row: any): PlatformStaffInvite {
+    const now = Date.now();
+    const expired = !row.acceptedAt && !row.revokedAt && new Date(String(row.expiresAt)).getTime() < now;
+    const status: PlatformStaffInviteStatus = row.acceptedAt
+      ? 'ACCEPTED'
+      : row.revokedAt
+        ? 'REVOKED'
+        : expired
+          ? 'EXPIRED'
+          : 'PENDING';
+    return {
+      id: String(row.id),
+      email: String(row.email),
+      fullName: String(row.fullName),
+      phone: row.phone ?? null,
+      role: row.role as PlatformStaffRole,
+      status,
+      expiresAt: String(row.expiresAt),
+      acceptedAt: row.acceptedAt ?? null,
+      revokedAt: row.revokedAt ?? null,
+      invitedBy: row.invitedBy ?? null,
+      invitedByName: row.invitedByName ?? null,
+      createdAt: String(row.createdAt || nowIso()),
+    };
+  }
+
+  private assertKnownPlatformRole(role: string): asserts role is PlatformStaffRole {
+    if (!PLATFORM_ROLE_CODES_SET.has(String(role))) {
+      throw new Error('دور منصة غير معروف.');
+    }
+  }
+
+  public createStaffInvite(input: PlatformStaffInviteInput): PlatformStaffInviteCreated {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.create');
+    const actor = AuthService.getCurrentUser();
+    const fullName = String(input.fullName || '').trim();
+    const email = String(input.email || '').trim().toLowerCase();
+    const role = String(input.role || 'SUPPORT_AGENT');
+    if (fullName.length < 2) throw new Error('اسم الموظف مطلوب.');
+    if (!email.includes('@') || email.length < 5) throw new Error('البريد الإلكتروني غير صالح.');
+    this.assertKnownPlatformRole(role);
+
+    const existingStaff = this.db.query<any>(
+      'SELECT id FROM platform_staff WHERE lower(email) = ? AND deleted_at IS NULL LIMIT 1',
+      [email]
+    )[0];
+    if (existingStaff) throw new Error('هذا البريد مرتبط بحساب موظف موجود بالفعل.');
+
+    // One live invite per email — revoke a stale pending one instead of erroring.
+    this.db.run(
+      `UPDATE platform_staff_invites SET revoked_at = ?
+       WHERE lower(email) = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
+      [nowIso(), email, nowIso()]
+    );
+
+    const expiresInHours = Number.isFinite(Number(input.expiresInHours)) && Number(input.expiresInHours) > 0
+      ? Math.min(24 * 30, Math.floor(Number(input.expiresInHours)))
+      : 72;
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = PlatformAdminService.hashStaffInviteToken(token);
+    const id = `inv_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
+
+    this.db.run(
+      `INSERT INTO platform_staff_invites
+        (id, email, full_name, phone, role, token_hash, expires_at, invited_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, email, fullName, input.phone?.trim() || null, role, tokenHash, expiresAt, actor?.id ?? null, nowIso()]
+    );
+
+    this.audit('إنشاء دعوة لموظف منصة', 'SYSTEM', id, { email, role, expiresInHours }, { severity: 'NOTICE' });
+
+    let link = `#/accept-staff-invite/${token}`;
+    try {
+      const origin = typeof window !== 'undefined' ? window.location?.origin : '';
+      const pathname = typeof window !== 'undefined' ? window.location?.pathname : '';
+      if (origin && origin.startsWith('http')) {
+        link = `${origin}${pathname || '/'}#/accept-staff-invite/${token}`;
+      }
+    } catch {
+      // keep hash-only link
+    }
+
+    const invite = this.listStaffInvites('all').find((item) => item.id === id)!;
+    return { invite, token, link };
+  }
+
+  public listStaffInvites(status: 'all' | PlatformStaffInviteStatus = 'all'): PlatformStaffInvite[] {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    const rows = this.db.query<any>(
+      `SELECT i.*, u.full_name AS invited_by_name
+       FROM platform_staff_invites i
+       LEFT JOIN platform_staff u ON u.id = i.invited_by
+       ORDER BY i.created_at DESC`
+    );
+    const invites = rows.map((row) => PlatformAdminService.mapStaffInvite(row));
+    const wanted = String(status || 'all').toUpperCase();
+    return wanted === 'ALL' ? invites : invites.filter((invite) => invite.status === wanted);
+  }
+
+  public revokeStaffInvite(id: string): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.update');
+    const row = this.db.query<any>('SELECT * FROM platform_staff_invites WHERE id = ?', [id])[0];
+    if (!row) throw new Error('الدعوة غير موجودة.');
+    const invite = PlatformAdminService.mapStaffInvite(row);
+    if (invite.status !== 'PENDING') {
+      throw new Error('لا يمكن إلغاء دعوة غير معلقة.');
+    }
+    this.db.run('UPDATE platform_staff_invites SET revoked_at = ? WHERE id = ?', [nowIso(), id]);
+    this.audit('إلغاء دعوة موظف منصة', 'SYSTEM', id, { email: invite.email }, { severity: 'NOTICE' });
+  }
+
+  /** Pre-auth preview of an invitation (name/email/role/expiry) so the invitee can confirm before accepting. */
+  public getStaffInviteByToken(token: string): PlatformStaffInvite {
+    const tokenHash = PlatformAdminService.hashStaffInviteToken(String(token || '').trim());
+    const row = this.db.query<any>(
+      'SELECT * FROM platform_staff_invites WHERE token_hash = ? LIMIT 1',
+      [tokenHash]
+    )[0];
+    if (!row) throw new Error('رابط الدعوة غير صالح.');
+    const invite = PlatformAdminService.mapStaffInvite(row);
+    if (invite.status === 'REVOKED' || invite.status === 'ACCEPTED' || invite.status === 'EXPIRED') {
+      throw new Error(invite.status === 'REVOKED'
+        ? 'تم إلغاء هذه الدعوة من مالك المنصة.'
+        : invite.status === 'ACCEPTED'
+          ? 'تم استخدام هذه الدعوة بالفعل.'
+          : 'انتهت صلاحية هذه الدعوة. اطلب دعوة جديدة.');
+    }
+    return invite;
+  }
+
+  /** Pre-auth: accept a staff invite and create the staff account. No platform session required. */
+  public acceptStaffInvite(token: string, fullName: string, password: string): PlatformStaff {
+    const trimmedName = String(fullName || '').trim();
+    if (trimmedName.length < 2) throw new Error('اسم الموظف مطلوب.');
+    const cleanPassword = String(password || '');
+    if (cleanPassword.length < 8) {
+      throw new Error('كلمة المرور مطلوبة ويجب أن تكون 8 أحرف على الأقل.');
+    }
+
+    const tokenHash = PlatformAdminService.hashStaffInviteToken(String(token || '').trim());
+    const row = this.db.query<any>(
+      'SELECT * FROM platform_staff_invites WHERE token_hash = ? LIMIT 1',
+      [tokenHash]
+    )[0];
+    if (!row) throw new Error('رابط الدعوة غير صالح.');
+    const invite = PlatformAdminService.mapStaffInvite(row);
+    if (invite.status === 'REVOKED') throw new Error('تم إلغاء هذه الدعوة من مالك المنصة.');
+    if (invite.status === 'ACCEPTED') throw new Error('تم استخدام هذه الدعوة بالفعل.');
+    if (invite.status === 'EXPIRED') throw new Error('انتهت صلاحية هذه الدعوة. اطلب دعوة جديدة.');
+
+    const existingStaff = this.db.query<any>(
+      'SELECT id FROM platform_staff WHERE lower(email) = ? AND deleted_at IS NULL LIMIT 1',
+      [invite.email]
+    )[0];
+    if (existingStaff) {
+      throw new Error('يوجد حساب موظف بنفس البريد بالفعل. تواصل مع مالك المنصة.');
+    }
+
+    const id = `staff_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
+    const passwordHash = bcrypt.hashSync(cleanPassword, 10);
+    const now = nowIso();
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `INSERT INTO platform_staff
+          (id, full_name, email, phone, role, password_hash, is_active, must_change_password, invited_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
+        [id, trimmedName, invite.email, invite.phone, invite.role, passwordHash, invite.invitedBy ?? null, now, now]
+      );
+      this.db.run('UPDATE platform_staff_invites SET accepted_at = ? WHERE id = ?', [now, row.id]);
+    });
+
+    this.audit('قبول دعوة موظف منصة', 'SYSTEM', id, { email: invite.email, role: invite.role, inviteId: row.id }, { severity: 'NOTICE' });
+    return this.getPlatformStaff(id)!;
+  }
+
+  public resetPlatformStaffPassword(id: string, newPassword: string): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.reset_password');
+    const actor = AuthService.getCurrentUser();
+    const clean = String(newPassword || '');
+    if (clean.length < 8) throw new Error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+
+    const staff = this.db.query<any>('SELECT role, full_name FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [id])[0];
+    if (!staff) throw new Error('الموظف غير موجود.');
+    if (String(staff.role) === 'SUPER_ADMIN' && actor?.id !== id) {
+      throw new Error('لا يمكن إعادة تعيين كلمة مرور مالك المنصة من قبل موظف آخر.');
+    }
+
+    this.db.run(
+      'UPDATE platform_staff SET password_hash = ?, must_change_password = 1, failed_login_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ?',
+      [bcrypt.hashSync(clean, 10), nowIso(), id]
+    );
+    PlatformStaffAuthService.revokeSessionsForStaff(id);
+    this.audit('إعادة تعيين كلمة مرور موظف منصة', 'SYSTEM', id, { name: staff.fullName, sessionsRevoked: true, mustChangePassword: true, resetBy: actor?.id ?? null }, { severity: 'SECURITY' });
+  }
+
+  public forcePlatformStaffPasswordChange(id: string, flag = true): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.reset_password');
+    const actor = AuthService.getCurrentUser();
+    const staff = this.db.query<any>('SELECT role, full_name FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [id])[0];
+    if (!staff) throw new Error('الموظف غير موجود.');
+    if (String(staff.role) === 'SUPER_ADMIN' && actor?.id !== id) {
+      throw new Error('لا يمكن إجبار مالك المنصة الرئيسي على تغيير كلمة المرور من موظف آخر.');
+    }
+    this.db.run('UPDATE platform_staff SET must_change_password = ?, updated_at = ? WHERE id = ?', [flag ? 1 : 0, nowIso(), id]);
+    this.audit(flag ? 'فرض تغيير كلمة المرور لموظف منصة' : 'إلغاء فرض تغيير كلمة المرور', 'SYSTEM', id, { name: staff.fullName, by: actor?.id ?? null }, { severity: 'NOTICE' });
+  }
+
+  /** Self-service: change your own staff password (forced-change flow). */
+  public changeOwnStaffPassword(currentPassword: string, newPassword: string, fullName?: string): void {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+
+    const row = this.db.query<any>('SELECT id, full_name, password_hash FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [actor.id])[0];
+    if (!row) throw new Error('حساب موظف المنصة غير موجود.');
+    if (!row.passwordHash) throw new Error('لا توجد كلمة مرور حالية لهذا الحساب.');
+    if (!bcrypt.compareSync(String(currentPassword || ''), String(row.passwordHash))) {
+      throw new Error('كلمة المرور الحالية غير صحيحة.');
+    }
+
+    const clean = String(newPassword || '');
+    if (clean.length < 8) throw new Error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+    if (bcrypt.compareSync(clean, String(row.passwordHash))) {
+      throw new Error('كلمة المرور الجديدة يجب أن تختلف عن الحالية.');
+    }
+
+    const savedName = fullName && fullName.trim().length >= 2 ? fullName.trim() : String(row.fullName);
+    const now = nowIso();
+    this.db.run(
+      'UPDATE platform_staff SET password_hash = ?, full_name = ?, must_change_password = 0, updated_at = ? WHERE id = ?',
+      [bcrypt.hashSync(clean, 10), savedName, now, actor.id]
+    );
+
+    // Revoke every OTHER session; keep the one used to make the change.
+    const currentSessionId = PlatformStaffAuthService.getCurrentSessionId();
+    this.db.run(
+      `UPDATE platform_staff_sessions SET is_current = 0, last_activity_at = ? WHERE staff_id = ? AND id <> COALESCE(?, '')`,
+      [now, actor.id, currentSessionId]
+    );
+
+    authSession.setCurrentUser({
+      ...actor,
+      fullName: savedName,
+      mustChangePassword: false,
+      updatedAt: now,
+    });
+
+    this.audit('تغيير ذاتي لكلمة مرور موظف منصة', 'SYSTEM', actor.id, { selfService: true, otherSessionsRevoked: true }, { severity: 'SECURITY' });
+  }
+
+  public listTrustedDevices(staffId?: string): PlatformTrustedDevice[] {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    const rows = this.db.query<any>(
+      `SELECT t.*, s.full_name AS staff_name
+       FROM platform_trusted_devices t
+       LEFT JOIN platform_staff s ON s.id = t.staff_id
+       ${staffId ? 'WHERE t.staff_id = ?' : ''}
+       ORDER BY t.created_at DESC`,
+      staffId ? [staffId] : []
+    );
+    return rows.map((row) => ({
+      id: String(row.id),
+      staffId: String(row.staffId),
+      staffName: row.staffName ?? null,
+      deviceName: row.deviceName ?? null,
+      fingerprint: String(row.fingerprint),
+      lastSeenAt: row.last_seen_at ?? null,
+      revokedAt: row.revokedAt ?? null,
+      createdAt: String(row.createdAt || nowIso()),
+    }));
+  }
+
+  public revokeTrustedDevice(id: string): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.update');
+    const row = this.db.query<any>('SELECT * FROM platform_trusted_devices WHERE id = ?', [id])[0];
+    if (!row) throw new Error('الجهاز الموثوق غير موجود.');
+    this.db.run('UPDATE platform_trusted_devices SET revoked_at = ? WHERE id = ?', [nowIso(), id]);
+    this.audit('إلغاء جهاز موثوق لموظف منصة', 'SYSTEM', id, { staffId: row.staffId, deviceName: row.deviceName }, { severity: 'SECURITY' });
+  }
+
+  /** Self-service: is the current platform staff member's MFA enabled? */
+  public getOwnStaffMfaStatus(): { enabled: boolean; enforcement: 'off' | 'optional' | 'required' } {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+    return {
+      enabled: platformStaffTwoFactorAuth.isEnabled(actor.id),
+      enforcement: this.getStaffMfaEnforcement(),
+    };
+  }
+
+  public revokeStaffSessionsForStaff(staffId: string): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.revoke_sessions');
+    const staff = this.db.query<any>('SELECT full_name FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [staffId])[0];
+    if (!staff) throw new Error('الموظف غير موجود.');
+    PlatformStaffAuthService.revokeSessionsForStaff(staffId);
+    this.audit('إنهاء جميع جلسات موظف منصة', 'SYSTEM', staffId, { name: staff.fullName, by: AuthService.getCurrentUser()?.id ?? null }, { severity: 'SECURITY' });
+  }
+
+  /** Any authenticated platform staff member may trust the device they are using right now. */
+  public trustCurrentStaffDevice(deviceName?: string): void {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+    PlatformStaffAuthService.trustCurrentDevice(deviceName);
+    this.audit('توثيق الجهاز الحالي كجهاز موثوق', 'SYSTEM', actor.id, { selfService: true }, { severity: 'NOTICE' });
+  }
+
+  public getStaffMfaEnforcement(): 'off' | 'optional' | 'required' {
+    try {
+      const row = this.db.query<any>('SELECT value FROM platform_settings WHERE key = ? LIMIT 1', ['platform_mfa_enforcement'])[0];
+      const value = String(row?.value ?? 'off');
+      return value === 'required' || value === 'optional' ? value : 'off';
+    } catch {
+      return 'off';
+    }
+  }
+
+  public setStaffMfaEnforcement(policy: 'off' | 'optional' | 'required'): void {
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.update');
+    if (policy !== 'off' && policy !== 'optional' && policy !== 'required') {
+      throw new Error('سياسة المصادقة الثنائية غير معروفة.');
+    }
+    this.db.run(
+      `INSERT INTO platform_settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      ['platform_mfa_enforcement', policy]
+    );
+    this.audit('تغيير سياسة المصادقة الثنائية للمنصة', 'SYSTEM', null, { policy, by: AuthService.getCurrentUser()?.id ?? null }, { severity: 'SECURITY' });
+  }
+
+  public getStaffMfaCompliance(): {
+    enforcement: 'off' | 'optional' | 'required';
+    total: number;
+    compliant: number;
+    missing: Array<{ id: string; fullName: string; email: string; role: PlatformStaffRole }>;
+  } {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    const staff = this.listPlatformStaff();
+    const missing = staff.filter((item) => !platformStaffTwoFactorAuth.isEnabled(item.id));
+    return {
+      enforcement: this.getStaffMfaEnforcement(),
+      total: staff.length,
+      compliant: staff.length - missing.length,
+      missing: missing.map((item) => ({ id: item.id, fullName: item.fullName, email: item.email, role: item.role })),
+    };
+  }
+
+  /** Start TOTP enrollment for the currently signed-in platform staff member. */
+  public startMfaEnrollmentForStaffSelf() {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+    return platformStaffTwoFactorAuth.setup2FA(actor.id, 'TOTP');
+  }
+
+  public async confirmMfaForStaffSelf(code: string): Promise<void> {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+    await platformStaffTwoFactorAuth.enable2FA(actor.id, 'TOTP', code);
+    this.audit('تفعيل المصادقة الثنائية لموظف منصة', 'SYSTEM', actor.id, { selfService: true }, { severity: 'SECURITY' });
+  }
+
+  public async disableMfaForStaffSelf(code: string): Promise<void> {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) throw new Error('يجب تسجيل الدخول أولاً.');
+    if (!PLATFORM_ROLE_CODES_SET.has(String(actor.role))) {
+      throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
+    }
+    await platformStaffTwoFactorAuth.disable2FA(actor.id, code);
+    this.audit('تعطيل المصادقة الثنائية لموظف منصة', 'SYSTEM', actor.id, { selfService: true }, { severity: 'SECURITY' });
+  }
+
+  /** Owner emergency reset of a staff member's MFA (re-enrollment required). */
+  public resetStaffMfa(id: string): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.reset_password');
+    const actor = AuthService.getCurrentUser();
+    if (id === actor?.id) {
+      throw new Error('استخدم تعطيل المصادقة الثنائية من حسابك بدلاً من إعادة التعيين.');
+    }
+    const staff = this.db.query<any>('SELECT role, full_name FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [id])[0];
+    if (!staff) throw new Error('الموظف غير موجود.');
+    if (String(staff.role) === 'SUPER_ADMIN') {
+      throw new Error('لا يمكن إعادة تعيين مصادقة مالك المنصة من قبل موظف آخر.');
+    }
+    deletePlatformStaffTwoFactorRow(id);
+    this.audit('إعادة تعيين مصادقة ثنائية لموظف منصة', 'SYSTEM', id, { name: staff.fullName, by: actor?.id ?? null }, { severity: 'SECURITY' });
+  }
+
+  public transferStaffPermissions(fromStaffId: string, toStaffId: string, note?: string): PlatformStaff {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.manage_permissions');
+    const actor = AuthService.getCurrentUser();
+    if (!fromStaffId || !toStaffId) throw new Error('حدد الموظف المصدر والهدف.');
+    if (fromStaffId === toStaffId) throw new Error('لا يمكن نقل الصلاحيات إلى نفس الموظف.');
+
+    const from = this.db.query<any>('SELECT * FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [fromStaffId])[0];
+    const to = this.db.query<any>('SELECT * FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [toStaffId])[0];
+    if (!from) throw new Error('الموظف المصدر غير موجود.');
+    if (!to) throw new Error('الموظف الهدف غير موجود.');
+    if (String(to.role) === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('نقل الصلاحيات إلى حساب مالك المنصة متاح لمالك المنصة فقط.');
+    }
+
+    const now = nowIso();
+    this.db.executeTransaction(() => {
+      this.db.run(
+        'UPDATE platform_staff SET role = ?, permissions_override = ?, data_scope = ?, updated_at = ? WHERE id = ?',
+        [from.role, from.permissionsOverride ?? null, from.dataScope ?? 'ALL', now, toStaffId]
+      );
+      this.db.run('DELETE FROM platform_staff_scopes WHERE staff_id = ?', [toStaffId]);
+      const scopeRows = this.db.query<any>('SELECT tenant_id FROM platform_staff_scopes WHERE staff_id = ?', [fromStaffId]);
+      for (const scopeRow of scopeRows) {
+        this.db.run('INSERT OR IGNORE INTO platform_staff_scopes (staff_id, tenant_id) VALUES (?, ?)', [toStaffId, scopeRow.tenant_id]);
+      }
+    });
+
+    PlatformStaffAuthService.revokeSessionsForStaff(toStaffId);
+    this.audit('نقل صلاحيات موظف منصة إلى موظف آخر', 'SYSTEM', toStaffId, {
+      fromStaffId,
+      toStaffId,
+      roleTransferred: from.role,
+      fromName: from.fullName,
+      toName: to.fullName,
+      note: note?.trim() || null,
+      by: actor?.id ?? null,
+      sessionsRevoked: true,
+    }, { severity: 'SECURITY' });
+    return this.getPlatformStaff(toStaffId)!;
+  }
+
+  public getStaffDataScope(id: string): PlatformStaffDataScopeState {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    const row = this.db.query<any>('SELECT data_scope FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [id])[0];
+    if (!row) throw new Error('الموظف غير موجود.');
+    const scope = String(row.dataScope || 'ALL') === 'LIMITED' ? 'LIMITED' : 'ALL';
+    const tenantRows = this.db.query<any>('SELECT tenant_id AS tenantId FROM platform_staff_scopes WHERE staff_id = ? ORDER BY tenant_id', [id]);
+    return {
+      staffId: id,
+      scope,
+      tenantIds: scope === 'LIMITED' ? tenantRows.map((r) => String(r.tenantId)) : [],
+    };
+  }
+
+  public setStaffDataScope(id: string, scope: 'ALL' | 'LIMITED', tenantIds: string[] = []): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.manage_permissions');
+    if (scope !== 'ALL' && scope !== 'LIMITED') throw new Error('نطاق بيانات غير معروف.');
+    const actor = AuthService.getCurrentUser();
+    const staff = this.db.query<any>('SELECT role, full_name FROM platform_staff WHERE id = ? AND deleted_at IS NULL', [id])[0];
+    if (!staff) throw new Error('الموظف غير موجود.');
+    if (String(staff.role) === 'SUPER_ADMIN') {
+      throw new Error('نطاق البيانات غير قابل للتقييد على حساب مالك المنصة.');
+    }
+
+    const cleanIds = Array.from(new Set(tenantIds.map((item) => String(item).trim()).filter(Boolean)));
+    const now = nowIso();
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE platform_staff SET data_scope = ?, updated_at = ? WHERE id = ?', [scope, now, id]);
+      this.db.run('DELETE FROM platform_staff_scopes WHERE staff_id = ?', [id]);
+      if (scope === 'LIMITED') {
+        for (const tenantId of cleanIds) {
+          this.db.run('INSERT OR IGNORE INTO platform_staff_scopes (staff_id, tenant_id) VALUES (?, ?)', [id, tenantId]);
+        }
+      }
+    });
+
+    this.audit('تغيير نطاق بيانات موظف منصة', 'SYSTEM', id, { scope, tenantIds: scope === 'LIMITED' ? cleanIds : [], by: actor?.id ?? null }, { severity: 'SECURITY' });
+  }
+
+  public getRolePermissionMatrix(): PlatformRoleMatrix {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    return {
+      matrix: PlatformAuthorizationService.listRolePermissionMatrix(),
+      sections: PLATFORM_PERMISSION_SECTIONS.map((section) => ({
+        module: section.module,
+        title: section.title,
+        standardActions: section.standardActions,
+        permissions: section.permissions.map((permission) => ({
+          code: permission.code,
+          action: permission.action,
+          name: permission.name,
+          special: permission.special,
+        })),
+      })),
+      standardActionLabels: { ...STANDARD_ACTION_LABELS },
+      fetchedAt: nowIso(),
+    };
+  }
+
+  public setRolePermissions(role: string, permissionCodes: string[]): void {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.manage_permissions');
+    this.assertKnownPlatformRole(String(role));
+    const actor = AuthService.getCurrentUser();
+    if (role === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('تعديل دور مالك المنصة متاح لمالك المنصة فقط.');
+    }
+
+    const validCodes = new Set<string>([...PLATFORM_PERMISSION_CODES, PLATFORM_ALL_PERMISSION]);
+    const clean = Array.from(new Set((permissionCodes || []).map((code) => String(code)).filter((code) => validCodes.has(code))));
+
+    const before = PlatformAuthorizationService.getRolePermissions(String(role));
+    PlatformAuthorizationService.setRolePermissions(String(role), clean);
+    const after = PlatformAuthorizationService.getRolePermissions(String(role));
+
+    this.audit('تعديل مصفوفة صلاحيات دور المنصة', 'SYSTEM', role, {
+      role,
+      added: after.filter((code) => !before.includes(code)),
+      removed: before.filter((code) => !after.includes(code)),
+      by: actor?.id ?? null,
+    }, { severity: 'SECURITY' });
   }
 
   // ─── Platform Central Security Center (Item 19) ─────────────────────────────
 
   public getPlatformSecurityOverview(): PlatformCentralSecurityOverview {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.view');
 
     const staffList = this.listPlatformStaff();
     const totalStaffCount = staffList.length;
-    // 2FA compliant if active and has configured 2fa flag (simulated high compliance)
-    const compliantStaffCount = Math.max(1, totalStaffCount);
+    const twoFactorEnforcement = this.getStaffMfaEnforcement();
+    const compliantStaffCount = staffList.filter((s) => platformStaffTwoFactorAuth.isEnabled(s.id)).length;
+    const twoFactorEnabled = twoFactorEnforcement === 'required';
 
     const sessions = this.listStaffSessions();
     const activeStaffSessionsCount = sessions.length;
-    const trustedDevicesCount = sessions.filter(s => s.isTrustedDevice).length;
+    const trustedDevicesCount = this.db.query<any>('SELECT COUNT(*) AS count FROM platform_trusted_devices WHERE revoked_at IS NULL')[0]?.count ?? 0;
 
     const recentLogins = this.listStaffLogins(50);
     const failedLogins24hCount = recentLogins.filter(l => l.status === 'FAILED' || l.status === 'BLOCKED').length;
@@ -7761,7 +8779,7 @@ export class PlatformAdminService {
     return {
       securityScore,
       twoFactorEnforcement: {
-        enabled: true,
+        enabled: twoFactorEnabled,
         compliantStaffCount,
         totalStaffCount,
       },
@@ -7777,61 +8795,69 @@ export class PlatformAdminService {
     };
   }
 
-  public listStaffSessions(): PlatformStaffSession[] {
-    PlatformAdminService.owner();
+  public listStaffSessions(staffId?: string): PlatformStaffSession[] {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
     const rows = this.db.query<any>(
-      `SELECT * FROM platform_staff_sessions ORDER BY is_current DESC, last_activity_at DESC`
+      `SELECT * FROM platform_staff_sessions
+       ${staffId ? 'WHERE staff_id = ?' : ''}
+       ORDER BY is_current DESC, last_activity_at DESC`,
+      staffId ? [staffId] : []
     );
     return rows.map(r => ({
       id: String(r.id),
-      staffId: String(r.staff_id),
-      staffName: String(r.staff_name),
-      staffRole: String(r.staff_role),
-      ipAddress: r.ip_address ?? null,
-      deviceName: r.device_name ?? null,
-      isTrustedDevice: Boolean(r.is_trusted_device),
-      isCurrent: Boolean(r.is_current),
-      expiresAt: r.expires_at ?? null,
-      createdAt: String(r.created_at || nowIso()),
-      lastActivityAt: String(r.last_activity_at || nowIso()),
+      staffId: String(r.staffId),
+      staffName: String(r.staffName),
+      staffRole: String(r.staffRole),
+      ipAddress: r.ipAddress ?? null,
+      deviceName: r.deviceName ?? null,
+      isTrustedDevice: Boolean(r.isTrustedDevice),
+      isCurrent: Boolean(r.isCurrent),
+      expiresAt: r.expiresAt ?? null,
+      createdAt: String(r.createdAt || nowIso()),
+      lastActivityAt: String(r.lastActivityAt || nowIso()),
     }));
   }
 
   public revokeStaffSession(sessionId: string): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.staff.revoke_sessions');
     const session = this.db.query<any>('SELECT * FROM platform_staff_sessions WHERE id = ?', [sessionId])[0];
     if (!session) throw new Error('الجلسة غير موجودة.');
-    if (Boolean(session.is_current)) {
+    if (Boolean(session.isCurrent)) {
       throw new Error('لا يمكن إنهاء جلستك الحالية من هذه الشاشة.');
     }
 
     this.db.run('DELETE FROM platform_staff_sessions WHERE id = ?', [sessionId]);
-    this.audit('إنهاء جلسة موظف عن بعد', 'SYSTEM', sessionId, { staffId: session.staff_id, name: session.staff_name }, { severity: 'SECURITY' });
+    this.audit('إنهاء جلسة موظف عن بعد', 'SYSTEM', sessionId, { staffId: session.staffId, name: session.staffName }, { severity: 'SECURITY' });
   }
 
   public revokeAllOtherStaffSessions(): void {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.staff.revoke_sessions');
     this.db.run('DELETE FROM platform_staff_sessions WHERE is_current = 0');
     this.audit('إنهاء كافة الجلسات النشطة الأخرى لموظفي المنصة', 'SYSTEM', null, null, { severity: 'SECURITY' });
   }
 
-  public listStaffLogins(limit = 100, failedOnly = false): PlatformStaffLogin[] {
-    PlatformAdminService.owner();
-    const where = failedOnly ? "WHERE status IN ('FAILED', 'BLOCKED')" : "";
+  public listStaffLogins(limit = 100, failedOnly = false, staffId?: string): PlatformStaffLogin[] {
+    PlatformAdminService.requirePlatformAccess('staff', 'platform.staff.view');
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (failedOnly) conditions.push("status IN ('FAILED', 'BLOCKED')");
+    if (staffId) { conditions.push('staff_id = ?'); params.push(staffId); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(limit);
     const rows = this.db.query<any>(
       `SELECT * FROM platform_staff_logins ${where} ORDER BY attempted_at DESC LIMIT ?`,
-      [limit]
+      params
     );
 
     return rows.map(r => ({
       id: String(r.id),
-      staffId: r.staff_id ?? null,
+      staffId: r.staffId ?? null,
       email: String(r.email),
-      ipAddress: r.ip_address ?? null,
-      userAgent: r.user_agent ?? null,
+      ipAddress: r.ipAddress ?? null,
+      userAgent: r.userAgent ?? null,
       status: r.status as any,
-      failureReason: r.failure_reason ?? null,
-      attemptedAt: String(r.attempted_at || nowIso()),
+      failureReason: r.failureReason ?? null,
+      attemptedAt: String(r.attemptedAt || nowIso()),
     }));
   }
 
@@ -7856,7 +8882,7 @@ export class PlatformAdminService {
   }
 
   public listPlatformSecurityIncidents(): PlatformCentralSecurityIncident[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('system-health', 'platform.system-health.view');
     const rows = this.db.query<any>(
       `SELECT * FROM platform_security_incidents_log ORDER BY created_at DESC`
     );
@@ -7869,7 +8895,7 @@ export class PlatformAdminService {
       sourceIp: r.source_ip ?? null,
       status: r.status as any,
       containmentAction: r.containment_action ?? null,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
       resolvedAt: r.resolved_at ?? null,
     }));
   }
@@ -7881,7 +8907,7 @@ export class PlatformAdminService {
     details?: string;
     sourceIp?: string;
   }): PlatformCentralSecurityIncident {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.approve');
     const id = `secinc_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     const now = nowIso();
 
@@ -7896,7 +8922,7 @@ export class PlatformAdminService {
   }
 
   public respondToSecurityIncident(id: string, action: string, resolve = false): PlatformCentralSecurityIncident {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.approve');
     const now = nowIso();
     const status = resolve ? 'RESOLVED' : 'CONTAINED';
     this.db.run(
@@ -7911,7 +8937,7 @@ export class PlatformAdminService {
   }
 
   public listPlatformSigningKeys(): PlatformSigningKey[] {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.view');
     const rows = this.db.query<any>(
       `SELECT * FROM platform_signing_keys ORDER BY created_at DESC`
     );
@@ -7922,12 +8948,12 @@ export class PlatformAdminService {
       version: toNumber(r.version, 1),
       status: r.status as any,
       rotatedAt: r.rotated_at ?? null,
-      createdAt: String(r.created_at || nowIso()),
+      createdAt: String(r.createdAt || nowIso()),
     }));
   }
 
   public rotatePlatformSigningKey(keyAlias: string): PlatformSigningKey {
-    PlatformAdminService.owner();
+    PlatformAdminService.requirePlatformAccess('security-center', 'platform.security.update');
     const active = this.db.query<any>(
       `SELECT * FROM platform_signing_keys WHERE key_alias = ? AND status = 'ACTIVE' ORDER BY version DESC LIMIT 1`,
       [keyAlias]

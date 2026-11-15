@@ -12,6 +12,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -32,6 +33,7 @@ interface NotificationLog {
 }
 
 export const PlatformNotificationsHubPage: React.FC = () => {
+  const canManageNotifications = canPlatform('notifications');
   const [logs, setLogs] = useState<NotificationLog[]>([
     {
       id: 'notif_1',
@@ -75,6 +77,10 @@ export const PlatformNotificationsHubPage: React.FC = () => {
   });
 
   const handleSendBroadcast = () => {
+    if (!canManageNotifications) {
+      alert('لا تملك صلاحية إرسال الإشعارات.');
+      return;
+    }
     if (!broadcastForm.subject.trim() || !broadcastForm.message.trim()) {
       alert('الموضوع ومحتوى الرسالة مطلوبان.');
       return;
@@ -104,13 +110,15 @@ export const PlatformNotificationsHubPage: React.FC = () => {
         description="إرسال التنبيهات الجماعية، البريد الإلكتروني، والرسائل النصية للعملاء ومتابعة سجلات التسليم."
         icon={<Bell className="h-5 w-5" />}
         actions={
-          <Button
-            size="sm"
-            onClick={() => setIsSendOpen(true)}
-            leadingIcon={<Send className="h-4 w-4" />}
-          >
-            إرسال إشعار مركزي جديد
-          </Button>
+          canManageNotifications ? (
+            <Button
+              size="sm"
+              onClick={() => setIsSendOpen(true)}
+              leadingIcon={<Send className="h-4 w-4" />}
+            >
+              إرسال إشعار مركزي جديد
+            </Button>
+          ) : null
         }
       />
 
@@ -250,7 +258,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsSendOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleSendBroadcast}>
+            <Button size="sm" onClick={handleSendBroadcast} disabled={!canManageNotifications}>
               إرسال فوراً
             </Button>
           </div>

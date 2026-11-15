@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layers3, Plus, Pencil, CheckCircle2, XCircle, Star } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformBillingCycle,
   PlatformModule,
@@ -53,6 +54,7 @@ const emptyPlan: PlatformPlanInput = {
 
 export const PlatformPlansPage: React.FC = () => {
   const toast = useToast();
+  const canManagePlans = canPlatform('plans');
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
   const [modules, setModules] = React.useState<PlatformModule[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -123,6 +125,10 @@ export const PlatformPlansPage: React.FC = () => {
   };
 
   const save = () => {
+    if (!canManagePlans) {
+      toast.error('لا تملك صلاحية إدارة الخطط');
+      return;
+    }
     setSaving(true);
     try {
       const payload: PlatformPlanInput = {
@@ -146,6 +152,10 @@ export const PlatformPlansPage: React.FC = () => {
   };
 
   const toggleActive = (plan: PlatformPlan) => {
+    if (!canManagePlans) {
+      toast.error('لا تملك صلاحية إدارة الخطط');
+      return;
+    }
     try {
       platformAdminService.setPlanActive(plan.id, !plan.isActive);
       toast.success(plan.isActive ? 'تم تعطيل الخطة' : 'تم تفعيل الخطة');
@@ -162,9 +172,11 @@ export const PlatformPlansPage: React.FC = () => {
         description="أنشئ خطط التسعير وحدود الاستخدام والوحدات المتضمنة."
         icon={<Layers3 className="h-5 w-5" />}
         actions={
-          <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
-            خطة جديدة
-          </Button>
+          canManagePlans ? (
+            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
+              خطة جديدة
+            </Button>
+          ) : null
         }
       />
 
@@ -222,17 +234,21 @@ export const PlatformPlansPage: React.FC = () => {
               <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
                 <span className="text-[10.5px] text-slate-500">{plan.subscriberCount ?? 0} مشترك</span>
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => openEdit(plan)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(plan)}
-                    className={`rounded p-1.5 ${plan.isActive ? 'text-slate-500 hover:bg-rose-50 hover:text-rose-700' : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
-                    title={plan.isActive ? 'تعطيل' : 'تفعيل'}
-                  >
-                    {plan.isActive ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                  </button>
+                  {canManagePlans && (
+                    <>
+                      <button type="button" onClick={() => openEdit(plan)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleActive(plan)}
+                        className={`rounded p-1.5 ${plan.isActive ? 'text-slate-500 hover:bg-rose-50 hover:text-rose-700' : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                        title={plan.isActive ? 'تعطيل' : 'تفعيل'}
+                      >
+                        {plan.isActive ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </article>
@@ -250,7 +266,7 @@ export const PlatformPlansPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>إلغاء</Button>
-            <Button variant="primary" onClick={save} loading={saving}>{editing ? 'حفظ التعديلات' : 'إنشاء الخطة'}</Button>
+            <Button variant="primary" onClick={save} loading={saving} disabled={!canManagePlans}>{editing ? 'حفظ التعديلات' : 'إنشاء الخطة'}</Button>
           </div>
         }
       >

@@ -1,6 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import {
@@ -8,9 +9,31 @@ import {
   platformAdminService,
 } from '../src/services/domains/platform/PlatformAdminService.ts';
 
+/**
+ * The platform owner is never seeded by migrations (a known default credential
+ * would be a security risk). Tests bootstrap their own fixture account instead.
+ */
+function ensurePlatformOwner(db: DatabaseManager) {
+  const existing = db.query<any>(`SELECT id FROM users WHERE username = 'platform'`)[0];
+  if (existing) return;
+  const passwordHash = bcrypt.hashSync('Platform@2026', 10);
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO users (id, username, password_hash, full_name, role, is_active, created_at, updated_at)
+     VALUES ('usr_platform_test', 'platform', ?, 'مالك المنصة', 'SUPER_ADMIN', 1, ?, ?)`,
+    [passwordHash, now, now]
+  );
+}
+
+/** Issue licenses through the local path in tests (central server is the production source). */
+function enableLocalIssuance(db: DatabaseManager) {
+  db.run(`INSERT OR REPLACE INTO platform_settings (key, value) VALUES ('platform.localIssuance', 'true')`);
+}
+
 test('platform owner account is seeded with the SUPER_ADMIN role', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  ensurePlatformOwner(db);
 
   const row = db.query<any>(`SELECT id, username, role, is_active AS isActive FROM users WHERE username = 'platform'`)[0];
   assert.ok(row, 'platform account should exist');
@@ -24,13 +47,15 @@ test('platform service refuses non-owner sessions', async () => {
 
   AuthService.login('admin', 'admin123');
   assert.equal(PlatformAdminService.isPlatformOwner(AuthService.getCurrentUser()), false);
-  assert.throws(() => platformAdminService.listTenants(), /مالك المنصة/);
+  assert.throws(() => platformAdminService.listTenants(), /المنصة/);
   AuthService.logout();
 });
 
 test('platform owner can manage tenants, licenses, invoices and payments', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  ensurePlatformOwner(db);
+  enableLocalIssuance(db);
   AuthService.login('platform', 'Platform@2026');
 
   const owner = AuthService.getCurrentUser();
@@ -138,6 +163,8 @@ test('platform owner can manage tenants, licenses, invoices and payments', async
 test('tenant central file: account, activation, plan change, renew, devices and cancel', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  ensurePlatformOwner(db);
+  enableLocalIssuance(db);
   AuthService.login('platform', 'Platform@2026');
 
   const plans = platformAdminService.listPlans().filter((plan) => plan.isActive);

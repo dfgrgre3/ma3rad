@@ -10,7 +10,18 @@ interface PendingTwoFactorSetup {
   setupDate: string;
 }
 
+/**
+ * Repository for 2FA secrets/recovery codes. The table is injectable so the
+ * same battle-tested crypto path serves both ERP users (`user_2fa`) and
+ * platform staff (`platform_staff_2fa`, see migration part116).
+ */
 export class TwoFactorAuthRepository {
+  private readonly tableName: string;
+
+  constructor(tableName = 'user_2fa') {
+    this.tableName = tableName;
+  }
+
   private db(): DatabaseManager {
     return DatabaseManager.getInstance();
   }
@@ -21,7 +32,7 @@ export class TwoFactorAuthRepository {
         `SELECT user_id AS userId, secret, algorithm, period, counter, enabled,
                 recovery_codes AS recoveryCodes, setup_date AS setupDate,
                 last_used_counter AS lastUsedCounter
-         FROM user_2fa WHERE user_id = ?`,
+         FROM ${this.tableName} WHERE user_id = ?`,
         [userId]
       );
       return rows.length > 0 ? rows[0] : null;
@@ -32,7 +43,7 @@ export class TwoFactorAuthRepository {
 
   savePendingSetup(setup: PendingTwoFactorSetup): void {
     this.db().run(
-      `INSERT INTO user_2fa
+      `INSERT INTO ${this.tableName}
          (user_id, secret, algorithm, period, counter, enabled, recovery_codes, setup_date, last_used_counter, created_at, updated_at)
        VALUES (?, ?, ?, ?, 0, 0, ?, ?, NULL, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET
@@ -60,40 +71,45 @@ export class TwoFactorAuthRepository {
 
   advanceHotpCounter(userId: string, updatedAt: string): void {
     this.db().run(
-      `UPDATE user_2fa SET counter = counter + 1, last_used_counter = counter, updated_at = ? WHERE user_id = ?`,
+      `UPDATE ${this.tableName} SET counter = counter + 1, last_used_counter = counter, updated_at = ? WHERE user_id = ?`,
       [updatedAt, userId]
     );
   }
 
   setLastUsedCounter(userId: string, counter: number, updatedAt: string): void {
     this.db().run(
-      `UPDATE user_2fa SET last_used_counter = ?, updated_at = ? WHERE user_id = ?`,
+      `UPDATE ${this.tableName} SET last_used_counter = ?, updated_at = ? WHERE user_id = ?`,
       [counter, updatedAt, userId]
     );
   }
 
   setRecoveryCodes(userId: string, recoveryCodes: string[], updatedAt: string): void {
     this.db().run(
-      `UPDATE user_2fa SET recovery_codes = ?, updated_at = ? WHERE user_id = ?`,
+      `UPDATE ${this.tableName} SET recovery_codes = ?, updated_at = ? WHERE user_id = ?`,
       [JSON.stringify(recoveryCodes), updatedAt, userId]
     );
   }
 
   disable(userId: string, updatedAt: string): void {
-    this.db().run(`UPDATE user_2fa SET enabled = 0, updated_at = ? WHERE user_id = ?`, [updatedAt, userId]);
+    this.db().run(`UPDATE ${this.tableName} SET enabled = 0, updated_at = ? WHERE user_id = ?`, [updatedAt, userId]);
   }
 
   enable(userId: string, algorithm: 'TOTP' | 'HOTP', period: number, updatedAt: string): void {
     this.db().run(
-      `UPDATE user_2fa SET enabled = 1, algorithm = ?, period = ?, setup_date = COALESCE(setup_date, ?), updated_at = ? WHERE user_id = ?`,
+      `UPDATE ${this.tableName} SET enabled = 1, algorithm = ?, period = ?, setup_date = COALESCE(setup_date, ?), updated_at = ? WHERE user_id = ?`,
       [algorithm, period, updatedAt, updatedAt, userId]
     );
   }
 
   setHardwareToken(userId: string, deviceId: string | null, updatedAt: string): void {
     this.db().run(
-      `UPDATE user_2fa SET hardware_token_id = ?, updated_at = ? WHERE user_id = ?`,
+      `UPDATE ${this.tableName} SET hardware_token_id = ?, updated_at = ? WHERE user_id = ?`,
       [deviceId, updatedAt, userId]
     );
+  }
+
+  /** Hard delete of the row (used by an owner emergency reset of a staff member's 2FA). */
+  deleteRow(userId: string): void {
+    this.db().run(`DELETE FROM ${this.tableName} WHERE user_id = ?`, [userId]);
   }
 }

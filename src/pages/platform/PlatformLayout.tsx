@@ -27,6 +27,9 @@ import {
   AlertOctagon,
 } from 'lucide-react';
 import type { User } from '../../types';
+import { PLATFORM_ROUTE_PERMISSION_MAP, PlatformAuthorizationService } from '../../services/domains/platform/PlatformAuthorizationService';
+import { PlatformStaffAuthService } from '../../services/domains/platform/PlatformStaffAuthService';
+import { PlatformStaffForcePasswordChange } from './PlatformStaffForcePasswordChange';
 
 interface PlatformLayoutProps {
   currentUser: User;
@@ -41,6 +44,7 @@ const NAV_ITEMS = [
   { to: '/platform/billing', label: 'المبيعات والفواتير', icon: ReceiptText },
   { to: '/platform/plans', label: 'خطط الاشتراك', icon: Layers3 },
   { to: '/platform/staff', label: 'فريق ومستخدمي المنصة', icon: Users },
+  { to: '/platform/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
   { to: '/platform/releases', label: 'حزم الإصدارات', icon: Package },
   { to: '/platform/product', label: 'المنتج والمزايا', icon: Boxes },
   { to: '/platform/audit', label: 'سجل العمليات', icon: ScrollText },
@@ -73,7 +77,8 @@ const TITLES: Record<string, string> = {
   '/platform/licenses': 'إدارة التراخيص',
   '/platform/billing': 'المبيعات والفواتير',
   '/platform/plans': 'خطط الاشتراك',
-  '/platform/staff': 'فريق ومستخدمي المنصة',
+  '/platform/staff': 'مركز التحكم في حسابات الإدارة',
+  '/platform/roles': 'مصفوفة الأدوار والصلاحيات',
   '/platform/releases': 'حزم الإصدارات والتحديثات',
   '/platform/product': 'التحكم في المنتج',
   '/platform/audit': 'سجل عمليات المنصة',
@@ -108,9 +113,19 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
     setMobileOpen(false);
   }, [location.pathname]);
 
+  const permissionsOverride = PlatformStaffAuthService.getCurrentPermissionsOverride();
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.to === '/platform') return true;
+    const required = PLATFORM_ROUTE_PERMISSION_MAP[item.to];
+    if (required) {
+      return PlatformAuthorizationService.canAccessPermission(currentUser.role, required, permissionsOverride);
+    }
+    return PlatformAuthorizationService.canAccessRoute(currentUser.role, item.to, permissionsOverride);
+  });
+
   const nav = (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-      {NAV_ITEMS.map((item) => {
+      {visibleNavItems.map((item) => {
         const Icon = item.icon;
         return (
           <NavLink
@@ -135,6 +150,7 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
 
   return (
     <div dir="rtl" className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">
+      {currentUser.mustChangePassword && <PlatformStaffForcePasswordChange currentUser={currentUser} />}
       {/* Sidebar */}
       <aside className="hidden w-[262px] shrink-0 flex-col bg-slate-950 lg:flex">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">

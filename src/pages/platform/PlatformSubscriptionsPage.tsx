@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformSubscription,
   PlatformPlan,
@@ -42,6 +43,7 @@ const CYCLE_LABELS: Record<string, string> = {
 
 export const PlatformSubscriptionsPage: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<PlatformSubscription[]>([]);
+  const canManageSubscriptions = canPlatform('subscriptions');
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -93,6 +95,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
 
   const handleExecuteModal = () => {
     if (!activeSub) return;
+    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     try {
       if (actionType === 'RENEW') {
         platformAdminService.renewTenantSubscription(activeSub.tenantId, renewMonths);
@@ -116,6 +119,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   };
 
   const handleCancelSub = (sub: PlatformSubscription) => {
+    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     if (!confirm(`هل أنت متأكد من إلغاء اشتراك "${sub.tenantName || sub.tenantId}"؟ سيتم إبطال التراخيص والحساب المرتبط.`)) return;
     try {
       platformAdminService.cancelTenantSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
@@ -126,6 +130,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   };
 
   const exportSubscriptions = () => {
+    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     downloadCsv('platform-subscriptions.csv', [
       ['رقم الاشتراك', 'العميل', 'الباقة', 'الحالة', 'تاريخ البدء', 'تاريخ الانتهاء', 'القيمة', 'دورة الفوترة', 'التجديد التلقائي'],
       ...subscriptions.map((s) => [
@@ -150,14 +155,16 @@ export const PlatformSubscriptionsPage: React.FC = () => {
         icon={<CalendarClock className="h-5 w-5" />}
         actions={
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={exportSubscriptions}
-              leadingIcon={<Download className="h-4 w-4" />}
-            >
-              تصدير CSV
-            </Button>
+            {canManageSubscriptions && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={exportSubscriptions}
+                leadingIcon={<Download className="h-4 w-4" />}
+              >
+                تصدير CSV
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={loadData}
@@ -317,32 +324,36 @@ export const PlatformSubscriptionsPage: React.FC = () => {
 
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleRenew(sub)}
-                          className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1"
-                          title="تجديد مدة الاشتراك"
-                        >
-                          <RotateCw className="h-3 w-3" />
-                          تجديد
-                        </button>
+                        {canManageSubscriptions && (
+                          <>
+                            <button
+                              onClick={() => handleRenew(sub)}
+                              className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1"
+                              title="تجديد مدة الاشتراك"
+                            >
+                              <RotateCw className="h-3 w-3" />
+                              تجديد
+                            </button>
 
-                        <button
-                          onClick={() => handleChangePlan(sub)}
-                          className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                          title="ترقية أو تخفيض الباقة"
-                        >
-                          <ArrowUpRight className="h-3 w-3" />
-                          تغيير الباقة
-                        </button>
+                            <button
+                              onClick={() => handleChangePlan(sub)}
+                              className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
+                              title="ترقية أو تخفيض الباقة"
+                            >
+                              <ArrowUpRight className="h-3 w-3" />
+                              تغيير الباقة
+                            </button>
 
-                        {sub.status !== 'CANCELLED' && (
-                          <button
-                            onClick={() => handleCancelSub(sub)}
-                            className="text-rose-400 hover:text-rose-300 text-xs"
-                            title="إلغاء الاشتراك فوراً"
-                          >
-                            إلغاء
-                          </button>
+                            {sub.status !== 'CANCELLED' && (
+                              <button
+                                onClick={() => handleCancelSub(sub)}
+                                className="text-rose-400 hover:text-rose-300 text-xs"
+                                title="إلغاء الاشتراك فوراً"
+                              >
+                                إلغاء
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -403,7 +414,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setActiveSub(null)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleExecuteModal}>
+            <Button size="sm" onClick={handleExecuteModal} disabled={!canManageSubscriptions}>
               تأكيد العملية
             </Button>
           </div>

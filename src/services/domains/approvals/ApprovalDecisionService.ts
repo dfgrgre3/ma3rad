@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { BranchAccessService } from '../auth/BranchAccessService';
@@ -34,7 +34,7 @@ export class ApprovalDecisionService {
       const policy = details.policy || new ApprovalPolicyService().getPolicy('inventory.adjustment.create');
       PermissionService.require(actor, 'inventory.adjustment.approve');
       if (!policy.allowSelfApproval && row.requestedBy === actor.id) throw new Error('لا يمكن لمنشئ طلب المخزون اعتماده.');
-      if (policy.approverRoles?.length && !policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN') {
+      if (policy.approverRoles?.length && !policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
         throw new Error('دور المستخدم غير مخول لاعتماد هذا الطلب.');
       }
     }
@@ -49,7 +49,7 @@ export class ApprovalDecisionService {
       if (payload.operationCode && payload.operationCode !== 'inventory.adjustment.create') {
         throw new Error(`لا يمكن اعتماد هذا الطلب؛ تنفيذ العملية ${payload.operationCode} غير موصول بعد.`);
       }
-      if (approved && payload.policy?.approverRoles?.length && !payload.policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN') {
+      if (approved && payload.policy?.approverRoles?.length && !payload.policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
         throw new Error('دور المستخدم غير مخول لاعتماد هذا الطلب.');
       }
     }

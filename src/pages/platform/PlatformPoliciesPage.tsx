@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Shield,
   Lock,
   Save,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  History,
 } from 'lucide-react';
+import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { inputClass, formatDateTime } from './components/PlatformUI';
 
 export const PlatformPoliciesPage: React.FC = () => {
   const [tab, setTab] = useState<'TERMS' | 'PRIVACY' | 'RETENTION'>('TERMS');
+  const canManagePolicies = canPlatform('policies');
 
   const [terms, setTerms] = useState(
     `شروط الاستخدام واتفاقية مستوى الخدمة (Terms of Service & SLA)
@@ -39,11 +38,44 @@ export const PlatformPoliciesPage: React.FC = () => {
     softDeleteGraceDays: 14,
   });
 
-  const [lastSaved, setLastSaved] = useState<string>(new Date().toISOString());
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = platformAdminService.getPlatformPolicies();
+      if (saved.terms) setTerms(saved.terms);
+      if (saved.privacy) setPrivacy(saved.privacy);
+      setRetention(saved.retention);
+      setLastSaved(saved.updatedAt);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر تحميل سياسات المنصة.');
+    }
+  }, []);
 
   const handleSave = () => {
-    setLastSaved(new Date().toISOString());
-    alert('تم حفظ وتحديث السياسات المنشورة للمنصة بنجاح.');
+    if (!canManagePolicies) {
+      alert('لا تملك صلاحية تعديل سياسات المنصة.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = platformAdminService.savePlatformPolicies({ terms, privacy, retention });
+      setTerms(saved.terms);
+      setPrivacy(saved.privacy);
+      setRetention(saved.retention);
+      setLastSaved(saved.updatedAt);
+      setError(null);
+      alert('تم حفظ السياسات وفترات الاحتفاظ في قاعدة البيانات.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'تعذر حفظ السياسات.';
+      setError(message);
+      alert(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -53,11 +85,19 @@ export const PlatformPoliciesPage: React.FC = () => {
         description="إدارة شروط الاستخدام، سياسات الخصوصية، وقواعد وفترات الاحتفاظ بالبيانات وسجلات التدقيق."
         icon={<FileText className="h-5 w-5" />}
         actions={
-          <Button size="sm" onClick={handleSave} leadingIcon={<Save className="h-4 w-4" />}>
-            حفظ التغييرات
-          </Button>
+          canManagePolicies ? (
+            <Button size="sm" onClick={handleSave} disabled={saving} leadingIcon={<Save className="h-4 w-4" />}>
+              حفظ التغييرات
+            </Button>
+          ) : null
         }
       />
+
+      {error && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+          {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-800 text-xs font-bold text-slate-400 gap-1">
@@ -197,10 +237,12 @@ export const PlatformPoliciesPage: React.FC = () => {
         )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-[11px] text-slate-400">
-          <span>آخر تحديث واعتماد: {formatDateTime(lastSaved)}</span>
-          <Button size="sm" onClick={handleSave} leadingIcon={<Save className="h-3.5 w-3.5" />}>
-            حفظ
-          </Button>
+          <span>آخر تحديث واعتماد: {lastSaved ? formatDateTime(lastSaved) : 'لم تُحفظ السياسات بعد'}</span>
+          {canManagePolicies && (
+            <Button size="sm" onClick={handleSave} disabled={saving} leadingIcon={<Save className="h-3.5 w-3.5" />}>
+              {saving ? 'جارٍ الحفظ...' : 'حفظ'}
+            </Button>
+          )}
         </div>
       </div>
     </div>

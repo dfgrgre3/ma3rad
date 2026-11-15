@@ -19,6 +19,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformFeatureFlag,
   PlatformFeatureOverride,
@@ -101,6 +102,7 @@ const emptyRelease = {
 
 export const PlatformProductPage: React.FC = () => {
   const toast = useToast();
+  const canManageProduct = canPlatform('product', 'platform.product.update');
   const [tab, setTab] = React.useState<TabId>('modules');
   const [modules, setModules] = React.useState<PlatformModule[]>([]);
   const [features, setFeatures] = React.useState<PlatformFeatureFlag[]>([]);
@@ -372,13 +374,17 @@ export const PlatformProductPage: React.FC = () => {
         icon={<Boxes className="h-5 w-5" />}
         actions={
           tab === 'features' ? (
-            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openFeature()}>
-              ميزة جديدة
-            </Button>
+            canManageProduct ? (
+              <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openFeature()}>
+                ميزة جديدة
+              </Button>
+            ) : null
           ) : tab === 'releases' ? (
-            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openRelease()}>
-              إصدار / حزمة جديدة
-            </Button>
+            canManageProduct ? (
+              <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openRelease()}>
+                إصدار / حزمة جديدة
+              </Button>
+            ) : null
           ) : undefined
         }
       />
@@ -445,7 +451,7 @@ export const PlatformProductPage: React.FC = () => {
                     <span className={`text-[10.5px] font-bold ${module.isEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
                       {module.isEnabled ? 'مفعّلة' : 'معطّلة'}
                     </span>
-                    <Toggle checked={module.isEnabled} onChange={() => toggleModule(module)} label={module.name} />
+                    <Toggle checked={module.isEnabled} onChange={() => toggleModule(module)} disabled={!canManageProduct} label={module.name} />
                   </div>
                 </div>
               ))}
@@ -516,7 +522,7 @@ export const PlatformProductPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
-                          <Toggle checked={flag.isEnabled} onChange={() => toggleFeature(flag)} label={flag.name} />
+                          <Toggle checked={flag.isEnabled} onChange={() => toggleFeature(flag)} disabled={!canManageProduct} label={flag.name} />
                           <button
                             type="button"
                             onClick={() => openFeature(flag)}
@@ -661,7 +667,7 @@ export const PlatformProductPage: React.FC = () => {
             <Button variant="ghost" onClick={() => setFeatureOpen(false)} disabled={saving}>
               إلغاء
             </Button>
-            <Button variant="primary" onClick={saveFeature} loading={saving}>
+            <Button variant="primary" onClick={saveFeature} loading={saving} disabled={!canManageProduct}>
               حفظ
             </Button>
           </div>
@@ -756,7 +762,7 @@ export const PlatformProductPage: React.FC = () => {
                   <option value="1">تفعيل إجباري</option>
                   <option value="0">حجب إجباري</option>
                 </select>
-                <Button variant="primary" size="sm" onClick={addOverride} disabled={!newOverrideTenantId}>
+                <Button variant="primary" size="sm" onClick={addOverride} disabled={!newOverrideTenantId || !canManageProduct}>
                   إضافة
                 </Button>
               </div>
@@ -823,7 +829,7 @@ export const PlatformProductPage: React.FC = () => {
             <Button variant="ghost" onClick={() => setReleaseOpen(false)} disabled={saving}>
               إلغاء
             </Button>
-            <Button variant="primary" onClick={saveRelease} loading={saving}>
+            <Button variant="primary" onClick={saveRelease} loading={saving} disabled={!canManageProduct}>
               حفظ الإصدار
             </Button>
           </div>
@@ -927,7 +933,7 @@ export const PlatformProductPage: React.FC = () => {
               <Button variant="ghost" onClick={() => setSelectedReleaseForTargets(null)} disabled={saving}>
                 إغلاق
               </Button>
-              <Button variant="primary" onClick={saveTargets} loading={saving}>
+              <Button variant="primary" onClick={saveTargets} loading={saving} disabled={!canManageProduct}>
                 حفظ المستهدفين
               </Button>
             </div>
@@ -1052,7 +1058,7 @@ export const PlatformProductPage: React.FC = () => {
             <Button variant="ghost" onClick={() => setRollbackOpen(false)} disabled={saving}>
               إلغاء
             </Button>
-            <Button variant="danger" onClick={confirmRollback} loading={saving}>
+            <Button variant="danger" onClick={confirmRollback} loading={saving} disabled={!canManageProduct}>
               تأكيد التراجع الآن
             </Button>
           </div>

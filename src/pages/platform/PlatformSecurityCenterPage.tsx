@@ -28,6 +28,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformCentralSecurityOverview,
   PlatformStaffSession,
@@ -93,6 +94,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   });
 
   // Load Security Overview
+  const canManageSecurity = canPlatform('security-center');
+
   const loadSecurity = useCallback(() => {
     setLoading(true);
     try {
@@ -302,6 +305,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
               variant="danger"
               size="sm"
               onClick={handleRevokeAllOtherSessions}
+              disabled={!canManageSecurity}
               leadingIcon={<Flame className="h-3.5 w-3.5" />}
             >
               إنهاء كافة الجلسات النشطة
@@ -348,7 +352,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             </div>
 
             <p className="text-sm text-slate-300 max-w-xl">
-              المصادقة الثنائية (2FA) مفعلة إلزامياً لمسؤولي المنصة، ومفاتيح التوقيع الرقمي محدثة، مع تسجيل دقيق لكافة محاولات الدخول عبر الجلسات السحابية.
+              المصادقة الثنائية (2FA) لموظفي المنصة، الجلسات المفتوحة والأجهزة الموثوقة، مفاتيح التوقيع الرقمي، مع تسجيل دقيق لكافة محاولات الدخول والحوادث الأمنية.
             </p>
           </div>
 
@@ -462,23 +466,48 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       {tab === 'OVERVIEW' && (
         <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* 1. 2FA Policy Card */}
+            {/* 1. 2FA Policy Card (live: reads real enforcement + compliance) */}
             <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                   <Lock className="h-4 w-4 text-emerald-400" />
                   سياسة المصادقة الثنائية (2FA)
                 </span>
-                <span className="rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5">
-                  إلزامية
+                <span className={`rounded text-[10px] font-bold px-2 py-0.5 ${
+                  data.twoFactorEnforcement.enabled
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {data.twoFactorEnforcement.enabled ? 'إلزامية' : 'غير إلزامية'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                مطبقة على كافة موظفي المنصة. لا يمكن لأي حساب الوصول للوحة التحكم بدون التحقق بواسطة تطبيق التوثيق.
+                {data.twoFactorEnforcement.enabled
+                  ? 'إلزامية على كافة موظفي المنصة. الحساب غير المفعّل لا يستطيع استخدام لوحة التحكم.'
+                  : 'المصادقة الثنائية غير ملزمة حالياً. يمكن للمالك تفعيل الإلزام من هنا أو من صفحة الفريق.'}
               </p>
-              <div className="mt-3 pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between">
-                <span>نسبة الامتثال</span>
-                <span className="text-emerald-400 font-bold">100% (محصن)</span>
+              <div className="mt-3 pt-2 border-t border-slate-800 text-[11px] text-slate-400 space-y-1.5">
+                <div className="flex justify-between">
+                  <span>نسبة الامتثال</span>
+                  <span className={`font-bold ${data.twoFactorEnforcement.totalStaffCount > 0 && data.twoFactorEnforcement.compliantStaffCount === data.twoFactorEnforcement.totalStaffCount ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {data.twoFactorEnforcement.compliantStaffCount} / {data.twoFactorEnforcement.totalStaffCount}
+                  </span>
+                </div>
+                <button
+                  disabled={!canManageSecurity}
+                  onClick={() => {
+                    if (!canManageSecurity) return;
+                    try {
+                      platformAdminService.setStaffMfaEnforcement(data.twoFactorEnforcement.enabled ? 'optional' : 'required');
+                      loadSecurity();
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : 'تعذر تغيير السياسة.');
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-700 px-3 py-1.5 text-[10.5px] font-bold text-sky-300 transition hover:border-sky-600 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {data.twoFactorEnforcement.enabled ? 'اجعلها اختيارية' : 'اجعلها إلزامية'}
+                </button>
               </div>
             </div>
 
@@ -553,6 +582,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="secondary"
+                        disabled={!canManageSecurity}
                         onClick={() => handleRespondIncident(inc.id, true)}
                       >
                         إغلاق وحل الحادث
@@ -581,6 +611,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
               size="sm"
               variant="danger"
               onClick={handleRevokeAllOtherSessions}
+              disabled={!canManageSecurity}
               leadingIcon={<LogOut className="h-3.5 w-3.5" />}
             >
               إنهاء كافة الجلسات الأخرى
@@ -645,6 +676,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                           size="sm"
                           variant="danger"
                           onClick={() => handleRevokeSession(sess.id)}
+                          disabled={!canManageSecurity}
                           leadingIcon={<LogOut className="h-3 w-3" />}
                         >
                           إنهاء الجلسة
@@ -785,6 +817,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                     size="sm"
                     variant="secondary"
                     onClick={() => handleRotateKey(k.keyAlias)}
+                    disabled={!canManageSecurity}
                     leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}
                   >
                     تدوير المفتاح
@@ -806,21 +839,23 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                   مفاتيح التكامل الخاصة بالمنصة وخدمات الربط الخارجي ونطاقات الصلاحيات.
                 </p>
               </div>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setApiKeyForm({
-                    tenantId: tenants[0]?.id ?? '',
-                    name: '',
-                    scopes: ['read', 'write'],
-                    expiresAt: '',
-                  });
-                  setIsApiKeyModalOpen(true);
-                }}
-                leadingIcon={<Plus className="h-4 w-4" />}
-              >
-                إنشاء مفتاح API جديد
-              </Button>
+              {canManageSecurity && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setApiKeyForm({
+                      tenantId: tenants[0]?.id ?? '',
+                      name: '',
+                      scopes: ['read', 'write'],
+                      expiresAt: '',
+                    });
+                    setIsApiKeyModalOpen(true);
+                  }}
+                  leadingIcon={<Plus className="h-4 w-4" />}
+                >
+                  إنشاء مفتاح API جديد
+                </Button>
+              )}
             </header>
 
             {apiKeys.length === 0 ? (
@@ -866,6 +901,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                           {key.isActive && (
                             <div className="flex items-center justify-center gap-2">
                               <button
+                                disabled={!canManageSecurity}
                                 onClick={() => handleRotateApiKey(key.id)}
                                 className="text-sky-400 hover:underline text-xs flex items-center gap-1"
                                 title="تدوير المفتاح"
@@ -875,6 +911,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                               </button>
                               <span className="text-slate-600">|</span>
                               <button
+                                disabled={!canManageSecurity}
                                 onClick={() => handleRevokeApiKey(key.id)}
                                 className="text-rose-400 hover:underline text-xs"
                               >
@@ -902,7 +939,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             </h3>
             <Button
               size="sm"
-              onClick={() => setIsIncidentModalOpen(true)}
+              disabled={!canManageSecurity}
+              onClick={() => { if (!canManageSecurity) return; setIsIncidentModalOpen(true); }}
               leadingIcon={<ShieldAlert className="h-4 w-4" />}
             >
               تسجيل بلاغ أمني يدوي
@@ -982,7 +1020,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => handleRespondIncident(inc.id, true)}
+                              disabled={!canManageSecurity}
+                        onClick={() => handleRespondIncident(inc.id, true)}
                             >
                               إغلاق كـ محلول
                             </Button>
@@ -1056,7 +1095,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsIncidentModalOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleCreateIncident}>
+            <Button size="sm" onClick={handleCreateIncident} disabled={!canManageSecurity}>
               تسجيل البلاغ
             </Button>
           </div>
@@ -1144,7 +1183,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsApiKeyModalOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleCreateApiKey}>
+            <Button size="sm" onClick={handleCreateApiKey} disabled={!canManageSecurity}>
               إنشاء المفتاح الآن
             </Button>
           </div>

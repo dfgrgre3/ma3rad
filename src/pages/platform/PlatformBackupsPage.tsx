@@ -9,10 +9,10 @@ import {
   Play,
   RotateCcw,
   HardDrive,
-  FileCheck,
   AlertTriangle,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformCentralBackup } from '../../services/domains/platform/platformTypes';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -54,31 +54,28 @@ export const PlatformBackupsPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleTriggerBackup = () => {
-    if (!confirm('هل ترغب في أخذ نسخة احتياطية سحابية مشفرة وفورية لقواعد بيانات المنصة؟')) return;
+  const canManageBackups = canPlatform('backups');
+
+  const handleTriggerBackup = async () => {
+    if (!canManageBackups) {
+      alert('لا تملك صلاحية تنفيذ النسخ الاحتياطي.');
+      return;
+    }
+    if (!confirm('هل ترغب في أخذ نسخة احتياطية مشفرة فورية لقاعدة بيانات المنصة؟')) return;
     setRunning(true);
     try {
-      const created = platformAdminService.triggerCentralBackup();
-      alert(`تم بنجاح أخذ النسخة الاحتياطية والتحقق من سلامتها: ${created.filename}`);
+      const created = await platformAdminService.triggerCentralBackup();
+      alert(
+        created.integrityCheckPassed
+          ? `تم إنشاء النسخة الاحتياطية والتحقق منها: ${created.filename}`
+          : `تم إنشاء نسخة احتياطية محلية مشفرة: ${created.filename}\nلم يتم التحقق من نسخة خارج الموقع، لذا لا تصنف كنسخة موثقة (VERIFIED).`
+      );
       loadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'فشل أخذ النسخة الاحتياطية.');
     } finally {
       setRunning(false);
     }
-  };
-
-  const handleVerifyIntegrity = (b: PlatformCentralBackup) => {
-    alert(`تم التحقق من سلامة الأرشيف والتوقيع الرقمي للنسخة: ${b.filename}\nحالة السلامة: ناجح ومطابق 100%`);
-  };
-
-  const handleRestore = (b: PlatformCentralBackup) => {
-    const confirmation = prompt(`تنبيه خطير: استعادة النسخة (${b.filename}) ستعيد حالة البيانات إلى توقيت أخذها.\nللتأكيد، اكتب RESTORE-PLATFORM أدناه:`);
-    if (confirmation !== 'RESTORE-PLATFORM') {
-      alert('تم إلغاء الاستعادة لعدم تطابق نص التأكيد.');
-      return;
-    }
-    alert('بدأت محاكاة الاستعادة بنجاح. تم فحص سلامة الحزمة والتحقق من التشفير.');
   };
 
   return (
@@ -91,7 +88,7 @@ export const PlatformBackupsPage: React.FC = () => {
           <Button
             size="sm"
             onClick={handleTriggerBackup}
-            disabled={running}
+            disabled={running || !canManageBackups}
             leadingIcon={<Play className="h-4 w-4" />}
           >
             {running ? 'جارٍ الحفظ...' : 'أخذ نسخة احتياطية فورية الآن'}
@@ -112,7 +109,9 @@ export const PlatformBackupsPage: React.FC = () => {
           <p className="text-2xl font-black text-emerald-300 mt-1">
             {backups.filter((b) => b.integrityCheckPassed).length} / {backups.length}
           </p>
-          <p className="text-[11px] text-emerald-500/80 mt-1">100% من النسخ صالحة للاستعادة الفورية</p>
+          <p className="text-[11px] text-emerald-500/80 mt-1">
+            النسخ التي اجتازت التحقق من نسخة خارج الموقع فقط
+          </p>
         </div>
 
         <div className="p-4 bg-sky-950/20 border border-sky-500/20 rounded-xl">
@@ -120,7 +119,7 @@ export const PlatformBackupsPage: React.FC = () => {
           <p className="text-2xl font-black text-sky-300 mt-1">
             {formatBytes(backups.reduce((sum, b) => sum + (b.sizeBytes || 0), 0))}
           </p>
-          <p className="text-[11px] text-sky-500/80 mt-1">مخزن في سحابة التخزين الآمنة المشفرة</p>
+          <p className="text-[11px] text-sky-500/80 mt-1">حجم الأرشيفات المشفرة المسجلة فعلياً</p>
         </div>
       </div>
 
@@ -151,7 +150,6 @@ export const PlatformBackupsPage: React.FC = () => {
                   <th className="px-4 py-3">الحالة</th>
                   <th className="px-4 py-3">فحص السلامة</th>
                   <th className="px-4 py-3">تاريخ الإنشاء</th>
-                  <th className="px-4 py-3 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
@@ -188,28 +186,6 @@ export const PlatformBackupsPage: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3 text-slate-400">{formatDateTime(b.createdAt)}</td>
-
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleVerifyIntegrity(b)}
-                          className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                          title="إعادة فحص السلامة"
-                        >
-                          <FileCheck className="h-3.5 w-3.5" />
-                          فحص
-                        </button>
-
-                        <button
-                          onClick={() => handleRestore(b)}
-                          className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1"
-                          title="استعادة هذه النسخة"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          استعادة
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>

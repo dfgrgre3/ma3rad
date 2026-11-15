@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Building2, Check, ChevronDown, ChevronLeft, KeyRound, LogOut, Moon, Power, Sun, User as UserIcon, Users, X } from 'lucide-react';
+import { Bell, Building2, Check, ChevronDown, ChevronLeft, KeyRound, LogOut, Moon, Power, Sun, User as UserIcon, Users, X, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { useTheme } from '../../contexts/useTheme';
@@ -279,6 +279,14 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
           >
             <KeyRound className="win-nav-icon" /> إعدادات رمز الدخول
           </button>
+          {['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUPPORT_AGENT', 'OPERATIONS_ENGINEER', 'BILLING_SPECIALIST', 'LICENSE_MANAGER'].includes(String(currentUser.role)) && (
+            <button
+              onClick={() => { setOpen(false); navigate('/platform'); }}
+              className="win-nav-item w-full !mx-0 !text-[12px] !text-emerald-700 dark:!text-emerald-400 font-bold"
+            >
+              <ShieldAlert className="win-nav-icon !text-emerald-600 dark:!text-emerald-400" /> لوحة تحكم المنصة (Super Admin)
+            </button>
+          )}
           <button
             onClick={() => { setOpen(false); setRestartOpen(true); }}
             className="win-nav-item w-full !mx-0 !text-[12px]"

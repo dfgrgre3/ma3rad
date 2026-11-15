@@ -33,6 +33,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { platformAdminService, PLATFORM_TENANT_STATUS_LABELS } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformActivationDetails,
   PlatformPlan,
@@ -239,6 +240,8 @@ export const PlatformTenantsPage: React.FC = () => {
 
   React.useEffect(() => { load(); }, [load]);
 
+  const canManageTenants = canPlatform('tenants', 'platform.tenants.update');
+
   const loadProfile = React.useCallback((id: string) => {
     try {
       const next = platformAdminService.getTenantProfile(id);
@@ -380,6 +383,7 @@ export const PlatformTenantsPage: React.FC = () => {
   };
 
   const resetPassword = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId || !profile) return;
     if (!window.confirm('إعادة تعيين كلمة مرور حساب العميل؟ سيتم إنشاء كلمة مرور مؤقتة جديدة.')) return;
     setWorking(true);
@@ -462,15 +466,26 @@ export const PlatformTenantsPage: React.FC = () => {
   };
 
   const saveUser = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     setWorking(true);
     try {
       if (editingUser) {
         platformAdminService.updateTenantUser(editingUser.id, { ...userForm, status: userForm.status as any });
-        toast.success('تم تحديث المستخدم');
+        toast.success('تم تحديث بيانات المستخدم.');
       } else {
-        platformAdminService.createTenantUser(detailId, { ...userForm, status: userForm.status as any });
-        toast.success('تمت إضافة المستخدم');
+        const result = platformAdminService.createTenantUser(detailId, {
+          ...userForm,
+          status: userForm.status as any,
+          provisionIdentity: true,
+          provisioningMode: 'INVITE',
+        });
+        const details = [result.message];
+        if (result.inviteCode) details.push(`كود الدعوة: ${result.inviteCode}`);
+        if (result.temporaryPassword) details.push(`كلمة المرور المؤقتة: ${result.temporaryPassword}`);
+        if (result.user.identityUserId) details.push(`معرّف الهوية: ${result.user.identityUserId}`);
+        details.push(`الدور/النطاق: ${result.user.role}${result.user.scope ? ` / ${result.user.scope}` : ''}`);
+        toast.success('تم إنشاء/دعوة حساب هوية فعلي للعميل وربطه بالدور والنطاق', details.join('\n'));
       }
       setUserOpen(false);
       refreshDetail();
@@ -486,11 +501,13 @@ export const PlatformTenantsPage: React.FC = () => {
   };
 
   const deleteUser = (user: any) => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!window.confirm(`حذف المستخدم "${user.fullName}"؟`)) return;
     run(() => platformAdminService.deleteTenantUser(user.id), 'تم حذف المستخدم');
   };
 
   const resetDevices = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     if (!window.confirm('إعادة تعيين الأجهزة المرتبطة بهذا العميل؟ سيتم تحرير كل الأجهزة المربوطة بالتراخيص.')) return;
     setWorking(true);
@@ -656,6 +673,7 @@ export const PlatformTenantsPage: React.FC = () => {
   }, [detailId, loadRemoteDevices, loadRemoteHistory]);
 
   const sendActivation = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     if (channels.length === 0) {
       toast.error('اختر وسيلة إرسال واحدة على الأقل');
@@ -727,13 +745,14 @@ export const PlatformTenantsPage: React.FC = () => {
         icon={<Building2 className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
+            {canManageTenants && (<Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
               تصدير CSV
-            </Button>
-            <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
-              عميل جديد
-            </Button>
-          </div>
+            </Button>)}
+            {canManageTenants && (
+              <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
+                عميل جديد
+              </Button>
+            )}    </div>
         }
       />
 
@@ -831,14 +850,14 @@ export const PlatformTenantsPage: React.FC = () => {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
-                        <button
+                        {canManageTenants && (<button
                           type="button"
                           onClick={() => openEdit(item)}
                           className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
                           title="تعديل البيانات"
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        </button>)}
                         <button
                           type="button"
                           onClick={() => openProfile(item)}
@@ -868,7 +887,7 @@ export const PlatformTenantsPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>إلغاء</Button>
-            <Button variant="primary" onClick={save} loading={saving}>{editing ? 'حفظ التعديلات' : 'إضافة العميل'}</Button>
+            <Button variant="primary" onClick={save} loading={saving} disabled={!canManageTenants}>{editing ? 'حفظ التعديلات' : 'إضافة العميل'}</Button>
           </div>
         }
       >
@@ -941,15 +960,15 @@ export const PlatformTenantsPage: React.FC = () => {
           <div className="flex flex-wrap justify-end gap-2">
             {tenant && (
               <>
-                <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
+                {canManageTenants && (<Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
                   تصدير القائمة
-                </Button>
-                <Button variant="secondary" size="sm" leadingIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => openEdit(tenant)}>
+                </Button>)}
+                {canManageTenants && (<Button variant="secondary" size="sm" leadingIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => openEdit(tenant)}>
                   تعديل البيانات
-                </Button>
-                <Button variant="primary" size="sm" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working}>
+                </Button>)}
+                {canManageTenants && (<Button variant="primary" size="sm" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working}>
                   إرسال بيانات التفعيل
-                </Button>
+                </Button>)}
               </>
             )}
           </div>
@@ -985,12 +1004,14 @@ export const PlatformTenantsPage: React.FC = () => {
             {/* Actions */}
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {!account ? (
-                <Button variant="secondary" size="sm" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAccountOpen(true)}>
-                  إنشاء حساب للعميل
-                </Button>
+                canManageTenants ? (
+                  <Button variant="secondary" size="sm" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAccountOpen(true)}>
+                    إنشاء حساب للعميل
+                  </Button>
+                ) : null
               ) : (
                 <>
-                  <Button variant="secondary" size="sm" leadingIcon={<LockKeyhole className="h-3.5 w-3.5" />} onClick={resetPassword} loading={working}>
+                  <Button variant="secondary" size="sm" leadingIcon={<LockKeyhole className="h-3.5 w-3.5" />} onClick={resetPassword} loading={working} disabled={!canManageTenants}>
                     إعادة تعيين كلمة المرور
                   </Button>
                   <Button
@@ -999,27 +1020,28 @@ export const PlatformTenantsPage: React.FC = () => {
                     leadingIcon={account.isActive ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                     onClick={() => toggleAccount(!account.isActive)}
                     loading={working}
+                    disabled={!canManageTenants}
                   >
                     {account.isActive ? 'تعليق حساب الدخول' : 'تفعيل حساب الدخول'}
                   </Button>
                 </>
               )}
               {tenant.status === 'SUSPENDED' ? (
-                <Button variant="success" size="sm" leadingIcon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={() => changeStatus(tenant, 'ACTIVE')} loading={working}>
+                <Button variant="success" size="sm" leadingIcon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={() => changeStatus(tenant, 'ACTIVE')} loading={working} disabled={!canManageTenants}>
                   إعادة تفعيل العميل
                 </Button>
               ) : (
-                <Button variant="ghost" size="sm" leadingIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => changeStatus(tenant, 'SUSPENDED')} loading={working}>
+                <Button variant="ghost" size="sm" leadingIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => changeStatus(tenant, 'SUSPENDED')} loading={working} disabled={!canManageTenants}>
                   تعليق العميل
                 </Button>
               )}
-              <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={resetDevices} loading={working}>
+              <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={resetDevices} loading={working} disabled={!canManageTenants}>
                 إعادة تعيين الأجهزة
               </Button>
-              <Button variant="danger" size="sm" leadingIcon={<XCircle className="h-3.5 w-3.5" />} onClick={cancelSubscription} loading={working}>
+              <Button variant="danger" size="sm" leadingIcon={<XCircle className="h-3.5 w-3.5" />} onClick={cancelSubscription} loading={working} disabled={!canManageTenants}>
                 إلغاء الاشتراك
               </Button>
-              <Button variant="ghost" size="sm" leadingIcon={<Archive className="h-3.5 w-3.5" />} onClick={() => archive(tenant)} loading={working}>
+              <Button variant="ghost" size="sm" leadingIcon={<Archive className="h-3.5 w-3.5" />} onClick={() => archive(tenant)} loading={working} disabled={!canManageTenants}>
                 أرشفة العميل
               </Button>
             </div>
@@ -1135,9 +1157,11 @@ export const PlatformTenantsPage: React.FC = () => {
                         <InfoItem label="تاريخ الإنشاء" value={formatDate(account.createdAt)} />
                       </div>
                       <div className="flex flex-col gap-2">
-                        <Button variant="secondary" size="sm" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working}>
-                          تجهيز بيانات التفعيل
-                        </Button>
+                        {canManageTenants && (
+                          <Button variant="secondary" size="sm" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working}>
+                            تجهيز بيانات التفعيل
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" leadingIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => copyToClipboard(account.username, 'اسم المستخدم')}>
                           نسخ اسم المستخدم
                         </Button>
@@ -1146,9 +1170,11 @@ export const PlatformTenantsPage: React.FC = () => {
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-3 p-3">
                       <p className="text-[11.5px] text-slate-500">لا يوجد حساب دخول لهذا العميل بعد. أنشئ حساباً لتوليد بيانات التفعيل.</p>
-                      <Button variant="primary" size="sm" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAccountOpen(true)}>
-                        إنشاء حساب
-                      </Button>
+                      {canManageTenants && (
+                        <Button variant="primary" size="sm" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAccountOpen(true)}>
+                          إنشاء حساب
+                        </Button>
+                      )}
                     </div>
                   )}
                 </SectionCard>
@@ -1170,7 +1196,7 @@ export const PlatformTenantsPage: React.FC = () => {
                         <input className={inputClass} value={overrideForm.value ?? ''} onChange={(event) => setOverrideForm({ ...overrideForm, value: event.target.value })} placeholder="true / 5000" />
                       </Field>
                       <div className="flex items-end">
-                        <Button variant="primary" size="sm" block leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={addOverride} loading={working}>
+                        <Button variant="primary" size="sm" block leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={addOverride} loading={working} disabled={!canManageTenants}>
                           إضافة
                         </Button>
                       </div>
@@ -1199,7 +1225,8 @@ export const PlatformTenantsPage: React.FC = () => {
                                 <td className="px-3 py-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => removeOverride(item.id)}
+                                    disabled={!canManageTenants}
+              onClick={() => removeOverride(item.id)}
                                     className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                                     title="حذف"
                                   >
@@ -1226,7 +1253,7 @@ export const PlatformTenantsPage: React.FC = () => {
                         <input type="number" min={1} className={inputClass} value={renewMonths} onChange={(event) => setRenewMonths(Math.max(1, Number(event.target.value)))} />
                       </Field>
                       <div className="flex items-end">
-                        <Button variant="success" block leadingIcon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={renewSubscription} loading={working}>
+                        <Button variant="success" block leadingIcon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={renewSubscription} loading={working} disabled={!canManageTenants}>
                           تجديد الاشتراك
                         </Button>
                       </div>
@@ -1253,7 +1280,7 @@ export const PlatformTenantsPage: React.FC = () => {
                         <input type="number" min={1} className={inputClass} value={planForm.seats} onChange={(event) => setPlanForm({ ...planForm, seats: Math.max(1, Number(event.target.value)) })} />
                       </Field>
                       <div className="sm:col-span-2">
-                        <Button variant="primary" block leadingIcon={<ArrowRightIcon />} onClick={changePlan} loading={working} disabled={!planForm.planId}>
+                        <Button variant="primary" block leadingIcon={<ArrowRightIcon />} onClick={changePlan} loading={working} disabled={!planForm.planId || !canManageTenants}>
                           نقل العميل إلى الباقة الجديدة
                         </Button>
                       </div>
@@ -1308,7 +1335,7 @@ export const PlatformTenantsPage: React.FC = () => {
                   subtitle={`${profile.licenses.length} ترخيص · ${formatNumber(profile.usage.devicesUsed)} جهاز مستخدم من ${formatNumber(profile.usage.devicesLimit)}`}
                   icon={<KeyRound className="h-4 w-4" />}
                   action={
-                    <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={resetDevices} loading={working}>
+                    <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={resetDevices} loading={working} disabled={!canManageTenants}>
                       إعادة تعيين الأجهزة
                     </Button>
                   }
@@ -1454,9 +1481,9 @@ export const PlatformTenantsPage: React.FC = () => {
                   subtitle={`${users.length} مستخدم مسجل`}
                   icon={<Users className="h-4 w-4" />}
                   action={
-                    <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openUserCreate}>
+                    canManageTenants ? (<Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openUserCreate}>
                       إضافة مستخدم
-                    </Button>
+                    </Button>) : null
                   }
                 >
                   {users.length === 0 ? (
@@ -1488,12 +1515,13 @@ export const PlatformTenantsPage: React.FC = () => {
                               <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{user.notes || '—'}</td>
                               <td className="px-3 py-1.5">
                                 <div className="flex items-center gap-1">
-                                  <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل">
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleUser(user, user.status !== 'ACTIVE')}
+                                  {canManageTenants && (<>
+                                    <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleUser(user, user.status !== 'ACTIVE')}
                                     className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
                                     title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}
                                   >
@@ -1502,6 +1530,7 @@ export const PlatformTenantsPage: React.FC = () => {
                                   <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
+                                  </>)}
                                 </div>
                               </td>
                             </tr>
@@ -1583,9 +1612,9 @@ export const PlatformTenantsPage: React.FC = () => {
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-1">
-                                  <button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
+                                  {canManageTenants && (<button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
                                     {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                                  </button>
+                                  </button>)}
                                 </div>
                               </td>
                             </tr>
@@ -1616,7 +1645,7 @@ export const PlatformTenantsPage: React.FC = () => {
                       </select>
                     </Field>
                     <div className="flex items-end">
-                      <Button variant="primary" block leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendConfig} loading={configSending} disabled={!configForm.key.trim() || (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0)}>
+                      <Button variant="primary" block leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendConfig} loading={configSending} disabled={!canManageTenants || !configForm.key.trim() || (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0)}>
                         إرسال الإعداد
                       </Button>
                     </div>
@@ -1715,7 +1744,7 @@ export const PlatformTenantsPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setAccountOpen(false)} disabled={working}>إلغاء</Button>
-            <Button variant="primary" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={createAccount} loading={working}>
+            <Button variant="primary" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={createAccount} loading={working} disabled={!canManageTenants}>
               إنشاء الحساب
             </Button>
           </div>
@@ -1753,7 +1782,7 @@ export const PlatformTenantsPage: React.FC = () => {
                 <Button variant="secondary" leadingIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => copyToClipboard(activationText(activation), 'بيانات التفعيل')}>
                   نسخ كل البيانات
                 </Button>
-                <Button variant="primary" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working}>
+                <Button variant="primary" leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendActivation} loading={working} disabled={!canManageTenants}>
                   إعادة الإرسال
                 </Button>
               </>
@@ -1826,7 +1855,7 @@ export const PlatformTenantsPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setUserOpen(false)} disabled={working}>إلغاء</Button>
-            <Button variant="primary" onClick={saveUser} loading={working}>{editingUser ? 'حفظ' : 'إضافة'}</Button>
+            <Button variant="primary" onClick={saveUser} loading={working} disabled={!canManageTenants}>{editingUser ? 'حفظ' : 'إضافة'}</Button>
           </div>
         }
       >

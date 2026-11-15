@@ -17,6 +17,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformRelease,
   PlatformReleaseTarget,
@@ -73,6 +74,8 @@ export const PlatformReleasesPage: React.FC = () => {
     changelog: '',
   });
 
+  const canManageReleases = canPlatform('releases');
+
   const loadData = useCallback(() => {
     setLoading(true);
     try {
@@ -108,6 +111,10 @@ export const PlatformReleasesPage: React.FC = () => {
 
   const handleSaveTargets = () => {
     if (!activeReleaseForTargets) return;
+    if (!canManageReleases) {
+      alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
     try {
       platformAdminService.setReleaseTargets(activeReleaseForTargets.id, selectedTenantIds);
       setActiveReleaseForTargets(null);
@@ -118,6 +125,10 @@ export const PlatformReleasesPage: React.FC = () => {
   };
 
   const handleDisableRelease = (id: string) => {
+    if (!canManageReleases) {
+      alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من تعطيل/إيقاف هذا الإصدار لمنع تحميله أو استخدامه؟')) return;
     try {
       platformAdminService.disableRelease(id);
@@ -128,6 +139,10 @@ export const PlatformReleasesPage: React.FC = () => {
   };
 
   const handleRollback = (rel: PlatformRelease) => {
+    if (!canManageReleases) {
+      alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
     const safeVer = prompt(`أدخل الإصدار الآمن الذي ترغب في التراجع الطارئ إليه (الإصدار الحالي: ${rel.version}):`);
     if (!safeVer || !safeVer.trim()) return;
     try {
@@ -139,6 +154,10 @@ export const PlatformReleasesPage: React.FC = () => {
   };
 
   const handleSaveRelease = () => {
+    if (!canManageReleases) {
+      alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
     if (!releaseForm.version.trim()) {
       alert('رقم الإصدار مطلوب.');
       return;
@@ -159,28 +178,30 @@ export const PlatformReleasesPage: React.FC = () => {
         description="إدارة حزم التحديث، التوزيع التدريجي على العملاء، التوقيعات الرقمية، والتراجع الطارئ عند حدوث أخطاء."
         icon={<Boxes className="h-5 w-5" />}
         actions={
-          <Button
-            size="sm"
-            onClick={() => {
-              setReleaseForm({
-                version: '',
-                channel: 'STABLE',
-                status: 'PUBLISHED',
-                isMandatory: false,
-                minVersion: '1.0.0',
-                rolloutGroup: 'ALL',
-                notes: '',
-                fileUrl: '',
-                fileName: '',
-                checksumSha256: '',
-                changelog: '',
-              });
-              setIsUpsertOpen(true);
-            }}
-            leadingIcon={<Plus className="h-4 w-4" />}
-          >
-            إضافة إصدار جديد
-          </Button>
+          canManageReleases ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setReleaseForm({
+                  version: '',
+                  channel: 'STABLE',
+                  status: 'PUBLISHED',
+                  isMandatory: false,
+                  minVersion: '1.0.0',
+                  rolloutGroup: 'ALL',
+                  notes: '',
+                  fileUrl: '',
+                  fileName: '',
+                  checksumSha256: '',
+                  changelog: '',
+                });
+                setIsUpsertOpen(true);
+              }}
+              leadingIcon={<Plus className="h-4 w-4" />}
+            >
+              إضافة إصدار جديد
+            </Button>
+          ) : null
         }
       />
 
@@ -291,7 +312,7 @@ export const PlatformReleasesPage: React.FC = () => {
                             العملاء
                           </button>
 
-                          {rel.status !== 'DEPRECATED' && (
+                          {rel.status !== 'DEPRECATED' && canManageReleases && (
                             <>
                               <button
                                 onClick={() => handleDisableRelease(rel.id)}
@@ -384,7 +405,7 @@ export const PlatformReleasesPage: React.FC = () => {
               <Button variant="secondary" size="sm" onClick={() => setActiveReleaseForTargets(null)}>
                 إغلاق
               </Button>
-              <Button size="sm" onClick={handleSaveTargets}>
+              <Button size="sm" onClick={handleSaveTargets} disabled={!canManageReleases}>
                 حفظ التعيين والنشر
               </Button>
             </div>
@@ -475,7 +496,7 @@ export const PlatformReleasesPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setIsUpsertOpen(false)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleSaveRelease}>
+            <Button size="sm" onClick={handleSaveRelease} disabled={!canManageReleases}>
               نشر الإصدار
             </Button>
           </div>
