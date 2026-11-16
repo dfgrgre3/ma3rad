@@ -70,7 +70,7 @@ function HBar({ rows, color }: { rows: { label: string; value: number; sub?: str
 }
 
 export const PurchaseInventoryReportPage: React.FC = () => {
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -114,10 +114,10 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   }, [canView, canViewInventory, canViewPurchases, load, tab]);
 
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) { initialRef.current = false; return; }
     if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
-  }, [refreshCtx, canView, canViewInventory, canViewPurchases, load, tab]);
+  }, [refreshToken, canView, canViewInventory, canViewPurchases, load, tab]);
 
   const TABS: { id: Tab; label: string; icon: React.ElementType; visible: boolean }[] = [
     { id: 'purchases', label: 'المشتريات', icon: ShoppingBag, visible: canViewPurchases },

@@ -125,6 +125,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           size="sm"
           onClick={onRefresh}
           disabled={isRefreshing}
+          className="w-full justify-center sm:w-auto"
           leadingIcon={<RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />}
           aria-label="تحديث بيانات لوحة المعلومات"
         >

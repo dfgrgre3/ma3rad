@@ -615,15 +615,20 @@ export class CentralLicenseService {
     return res.json();
   }
 
-  static async detectCloneDevicesCentral(): Promise<any> {
-    const res = await this.request('/api/v1/admin/devices/detect-clones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'clone_detection_failed');
+  static async detectCloneDevicesCentral(): Promise<any | null> {
+    try {
+      const res = await this.request('/api/v1/admin/devices/detect-clones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'clone_detection_failed');
+      }
+      return res.json();
+    } catch (error) {
+      console.warn('Central clone detection failed:', error);
+      return null;
     }
-    return res.json();
   }
 }

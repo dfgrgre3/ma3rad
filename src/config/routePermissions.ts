@@ -168,6 +168,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/security', any: ['security.view', 'sessions.view'] },
   { path: '/central-activation', all: ['admin.license.manage'] },
   { path: '/admin', any: ['admin.view', 'users.view', 'roles.view', 'roles.manage', 'admin.navigation', 'admin.data', 'audit.view', 'settings.view'] },
+  { path: '/admin/sync', any: ['admin.view', 'ui.admin.sync_center.view'] },
   { path: '/admin/sync-conflicts', all: ['admin.view'] },
   { path: '/admin/data-deletion', all: ['admin.data.delete'] },
 

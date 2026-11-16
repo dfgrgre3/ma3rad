@@ -17,7 +17,7 @@ const {
 } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
 const { registerDocumentHandlers } = require('./documentHandlers');
-const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
+const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl, guardedHandle } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 const { createHttpSyncClient, createSyncRelay } = require('./syncRelay');
 const { resolveCentralRequest, sanitizeCentralHeaders } = require('./centralApi');
@@ -28,7 +28,7 @@ const {
 const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
-const { autoUpdater } = require('electron-updater');
+// electron-updater is lazily loaded in autoUpdater.js to avoid accessing 'app' before ready
 const { getMaxDatabaseSize, getMaxV8HeapSize } = require('./databaseMemoryPolicy');
 const { configureHwidCache, warmUpHardwareId } = require('./hardwareId');
 
@@ -452,7 +452,7 @@ const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
 const PRELOAD_INTEGRITY_SHA256 = '3a4683def8e7fee0031589deb39d199347bddaae1cf240861083682085b2aab6';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
-const SECURITY_SOURCE_INTEGRITY_SHA256 = 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd';
+const SECURITY_SOURCE_INTEGRITY_SHA256 = '605a8b4f72517a8c3e5b87626f8a483ea49f71c8d66f73bd4be964d1b4526123';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
 const BYTECODE_INTEGRITY = app.isPackaged
   ? JSON.parse(fsSync.readFileSync(path.join(__dirname, 'bytecode-integrity.json'), 'utf8'))
@@ -846,15 +846,13 @@ app.whenReady().then(async () => {
   createWindow();
   updateController = configureAutoUpdater({
     app,
-    updater: autoUpdater,
     ipcMain,
     validateIpcSender,
     getWindow: () => BrowserWindow.getAllWindows()[0] || null,
     onInstallRequested: () => {
-      const [win] = BrowserWindow.getAllWindows();
-      if (!win) throw new Error('The application window is not available for a safe update.');
       pendingUpdateInstall = true;
-      win.close();
+      //让 quitAndInstall manages window closing and app restart to avoid freezing.
+      // Do not close the window here; electron-updater's quitAndInstall handles it safely.
     },
   });
   syncInitialization = (async () => {

@@ -2,6 +2,7 @@ import type { Database } from 'sql.js';
 import type { MigrationReport } from '../migrations';
 import { DEFAULT_BRANCH_ID } from '../migrations/settings';
 import { AppError, toAppError } from '../../errors/appError';
+import { logger } from '../../utils/logger';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 const DB_IDB_NAME = 'ceramisys_database';
@@ -164,6 +165,14 @@ export class DatabaseManager {
   private persistQueue: Promise<void> = Promise.resolve();
   private pendingSnapshot: Uint8Array | null = null;
   private isPersisting = false;
+  // Full-DB snapshot export (sql.js `db.export()`) is synchronous and runs on
+  // the renderer UI thread. Skip exports when nothing changed since the last
+  // snapshot was taken so read-only interactions stay free of multi-megabyte
+  // serialization stalls. `mutationSeq` guards against clearing the flag for
+  // changes that happen while a snapshot persists in the background.
+  private dirtySinceLastSave = true;
+  private mutationSeq = 0;
+  private lastSnapshotSeq = 0;
   private lastPersistError: string | null = null;
   private lastPersistErrorCode: string | null = null;
   private initializedSuccessfully = false;
@@ -174,6 +183,11 @@ export class DatabaseManager {
   private debounceSaveTimer: any = null;
   private idleSaveHandle: number | null = null;
   private idleSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveInProgress = false;
+  private lastSaveStartMs = 0;
+  // Minimum gap between full-DB exports. sql.js db.export() on a ~10 MB database
+  // takes ~50-200 ms and blocks the UI thread; throttling to 3s prevents save storms.
+  private readonly SAVE_MIN_INTERVAL_MS = 3000;
 
   private constructor() {}
 
@@ -514,6 +528,7 @@ export class DatabaseManager {
     }
 
     if (!databaseChanged) return;
+    this.markDirty();
     this.saveToStorage();
     await this.flush();
     if (this.lastPersistError) {
@@ -696,12 +711,22 @@ export class DatabaseManager {
     }
   }
 
-  public scheduleDebouncedSave(delayMs = 1500): void {
+  public scheduleDebouncedSave(delayMs = 3000): void {
     if (this.transactionDepth > 0) return;
     if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
     this.cancelIdleSave();
     this.debounceSaveTimer = setTimeout(() => {
       this.debounceSaveTimer = null;
+      // Throttle: if a save just completed recently, skip this debounced save
+      // to avoid back-to-back full-database exports that freeze the UI.
+      const now = Date.now();
+      if (now - this.lastSaveStartMs < this.SAVE_MIN_INTERVAL_MS) {
+        // Too soon after the last save; re-schedule instead of skipping entirely so
+        // we don't silently lose pending changes (setting dirtySinceLastSave=false here
+        // was a data-loss bug — changes could go un-persisted until the next mutation).
+        this.scheduleDebouncedSave(this.SAVE_MIN_INTERVAL_MS);
+        return;
+      }
       const idleHost = globalThis as IdleCallbackHost;
       if (typeof idleHost.requestIdleCallback === 'function') {
         this.idleSaveHandle = idleHost.requestIdleCallback(() => {
@@ -709,12 +734,13 @@ export class DatabaseManager {
           this.saveToStorage();
         }, { timeout: 10000 });
       } else {
-        // sql.js exports the entire database synchronously. Avoid doing that
-        // work on the interaction frame when requestIdleCallback is absent.
+        // requestIdleCallback not available (some Electron builds): give the renderer
+        // 300 ms of idle time so button presses and form submissions can paint before
+        // we start the synchronous multi-megabyte db.export().
         this.idleSaveTimer = setTimeout(() => {
           this.idleSaveTimer = null;
           this.saveToStorage();
-        }, 1000);
+        }, 300);
       }
     }, delayMs);
   }
@@ -726,6 +752,32 @@ export class DatabaseManager {
       this.debounceSaveTimer = null;
     }
     this.cancelIdleSave();
+    if (!this.dirtySinceLastSave) return;
+    if (this.saveInProgress) return; // Already saving; skip to avoid UI freeze
+    const now = Date.now();
+    if (now - this.lastSaveStartMs < this.SAVE_MIN_INTERVAL_MS) {
+      this.dirtySinceLastSave = false;
+      return;
+    }
+    this.saveInProgress = true;
+    this.lastSaveStartMs = now;
+    // Yield to the browser before the synchronous, potentially multi-megabyte
+    // db.export() so the current click/interaction frame can fully paint first.
+    // queueMicrotask runs before the next render frame; setTimeout(0) or
+    // MessageChannel yields past the paint checkpoint so the UI stays responsive.
+    const scheduleExport = typeof MessageChannel !== 'undefined'
+      ? (fn: () => void) => { const ch = new MessageChannel(); ch.port1.onmessage = fn; ch.port2.postMessage(null); }
+      : (fn: () => void) => setTimeout(fn, 0);
+    scheduleExport(() => {
+      try {
+        this.doSaveToStorage();
+      } finally {
+        this.saveInProgress = false;
+      }
+    });
+  }
+
+  private doSaveToStorage(): void {
     let snapshot: Uint8Array;
     const exportStartedAt = performance.now();
     try {
@@ -737,6 +789,7 @@ export class DatabaseManager {
       console.error('Failed to export SQLite database snapshot', e);
       return;
     }
+    this.lastSnapshotSeq = this.mutationSeq;
     const exportDurationMs = Math.max(0, performance.now() - exportStartedAt);
     if (exportDurationMs >= SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS) {
       console.warn('[performance] Slow database snapshot export', JSON.stringify({
@@ -771,10 +824,15 @@ export class DatabaseManager {
 
   private async persistSnapshot(snapshot: Uint8Array): Promise<void> {
     const persistStartedAt = performance.now();
+    let persistSucceeded = false;
     try {
-      if (await this.persistToFile(snapshot)) return;
+      if (await this.persistToFile(snapshot)) {
+        persistSucceeded = true;
+        return;
+      }
       if (typeof indexedDB !== 'undefined' || typeof localStorage !== 'undefined') {
         await writeBrowserSnapshot(snapshot);
+        persistSucceeded = true;
         this.storageBackend = typeof indexedDB !== 'undefined' ? 'indexedDB' : 'localStorage';
         if (this.migratedLegacyStorage && typeof localStorage !== 'undefined' && typeof indexedDB !== 'undefined') {
           try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* keep the migrated copy if cleanup is blocked */ }
@@ -791,6 +849,13 @@ export class DatabaseManager {
       this.lastPersistErrorCode = failure.code;
       console.error('Failed to persist SQLite database', error);
     } finally {
+      // The snapshot reflects every mutation up to `lastSnapshotSeq`. Clear
+      // the dirty flag only when the write actually reached durable storage
+      // and no newer mutation happened since the export started, otherwise
+      // the next save exports the newer state or retries the failed write.
+      if (persistSucceeded && this.mutationSeq === this.lastSnapshotSeq) {
+        this.dirtySinceLastSave = false;
+      }
       const durationMs = Math.max(0, performance.now() - persistStartedAt);
       if (durationMs >= SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS) {
         console.warn('[performance] Slow database snapshot persistence', JSON.stringify({
@@ -883,7 +948,10 @@ export class DatabaseManager {
             return (...args: unknown[]) => {
               const sql = args[0];
               return this.trackQuery(typeof sql === 'string' ? sql : '', () => {
-                if (typeof sql !== 'string' || this.isMutatingSql(sql)) this.clearQueryCache();
+                if (typeof sql !== 'string' || this.isMutatingSql(sql)) {
+                  this.clearQueryCache();
+                  this.markDirty();
+                }
                 if (property === 'exec' && typeof sql === 'string') {
                   const params = Array.isArray(args[1]) ? args[1] : [];
                   const cacheKey = this.createQueryCacheKey(sql, params);
@@ -909,6 +977,96 @@ export class DatabaseManager {
 
   public getDb(): Database {
     return this.getDatabase();
+  }
+
+  /**
+   * Esporta l'intero database come Uint8Array (binary snapshot di sql.js).
+   * Utile per trasferire lo stato del database a un Web Worker e tornare indietro.
+   */
+  public exportDatabaseBytes(): Uint8Array {
+    const db = this.getDatabase();
+    return db.export();
+  }
+
+  /**
+   * Sostituisce il database in memoria con i bytes forniti (es. ricevuti da un Web Worker).
+   * Dopo questa chiamata tutte le query successive lavoreranno sul nuovo stato.
+   */
+  public importDatabaseBytes(bytes: Uint8Array): void {
+    if (!this.SQL) throw new Error('SQL engine not loaded');
+    const candidate = new this.SQL.Database(bytes);
+    const integrity = candidate.exec('PRAGMA integrity_check')[0]?.values[0]?.[0];
+    if (integrity !== 'ok') {
+      candidate.close();
+      throw new Error('Imported database failed integrity check');
+    }
+    this.db = candidate;
+    this.databaseFacade = null;
+    this.databaseFacadeTarget = null;
+    this.markDirty();
+    this.scheduleDebouncedSave();
+  }
+
+  // ============================================================================
+  // واجهة غير متزامنة (Async API) — تُنفذ العمليات في Web Worker منفصل
+  // لمنع تجميد واجهة المستخدم عند استدعاء أي استعلام SQLite أو تصدير قاعدة البيانات.
+  // ============================================================================
+
+  private async importAsyncService(): Promise<typeof import('../databaseAsyncService')> {
+    return import('../databaseAsyncService');
+  }
+
+  /**
+   * تنفيذ استعلام SELECT بشكل غير متزامن في Web Worker (لا يحجب واجهة المستخدم).
+   * يعيد نفس تنسيق النتيجة الخاص بـ `query` (مصفوفة من الكائنات بمفاتيح camelCase).
+   */
+  public async queryAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+    const { syncMainToWorkerAsync, queryAsync, syncWorkerToMainAsync } = await this.importAsyncService();
+    await syncMainToWorkerAsync();
+    const result = await queryAsync<T>(sql, params);
+    await syncWorkerToMainAsync();
+    return result;
+  }
+
+  /**
+   * تنفيذ INSERT/UPDATE/DELETE بشكل غير متزامن في Web Worker.
+   */
+  public async runAsync(sql: string, params: unknown[] = []): Promise<void> {
+    const { syncMainToWorkerAsync, runAsync, syncWorkerToMainAsync } = await this.importAsyncService();
+    await syncMainToWorkerAsync();
+    await runAsync(sql, params);
+    await syncWorkerToMainAsync();
+  }
+
+  /**
+   * تنفيذ SQL خام (transactions, PRAGMA) بشكل غير متزامن في Web Worker.
+   */
+  public async execAsync(sql: string): Promise<void> {
+    const { syncMainToWorkerAsync, execAsync, syncWorkerToMainAsync } = await this.importAsyncService();
+    await syncMainToWorkerAsync();
+    await execAsync(sql);
+    await syncWorkerToMainAsync();
+  }
+
+  /**
+   * تصدير قاعدة البيانات بشكل غير متزامن من Web Worker.
+   * يعيد Uint8Array يمكن حفظه في indexedDB أو ملف.
+   */
+  public async exportDatabaseAsync(): Promise<Uint8Array> {
+    const { syncMainToWorkerAsync, exportDatabaseFromWorkerAsync, syncWorkerToMainAsync } = await this.importAsyncService();
+    await syncMainToWorkerAsync();
+    const bytes = await exportDatabaseFromWorkerAsync();
+    await syncWorkerToMainAsync();
+    return bytes;
+  }
+
+  /**
+   * استيراد قاعدة بيانات ثنائية بشكل غير متزامن إلى Web Worker والخيط الرئيسي.
+   */
+  public async importDatabaseAsync(bytes: Uint8Array): Promise<void> {
+    const { importDatabaseToWorkerAsync } = await this.importAsyncService();
+    this.importDatabaseBytes(bytes); // تحديث النسخة في الخيط الرئيسي أيضًا
+    await importDatabaseToWorkerAsync(bytes);
   }
 
   /**
@@ -953,6 +1111,7 @@ export class DatabaseManager {
         db.exec('COMMIT;');
         committed = true;
         this.clearQueryCache();
+        this.markDirty();
         this.scheduleDebouncedSave();
       } else {
         db.exec(`RELEASE SAVEPOINT ${savepoint};`);
@@ -961,9 +1120,13 @@ export class DatabaseManager {
     } catch (error) {
       if (!depthReleased) this.transactionDepth--;
       if (!committed) this.rollbackTransaction(db, isOuterTransaction, savepoint);
-      console.error(committed
-        ? 'Transaction committed in memory but could not be persisted:'
-        : 'Transaction rolled back due to error:', error);
+      logger.error(
+        committed
+          ? 'Transaction committed in memory but could not be persisted:'
+          : 'Transaction rolled back due to error:',
+        error instanceof Error ? error : new Error(String(error)),
+        { committed }
+      );
       throw toAppError(error, 'DATABASE_TRANSACTION_FAILED');
     }
   }
@@ -1012,11 +1175,17 @@ export class DatabaseManager {
         throw new Error('Database not initialized! Call DatabaseManager.getInstance().initialize() first.');
       }
       db.run(sql, params);
+      this.markDirty();
       // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
       if (this.transactionDepth === 0) {
         this.scheduleDebouncedSave();
       }
     });
+  }
+
+  private markDirty(): void {
+    this.dirtySinceLastSave = true;
+    this.mutationSeq++;
   }
 
   private trackQuery<T>(sql: string, operation: () => T): T {
@@ -1203,7 +1372,7 @@ export class DatabaseManager {
     if (/\b(insert|update|delete|replace|create|drop|alter|vacuum|reindex|attach|detach)\b/i.test(sql)) {
       return true;
     }
-    return !/^\s*(select|explain|pragma)\b/i.test(sql);
+    return !/^\s*(select|explain|pragma|begin|commit|savepoint|release|rollback)\b/i.test(sql);
   }
 
   private clearQueryCache(): void {
@@ -1336,6 +1505,9 @@ export class DatabaseManager {
 
     if (typeof imported === 'undefined') throw new Error('Backup database was not initialized.');
     this.db = imported;
+    this.databaseFacade = null;
+    this.databaseFacadeTarget = null;
+    this.markDirty();
     this.saveToStorage();
   }
 

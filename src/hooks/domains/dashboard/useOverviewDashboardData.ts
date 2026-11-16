@@ -1,15 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { dashboardMetricsService, type OverviewDashboardData as ServiceOverviewData } from '../../../services/domains/dashboard/DashboardMetricsService';
 import { AccountingService, type DashboardMetrics, type MonthlyComparison } from '../../../services/domains/finance/AccountingService';
-import { DailyOperationsService, type DailyPurchaseResult } from '../../../services/domains/operations/DailyOperationsService';
-import { AuthService } from '../../../services/domains/auth/AuthService';
-import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import type {
   CategoryDistributionItem, PaymentDistributionItem, PurchaseHourlyBucket,
   PurchasePaymentMixItem, PurchaseTopItem, PurchaseTopSupplier, RecentActivityItem, SalesTrendPoint,
   TopCustomerItem, TopSellingProduct,
 } from '../../../types/dashboard/components';
+import type { DailyPurchaseResult } from '../../../services/domains/operations/DailyOperationsService';
+
+// Translate payment method to Arabic
+const translatePaymentMethod = (method: string): string => {
+  const translations: Record<string, string> = {
+    'CASH': 'نقدي',
+    'CARD': 'بطاقة',
+    'BANK_TRANSFER': 'تحويل بنكي',
+    'CHECK': 'شيك',
+    'VOUCHER': 'قسيمة',
+  };
+  return translations[method] ?? method;
+};
 
 export interface OverviewDashboardData {
   metrics: DashboardMetrics | null;
@@ -24,7 +34,7 @@ export interface OverviewDashboardData {
   gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[];
   paymentDistribution: PaymentDistributionItem[];
   recentActivities: RecentActivityItem[];
-  todayPurchases: DailyPurchaseResult | null;
+  todayPurchases: ServiceOverviewData['todayPurchases'] | null;
   purchasesLoading: boolean;
   purchasesError: string | null;
   loadData: () => void;
@@ -43,6 +53,7 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const [monthlyComparison, setMonthlyComparison] = useState<MonthlyComparison | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomerItem[]>([]);
@@ -50,94 +61,65 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
   const [gradeSales, setGradeSales] = useState<{ grade: string; quantityM2: number; totalRevenue: number }[]>([]);
   const [paymentDistribution, setPaymentDistribution] = useState<PaymentDistributionItem[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivityItem[]>([]);
-  const [todayPurchases, setTodayPurchases] = useState<DailyPurchaseResult | null>(null);
+  const [todayPurchases, setTodayPurchases] = useState<ServiceOverviewData['todayPurchases'] | null>(null);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [purchasesError, setPurchasesError] = useState<string | null>(null);
 
-  const accountingService = useMemo(() => new AccountingService(), []);
-
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     const dashboardStartedAt = performance.now();
-    setRefreshing(true);
-    setPurchasesLoading(true);
-    const databaseManager = DatabaseManager.getInstance();
-    const accountingStartedAt = performance.now();
-    const accountingQueryCountBefore = databaseManager.getQueryStats().totalQueries;
+    // Allow spinner to render first
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    startTransition(() => {
+      setRefreshing(true);
+      setPurchasesLoading(true);
+    });
+    
     try {
-      const actor = AuthService.requireAuth();
-      PermissionService.require(actor, 'sales.view', '/sales');
-      PermissionService.require(actor, 'purchases.view', '/purchases');
-      PermissionService.require(actor, 'finance.view', '/finance');
-      PermissionService.require(actor, 'customers.view', '/customers');
-      PermissionService.require(actor, 'inventory.view', '/inventory');
-      const data = accountingService.getDashboardMetrics();
-      const trend = accountingService.getSalesTrendLast7Days();
-      const top = accountingService.getTopSellingProducts(5);
-      const monthlyComp = accountingService.getMonthlyComparison();
-      const topCust = accountingService.getTopCustomers(5).map((customer) => ({
-        name: customer.name,
-        totalAmount: customer.totalPurchases,
-        invoiceCount: customer.purchaseCount,
-      }));
-      const categories = new Map<string, number>();
-      accountingService.getCategorySalesReport().forEach((category) => {
-        categories.set(category.categoryName, (categories.get(category.categoryName) || 0) + category.totalRevenue);
-      });
-      const catSales = [...categories.entries()].map(([name, value]) => ({ name, value }));
-      const gradeDist = accountingService.getSalesByGrade();
-      const payDist = accountingService.getPaymentMethodDistribution().map((payment) => ({
-        method: payment.method,
-        amount: payment.totalAmount,
-        count: payment.count,
-      }));
-      const activities = accountingService.getRecentActivities(6);
+      const data = await dashboardMetricsService.getOverviewDashboardData();
+      
+      // Check for partial errors
+      const errors = dashboardMetricsService.getErrors();
+      if (errors.length > 0) {
+        const errorMessages = errors.map(e => `${e.section}: ${e.message}`).join('; ');
+        startTransition(() => {
+          setDashboardError(`تحميل جزئي: ${errorMessages}`);
+        });
+      } else {
+        startTransition(() => {
+          setDashboardError(null);
+        });
+      }
 
-      setMetrics(data);
-      setChartData(trend);
-      setTopProducts(top);
-      setMonthlyComparison(monthlyComp);
-      setTopCustomers(topCust);
-      setCategorySales(catSales);
-      setGradeSales(gradeDist);
-      setPaymentDistribution(payDist);
-      setRecentActivities(activities);
-      setDashboardError(null);
+      startTransition(() => {
+        setMetrics(data.metrics);
+        setChartData(data.chartData);
+        setTopProducts(data.topProducts);
+        setMonthlyComparison(data.monthlyComparison);
+        setTopCustomers(data.topCustomers);
+        setCategorySales(data.categorySales);
+        setGradeSales(data.gradeSales);
+        setPaymentDistribution(data.paymentDistribution);
+        setRecentActivities(data.recentActivities);
+        setTodayPurchases(data.todayPurchases);
+        setPurchasesError(data.purchasesError);
+      });
     } catch (e) {
       console.error(e);
-      setDashboardError((e as Error)?.message || 'تعذر تحميل بيانات لوحة المعلومات');
+      startTransition(() => {
+        setDashboardError((e as Error)?.message || 'تعذر تحميل بيانات لوحة المعلومات');
+      });
     } finally {
-      console.info('[performance] Dashboard accounting data loaded', JSON.stringify({
-        durationMs: Math.round((performance.now() - accountingStartedAt) * 100) / 100,
-        queryCount: databaseManager.getQueryStats().totalQueries - accountingQueryCountBefore,
-      }));
-    }
-
-    const purchasesStartedAt = performance.now();
-    const purchasesQueryCountBefore = databaseManager.getQueryStats().totalQueries;
-    try {
-      if (PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')) {
-        setTodayPurchases(new DailyOperationsService().getPurchases());
-        setPurchasesError(null);
-      } else {
-        setTodayPurchases(null);
-        setPurchasesError(null);
-      }
-    } catch (error: any) {
-      setTodayPurchases(null);
-      setPurchasesError(error?.message || 'تعذر تحميل مؤشرات مشتريات اليوم');
-    } finally {
-      console.info('[performance] Dashboard purchase data loaded', JSON.stringify({
-        durationMs: Math.round((performance.now() - purchasesStartedAt) * 100) / 100,
-        queryCount: databaseManager.getQueryStats().totalQueries - purchasesQueryCountBefore,
-      }));
       console.info('[performance] Dashboard data ready', JSON.stringify({
         durationMs: Math.round((performance.now() - dashboardStartedAt) * 100) / 100,
       }));
-      setLoading(false);
-      setPurchasesLoading(false);
-      setRefreshing(false);
+      startTransition(() => {
+        setLoading(false);
+        setPurchasesLoading(false);
+        setRefreshing(false);
+      });
     }
-  }, [accountingService]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -166,7 +148,7 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
       mix.set(key, entry);
     });
     return [...mix.entries()]
-      .map(([method, values]) => ({ method, ...values }))
+      .map(([method, values]) => ({ method: translatePaymentMethod(method), ...values }))
       .sort((a, b) => b.total - a.total);
   }, [todayPurchases]);
 
@@ -209,7 +191,7 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     metrics,
     chartData,
     topProducts,
-    loading,
+    loading: loading || isPending,
     refreshing,
     dashboardError,
     monthlyComparison,

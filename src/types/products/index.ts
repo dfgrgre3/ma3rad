@@ -72,6 +72,7 @@ export interface ProductBatch {
   batchNumber: string;
   toneShade: string;     // نغمة اللون مثل A12 أو Shade-3
   caliber: string;       // العيار / المعايرة مثل 0 أو 1
+  grade: string;         // الفرز / الدرجة مثل GRADE_1 أو GRADE_2
   productionDate?: string;
   receivedDate?: string;
   supplierId?: string;
@@ -92,6 +93,7 @@ export interface ToneMixingConflict {
     batchNumber: string;
     toneShade: string;
     caliber: string;
+    grade: string;
     requiredM2: number;
   }>;
 }

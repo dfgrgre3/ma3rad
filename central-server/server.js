@@ -40,7 +40,7 @@ async function checkExpiringLicensesAndSubscriptions() {
       [cutoffStr]
     );
     for (const license of expiringLicenses) {
-      console.log(`License expiring in ${days} days: ${license.license_key} for tenant ${license.tenantName}`);
+      console.log(`License expiring in ${days} days: ${license.id} for tenant ${license.tenantName}`);
       await recordAuditEvent({
         actorType: 'SYSTEM',
         actorId: null,
@@ -50,7 +50,7 @@ async function checkExpiringLicensesAndSubscriptions() {
         resourceType: 'platform_licenses',
         resourceId: license.id,
         beforeData: null,
-        afterData: { licenseKey: license.license_key, expiresAt: license.expires_at, daysRemaining: days },
+        afterData: { licenseKey: license.id, expiresAt: license.expires_at, daysRemaining: days },
         ipAddress: null,
         userAgent: 'system-scheduler',
       });
@@ -93,7 +93,7 @@ async function checkExpiringLicensesAndSubscriptions() {
        AND date(l.expires_at) < date('now')`
   );
   for (const license of expiredLicenses) {
-    console.log(`License ALREADY EXPIRED: suspending ${license.license_key} for tenant ${license.tenantName}`);
+    console.log(`License ALREADY EXPIRED: suspending ${license.id} for tenant ${license.tenantName}`);
     await db.run(
       `UPDATE platform_licenses SET status = 'EXPIRED', updated_at = ? WHERE id = ?`,
       [now.toISOString(), license.id]
@@ -107,7 +107,7 @@ async function checkExpiringLicensesAndSubscriptions() {
       resourceType: 'platform_licenses',
       resourceId: license.id,
       beforeData: { status: 'ACTIVE' },
-      afterData: { status: 'EXPIRED', licenseKey: license.license_key, expiresAt: license.expires_at },
+      afterData: { status: 'EXPIRED', licenseKey: license.id, expiresAt: license.expires_at },
       ipAddress: null,
       userAgent: 'system-scheduler',
     });

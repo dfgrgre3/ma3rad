@@ -138,7 +138,29 @@ async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, crea
     if (key.length !== 32) throw new Error('Invalid database encryption key.');
     return key;
   } catch (error) {
-    if (error.code !== 'ENOENT') throw new Error(`تعذر فتح مفتاح تشفير قاعدة البيانات: ${error.message || error}`);
+    // Check if this is a decryption failure (not a missing file)
+    const isDecryptionError = error.code !== 'ENOENT' && (
+      error.message?.includes('decrypt') ||
+      error.message?.includes('decryption') ||
+      error.message?.includes('ciphertext') ||
+      error.message?.includes('safeStorage')
+    );
+
+    if (isDecryptionError) {
+      // The encrypted key exists but cannot be decrypted (e.g., user profile changed, DPAPI master key rotated)
+      // This is a critical error - the database cannot be decrypted without the original key.
+      // We throw a specific error code so the UI can prompt for recovery.
+      const recoveryError = new Error(
+        'مفتاح تشفير قاعدة البيانات تالف أو لا يمكن فك تشفيره (ربما تغير حساب المستخدم أو مفاتيح النظام). ' +
+        'ستحتاج إلى استخدام مفتاح استرداد أو حذف ملف المفتاح لبدء قاعدة بيانات جديدة (ستفقد البيانات المشفرة الحالية).'
+      );
+      Object.assign(recoveryError, { code: 'DATABASE_KEY_DECRYPTION_FAILED', keyPath });
+      throw recoveryError;
+    }
+
+    if (error.code !== 'ENOENT') {
+      throw new Error(`تعذر فتح مفتاح تشفير قاعدة البيانات: ${error.message || error}`);
+    }
     if (!createIfMissing) throw new Error('مفتاح تشفير قاعدة البيانات غير موجود؛ لم يتم تعديل ملف البيانات. استعد مفتاح النظام أو نسخة احتياطية خارجية.');
   }
 

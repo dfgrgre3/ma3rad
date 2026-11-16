@@ -137,6 +137,7 @@ export const APP_ROUTE_PATHS = [
   "audit",
   "security",
   "admin",
+  "admin/sync",
   "admin/sync-conflicts",
   "admin/data-deletion",
   "data-import/types",

@@ -267,8 +267,18 @@ export const FinancialEventsCalendar: React.FC = () => {
       }
     };
     notifyDueEvents();
-    const timer = window.setInterval(notifyDueEvents, 60_000);
-    return () => window.clearInterval(timer);
+    // Use requestIdleCallback for non-urgent event notification if available
+    const idleCallback = typeof window.requestIdleCallback !== 'undefined'
+      ? window.requestIdleCallback
+      : null;
+
+    if (idleCallback) {
+      const idleTimer = idleCallback(notifyDueEvents, { timeout: 60000 }); // 60 seconds
+      return () => window.cancelIdleCallback(idleTimer);
+    } else {
+      const timer = window.setInterval(notifyDueEvents, 60_000);
+      return () => window.clearInterval(timer);
+    }
   }, [canView, reminderEvents, toast]);
 
   const filteredEvents = useMemo(() => events.filter((event) => {

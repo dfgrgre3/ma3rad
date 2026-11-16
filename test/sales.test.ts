@@ -600,3 +600,47 @@ test('sales return credit memo includes VAT for unpaid customer balances', async
     [invoice.id],
   )[0], { remaining: 0, status: 'PAID' });
 });
+
+test('overpayment: paidAmount greater than totalAmount should fail with clear error', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const svc = new SalesService();
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل اختبار زيادة الدفع', phone: '0122222255', customerType: 'RETAIL', creditLimit: 0,
+  });
+  seedProduct(db, 'prod_overpay_1');
+
+  // Try to create invoice with paidAmount (100) > totalAmount (80 = 10 * 8)
+  // Product price is 300, so 10 m2 = 3000 total
+  // Let's use a smaller quantity: 0.2 m2 * 300 = 60 total
+  // Then pay 100 > 60
+  const smallProductId = 'prod_overpay_small';
+  db.run(
+    `INSERT INTO products (id, sku, barcode, name, category_id, brand_id, grade, size,
+       base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+       wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+    [smallProductId, `SKU-${smallProductId}`, `BAR-${smallProductId}`, 'صنف صغير', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60',
+     'M2', 'M2', 4, 1.44, 10, 300, 250, 0, 10]
+  );
+  db.run(
+    `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+     VALUES (?,?,?,?,0)`,
+    [`stk_${smallProductId}`, 'wh_main', smallProductId, 100]
+  );
+
+  // Total = 0.2 * 300 = 60, paidAmount = 100 > 60
+  assert.throws(
+    () => svc.createSale({
+      customerId: customer.id,
+      warehouseId: 'wh_main',
+      items: [{ productId: smallProductId, soldBy: 'M2', quantityM2: 0.2, boxesCount: 0, piecesCount: 0, unitPrice: 300 }],
+      paidAmount: 100,
+      paymentType: 'CASH',
+    }),
+    /المبلغ المدفوع|أكبر من|يزيد عن|Unbalanced|غير متوازن/,
+    'Should reject overpayment with clear error message'
+  );
+});

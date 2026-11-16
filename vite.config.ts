@@ -76,6 +76,9 @@ export default defineConfig(({ command }) => {
     // like /assets/... resolve outside the app bundle and leave a blank window.
     // Relative URLs also work when Vite serves the app from the LAN host root.
     base: './',
+    worker: {
+      format: 'es',
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -105,6 +108,11 @@ export default defineConfig(({ command }) => {
       reportCompressedSize: false,
       target: process.env.CERAMISYS_LEGACY_BUILD === '1' ? 'chrome108' : 'modules',
       chunkSizeWarningLimit: 2000,
+      // Web Workers bundled as ES modules so Vite can tree-shake them
+      // correctly. IIFE/UMD are incompatible with code-splitting.
+      worker: {
+        format: 'es',
+      },
       // Keep stable third-party code cacheable and out of the application entry chunk.
       rollupOptions: {
         output: {

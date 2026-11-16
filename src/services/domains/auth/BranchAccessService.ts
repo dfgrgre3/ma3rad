@@ -113,6 +113,28 @@ export class BranchAccessService {
     return { clause: `${column} = ?`, params: [companyId] };
   }
 
+  /**
+   * Company scope for tables that only have branch_id (not company_id).
+   * Uses a subquery to filter branches belonging to the current user's company.
+   * @param branchExpression - The branch_id column expression (e.g., 'si.branch_id')
+   * @param user - The user context
+   * @returns SQL scope clause and params for company-level filtering
+   */
+  public companyScopeViaBranch(
+    branchExpression: string,
+    user = this.actor()
+  ): { clause: string; params: string[] } {
+    const companyId = this.db.query<{ companyId: string | null }>(
+      'SELECT company_id AS companyId FROM branches WHERE id = ? AND is_active = 1',
+      [this.getCurrentBranchId(user)]
+    )[0]?.companyId;
+    if (!companyId) return { clause: '1 = 0', params: [] };
+    return {
+      clause: `${branchExpression} IN (SELECT id FROM branches WHERE company_id = ? AND is_active = 1)`,
+      params: [companyId],
+    };
+  }
+
   public hasCompanyAccess(companyId: string, user = this.actor()): boolean {
     const allowed = this.getAccessibleCompanyIds(user);
     if (allowed === null) return true;

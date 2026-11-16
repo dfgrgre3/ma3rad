@@ -1,6 +1,7 @@
 import React, { memo, useState, useEffect, useCallback } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from '../database/repositories/databaseManager';
+import { logger } from '../utils/logger';
 import { AuthService } from '../services/domains/auth/AuthService';
 import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
 import { CentralConfigApplier } from '../services/domains/licensing/CentralConfigApplier';
@@ -34,6 +35,10 @@ export const App: React.FC = () => {
     setCurrentUser, retryInit, createFreshDatabase,
   } = useAppStartup();
 
+  // Add loading state for initialization
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initProgress, setInitProgress] = useState(0);
+
   const [showSetup, setShowSetup] = useState(false);
   const [activationComplete, setActivationComplete] = useState(
     BYPASS_FIRST_RUN_ACTIVATION
@@ -45,12 +50,18 @@ export const App: React.FC = () => {
   const [licenseRetrying, _setLicenseRetrying] = useState(false);
 
   useEffect(() => {
-    if (BYPASS_FIRST_RUN_ACTIVATION) return;
+    if (BYPASS_FIRST_RUN_ACTIVATION) {
+      setIsInitializing(false);
+      return;
+    }
+
     let active = true;
+    let progress = 0;
+    const totalSteps = 6;
     void CentralLicenseService.hasCompletedFirstRunActivation().then((complete) => {
       if (active) setActivationComplete(complete);
     }).catch((error: unknown) => {
-      console.error('Could not read the central activation state:', error);
+      logger.error('Could not read the central activation state:', error instanceof Error ? error : new Error(String(error)));
       if (active) setActivationComplete(false);
     });
     return () => { active = false; };
@@ -171,7 +182,7 @@ export const App: React.FC = () => {
         await securityService.initialize();
         if (active) await systemHealth.startHealthCheck();
       } catch (error) {
-        console.error('Application monitoring services could not start:', error);
+        logger.error('Application monitoring services could not start:', error instanceof Error ? error : new Error(String(error)));
       }
     };
     void startMonitoring();

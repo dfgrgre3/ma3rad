@@ -6,6 +6,7 @@ import { ExecutiveKpiGrid } from './ExecutiveKpiGrid';
 import { ExecutiveSalesChart } from './ExecutiveSalesChart';
 import { LowStockAlertsCard } from './LowStockAlertsCard';
 import { ExecutiveBottomGrid } from './ExecutiveBottomGrid';
+import { useTheme } from '../../../contexts/useTheme';
 import type { DateRange } from '../../../types/dashboard/executive';
 
 const RANGES: { id: DateRange; label: string }[] = [
@@ -16,6 +17,7 @@ const RANGES: { id: DateRange; label: string }[] = [
 ];
 
 export const ExecutiveDashboard: React.FC = () => {
+  const { isDark } = useTheme();
   const {
     range,
     setRange,
@@ -31,24 +33,24 @@ export const ExecutiveDashboard: React.FC = () => {
     lastRefresh,
     refresh,
   } = useExecutiveDashboard();
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) {
       initialRef.current = false;
       return;
     }
     refresh();
-  }, [refreshCtx, refresh]);
+  }, [refreshToken, refresh]);
 
   return (
-    <div className="h-full min-w-0 overflow-y-auto bg-slate-50 text-slate-900 p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5" dir="rtl">
+    <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`} dir="rtl">
       {/* Header */}
       <div className="flex min-w-0 items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-black text-slate-900">لوحة المعلومات التنفيذية</h1>
-          <p className="text-xs text-slate-500 mt-0.5">آخر تحديث: {format(lastRefresh, 'HH:mm:ss')}</p>
+          <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">لوحة المعلومات التنفيذية</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">آخر تحديث: {format(lastRefresh, 'HH:mm:ss')}</p>
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -57,7 +59,11 @@ export const ExecutiveDashboard: React.FC = () => {
               key={r.id}
               onClick={() => setRange(r.id)}
               className={`min-h-9 flex-1 px-2 sm:flex-none sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                range === r.id ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25' : 'bg-slate-100 hover:bg-slate-200'
+                range === r.id 
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25' 
+                  : isDark 
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >
               {r.label}
@@ -67,7 +73,11 @@ export const ExecutiveDashboard: React.FC = () => {
           <button
             onClick={refresh}
             disabled={loading}
-            className="min-h-9 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-50"
+            className={`min-h-9 px-3 py-1.5 text-xs font-semibold rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              isDark 
+                ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white' 
+                : 'bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+            }`}
             title="تحديث"
           >
             تحديث
@@ -79,20 +89,22 @@ export const ExecutiveDashboard: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-600 animate-bounce" />
-            <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">جاري تحميل البيانات...</p>
           </div>
         </div>
       ) : (
         <>
           {loadError && (
-            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <div role="alert" className={`rounded-xl border px-4 py-3 text-sm ${
+              isDark ? 'border-rose-900 bg-rose-950/30 text-rose-300' : 'border-rose-300 bg-rose-50 text-rose-800'
+            }`}>
               تعذر تحميل بعض المؤشرات: {loadError}
             </div>
           )}
 
           <ExecutiveKpiGrid kpis={kpis} />
 
-          <ExecutiveSalesChart dailySales={dailySales} branchData={branchData} />
+          <ExecutiveSalesChart dailySales={dailySales} branchData={branchData} range={range} />
 
           <LowStockAlertsCard lowStock={lowStock} />
 

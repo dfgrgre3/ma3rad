@@ -24,4 +24,18 @@ CREATE TABLE IF NOT EXISTS platform_coupons (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (plan_id) REFERENCES platform_plans(id)
 );
+
+-- 111. SYNC APPLIED EVENTS — أرشفة الأحداث الواردة التي تم تطبيقها لمراجعة المزامنة ومنع التكرار
+CREATE TABLE IF NOT EXISTS sync_applied_events (
+  event_id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  branch_id TEXT NOT NULL,
+  tenant_id TEXT,
+  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_applied_events_entity ON sync_applied_events(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_sync_applied_events_branch ON sync_applied_events(branch_id);
+CREATE INDEX IF NOT EXISTS idx_sync_applied_events_applied_at ON sync_applied_events(applied_at);
 `;

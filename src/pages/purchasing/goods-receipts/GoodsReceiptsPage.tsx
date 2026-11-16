@@ -553,7 +553,7 @@ export const GoodsReceiptsPage: React.FC = () => {
                             selectedLabel={it.productName || products.find((product) => product.id === it.productId)?.name}
                             ariaLabel={`استعراض أصناف إذن الاستلام للسطر ${idx + 1}`}
                             onChange={(productId, product) => {
-                              handleItemChange(idx, { productId, productName: product.name });
+                              handleItemChange(idx, { productId, productName: product.name, grade: product.grade || '' });
                             }}
                             disabled={Boolean(selectedPoId)}
                           />
@@ -600,7 +600,7 @@ export const GoodsReceiptsPage: React.FC = () => {
                       </div>
 
                       {/* Batch & Shade info */}
-                      <div className="grid grid-cols-1  sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200">
+                      <div className="grid grid-cols-1  sm:grid-cols-5 gap-2 pt-1 border-t border-slate-200">
                         <div>
                           <label htmlFor={`grn-item-${idx}-batch`} className="block text-[10px] text-slate-500">رقم التشغيلة / اللوت</label>
                           <input
@@ -629,6 +629,17 @@ export const GoodsReceiptsPage: React.FC = () => {
                             value={it.caliber}
                             onChange={(e) => handleItemChange(idx, { caliber: e.target.value })}
                             className="w-full bg-white border rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor={`grn-item-${idx}-grade`} className="block text-[10px] text-slate-500">الفرز / الدرجة</label>
+                          <input
+                            id={`grn-item-${idx}-grade`}
+                            type="text"
+                            value={it.grade}
+                            onChange={(e) => handleItemChange(idx, { grade: e.target.value })}
+                            placeholder="GRADE_1"
+                            className="w-full bg-white border rounded-lg px-2 py-1 text-xs font-bold"
                           />
                         </div>
                         <div>

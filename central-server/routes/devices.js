@@ -262,7 +262,7 @@ router.post(
         const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.id]);
         if (license) {
           flaggedLicenses.push(license);
-          alerts.push(`تجاوز عدد الأجهزة: الترخيص ${license.license_key} مفعل على ${row.active_device_count} أجهزة والحد المسموح ${license.device_limit}`);
+          alerts.push(`تجاوز عدد الأجهزة: الترخيص  مفعل على ${row.active_device_count} أجهزة والحد المسموح ${license.device_limit}`);
         }
       }
 
@@ -277,7 +277,7 @@ router.post(
       for (const row of rapidTransfers) {
         const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.license_id]);
         if (license) {
-          alerts.push(`نقل سريع للترخيص: ${license.license_key} نُقل ${row.transfer_count} مرة خلال 30 يوماً`);
+          alerts.push(`نقل سريع للترخيص:  نُقل ${row.transfer_count} مرة خلال 30 يوماً`);
         }
       }
 
@@ -294,7 +294,7 @@ router.post(
         const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.id]);
         if (license) {
           flaggedLicenses.push(license);
-          alerts.push(`ترخيص فردي على أجهزة متعددة: ${license.license_key} مفعل على ${row.distinct_hwids} بصمات عتاد مختلفة`);
+          alerts.push(`ترخيص فردي على أجهزة متعددة:  مفعل على ${row.distinct_hwids} بصمات عتاد مختلفة`);
         }
       }
 

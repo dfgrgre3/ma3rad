@@ -11,6 +11,20 @@ const getActivityIcon = (type: string) => {
   }
 };
 
+// Format timestamp for display
+const formatTimestamp = (timestamp: string): string => {
+  try {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return timestamp;
+    return new Intl.DateTimeFormat('ar-EG', { 
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).format(date);
+  } catch {
+    return timestamp;
+  }
+};
+
 interface RecentActivitiesFeedProps {
   recentActivities: RecentActivityItem[];
 }
@@ -26,12 +40,13 @@ export const RecentActivitiesFeed: React.FC<RecentActivitiesFeedProps> = ({ rece
         {recentActivities.length === 0 ? (
           <div className="col-span-2 text-center py-4 text-xs text-slate-400">لا توجد عمليات مسجلة حديثاً</div>
         ) : (
+          // Activities are already sorted by date (newest first) from the service
           recentActivities.map((activity, idx) => (
             <div key={idx} className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
               {getActivityIcon(activity.type)}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">{activity.description}</div>
-                <div className="text-[10px] text-slate-400">{activity.timestamp}</div>
+                <div className="text-[10px] text-slate-400">{formatTimestamp(activity.timestamp)}</div>
               </div>
             </div>
           ))

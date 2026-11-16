@@ -26,6 +26,7 @@ import { SCHEMA_PART_25 } from './part-25';
 import { SCHEMA_PART_26 } from './part-26';
 import { SCHEMA_PART_27 } from './part-27';
 import { SCHEMA_PART_28 } from './part-28';
+import { DATABASE_INDEXES } from './indexes';
 
 export const SCHEMA_SQL = [
   SCHEMA_PART_01,
@@ -56,4 +57,5 @@ export const SCHEMA_SQL = [
   SCHEMA_PART_26,
   SCHEMA_PART_27,
   SCHEMA_PART_28,
+  DATABASE_INDEXES,
 ].join('\n');

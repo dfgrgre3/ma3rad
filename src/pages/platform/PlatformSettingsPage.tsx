@@ -75,7 +75,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
     try {
       const updated = platformAdminService.updateSettings({
         ...settings,
-        defaultTrialDays: Math.max(1, Number(settings.defaultTrialDays) || 14),
+        defaultTrialDays: String(Math.max(1, Number(settings.defaultTrialDays) || 14)),
       });
       setSettings(updated);
       toast.success('تم حفظ إعدادات المنصة بنجاح');

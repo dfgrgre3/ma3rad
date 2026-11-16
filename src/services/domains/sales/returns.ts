@@ -568,9 +568,23 @@ function processReturnItem(
   const actualCost = shouldRestoreFifo
     ? InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2, item.invoiceItemId)
     : 0;
+
+  // CRITICAL: Unit cost MUST come from the original invoice line, never from client input.
+  // getAuthoritativeReturnItems already computes this from inv.items (database), but we
+  // fetch directly here as a safeguard against any future refactor that might leak client values.
+  let invoiceUnitCost = 0;
+  if (item.invoiceItemId) {
+    const invoiceLine = sqliteDb.query<{ unit_cost: number }>(
+      `SELECT unit_cost FROM sales_invoice_items WHERE id = ? AND invoice_id = ?`,
+      [item.invoiceItemId, invoiceId]
+    )[0];
+    if (invoiceLine) invoiceUnitCost = Number(invoiceLine.unit_cost || 0);
+  }
+  // Fallback to authoritative item (which is already sourced from inv.items) if direct fetch fails.
+  const authoritativeUnitCost = Number(item.unitCost || 0);
   const unitCost = shouldRestoreFifo
     ? round2(actualCost / item.quantityM2)
-    : item.unitCost > 0 ? item.unitCost : 0;
+    : (invoiceUnitCost > 0 ? invoiceUnitCost : authoritativeUnitCost);
   const returnItemId = `ritem_${uuidv4().substring(0, 8)}`;
   insertSalesReturnItem(
     sqliteDb, item, product, returnId, returnItemId, boxesCount, unitCost, lineTotal,
@@ -601,7 +615,8 @@ function processReturnItem(
   }
   // Service lines posted a direct cost against accrued service costs at sale
   // time (5102/2105); a return must reverse the proportional amount.
-  const serviceCost = serviceLine ? round2(item.quantityM2 * (item.unitCost || 0)) : 0;
+  // Use the safeguarded unitCost (from invoice line) not item.unitCost (from client).
+  const serviceCost = serviceLine ? round2(item.quantityM2 * unitCost) : 0;
   return {
     inventoryCost: shouldRestoreFifo ? actualCost : (serviceLine ? 0 : round2(item.quantityM2 * unitCost)),
     serviceCost,

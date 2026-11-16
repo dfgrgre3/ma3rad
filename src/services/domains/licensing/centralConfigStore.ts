@@ -8,11 +8,23 @@
  */
 const CONFIG_KEY = 'central_cached_config';
 
+// The central config blob is re-read by every permission check, and a theme
+// toggle re-renders the entire tree, so thousands of checks can run in one
+// frame. Parsing the blob each time blocks the UI thread — memoize it and
+// only re-parse when the stored string actually changed.
+let cachedRaw: string | null = null;
+let cachedConfig: any | null = null;
+
 export function readCachedCentralConfig(): any | null {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (raw === cachedRaw) return cachedConfig;
+    cachedRaw = raw;
+    cachedConfig = raw ? JSON.parse(raw) : null;
+    return cachedConfig;
   } catch {
+    cachedRaw = null;
+    cachedConfig = null;
     return null;
   }
 }

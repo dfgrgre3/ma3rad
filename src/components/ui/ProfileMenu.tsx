@@ -173,7 +173,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       </button>
 
       {open && (
-        <div className="win-popover absolute left-0 top-full z-50 mt-1 w-60 rounded-[2px] border border-[#b3b3b3] bg-white dark:border-[#565656] dark:bg-[#2b2b2b]">
+        <div className="win-popover absolute left-0 top-full z-50 mt-1 max-h-[80dvh] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-[2px] border border-[#b3b3b3] bg-white dark:border-[#565656] dark:bg-[#2b2b2b]">
           <div className="border-b border-[#e5e5e5] px-4 py-2.5 dark:border-[#3d3d3d]">
             <div className="truncate text-[12.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{currentUser.fullName}</div>
             <div className="truncate text-[11px] text-[#767676] dark:text-[#a6a6a6]">@{currentUser.username} · {roleName}</div>
@@ -195,7 +195,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
               </button>
               {branchMenuOpen && (
                 <div
-                  className="win-popover absolute left-full top-0 z-[60] ml-1 w-56 rounded-[2px] border border-[#b3b3b3] bg-white py-1 dark:border-[#565656] dark:bg-[#2b2b2b]"
+                  className="win-popover z-[60] mt-1 max-h-64 w-full overflow-y-auto rounded-[2px] border border-[#e5e5e5] bg-white py-1 dark:border-[#3d3d3d] dark:bg-[#2b2b2b] sm:absolute sm:left-full sm:top-0 sm:ml-1 sm:mt-0 sm:max-h-72 sm:w-56 sm:border-[#b3b3b3] sm:dark:border-[#565656]"
                   role="menu"
                   aria-label="اختيار الفرع"
                 >

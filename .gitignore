@@ -45,6 +45,14 @@ pnpm-debug.log*
 test-domain.js
 apply_invoice_pagination.py
 
+# Temporary files
+lint-results.json
+appearance-temp.tsx
+src/_dsh_write_probe.txt
+tmp-*.txt
+tmp-check-users.mjs
+tmpapp/
+
 # Python
 __pycache__/
 *.py[cod]

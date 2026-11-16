@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Calculator, NotebookPen, X } from 'lucide-react';
 import { Header } from '../components/shared/Header';
 import { Sidebar } from '../components/shared/Sidebar';
@@ -19,7 +19,8 @@ import {
   saveNavigationLocation,
   saveNavigationScrollPosition,
 } from '../router/navigationPersistence';
-import { recordRecentNavigation } from '../router/navigationShortcuts';
+import { getNavigationShortcuts, recordRecentNavigation } from '../router/navigationShortcuts';
+import { ShortcutsHelpDialog } from '../components/shared/ShortcutsHelpDialog';
 import { User } from '../types';
 
 interface MainLayoutProps {
@@ -47,10 +48,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [floatingCalculatorOpen, setFloatingCalculatorOpen] = useState(false);
   const [floatingNotesOpen, setFloatingNotesOpen] = useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const mobileSidebarCloseRef = useRef<HTMLButtonElement>(null);
   const required = NavigationService.getRequiredPermissionGroups(location.pathname);
   // الصلاحيات تُطبَّق دائماً على مستوى المسار: حتى في وضع «فتح كل الصفحات»
   // (الذي يتجاوز الوحدات/المظهر/قيود المنصة) لا يمكن تجاوز صلاحيات المستخدم.
@@ -108,11 +112,51 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   useEffect(() => { setMobileSidebarOpen(false); }, [location.pathname]);
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isTyping = target instanceof HTMLElement
+        && (target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.tagName === 'SELECT'
+          || target.isContentEditable);
+
+      if (event.key === 'F1') {
+        event.preventDefault();
+        // شاشة نقطة البيع تعرض مساعدتها السياقية بنفس الزر.
+        if (!location.pathname.startsWith('/pos')) setShortcutsHelpOpen(true);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b' && !isTyping) {
+        event.preventDefault();
+        setSidebarCollapsed((value) => {
+          const next = !value;
+          try { localStorage.setItem('sidebar_collapsed', String(next)); } catch { /* ignore */ }
+          return next;
+        });
+        return;
+      }
+
+      if (event.altKey && !isTyping && /^[1-9]$/.test(event.key) && currentUser?.id) {
+        const favorites = getNavigationShortcuts(currentUser.id, accessibleNavigationPaths).favorites;
+        const path = favorites[Number(event.key) - 1];
+        if (path) {
+          event.preventDefault();
+          navigate(path);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [accessibleNavigationPaths, currentUser?.id, location.pathname, navigate]);
+
+  useEffect(() => {
     if (!mobileSidebarOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileSidebarOpen(false); };
     window.addEventListener('keydown', closeOnEscape);
+    mobileSidebarCloseRef.current?.focus();
     return () => {
       document.body.style.overflow = previous;
       window.removeEventListener('keydown', closeOnEscape);
@@ -144,6 +188,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             onSwitchUser={onSwitchUser}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
             navigationLayout={navigationLayout}
+            onOpenShortcuts={() => setShortcutsHelpOpen(true)}
           />
         </NavigationGroupsProvider>
 
@@ -155,6 +200,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 <Sidebar
                   collapsed={sidebarCollapsed}
                   onToggleCollapsed={toggleSidebar}
+                  onOpenShortcuts={() => setShortcutsHelpOpen(true)}
                 />
               </NavigationGroupsProvider>
             </div>
@@ -196,7 +242,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               <NotebookPen className="h-3.5 w-3.5" />
             </button>
             <span aria-hidden="true" className="h-3 w-px bg-[var(--win-border)]" />
-            {currentUser && <span className="truncate">{currentUser.fullName}</span>}
+            {currentUser && <span className="max-w-[28vw] truncate sm:max-w-none">{currentUser.fullName}</span>}
             <span className="hidden sm:inline">
               <ConfigText k="shell.brand.name" fallback="سيراميسيس" />
             </span>
@@ -204,7 +250,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </footer>
         </ConfigSection>
         {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-[95] lg:hidden">
+          <div className="mobile-nav-overlay fixed inset-0 z-[95] lg:hidden" role="dialog" aria-modal="true" aria-label="القائمة الرئيسية">
             <button
               type="button"
               aria-label="إغلاق القائمة الجانبية"
@@ -212,15 +258,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               onClick={() => setMobileSidebarOpen(false)}
             />
             <div
-              className="absolute inset-y-0 flex h-full w-[280px] max-w-[85vw] flex-col bg-[var(--win-surface)]"
+              className="mobile-nav-drawer absolute inset-y-0 flex h-full w-[280px] max-w-[85vw] flex-col bg-[var(--win-surface)] shadow-2xl"
               style={{ insetInlineStart: 0, borderInlineEnd: '1px solid var(--win-border)' }}
             >
               <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--win-border)] px-3">
                 <span className="text-[12px] font-semibold">القائمة الرئيسية</span>
                 <button
+                  ref={mobileSidebarCloseRef}
                   type="button"
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="win-btn win-btn--ghost !min-h-7 !px-1.5"
+                  className="win-btn win-btn--ghost !min-h-8 !min-w-8 !px-1.5"
                   aria-label="إغلاق"
                 >
                   <X className="h-4 w-4" />
@@ -231,6 +278,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   <Sidebar
                     mobile
                     onNavigate={() => setMobileSidebarOpen(false)}
+                    onOpenShortcuts={() => setShortcutsHelpOpen(true)}
                   />
                 </NavigationGroupsProvider>
               </div>
@@ -251,6 +299,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             </div>
           </div>
         )}
+        <ShortcutsHelpDialog open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
       </div>
     </LayoutContext.Provider>
   );

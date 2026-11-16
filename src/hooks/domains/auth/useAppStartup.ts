@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { initializeDatabaseAsync } from '../database/useDatabaseAsync';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
 import { scheduleAutomaticBackupChecks } from '../../../services/infrastructure/backup/BackupScheduler';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
+import { LicenseNotificationService } from '../../../services/domains/notifications/LicenseNotificationService';
 import { ReservationService } from '../../../services/domains/sales/ReservationService';
 import { toAppError } from '../../../errors/appError';
 import { ElectronSyncTransport } from '../../../sync/ElectronSyncTransport';
@@ -50,6 +52,12 @@ export function useAppStartup() {
         PermissionService.seed();
         setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
+
+        // Inizializza il Web Worker per le operazioni asincrone sul database
+        // (evita il congelamento dell'interfaccia quando si premono pulsanti).
+        void initializeDatabaseAsync().catch((err) => {
+          console.error('Database worker initialization failed:', err);
+        });
         startupMaintenanceTimer.current = setTimeout(() => {
           startupMaintenanceTimer.current = null;
           scheduleAutomaticBackupChecks(backupTimer);
@@ -57,6 +65,15 @@ export function useAppStartup() {
             new NotificationService().runScheduledChecks();
           } catch (error) {
             console.error('Scheduled notifications could not be refreshed:', error);
+          }
+          // Run license/subscription expiry check daily
+          try {
+            const licenseNotificationService = LicenseNotificationService.getInstance();
+            licenseNotificationService.runDailyExpiryCheck().catch(err => {
+              console.error('Daily license expiry check failed:', err);
+            });
+          } catch (error) {
+            console.error('License notification service could not start:', error);
           }
         }, 1000);
       })
@@ -186,9 +203,19 @@ export function useAppStartup() {
       }
     };
 
-    releaseExpired();
-    const timer = setInterval(releaseExpired, 60_000);
-    return () => clearInterval(timer);
+    // Use requestIdleCallback for non-urgent reservation expiry if available
+    const idleCallback = typeof window.requestIdleCallback !== 'undefined'
+      ? window.requestIdleCallback
+      : null;
+
+    if (idleCallback) {
+      const idleTimer = idleCallback(releaseExpired, { timeout: 60000 }); // 60 seconds
+      return () => window.cancelIdleCallback(idleTimer);
+    } else {
+      releaseExpired();
+      const timer = setInterval(releaseExpired, 60_000);
+      return () => clearInterval(timer);
+    }
   }, [dbReady]);
 
   return {

@@ -1,13 +1,15 @@
 import React from 'react';
-import { FileSpreadsheet, Wallet, TrendingUp, BookOpen, RefreshCw, Calendar, Scale, GitCompare } from 'lucide-react';
+import { FileSpreadsheet, Wallet, TrendingUp, BookOpen, RefreshCw, Calendar, Scale, GitCompare, Users, BarChart3 } from 'lucide-react';
 
-export type FinancialStatementsTab = 'balance' | 'cash' | 'aging' | 'ledger' | 'reconciliation';
+export type FinancialStatementsTab = 'income' | 'balance' | 'cash' | 'aging' | 'subledger' | 'ledger' | 'reconciliation';
 export type AgingType = 'customer' | 'supplier';
 
 const tabs = [
+  ['income', 'قائمة الدخل', BarChart3],
   ['balance', 'الميزانية العمومية', Wallet],
   ['cash', 'التدفقات النقدية', TrendingUp],
   ['aging', 'أعمار الديون', Calendar],
+  ['subledger', 'الأستاذ المساعد', Users],
   ['ledger', 'دفتر الأستاذ', BookOpen],
   ['reconciliation', 'المصالحة', GitCompare],
 ] as const;
@@ -50,7 +52,7 @@ export function FinancialStatementsHeader({
           </div>
           <div>
             <h1 className="text-base font-black">القوائم المالية</h1>
-            <p className="text-xs text-slate-500 font-medium">الميزانية العمومية، التدفقات النقدية، أعمار الديون، ودفتر الأستاذ</p>
+            <p className="text-xs text-slate-500 font-medium">الميزانية العمومية، التدفقات النقدية، أعمار الديون، الأستاذ المساعد، ودفتر الأستاذ</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -63,7 +65,7 @@ export function FinancialStatementsHeader({
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
             />
           )}
-          {(tab === 'cash' || tab === 'ledger') && (
+          {(tab === 'cash' || tab === 'ledger' || tab === 'subledger' || tab === 'income') && (
             <>
               <input
                 type="date"

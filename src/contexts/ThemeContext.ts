@@ -7,6 +7,7 @@ export interface ThemeContextValue {
   settings: SystemSettings;
   mode: ThemeMode;
   resolvedMode: 'light' | 'dark';
+  isDark: boolean;
   setMode: (mode: ThemeMode) => void;
   toggleMode: () => void;
   refresh: () => void;

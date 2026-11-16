@@ -67,6 +67,44 @@ export interface LedgerLine {
   debit: number;
   credit: number;
   balance: number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+}
+
+export interface PartyStatementLine {
+  date: string;
+  entryNumber: string;
+  description: string;
+  referenceType: string;
+  referenceId: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface PartyStatement {
+  partyType: 'CUSTOMER' | 'SUPPLIER';
+  partyId: string;
+  name: string;
+  phone?: string | null;
+  from: string;
+  to: string;
+  opening: number;
+  lines: PartyStatementLine[];
+  closing: number;
+  masterBalance: number;
+  masterDifference: number;
+  masterStatus: 'MATCH' | 'DIFFERENCE' | 'NOT_COMPARABLE';
+  coverageStartDate?: string | null;
+  controlAccountCode: '1103' | '2101';
+  controlBalance: number;
+}
+
+export interface PartyOption {
+  id: string;
+  name: string;
+  phone?: string | null;
+  balance: number;
 }
 
 export interface ReconciliationCheck {
@@ -635,6 +673,119 @@ export class FinancialStatementsService {
     return { rows, bucket };
   }
 
+  // ── Party sub-ledger (AR/AP) ─────────────────────────────────────────────
+  public getSubledgerParties(partyType: 'CUSTOMER' | 'SUPPLIER'): PartyOption[] {
+    this.requireView('finance.view');
+    const actor = AuthService.requireAuth();
+    const table = partyType === 'CUSTOMER' ? 'customers' : 'suppliers';
+    const company = this.branchAccess.companyScope('p.company_id', actor);
+    return this.db.query<PartyOption>(`
+      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) AS balance
+      FROM ${table} p
+      WHERE ${company.clause}
+      ORDER BY p.name
+    `, company.params);
+  }
+
+  /**
+   * A dated customer/supplier statement built from the event log that
+   * accompanies every AR/AP control-account posting. The baseline row covers
+   * legacy balances captured before the event log started.
+   */
+  public getPartyStatement(
+    partyType: 'CUSTOMER' | 'SUPPLIER',
+    partyId: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ): PartyStatement {
+    this.requireView('finance.view');
+    const actor = AuthService.requireAuth();
+    const from = dateFrom || '0000-01-01';
+    const to = dateTo || localDateString();
+    if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || from > to) {
+      throw new Error('Invalid party statement date range.');
+    }
+    const table = partyType === 'CUSTOMER' ? 'customers' : 'suppliers';
+    const company = this.branchAccess.companyScope('p.company_id', actor);
+    const party = this.db.query<{ id: string; name: string; phone: string | null; currentBalance: number }>(`
+      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) AS current_balance
+      FROM ${table} p WHERE p.id = ? AND ${company.clause}
+    `, [partyId, ...company.params])[0];
+    if (!party) throw new Error('الطرف غير موجود ضمن نطاق صلاحيتك.');
+
+    const companyId = company.params[0];
+    const baseline = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(balance, 0) AS balance FROM finance_subledger_party_baselines
+      WHERE company_id = ? AND party_type = ? AND party_id = ?
+    `, [companyId, partyType, partyId])[0]?.balance || 0);
+    const priorMovement = Number(this.db.query<{ amount: number }>(`
+      SELECT COALESCE(SUM(amount), 0) AS amount FROM finance_subledger_events
+      WHERE company_id = ? AND party_type = ? AND party_id = ? AND effective_date < ?
+    `, [companyId, partyType, partyId, from])[0]?.amount || 0);
+    const opening = round2(baseline + priorMovement);
+
+    const events = this.db.query<{
+      date: string;
+      entryNumber: string;
+      description: string;
+      referenceType: string;
+      referenceId: string;
+      amount: number;
+    }>(`
+      SELECT se.effective_date AS date, e.entry_number AS entryNumber, e.description AS description,
+             se.reference_type AS referenceType, se.reference_id AS referenceId, se.amount AS amount
+      FROM finance_subledger_events se
+      JOIN journal_entries e ON e.id = se.journal_entry_id
+      WHERE se.company_id = ? AND se.party_type = ? AND se.party_id = ?
+        AND se.effective_date >= ? AND se.effective_date <= ?
+      ORDER BY se.effective_date ASC, se.rowid ASC
+    `, [companyId, partyType, partyId, from, to]);
+
+    let running = opening;
+    const lines = events.map((event) => {
+      const amount = Number(event.amount) || 0;
+      running = round2(running + amount);
+      return {
+        date: event.date,
+        entryNumber: event.entryNumber,
+        description: event.description,
+        referenceType: event.referenceType,
+        referenceId: event.referenceId,
+        debit: partyType === 'CUSTOMER' ? round2(Math.max(0, amount)) : round2(Math.max(0, -amount)),
+        credit: partyType === 'CUSTOMER' ? round2(Math.max(0, -amount)) : round2(Math.max(0, amount)),
+        balance: running,
+      };
+    });
+
+    const controlAccountCode: '1103' | '2101' = partyType === 'CUSTOMER' ? '1103' : '2101';
+    const controlScope = this.branchAccess.companyScope('e.company_id', actor);
+    const signed = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+      FROM journal_entry_lines l
+      JOIN journal_entries e ON e.id = l.entry_id
+      JOIN chart_of_accounts a ON a.id = l.account_id
+      WHERE e.is_posted = 1 AND a.code = ? AND e.date <= ? AND ${controlScope.clause}
+    `, [controlAccountCode, to, ...controlScope.params])[0]?.balance || 0);
+    const controlBalance = round2(partyType === 'CUSTOMER' ? signed : -signed);
+
+    const coverageStartDate = this.db.query<{ coverageStartDate: string }>(`
+      SELECT coverage_start_date AS coverageStartDate FROM finance_subledger_coverage WHERE id = 1
+    `)[0]?.coverageStartDate ?? null;
+    const closing = round2(running);
+    const masterBalance = round2(Number(party.currentBalance) || 0);
+    const isCurrentAsOf = to >= localDateString();
+    const masterDifference = round2(closing - masterBalance);
+    const masterStatus: PartyStatement['masterStatus'] = !isCurrentAsOf
+      ? 'NOT_COMPARABLE'
+      : Math.abs(masterDifference) < 0.01 ? 'MATCH' : 'DIFFERENCE';
+
+    return {
+      partyType, partyId, name: party.name, phone: party.phone,
+      from, to, opening, lines, closing, masterBalance, masterDifference, masterStatus,
+      coverageStartDate, controlAccountCode, controlBalance,
+    };
+  }
+
   // ── General ledger ───────────────────────────────────────────────────────
   public getAccountsForLedger(): Array<{ id: string; code: string; name: string; type: string }> {
     this.requireView('finance.view');
@@ -662,7 +813,8 @@ export class FinancialStatementsService {
 
     const rows = this.db.query<any>(`
       SELECT e.date, e.entry_number AS entryNumber, e.description,
-             l.debit, l.credit, l.description AS lineDescription
+             l.debit, l.credit, l.description AS lineDescription,
+             e.reference_type AS referenceType, e.reference_id AS referenceId
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}
       ORDER BY e.date ASC, e.created_at ASC
@@ -678,6 +830,8 @@ export class FinancialStatementsService {
         debit: round2(row.debit || 0),
         credit: round2(row.credit || 0),
         balance: running,
+        referenceType: row.referenceType || null,
+        referenceId: row.referenceId || null,
       };
     });
 

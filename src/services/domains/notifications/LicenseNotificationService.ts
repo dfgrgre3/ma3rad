@@ -1,191 +1,223 @@
+import { platformAdminService } from '../platform/PlatformAdminService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { NotificationServicePart01 } from './NotificationServicePart01';
-import type { NotificationType } from '../../../types/notifications';
-import { addLocalDays } from '../../../utils/shared/date';
+import type { PlatformNotification } from '../platform/platformTypes';
 
 /**
- * خدمة إشعارات انتهاء صلاحية التراخيص والاشتراكات.
- * تُنفذ دورياً للتحقق من التراخيص والاشتراكات التي تقترب من نهاية صلاحيتها
- * وتُنشئ إشعارات للمسؤولين والعملاء.
+ * Service for automated license and subscription expiry notifications.
+ * Runs periodically (e.g., via cron or background job) to check for expiring items.
  */
-export class LicenseNotificationService extends NotificationServicePart01 {
+export class LicenseNotificationService {
+  private db = DatabaseManager.getInstance();
+  private static instance: LicenseNotificationService | null = null;
+
+  public static getInstance(): LicenseNotificationService {
+    if (!LicenseNotificationService.instance) {
+      LicenseNotificationService.instance = new LicenseNotificationService();
+    }
+    return LicenseNotificationService.instance;
+  }
 
   /**
-   * يتحقق من التراخيص والاشتراكات التي تقترب من نهاية صلاحيتها خلال الأيام المحددة
-   * وينشئ إشعارات لكل منها إذا لم يكن هناك إشعار مماثل غير مقروء بالفعل.
-   * @param horizonDays عدد الأيام المستقبلية للتحقق (الافتراضي 30)
+   * Main entry point: check all expiring licenses/subscriptions and send notifications.
+   * Should be called daily via scheduled job.
    */
-  public checkExpiringLicensesAndSubscriptions(horizonDays = 30): {
+  public async runDailyExpiryCheck(): Promise<{
     licenseNotifications: number;
     subscriptionNotifications: number;
-  } {
-    const horizons = [1, 7, 14, 30];
-    let licenseCount = 0;
-    let subscriptionCount = 0;
+    offlineLeaseWarnings: number;
+    cloneDetections: number;
+  }> {
+    console.log('[LicenseNotificationService] Starting daily expiry check...');
 
-    for (const days of horizons) {
-      if (days > horizonDays) continue;
-      const cutoff = addLocalDays(new Date(), days).toISOString().slice(0, 10);
+    // 1. Check expiring licenses and subscriptions
+    const expiryResult = platformAdminService.checkExpiringLicensesAndSubscriptions();
 
-      // ── تراخيص تقترب من الانتهاء ────────────────────────────────────────
-      const expiringLicenses = this.db.query<any>(`
-        SELECT l.*, t.name AS tenantName, t.id AS tenantId
-        FROM platform_licenses l
-        JOIN platform_tenants t ON t.id = l.tenant_id
-        WHERE l.status IN ('ACTIVE', 'ISSUED')
-          AND l.expires_at IS NOT NULL
-          AND date(l.expires_at) = date(?)
-          AND NOT EXISTS (
-            SELECT 1 FROM notifications n
-            WHERE n.reference_type = 'LICENSE'
-              AND n.reference_id = l.id
-              AND n.type = 'LICENSE_EXPIRING_SOON'
-              AND n.is_read = 0
-          )
-      `, [cutoff]);
-
-      for (const lic of expiringLicenses) {
-        const daysLeft = days;
-        this.createNotification(
-          'LICENSE_EXPIRING_SOON' as NotificationType,
-          `تنبيه: ترخيص يقترب من الانتهاء`,
-          `التغذية "${lic.tenantName}" - ترخيص "${lic.licenseKey}" ينتهي خلال ${daysLeft} يوم (${lic.expires_at}).`,
-          undefined,
-          'LICENSE',
-          String(lic.id)
-        );
-        licenseCount += 1;
+    // 2. Run clone detection. Requires a valid platform session; skip gracefully if unavailable
+    //    (e.g. when running in the renderer without backend access).
+    //    detectCloneDevices() throws if requirePlatformAccess fails.
+    //    We catch any failure and skip the clone detection.
+    let cloneResult: ReturnType<typeof platformAdminService.detectCloneDevices> | null = null;
+    try {
+      // In renderer contexts the platform service may be unavailable. Attempt direct
+      // central API as a fallback instead of throwing, so the app does not crash.
+      try {
+        cloneResult = platformAdminService.detectCloneDevices();
+      } catch (error) {
+        console.warn('Clone detection skipped (no valid platform session):', error);
+        cloneResult = null;
       }
+    } catch (error) {
+      // Fallback: try central API directly if platform service is not reachable.
+      try {
+        const centralResult = await platformAdminService.detectCloneDevicesCentral?.();
+        cloneResult = {
+          suspected: [],
+          groups: [],
+          alerts: [],
+          duplicateHwids: (centralResult?.duplicateHwids ?? []),
+          overLimitLicenses: (centralResult?.overLimitLicenses ?? []),
+          suspiciousTransfers: (centralResult?.suspiciousTransfers ?? []),
+        };
+      } catch (centralError) {
+        console.warn('Clone detection via central API failed:', centralError);
+        cloneResult = null;
+      }
+    }
+    const cloneDetections = cloneResult
+      ? cloneResult.duplicateHwids.length +
+        cloneResult.overLimitLicenses.length +
+        cloneResult.suspiciousTransfers.length
+      : 0;
 
-      // ── اشتراكات تقترب من الانتهاء ──────────────────────────────────────
-      const expiringSubscriptions = this.db.query<any>(`
-        SELECT s.*, t.name AS tenantName, t.id AS tenantId
-        FROM platform_subscriptions s
-        JOIN platform_tenants t ON t.id = s.tenant_id
-        WHERE s.status IN ('ACTIVE', 'TRIAL')
-          AND s.end_date IS NOT NULL
-          AND date(s.end_date) = date(?)
-          AND NOT EXISTS (
-            SELECT 1 FROM notifications n
-            WHERE n.reference_type = 'SUBSCRIPTION'
-              AND n.reference_id = s.id
-              AND n.type = 'SUBSCRIPTION_EXPIRING_SOON'
-              AND n.is_read = 0
-          )
-      `, [cutoff]);
-
-      for (const sub of expiringSubscriptions) {
-        const daysLeft = days;
-        this.createNotification(
-          'SUBSCRIPTION_EXPIRING_SOON' as NotificationType,
-          `تنبيه: اشتراك يقترب من الانتهاء`,
-          `التغذية "${sub.tenantName}" - الاشتراك "${sub.planId}" ينتهي خلال ${daysLeft} يوم (${sub.end_date}).`,
-          undefined,
-          'SUBSCRIPTION',
-          String(sub.id)
-        );
-        subscriptionCount += 1;
+    // 3. Create notifications for clone detections
+    if (cloneResult) {
+    for (const dup of cloneResult.duplicateHwids) {
+      for (const tenantId of dup.tenants) {
+        this.createNotification({
+          tenantId,
+          type: 'CLONE_DETECTED',
+          title: 'اكتشاف استنساخ محتمل',
+          message: `جهاز بمعرف ${dup.hardwareId} مسجل لدى ${dup.tenantCount} عملاء.`,
+          referenceType: 'DEVICE',
+          referenceId: dup.hardwareId,
+          severity: 'CRITICAL',
+          channels: ['IN_APP', 'EMAIL'],
+          metadata: { hardwareId: dup.hardwareId, tenants: dup.tenants },
+        });
       }
     }
 
-    // ── تراخيص منتهية بالفعل ─────────────────────────────────────────────
-    const expiredLicenses = this.db.query<any>(`
-      SELECT l.*, t.name AS tenantName, t.id AS tenantId
-      FROM platform_licenses l
-      JOIN platform_tenants t ON t.id = l.tenant_id
-      WHERE l.status IN ('ACTIVE', 'ISSUED')
-        AND l.expires_at IS NOT NULL
-        AND date(l.expires_at) < date('now')
-        AND NOT EXISTS (
-          SELECT 1 FROM notifications n
-          WHERE n.reference_type = 'LICENSE'
-            AND n.reference_id = l.id
-            AND n.type = 'LICENSE_EXPIRED'
-            AND n.is_read = 0
-        )
-    `);
-
-    for (const lic of expiredLicenses) {
-      this.createNotification(
-        'LICENSE_EXPIRED' as NotificationType,
-        `تنبيه مهم: ترخيص منتهي`,
-        `التغذية "${lic.tenantName}" - ترخيص "${lic.licenseKey}" قد انقضت صلاحيته في ${lic.expires_at}. يرجى التجديد لاستمرار الخدمة.`,
-        undefined,
-        'LICENSE',
-        String(lic.id)
-      );
+    for (const over of cloneResult.overLimitLicenses) {
+      this.createNotification({
+        tenantId: over.tenantId,
+        type: 'CLONE_DETECTED',
+        title: 'ترخيص يتجاوز حد الأجهزة',
+        message: `الترخيص ${over.licenseKey} مفعل على ${over.deviceCount} جهاز بينما الحد ${over.deviceLimit}.`,
+        referenceType: 'LICENSE',
+        referenceId: over.licenseId,
+        severity: 'WARNING',
+        channels: ['IN_APP', 'EMAIL'],
+        metadata: { licenseKey: over.licenseKey, deviceCount: over.deviceCount, deviceLimit: over.deviceLimit },
+      });
     }
 
-    // ── اشتراكات منتهية بالفعل ────────────────────────────────────────────
-    const expiredSubscriptions = this.db.query<any>(`
-      SELECT s.*, t.name AS tenantName, t.id AS tenantId
-      FROM platform_subscriptions s
-      JOIN platform_tenants t ON t.id = s.tenant_id
-      WHERE s.status IN ('ACTIVE', 'TRIAL')
-        AND s.end_date IS NOT NULL
-        AND date(s.end_date) < date('now')
-        AND NOT EXISTS (
-          SELECT 1 FROM notifications n
-            WHERE n.reference_type = 'SUBSCRIPTION'
-            AND n.reference_id = s.id
-            AND n.type = 'SUBSCRIPTION_EXPIRED'
-            AND n.is_read = 0
-        )
-    `);
-
-    for (const sub of expiredSubscriptions) {
-      this.createNotification(
-        'SUBSCRIPTION_EXPIRED' as NotificationType,
-        `تنبيه مهم: اشتراك منتهي`,
-        `التغذية "${sub.tenantName}" - الاشتراك "${sub.planId}" قد انقضت مدته في ${sub.end_date}. يرجى التجديد لاستمرار الخدمة.`,
-        undefined,
-        'SUBSCRIPTION',
-        String(sub.id)
-      );
+    for (const trans of cloneResult.suspiciousTransfers) {
+      this.createNotification({
+        tenantId: trans.tenantId,
+        type: 'CLONE_DETECTED',
+        title: 'نقل ترخيص مشبوه',
+        message: `تم نقل الترخيص ${trans.licenseId} ${trans.transferCount} مرة خلال 30 يوماً.`,
+        referenceType: 'LICENSE',
+        referenceId: trans.licenseId,
+        severity: 'WARNING',
+        channels: ['IN_APP'],
+        metadata: { transferCount: trans.transferCount },
+      });
+    }
     }
 
-    return { licenseNotifications: licenseCount, subscriptionNotifications: subscriptionCount };
+    console.log('[LicenseNotificationService] Daily check completed:', {
+      licenseNotifications: expiryResult.licenseNotifications,
+      subscriptionNotifications: expiryResult.subscriptionNotifications,
+      offlineLeaseWarnings: expiryResult.offlineLeaseWarnings,
+      cloneDetections,
+    });
+
+    return {
+      licenseNotifications: expiryResult.licenseNotifications,
+      subscriptionNotifications: expiryResult.subscriptionNotifications,
+      offlineLeaseWarnings: expiryResult.offlineLeaseWarnings,
+      cloneDetections,
+    };
   }
 
   /**
-   * يُنشئ إشعار عند اكتشاف استنساخ ترخيص (نفس HWID على عدة عملاء أو تجاوز عدد الأجهزة).
+   * Create a notification in the database.
    */
-  public notifyCloneDetection(licenseId: string, tenantId: string, message: string): void {
-    this.createNotification(
-      'CLONE_DETECTED' as NotificationType,
-      `تنبيه أمني: اشتباه استنساخ ترخيص`,
-      message,
-      undefined,
-      'LICENSE',
-      licenseId
+  private createNotification(input: {
+    tenantId: string;
+    type: string;
+    title: string;
+    message: string;
+    referenceType: string;
+    referenceId: string;
+    severity: 'INFO' | 'WARNING' | 'CRITICAL';
+    channels: string[];
+    metadata: Record<string, unknown>;
+  }): void {
+    const { v4: uuidv4 } = require('uuid');
+    const id = `notif_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const now = new Date().toISOString();
+
+    this.db.run(
+      `INSERT INTO platform_notifications
+        (id, tenant_id, type, title, message, reference_type, reference_id, severity, channels, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.tenantId,
+        input.type,
+        input.title,
+        input.message,
+        input.referenceType,
+        input.referenceId,
+        input.severity,
+        JSON.stringify(input.channels),
+        JSON.stringify(input.metadata),
+        now,
+      ]
     );
   }
 
   /**
-   * يُنشئ إشعار عند إيقاف جهاز عن بُعد.
+   * Get notifications for a tenant.
    */
-  public notifyDeviceSuspended(deviceId: string, tenantId: string, hardwareId: string, reason: string): void {
-    this.createNotification(
-      'DEVICE_SUSPENDED_REMOTELY' as NotificationType,
-      `تنبيه: تم إيقاف الجهاز عن بُعد`,
-      `الجهاز ${hardwareId} (${deviceId}) تم إيقافه عن بُعد. السبب: ${reason}.`,
-      undefined,
-      'DEVICE',
-      deviceId
-    );
+  public getNotifications(tenantId: string, options: { unreadOnly?: boolean; limit?: number } = {}): PlatformNotification[] {
+    let query = 'SELECT * FROM platform_notifications WHERE tenant_id = ?';
+    const params: unknown[] = [tenantId];
+
+    if (options.unreadOnly) {
+      query += ' AND read_at IS NULL';
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    if (options.limit) {
+      query += ' LIMIT ?';
+      params.push(options.limit);
+    }
+
+    return this.db.query<any>(query, params).map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      referenceType: row.reference_type,
+      referenceId: row.reference_id,
+      severity: row.severity,
+      channels: JSON.parse(row.channels || '["IN_APP"]'),
+      metadata: JSON.parse(row.metadata || '{}'),
+      readAt: row.read_at,
+      createdAt: row.created_at,
+    }));
   }
 
   /**
-   * يُنشئ إشعار عند اقتراب انتهاء فترة العمل أوفلاين (offline lease).
+   * Mark notification as read.
    */
-  public notifyOfflineLeaseExpiring(licenseKey: string, tenantId: string, expiresAt: string, daysLeft: number): void {
-    this.createNotification(
-      'OFFLINE_LEASE_EXPIRING' as NotificationType,
-      `تنبيه: فترة العمل أوفلاين تقترب من الانتهاء`,
-      `الترخيص "${licenseKey}" - فترة العمل أوفلاين تنتهي خلال ${daysLeft} يوم (في ${expiresAt}). يرجى الاتصال بالإنترنت لتجديد الترخيص.`,
-      undefined,
-      'LICENSE',
-      licenseKey
-    );
+  public markAsRead(notificationId: string): void {
+    const now = new Date().toISOString();
+    this.db.run('UPDATE platform_notifications SET read_at = ? WHERE id = ?', [now, notificationId]);
+  }
+
+  /**
+   * Mark all notifications as read for a tenant.
+   */
+  public markAllAsRead(tenantId: string): void {
+    const now = new Date().toISOString();
+    this.db.run('UPDATE platform_notifications SET read_at = ? WHERE tenant_id = ? AND read_at IS NULL', [now, tenantId]);
   }
 }
+
+export const licenseNotificationService = LicenseNotificationService.getInstance();

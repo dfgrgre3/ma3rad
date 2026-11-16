@@ -118,13 +118,13 @@ function resolveCashRegister(
   dto: CreateSaleDTO,
   actor: any,
   tenderPayments: ReturnType<typeof resolvePayments>
-): { branchId: string; cashRegisterId: string } {
+): { branchId: string; cashRegisterId: string; shiftId: string | undefined } {
   const branchId = ctx.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
   const requiresShift = tenderPayments.some((payment) => payment.method === 'CASH' && payment.amount > 0);
   const shift = new CashShiftPolicyService().resolve(branchId, { shiftId: dto.shiftId, required: requiresShift });
-  dto.shiftId = shift.shiftId;
+  // Do NOT mutate dto — return shiftId explicitly to avoid side effects.
   const cashRegisterId = shift.registerId || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
-  return { branchId, cashRegisterId };
+  return { branchId, cashRegisterId, shiftId: shift.shiftId };
 }
 
 function validateItemQuantity(quantityM2: number): void {
@@ -674,11 +674,27 @@ function resolvePayments(dto: CreateSaleDTO): { method: PaymentType; amount: num
   return [];
 }
 
+/** Cap tender payments at a maximum total (e.g., invoice totalAmount). Excess is changeDue. */
+function capPayments(payments: ReturnType<typeof resolvePayments>, maxTotal: number): ReturnType<typeof resolvePayments> {
+  const capped: ReturnType<typeof resolvePayments> = [];
+  let remaining = maxTotal;
+  for (const p of payments) {
+    if (remaining <= 0) break;
+    const cappedAmount = Math.min(p.amount, remaining);
+    if (cappedAmount > 0) {
+      capped.push({ ...p, amount: round2(cappedAmount) });
+      remaining = round2(remaining - cappedAmount);
+    }
+  }
+  return capped;
+}
+
 function updateCustomerAndCash(
   sqliteDb: any,
   dto: CreateSaleDTO,
   totals: ReturnType<typeof computeSaleTotals>,
-  cashRegisterId: string
+  cashRegisterId: string,
+  shiftId: string | undefined
 ): void {
   sqliteDb.run(`
     UPDATE customers SET
@@ -689,28 +705,29 @@ function updateCustomerAndCash(
   `, [totals.totalAmount, totals.remainingAmount, dto.customerId]);
 
   const payments = resolvePayments(dto);
-  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-  if (totalPaid <= 0) return;
+  // Use capped payments for cash register / shift / ledger so physical cash matches accounting.
+  const cappedPayments = capPayments(payments, totals.totalAmount);
+  if (cappedPayments.length === 0) return;
 
-  // Cash portion goes to the cash register drawer.
-  const cashPortion = payments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
+  // Cash portion goes to the cash register drawer (net of changeDue).
+  const cashPortion = cappedPayments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
   if (cashPortion > 0) {
     sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [cashPortion, cashRegisterId]);
   }
-  for (const payment of payments.filter((row) => row.method === 'BANK_TRANSFER')) {
+  for (const payment of cappedPayments.filter((row) => row.method === 'BANK_TRANSFER')) {
     const bank = getActiveBankAccount(sqliteDb, payment.bankAccountId);
     updateBankBalance(sqliteDb, bank.id, payment.amount);
   }
 
-  if (!dto.shiftId) return;
+  if (!shiftId) return;
 
-  // Aggregate per method into the shift buckets.
-  const cashTotal = payments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
-  const cardTotal = payments.filter((p) => p.method === 'CARD').reduce((s, p) => s + p.amount, 0);
-  const transferTotal = payments.filter((p) => p.method === 'BANK_TRANSFER' || p.method === 'CHEQUE').reduce((s, p) => s + p.amount, 0);
-  if (cashTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = total_sales_cash + ? WHERE id = ?`, [cashTotal, dto.shiftId]);
-  if (cardTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_card = total_sales_card + ? WHERE id = ?`, [cardTotal, dto.shiftId]);
-  if (transferTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_transfer = total_sales_transfer + ? WHERE id = ?`, [transferTotal, dto.shiftId]);
+  // Aggregate per method into the shift buckets (net of changeDue).
+  const cashTotal = cappedPayments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
+  const cardTotal = cappedPayments.filter((p) => p.method === 'CARD').reduce((s, p) => s + p.amount, 0);
+  const transferTotal = cappedPayments.filter((p) => p.method === 'BANK_TRANSFER' || p.method === 'CHEQUE').reduce((s, p) => s + p.amount, 0);
+  if (cashTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = total_sales_cash + ? WHERE id = ?`, [cashTotal, shiftId]);
+  if (cardTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_card = total_sales_card + ? WHERE id = ?`, [cardTotal, shiftId]);
+  if (transferTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_transfer = total_sales_transfer + ? WHERE id = ?`, [transferTotal, shiftId]);
 }
 
 function buildLedgerEntries(
@@ -721,7 +738,10 @@ function buildLedgerEntries(
   serviceCost = 0
 ): any[] {
   const payments = resolvePayments(dto);
-  const paymentLines = payments.map((p) => ({
+  // Cap total tender at the invoice total to keep the ledger balanced.
+  // Any excess (changeDue) is a physical cash flow, not a ledger entry.
+  const cappedPayments = capPayments(payments, totals.totalAmount);
+  const paymentLines = cappedPayments.map((p) => ({
     accountCode: p.method === 'BANK_TRANSFER'
       ? getActiveBankAccount(sqliteDb, p.bankAccountId).glAccountCode
       : paymentAccountCode(p.method),
@@ -791,7 +811,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   PermissionService.require(actor, 'ui.sales.invoices.create');
   CentralUsageLimitService.assertWithin('maxInvoices');
   WarehouseTypePolicy.assertSellable(ctx.db, dto.warehouseId, 'البيع');
-  const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor, tenderPayments);
+  const { branchId, cashRegisterId, shiftId } = resolveCashRegister(ctx, dto, actor, tenderPayments);
   const companyId = ctx.db.query<{ companyId: string | null }>(
     `SELECT b.company_id AS companyId FROM branches b WHERE b.id = ?`,
     [branchId]
@@ -806,13 +826,18 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     validatePromotionEligibility(sqliteDb, dto, preparedItems);
     const headerDiscount = dto.discountAmount || 0;
+    // Compute tax on the backend from taxPercentage and taxable base (subtotal - headerDiscount).
+    // Do NOT trust dto.taxAmount from the frontend — it can be manipulated.
+    const subtotal = round2(preparedItems.reduce((sum, p) => sum + p.totalPrice, 0));
+    const taxableBase = round2(Math.max(0, subtotal - headerDiscount));
+    const computedTaxAmount = round2(taxableBase * (dto.taxPercentage || 0) / 100);
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({
         lineTotal: p.totalPrice,
         lineCost: p.totalCost,
       })),
       discountAmount: headerDiscount,
-      taxAmount: dto.taxAmount || 0,
+      taxAmount: computedTaxAmount,
       shippingCost: dto.shippingCost || 0,
       extraFees: dto.extraFees || 0,
       paidAmount: dto.paidAmount,
@@ -844,7 +869,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
     `, [
-      invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, dto.shiftId || null,
+      invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, shiftId || null,
       dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
       totals.shippingCost, totals.extraFees, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
@@ -852,7 +877,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     ]);
 
     insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod, allowNegativeStock);
-    updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
+    updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId, shiftId);
 
     if (dto.loyaltyRedemption) {
       const { points, discountAmount } = dto.loyaltyRedemption;

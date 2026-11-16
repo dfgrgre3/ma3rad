@@ -3,6 +3,7 @@ import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import { InboxRepository } from './InboxRepository.ts';
 import { OutboxRepository } from './OutboxRepository.ts';
 import { SyncPolicyService } from './SyncPolicyService.ts';
+import { PendingChangeService } from './PendingChangeService.ts';
 import { BusinessRecordSyncService } from './BusinessRecordSyncService.ts';
 import type { SyncEvent, SyncOperation } from '../types/sync/index.ts';
 import type { EventDispatcher } from './PullChangesService.ts';
@@ -132,6 +133,7 @@ export class MasterDataSyncService {
   private readonly inbox: InboxRepository;
   private readonly policies: SyncPolicyService;
   private readonly businessRecords: BusinessRecordSyncService;
+  private readonly pending: PendingChangeService;
   private readonly dbManager: DatabaseManager;
 
   constructor(
@@ -143,6 +145,7 @@ export class MasterDataSyncService {
     this.inbox = new InboxRepository(dbManager);
     this.policies = new SyncPolicyService(dbManager);
     this.businessRecords = new BusinessRecordSyncService(dbManager);
+    this.pending = new PendingChangeService(dbManager);
     if (identity) MasterDataSyncService.configure(identity);
   }
 
@@ -275,7 +278,8 @@ export class MasterDataSyncService {
     transaction: DatabaseManager,
     entityType: MasterEntityType,
     entityId: string,
-    operationType: SyncOperation
+    operationType: SyncOperation,
+    options: { bypassApproval?: boolean } = {}
   ): string | null {
     const identity = MasterDataSyncService.configuredIdentity;
     if (!identity) return null;
@@ -287,6 +291,14 @@ export class MasterDataSyncService {
 
     const spec = ENTITY_SPECS[entityType];
     if (operationType === 'DELETE') {
+      const entityVersion = this.nextLocalVersion(transaction, identity, entityType, entityId);
+      const payload = { deleted: true };
+      if (!options.bypassApproval && this.pending.isApprovalRequired()) {
+        return this.pending.stage({
+          transaction, entityType, entityId, operationType, entityVersion,
+          dataScope: policy.dataScope, payload,
+        });
+      }
       return this.outbox.enqueue({
         tenantId: identity.tenantId,
         branchId: identity.branchId,
@@ -294,9 +306,9 @@ export class MasterDataSyncService {
         entityType,
         entityId,
         operationType,
-        entityVersion: this.nextLocalVersion(transaction, identity, entityType, entityId),
+        entityVersion,
         dataScope: policy.dataScope,
-        payload: { deleted: true },
+        payload,
       });
     }
 
@@ -307,6 +319,13 @@ export class MasterDataSyncService {
     }
 
     const entityVersion = this.nextLocalVersion(transaction, identity, entityType, entityId);
+    const payload = { row };
+    if (!options.bypassApproval && this.pending.isApprovalRequired()) {
+      return this.pending.stage({
+        transaction, entityType, entityId, operationType, entityVersion,
+        dataScope: policy.dataScope, payload,
+      });
+    }
     return this.outbox.enqueue({
       tenantId: identity.tenantId,
       branchId: identity.branchId,
@@ -316,8 +335,19 @@ export class MasterDataSyncService {
       operationType,
       entityVersion,
       dataScope: policy.dataScope,
-      payload: { row },
+      payload,
     });
+  }
+
+  /** Re-capture master data after a pending change is approved, bypassing the gate. */
+  captureApproved(
+    transaction: DatabaseManager,
+    entityType: string,
+    entityId: string,
+    operationType: SyncOperation = 'UPSERT'
+  ): string | null {
+    if (!isMasterEntityType(entityType)) return null;
+    return this.capture(transaction, entityType, entityId, operationType, { bypassApproval: true });
   }
 
   registerHandlers(dispatcher: EventDispatcher): void {

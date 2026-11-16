@@ -652,6 +652,9 @@ const PAGES: PageSpec[] = [
     actions: ['view', 'delete', 'purge', 'backup', 'verify', 'audit_log'] },
   { key: 'sync_conflicts', label: 'تعارضات مزامنة الفروع', module: 'ADMIN', route: '/admin/sync-conflicts', legacyView: 'admin.view',
     actions: [...CONFIG, 'manage', 'sync', 'resolve', 'print'] },
+  { key: 'sync_center', label: 'مركز مزامنة الفروع والحسابات', module: 'ADMIN', route: '/admin/sync', legacyView: 'admin.view',
+    actions: [...CONFIG, 'manage', 'sync', 'link', 'approve', 'reject', 'revoke', 'print'],
+    sections: [section('status', 'حالة المزامنة'), section('links', 'الحسابات المرتبطة'), section('approvals', 'اعتماد تعديلات الفروع')] },
   { key: 'license', label: 'ترخيص المنصة المركزية', module: 'ADMIN', route: '/central-activation', legacyView: 'admin.license.manage',
     actions: [...CONFIG, 'manage', 'activate', 'deactivate', 'sync', 'verify'] },
 

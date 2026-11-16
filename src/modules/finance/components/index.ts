@@ -7,4 +7,6 @@ export * from '@/components/reports/financial-statements/CashFlowPanel';
 export * from '@/components/reports/financial-statements/format';
 export * from '@/components/reports/financial-statements/FinancialStatementsHeader';
 export * from '@/components/reports/financial-statements/GeneralLedgerPanel';
+export * from '@/components/reports/financial-statements/IncomeStatementPanel';
+export * from '@/components/reports/financial-statements/SubledgerPanel';
 export * from '@/components/reports/financial-statements/ReconciliationPanel';

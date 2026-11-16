@@ -172,7 +172,7 @@ function DriverLeaderboard({ stats }: { stats: FleetStats['driverStats'] }) {
 }
 
 export const FleetDashboardPage: React.FC = () => {
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const service = useMemo(() => new OperationsService(), []);
   const navigate = useNavigate();
@@ -197,10 +197,10 @@ export const FleetDashboardPage: React.FC = () => {
   useEffect(() => { if (canView) load(); }, [canView, load]);
 
   useEffect(() => {
-    if (!refreshCtx || !canView) return;
+    if (refreshToken === undefined || !canView) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx, canView, load]);
+  }, [refreshToken, canView, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

@@ -11,6 +11,8 @@ export interface DataTableColumn<T> {
   /** Optional numeric sizing hint; columns without one share the remaining space. */
   width?: number | string;
   align?: 'start' | 'center' | 'end';
+  /** Hide this column below the given breakpoint on small screens. */
+  hideBelow?: 'sm' | 'md' | 'lg';
 }
 
 export interface DataTableProps<T> {
@@ -41,6 +43,12 @@ const ALIGN_CLASS = {
   start: 'text-start',
   center: 'text-center',
   end: 'text-end',
+} as const;
+
+const HIDE_BELOW_CLASS = {
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+  lg: 'hidden lg:table-cell',
 } as const;
 
 export function DataTable<T>({
@@ -87,7 +95,7 @@ export function DataTable<T>({
                 <th
                   key={column.key}
                   scope="col"
-                  className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.headerClassName ?? ''}`}
+                  className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.hideBelow ? HIDE_BELOW_CLASS[column.hideBelow] : ''} ${column.headerClassName ?? ''}`}
                   style={column.width ? { width: column.width } : undefined}
                 >
                   {column.header}
@@ -101,7 +109,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.className ?? ''}`}
+                    className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.hideBelow ? HIDE_BELOW_CLASS[column.hideBelow] : ''} ${column.className ?? ''}`}
                   >
                     {column.render(row, index)}
                   </td>

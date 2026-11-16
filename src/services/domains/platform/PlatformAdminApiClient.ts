@@ -1,5 +1,5 @@
 // Adapter connecting Super Admin operations to the central server via the Electron bridge (electron/centralApi.js).
-import type { PlatformTenant, PlatformPlan, PlatformTenantInput } from './platformTypes';
+import type { PlatformTenant, PlatformPlan, PlatformTenantInput, CentralLicenseIssueRequest, CentralLicenseIssueResponse } from './platformTypes';
 
 export type CentralRequest = {
   path: string;
@@ -282,6 +282,18 @@ export class PlatformAdminApiClient {
       path: `/api/v1/admin/licenses/${encodeURIComponent(licenseId)}/revoke`,
       method: 'POST',
       body: { reason },
+    });
+  }
+
+  /**
+   * Issue a new license via central server (Ed25519 signed).
+   * This is the production path - local issuance is dev-only.
+   */
+  async issueLicense(input: CentralLicenseIssueRequest): Promise<CentralLicenseIssueResponse> {
+    return this.request<CentralLicenseIssueResponse>({
+      path: '/api/v1/admin/licenses/issue',
+      method: 'POST',
+      body: input,
     });
   }
 

@@ -49,7 +49,7 @@ type PromiseRow = {
 };
 
 export const DebtsDashboardPage: React.FC = () => {
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const debtService = useMemo(() => new DebtService(), []);
@@ -449,10 +449,10 @@ export const DebtsDashboardPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx, load]);
+  }, [refreshToken, load]);
 
   const openPayment = (d: DebtRow) => {
     setTarget(d);

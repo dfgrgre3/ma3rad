@@ -1,4 +1,23 @@
 export type PlatformTenantStatus = 'TRIAL' | 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+
+export const PLATFORM_TENANT_STATUS_LABELS: Record<PlatformTenantStatus, string> = {
+  TRIAL: 'تجريبي',
+  ACTIVE: 'نشط',
+  SUSPENDED: 'موقوف',
+  EXPIRED: 'منتهي',
+  CANCELLED: 'ملغي',
+};
+
+export type PlatformInvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID';
+
+export const PLATFORM_INVOICE_STATUS_LABELS: Record<PlatformInvoiceStatus, string> = {
+  DRAFT: 'مسودة',
+  SENT: 'مرسلة',
+  PARTIAL: 'مدفوعة جزئياً',
+  PAID: 'مدفوعة',
+  OVERDUE: 'متأخرة',
+  VOID: 'ملغاة',
+};
 export type PlatformLicenseStatus = 'ISSUED' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'EXPIRED';
 export type PlatformSubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED';
 export type PlatformInvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID';
@@ -165,6 +184,8 @@ export interface PlatformPlanInput {
   features?: string[];
   permissions?: string[];
   isActive?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
   /** Default offline grace period in days for licenses issued under this plan. */
   offlineGracePeriodDays?: number;
   /** إذا كانت الخطة تدعم نسخ الأسعار مع تواريخ سريان. */
@@ -323,7 +344,8 @@ export interface PlatformSubscription {
   trialEndsAt?: string | null;
   /** هل هذه فترة تجريبية مجانية. */
   isTrial?: boolean;
-  createdAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlatformAlert {
@@ -352,29 +374,34 @@ export interface PlatformModule {
   isEnabled: boolean;
   minPlanCode?: string | null;
   sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlatformFeatureFlag {
   id: string;
-  code: string;
+  key: string;
   name: string;
   description?: string | null;
-  category?: string | null;
-  isEnabled: boolean;
-  rolloutPercent: number;
-  isStagingOnly?: boolean;
-  minPlanTier?: string | null;
-  overridesCount?: number;
+  defaultEnabled: boolean;
+  isActive: boolean;
+  rolloutPercentage: number;
+  variant?: string | null;
+  targetPlans: string[];
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlatformFeatureOverride {
   id: string;
   featureId: string;
-  targetType: 'TENANT' | 'PLAN' | 'STAGING_GROUP';
-  targetId: string;
-  targetName?: string | null;
-  isEnabled: boolean;
-  customRolloutPercent?: number | null;
+  tenantId?: string | null;
+  enabled: boolean;
+  rolloutPercentage: number;
+  variant?: string | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,28 +409,26 @@ export interface PlatformFeatureOverride {
 export interface PlatformRelease {
   id: string;
   version: string;
-  channel: 'STABLE' | 'BETA' | 'NIGHTLY';
-  status: 'DRAFT' | 'PUBLISHED' | 'DEPRECATED';
-  isMandatory: boolean;
-  minVersion?: string | null;
-  rolloutGroup: string;
+  name?: string | null;
+  description?: string | null;
+  channel: string;
+  releaseDate?: string | null;
+  isActive: boolean;
+  status?: string | null;
+  targetsSummary?: Record<string, number> | null;
   notes?: string | null;
-  fileUrl?: string | null;
-  fileName?: string | null;
-  fileSize?: number | null;
-  checksumSha256?: string | null;
-  packageSignature?: string | null;
-  changelog?: string | null;
   rollbackVersion?: string | null;
-  stagingGroup?: string;
-  releasedAt?: string | null;
+  isMandatory?: boolean | null;
+  minVersion?: string | null;
+  rolloutGroup?: string | null;
+  minClientVersion?: string | null;
+  maxClientVersion?: string | null;
+  artifactUrl?: string | null;
+  artifactHash?: string | null;
+  changelog?: string | null;
+  rolledBackTo?: string | null;
   createdAt: string;
-  targetsSummary?: {
-    total: number;
-    pending: number;
-    success: number;
-    failed: number;
-  };
+  updatedAt: string;
 }
 
 export interface PlatformReleaseTarget {
@@ -414,10 +439,12 @@ export interface PlatformReleaseTarget {
   deviceId?: string | null;
   clientVersion?: string | null;
   attemptCount?: number;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  status: string;
   appliedAt?: string | null;
   error?: string | null;
+  deployedAt?: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export type AuditSeverity = 'INFO' | 'NOTICE' | 'WARNING' | 'SECURITY' | 'CRITICAL';
@@ -556,6 +583,7 @@ export interface PlatformTenantUser {
   phone?: string | null;
   role: string;
   status: 'ACTIVE' | 'SUSPENDED' | 'INVITED';
+  isActive: boolean;
   notes?: string | null;
   /** Directory/provisioning record is not a real tenant identity account until provisioned. */
   provisioningStatus: PlatformTenantUserProvisioningStatus;
@@ -563,10 +591,10 @@ export interface PlatformTenantUser {
   identityUserId?: string | null;
   scope?: string | null;
   inviteCode?: string | null;
-  temporaryPassword?: string | null;
-  inviteExpiresAt?: string | null;
-  provisionedAt?: string | null;
-  lastError?: string | null;
+  temporaryPassword?: string | null,
+  inviteExpiresAt?: string | null,
+  provisionedAt?: string | null,
+  lastError?: string | null,
   createdAt: string;
   updatedAt: string;
 }
@@ -593,6 +621,8 @@ export interface PlatformTenantUserProvisioningResult {
   user: PlatformTenantUser;
   inviteCode?: string | null;
   temporaryPassword?: string | null;
+  activationCode?: string | null;
+  loginUrl?: string;
   provisioned: boolean;
   message: string;
 }
@@ -638,6 +668,7 @@ export interface PlatformSupportTicket {
   deviceId?: string | null;
   subject: string;
   description?: string | null;
+  category?: string | null;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'OPEN' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'RESOLVED' | 'CLOSED';
   assignedTo?: string | null;
@@ -657,6 +688,8 @@ export interface PlatformSupportTicket {
 export interface PlatformSupportMessage {
   id: string;
   ticketId: string;
+  authorId: string;
+  authorType: 'STAFF' | 'TENANT';
   authorName: string;
   authorRole: 'CUSTOMER' | 'SUPPORT' | 'SYSTEM';
   body: string;
@@ -673,15 +706,18 @@ export interface PlatformCannedReply {
   category: string;
   body: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlatformRemoteSession {
   id: string;
   ticketId: string;
   tenantId: string;
+  staffId: string;
   technicianName: string;
   startedAt: string;
   endedAt?: string | null;
+  expiresAt?: string | null;
   durationMinutes: number;
   actionsSummary?: string | null;
   status: 'ACTIVE' | 'COMPLETED' | 'TERMINATED';
@@ -691,6 +727,21 @@ export interface PlatformSupportTicketDetails {
   ticket: PlatformSupportTicket;
   messages: PlatformSupportMessage[];
   remoteSessions: PlatformRemoteSession[];
+  tenant: {
+    id: string;
+    code: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    status: string;
+  } | null;
+  assignedStaff: {
+    id: string;
+    username: string;
+    fullName: string;
+    email: string | null;
+    role: string;
+  } | null;
 }
 
 export interface PlatformApiKey {
@@ -715,21 +766,16 @@ export interface PlatformCoupon {
   id: string;
   code: string;
   name: string;
-  discountType: 'PERCENT' | 'FIXED';
-  discountValue: number;
+  type: 'PERCENT' | 'FIXED';
+  value: number;
   maxUses?: number | null;
   usedCount: number;
   expiresAt?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  /** إذا كان الكوبون خاصاً بخطة معينة (null = كل الخطط). */
-  planId?: string | null;
-  /** إذا كان الكوبون للدفعة الأولى فقط. */
-  firstPaymentOnly: boolean;
-  /** الحد الأدنى لمبلغ الفاتورة لتطبيق الكوبون. */
+  applicablePlans: string[];
   minSubtotal: number;
-  /** تاريخ بدء سريان الكوبون. */
   startsAt?: string | null;
   notes?: string | null;
 }
@@ -737,13 +783,12 @@ export interface PlatformCoupon {
 export interface PlatformCouponInput {
   code: string;
   name: string;
-  discountType: 'PERCENT' | 'FIXED';
-  discountValue: number;
+  type: 'PERCENT' | 'FIXED';
+  value: number;
   maxUses?: number | null;
   expiresAt?: string | null;
   isActive?: boolean;
-  planId?: string | null;
-  firstPaymentOnly?: boolean;
+  applicablePlans?: string[];
   minSubtotal?: number;
   startsAt?: string | null;
   notes?: string;
@@ -751,7 +796,7 @@ export interface PlatformCouponInput {
 
 // ─── Plan Versioning ─────────────────────────────────────────────────────────
 
-export type PlatformPlanChangeType = 'upgrade' | 'downgrade' | 'same' | 'renewal';
+export type PlatformPlanChangeType = 'upgrade' | 'downgrade' | 'same' | 'renewal' | 'new';
 
 export interface PlatformPlanVersion {
   id: string;
@@ -774,6 +819,9 @@ export interface PlatformPlanVersion {
   includedModules: string[];
   features: string[];
   permissions: string[];
+  isActive: boolean;
+  isDefault: boolean;
+  sortOrder: number;
   offlineGracePeriodDays: number;
   /** تاريخ بدء سريان هذا الإصدار (ISO). */
   effectiveFrom: string;
@@ -805,6 +853,9 @@ export interface PlatformPlanVersionInput {
   includedModules?: string[];
   features?: string[];
   permissions?: string[];
+  isActive?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
   offlineGracePeriodDays?: number;
   /** تاريخ بدء سريان هذا الإصدار (ISO). مطلوب. */
   effectiveFrom: string;
@@ -817,15 +868,10 @@ export interface PlatformPlanVersionInput {
 export interface PlatformPriceHistoryEntry {
   id: string;
   planId: string;
-  version: number;
-  oldPrice?: number | null;
+  oldPrice: number;
   newPrice: number;
-  currency: string;
-  effectiveFrom: string;
-  reason?: string | null;
-  actorId?: string | null;
-  actorName?: string | null;
-  createdAt: string;
+  changedAt: string;
+  changedBy: string;
 }
 
 export interface PlatformSubscriptionPriceLock {
@@ -850,14 +896,10 @@ export interface PlatformPlanUpgradeRule {
   id: string;
   fromPlanId: string;
   toPlanId: string;
-  /** هل يسمح بالترقية/التخفيض من هذه الخطة إلى تلك؟ */
   allowed: boolean;
-  /** نسبة رسم الترقية من الفرق (0-100). */
-  upgradeFeePercent: number;
-  /** هل يتطلب موافقة يدوية؟ */
   requiresApproval: boolean;
-  notes?: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlatformPlanUpgradeRuleInput {
@@ -872,14 +914,8 @@ export interface PlatformPlanUpgradeRuleInput {
 // ─── Plan Copy / Versioning Results ──────────────────────────────────────────
 
 export interface PlatformPlanCopyResult {
-  /** معرف الخطة الجديدة المنسوخة. */
-  newPlanId: string;
-  /** معرف الإصدار الذي تم إنشاؤه للخطة الأصلية. */
-  versionId: string;
-  /** رقم الإصدار الجديد. */
-  newVersion: number;
-  /** السريان من تاريخ. */
-  effectiveFrom: string;
+  plan: PlatformPlan;
+  copiedRules: number;
 }
 
 export interface PlatformPlanEffectivePricing {
@@ -904,46 +940,18 @@ export interface PlatformPlanEffectivePricing {
 // ─── Impact Preview ──────────────────────────────────────────────────────────
 
 export interface PlatformPlanImpactPreview {
-  /** معرف الخطة المقترحة للتعديل. */
   planId: string;
-  /** number of active subscriptions affected. */
-  affectedSubscriptions: number;
-  /** number of tenants affected. */
+  planName: string;
   affectedTenants: number;
-  /** tenants whose price will change. */
-  priceChanges: Array<{
-    subscriptionId: string;
-    tenantId: string;
-    tenantName: string;
-    oldPrice: number;
-    newPrice: number;
-    currency: string;
-    isLocked: boolean;
-    effectiveFrom: string;
-  }>;
-  /** tenants who will lose access to modules/features. */
-  moduleChanges: Array<{
-    subscriptionId: string;
-    tenantId: string;
-    tenantName: string;
-    removedModules: string[];
-    removedFeatures: string[];
-  }>;
-  /** tenants exceeding new limits. */
   limitViolations: Array<{
-    subscriptionId: string;
     tenantId: string;
     tenantName: string;
-    metric: 'seats' | 'branches' | 'devices' | 'products' | 'warehouses' | 'storage';
-    currentUsage: number;
+    type: string;
+    current: number;
     newLimit: number;
   }>;
-  /** overall risk assessment. */
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  /** recommended action. */
+  riskLevel: 'LOW' | 'MEDIUM' | 'CRITICAL';
   recommendation: string;
-  /** estimated revenue impact. */
-  estimatedRevenueImpact: number;
 }
 
 // ─── Plan Change Request (upgrade/downgrade with effective date) ─────────────
@@ -1014,108 +1022,37 @@ export interface PlatformTrialCreateInput {
   trialDays?: number;
   startsAt?: string;
   couponCode?: string | null;
+  seats?: number;
+  branchesLimit?: number;
 }
 
 
 export interface PlatformSettingsMap {
-  // 1. Identity & General
-  platformName: string;
-  supportEmail: string;
-  supportPhone: string;
-  defaultCurrency: string;
-  defaultTrialDays: number;
-  invoicePrefix: string;
-  defaultLocale?: string;
-  timezone?: string;
-
-  // 2. Legal & Tax
-  companyLegalName?: string;
-  commercialRegistry?: string;
-  taxNumber?: string;
-  officialAddress?: string;
-  legalRepresentative?: string;
-
-  // 3. Email & SMS
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpUser?: string;
-  smtpPassword?: string;
-  smtpFromEmail?: string;
-  smtpEncryption?: 'NONE' | 'TLS' | 'SSL';
-  smsProvider?: string;
-  smsSenderId?: string;
-  smsApiKey?: string;
-
-  // 4. Payments & Billing
-  paymentGateway?: 'PAYMOB' | 'STRIPE' | 'FAWRY' | 'MOYASAR' | 'MANUAL';
-  paymentMode?: 'TEST' | 'LIVE';
-  paymentApiKey?: string;
-  paymentMerchantId?: string;
-  defaultTaxRate?: number;
-  licenseGracePeriodDays?: number;
-  autoRenewalPolicy?: boolean;
-
-  // 5. Network & APIs
-  platformDomain?: string;
-  centralApiEndpoint?: string;
-  syncServerEndpoint?: string;
-  enforceHttps?: boolean;
-
-  // 6. Security, MFA & Sessions
-  sessionTimeoutMinutes?: number;
-  maxFailedLogins?: number;
-  enforceMfa?: boolean;
-  passwordMinLength?: number;
-  passwordRequireComplex?: boolean;
-  kmsProvider?: string;
-  lastEncryptionRotation?: string;
-
-  // 7. Backup & Retention
-  backupFrequency?: 'DAILY' | 'TWICE_DAILY' | 'WEEKLY';
-  backupRetentionDays?: number;
-  backupStorageTarget?: 'CLOUD_ENCRYPTED' | 'LOCAL_SECURE';
+  [key: string]: string | undefined;
 }
 
 // ─── Per-Tenant Activity Customization & Versions ───────────────────────────
 
 export interface PlatformTenantActivityConfig {
-  id: string;
   tenantId: string;
-  activityId: string;
-  activityLabel?: string;
-  familyId?: string;
-  profileId: string;
-  enabledModules: string[];
-  customTerminology: Record<string, string>;
-  navigationOverrides: Array<{ path: string; label?: string; hidden?: boolean }>;
-  featuresEnabled: string[];
-  customAttributes: Array<{ code: string; name: string; dataType: string; unit?: string }>;
   version: number;
+  config: Record<string, unknown>;
   createdAt: string;
-  updatedAt: string;
+  createdBy: string;
 }
 
 export interface PlatformTenantActivityVersion {
   id: string;
   tenantId: string;
   version: number;
-  activityId: string;
-  profileId: string;
-  configSnapshot: PlatformTenantActivityConfig;
-  changeSummary?: string | null;
-  createdBy?: string | null;
+  config: Record<string, unknown>;
   createdAt: string;
+  createdBy: string;
 }
 
 export interface PlatformTenantActivityInput {
   tenantId: string;
-  activityId: string;
-  profileId?: string;
-  enabledModules?: string[];
-  customTerminology?: Record<string, string>;
-  navigationOverrides?: Array<{ path: string; label?: string; hidden?: boolean }>;
-  featuresEnabled?: string[];
-  changeSummary?: string;
+  config: Record<string, unknown>;
 }
 
 // ─── Time Period & Analytics ───────────────────────────────────────────────────
@@ -1672,6 +1609,22 @@ export interface PlatformBrandingInput {
   customSubdomain?: string;
   allowedCustomizations?: Partial<PlatformAllowedCustomizations>;
   changeSummary?: string;
+  backgroundColor?: string;
+  surfaceColor?: string;
+  textPrimaryColor?: string;
+  textSecondaryColor?: string;
+  borderColor?: string;
+  fontSizeBase?: string;
+  borderRadius?: string;
+  customCss?: string;
+  customJs?: string;
+  rtl?: boolean;
+  locale?: string;
+  timezone?: string;
+  currency?: string;
+  dateFormat?: string;
+  timeFormat?: string;
+  weekStart?: number;
 }
 
 export interface PlatformBrandingVersion {
@@ -1729,6 +1682,13 @@ export interface PlatformTenantUiInput {
   navOrder?: string[];
   formFieldRules?: Record<string, FormFieldRule>;
   changeSummary?: string;
+  overrides?: {
+    hiddenPages?: string[];
+    hiddenActions?: string[];
+    customLabels?: Record<string, string>;
+    navOrder?: string[];
+    formFieldRules?: Record<string, FormFieldRule>;
+  };
 }
 
 export interface PlatformTenantUiVersion {
@@ -1747,11 +1707,10 @@ export interface PlatformConfigTemplate {
   id: string;
   code: string;
   name: string;
-  businessType?: string;
-  planId?: string;
-  configPayload: Record<string, unknown>;
-  version: number;
-  isDefault: boolean;
+  description?: string | null;
+  schema: Record<string, unknown>;
+  defaultValues: Record<string, unknown>;
+  category?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1771,7 +1730,8 @@ export interface PlatformTenantConfig {
 export interface PlatformTenantConfigInput {
   tenantId: string;
   templateId?: string;
-  configPayload: Record<string, unknown>;
+  values: Record<string, unknown>;
+  configPayload?: Record<string, unknown>;
   status?: 'DRAFT' | 'ACTIVE' | 'DEPRECATED';
   changeSummary?: string;
 }
@@ -1808,10 +1768,13 @@ export interface PlatformConfigRollout {
 }
 
 export interface PlatformConfigRolloutInput {
-  title: string;
+  templateId: string;
+  name: string;
+  description?: string;
   targetType: RolloutTargetType;
-  targetFilter?: Record<string, unknown>;
-  configSnapshot: Record<string, unknown>;
+  targetIds?: string[];
+  rolloutPercentage?: number;
+  scheduledAt?: string;
 }
 
 export interface PlatformConfigAck {
@@ -1847,10 +1810,26 @@ export interface PlatformPolicyRetention {
 }
 
 export interface PlatformPolicySettings {
-  terms: string;
-  privacy: string;
-  retention: PlatformPolicyRetention;
-  updatedAt: string | null;
+  passwordMinLength: number;
+  passwordRequireUppercase: boolean;
+  passwordRequireLowercase: boolean;
+  passwordRequireNumbers: boolean;
+  passwordRequireSymbols: boolean;
+  passwordMaxAgeDays: number;
+  passwordHistoryCount: number;
+  sessionTimeoutMinutes: number;
+  maxConcurrentSessions: number;
+  mfaEnforcement: 'off' | 'optional' | 'required';
+  lockoutFailedAttempts: number;
+  lockoutDurationMinutes: number;
+  requireEmailVerification: boolean;
+  allowPasswordReset: boolean;
+  auditRetentionDays: number;
+  dataRetentionDays: number;
+  backupRetentionDays: number;
+  apiRateLimitPerMinute: number;
+  webhookRetryAttempts: number;
+  webhookTimeoutSeconds: number;
 }
 
 export interface PlatformCentralBackup {
@@ -1947,15 +1926,22 @@ export type PlatformStaffRole =
 
 export interface PlatformStaff {
   id: string;
+  username: string;
   fullName: string;
   email: string;
   phone?: string | null;
   role: PlatformStaffRole;
-  permissionsOverride?: string[];
+  passwordHash?: string;
   isActive: boolean;
+  mfaEnabled: boolean;
+  mfaEnforcement: 'off' | 'optional' | 'required';
+  totpSecret?: string | null;
+  backupCodes?: string[] | null;
+  dataScope: 'ALL' | 'LIMITED';
+  dataScopeTenantIds: string[] | null;
   lastLoginAt?: string | null;
-  mustChangePassword?: boolean;
-  dataScope?: 'ALL' | 'LIMITED';
+  failedLoginAttempts: number;
+  lockedUntil?: string | null;
   deletedAt?: string | null;
   invitedBy?: string | null;
   createdAt: string;
@@ -1963,6 +1949,7 @@ export interface PlatformStaff {
 }
 
 export interface PlatformStaffInput {
+  username: string;
   fullName: string;
   email: string;
   phone?: string;
@@ -1985,11 +1972,13 @@ export interface PlatformStaffRoleDefinition {
 export interface PlatformStaffLogin {
   id: string;
   staffId?: string | null;
+  username?: string | null;
   email: string;
   ipAddress?: string | null;
   userAgent?: string | null;
   status: 'SUCCESS' | 'FAILED' | 'BLOCKED';
   failureReason?: string | null;
+  mfaUsed?: boolean;
   attemptedAt: string;
 }
 
@@ -2000,6 +1989,7 @@ export interface PlatformStaffSession {
   staffRole: string;
   ipAddress?: string | null;
   deviceName?: string | null;
+  userAgent?: string | null;
   isTrustedDevice: boolean;
   isCurrent: boolean;
   expiresAt?: string | null;
@@ -2012,22 +2002,37 @@ export interface PlatformCentralSecurityIncident {
   type: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   title: string;
+  description?: string | null;
   details?: string | null;
   sourceIp?: string | null;
-  status: 'OPEN' | 'CONTAINED' | 'RESOLVED';
+  ipAddress?: string | null;
+  tenantId?: string | null;
+  staffId?: string | null;
+  deviceId?: string | null,
+  status: 'OPEN' | 'INVESTIGATING' | 'RESOLVED' | 'CONTAINED';
   containmentAction?: string | null;
+  response?: string | null;
+  metadata?: Record<string, unknown> | null,
   createdAt: string;
+  updatedAt?: string;
   resolvedAt?: string | null;
 }
 
 export interface PlatformSigningKey {
   id: string;
-  keyAlias: string;
+  alias: string;
+  keyAlias?: string;
+  privateKey?: string;
+  publicKey?: string;
+  publicKey?: string;
   algorithm: string;
   version: number;
   status: 'ACTIVE' | 'ROTATED' | 'REVOKED';
+  fingerprint?: string;
+  isCurrent?: boolean;
   rotatedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface PlatformCentralSecurityOverview {
@@ -2054,6 +2059,7 @@ export type PlatformStaffInviteStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EX
 
 export interface PlatformStaffInvite {
   id: string;
+  token: string;
   email: string;
   fullName: string;
   phone?: string | null;
@@ -2063,7 +2069,7 @@ export interface PlatformStaffInvite {
   acceptedAt?: string | null;
   revokedAt?: string | null;
   invitedBy?: string | null;
-  invitedByName?: string | null;
+  invitedByName?: string | null,
   createdAt: string;
 }
 
@@ -2082,6 +2088,8 @@ export interface PlatformStaffInviteCreated {
   token: string;
   /** Ready-to-share invite link (embeds the token). */
   link: string;
+  loginUrl: string;
+  temporaryPassword: string;
 }
 
 export interface PlatformTrustedDevice {
@@ -2090,6 +2098,9 @@ export interface PlatformTrustedDevice {
   staffName?: string | null;
   deviceName?: string | null;
   fingerprint: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  trustedAt: string;
   lastSeenAt?: string | null;
   revokedAt?: string | null;
   createdAt: string;
@@ -2115,4 +2126,56 @@ export interface PlatformRoleMatrix {
   }>;
   standardActionLabels: Record<string, string>;
   fetchedAt: string;
+}
+
+// ─── Bulk Operations & Remote Control Types (PLAN_TENANTS_ENHANCEMENT) ───────────
+
+export interface PlatformConfigPush {
+  id: string;
+  tenantId: string;
+  configJson: string;
+  pushedBy: string;
+  status: 'PENDING' | 'SENT' | 'ACKNOWLEDGED' | 'FAILED';
+  pushedAt: string;
+  acknowledgedAt?: string | null;
+  errorMessage?: string | null;
+  retryCount: number;
+  createdAt: string;
+}
+
+export interface PlatformTenantConfigPushInput {
+  tenantId: string;
+  configJson: string;
+  pushedBy?: string;
+  force?: boolean;
+}
+
+export interface PlatformOutboxEvent {
+  id: string;
+  entityType: 'TENANT' | 'LICENSE' | 'SUBSCRIPTION' | 'CONFIG' | 'DEVICE';
+  entityId: string;
+  eventType: string;
+  payload: Record<string, unknown>;
+  status: 'PENDING' | 'SENT' | 'FAILED';
+  attempts: number;
+  createdAt: string;
+  sentAt?: string | null;
+  errorMessage?: string | null;
+}
+
+// ─── Notifications (Phase 5: LICENSE_MANAGEMENT_IMPLEMENTATION_PLAN) ──────────────
+
+export interface PlatformNotification {
+  id: string;
+  tenantId: string;
+  type: string;
+  title: string;
+  message: string;
+  referenceType: string;
+  referenceId: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  channels: string[];
+  metadata: Record<string, unknown>;
+  readAt?: string | null;
+  createdAt: string;
 }

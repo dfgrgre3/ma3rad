@@ -47,32 +47,7 @@ export const PlatformReleasesPage: React.FC = () => {
 
   // Upsert Release Modal
   const [isUpsertOpen, setIsUpsertOpen] = useState(false);
-  const [releaseForm, setReleaseForm] = useState<{
-    id?: string;
-    version: string;
-    channel: 'STABLE' | 'BETA' | 'ALPHA' | 'HOTFIX';
-    status: 'DRAFT' | 'PUBLISHED' | 'DEPRECATED';
-    isMandatory: boolean;
-    minVersion: string;
-    rolloutGroup: string;
-    notes: string;
-    fileUrl: string;
-    fileName: string;
-    checksumSha256: string;
-    changelog: string;
-  }>({
-    version: '',
-    channel: 'STABLE',
-    status: 'PUBLISHED',
-    isMandatory: false,
-    minVersion: '1.0.0',
-    rolloutGroup: 'ALL',
-    notes: '',
-    fileUrl: '',
-    fileName: '',
-    checksumSha256: '',
-    changelog: '',
-  });
+  const [releaseForm, setReleaseForm] = useState<PlatformRelease>({ ...emptyRelease });
 
   const canManageReleases = canPlatform('releases');
 

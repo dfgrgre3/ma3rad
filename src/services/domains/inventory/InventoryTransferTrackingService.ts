@@ -12,6 +12,7 @@ interface BatchRow {
   batchNumber: string;
   toneShade: string;
   caliber: string | null;
+  grade: string | null;
   costPrice: number;
   remainingM2: number;
   productionDate: string | null;
@@ -25,6 +26,7 @@ interface BatchAllocationRow {
   batchNumber: string;
   toneShade: string | null;
   caliber: string | null;
+  grade: string | null;
   quantityM2: number;
   receivedM2: number;
   lostM2: number;
@@ -243,7 +245,7 @@ export class InventoryTransferTrackingService {
   }): void {
     const batches = db.query<BatchRow>(`
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
-        COALESCE(cost_price, 0) AS costPrice,
+        COALESCE(grade, '') AS grade, COALESCE(cost_price, 0) AS costPrice,
         COALESCE(quantity_remaining_m2, 0) AS remainingM2,
         production_date AS productionDate, received_date AS receivedDate,
         supplier_id AS supplierId, created_at AS createdAt
@@ -269,6 +271,7 @@ export class InventoryTransferTrackingService {
         batchNumber: batch.batchNumber,
         toneShade: batch.toneShade,
         caliber: batch.caliber,
+        grade: batch.grade,
         costPrice: Number(batch.costPrice),
         quantity: take,
         productionDate: batch.productionDate,
@@ -281,8 +284,8 @@ export class InventoryTransferTrackingService {
       db.run(`
         INSERT INTO stock_transfer_batch_allocations (
           id, transfer_item_id, source_batch_id, transit_batch_id, batch_number,
-          tone_shade, caliber, quantity_m2, unit_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tone_shade, caliber, grade, quantity_m2, unit_cost
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         `trfba_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
         input.transferItemId,
@@ -291,6 +294,7 @@ export class InventoryTransferTrackingService {
         batch.batchNumber,
         batch.toneShade,
         batch.caliber,
+        batch.grade,
         take,
         Number(batch.costPrice),
       ]);
@@ -319,6 +323,7 @@ export class InventoryTransferTrackingService {
   }): void {
     const allocations = db.query<BatchAllocationRow>(`
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
+        COALESCE(grade, '') AS grade,
         quantity_m2 AS quantityM2, received_m2 AS receivedM2, lost_m2 AS lostM2,
         reverted_m2 AS revertedM2, unit_cost AS unitCost,
         transit_batch_id AS transitBatchId, source_batch_id AS sourceBatchId,
@@ -348,6 +353,7 @@ export class InventoryTransferTrackingService {
           batchNumber: allocation.batchNumber,
           toneShade: allocation.toneShade || '',
           caliber: allocation.caliber,
+          grade: allocation.grade,
           costPrice: Number(allocation.unitCost),
           quantity: receivedNow,
           productionDate: null,
@@ -395,6 +401,7 @@ export class InventoryTransferTrackingService {
   }): void {
     const allocations = db.query<BatchAllocationRow>(`
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
+        COALESCE(grade, '') AS grade,
         quantity_m2 AS quantityM2, received_m2 AS receivedM2, lost_m2 AS lostM2,
         reverted_m2 AS revertedM2, unit_cost AS unitCost,
         transit_batch_id AS transitBatchId, source_batch_id AS sourceBatchId,
@@ -425,6 +432,7 @@ export class InventoryTransferTrackingService {
           batchNumber: allocation.batchNumber,
           toneShade: allocation.toneShade || '',
           caliber: allocation.caliber,
+          grade: allocation.grade,
           costPrice: Number(allocation.unitCost),
           quantity: outstanding,
           productionDate: null,
@@ -462,6 +470,7 @@ export class InventoryTransferTrackingService {
     batchNumber: string;
     toneShade: string;
     caliber: string | null;
+    grade: string | null;
     costPrice: number;
     quantity: number;
     productionDate: string | null;
@@ -476,8 +485,9 @@ export class InventoryTransferTrackingService {
       WHERE product_id = ? AND warehouse_id = ? AND batch_number = ?
         AND COALESCE(tone_shade, '') = COALESCE(?, '')
         AND COALESCE(caliber, '') = COALESCE(?, '')
+        AND COALESCE(grade, '') = COALESCE(?, '')
       LIMIT 1
-    `, [input.productId, input.warehouseId, input.batchNumber, input.toneShade, input.caliber])[0];
+    `, [input.productId, input.warehouseId, input.batchNumber, input.toneShade, input.caliber, input.grade])[0];
     if (existing) {
       db.run(`
         UPDATE product_batches
@@ -489,10 +499,10 @@ export class InventoryTransferTrackingService {
     const id = `batch_${uuidv4().replace(/-/g, '').slice(0, 10)}`;
     db.run(`
       INSERT INTO product_batches (
-        id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+        id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
         production_date, received_date, supplier_id, cost_price,
         quantity_m2, quantity_remaining_m2, notes, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
     `, [
       id,
       input.productId,
@@ -500,6 +510,7 @@ export class InventoryTransferTrackingService {
       input.batchNumber,
       input.toneShade,
       input.caliber,
+      input.grade,
       input.productionDate,
       input.receivedDate,
       input.supplierId,

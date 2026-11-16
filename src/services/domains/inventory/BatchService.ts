@@ -31,6 +31,7 @@ export interface CreateBatchDTO {
   batchNumber: string;
   toneShade: string;
   caliber?: string;
+  grade?: string;
   productionDate?: string;
   receivedDate?: string;
   supplierId?: string;
@@ -64,6 +65,7 @@ export class BatchService {
         pb.batch_number        AS batchNumber,
         pb.tone_shade          AS toneShade,
         pb.caliber,
+        COALESCE(pb.grade, '') AS grade,
         pb.production_date     AS productionDate,
         pb.received_date       AS receivedDate,
         pb.supplier_id         AS supplierId,
@@ -100,6 +102,7 @@ export class BatchService {
          pb.batch_number        AS batchNumber,
          pb.tone_shade          AS toneShade,
          pb.caliber,
+         COALESCE(pb.grade, '') AS grade,
          pb.production_date     AS productionDate,
          pb.received_date       AS receivedDate,
          pb.supplier_id         AS supplierId,
@@ -175,9 +178,10 @@ export class BatchService {
         metersPerBox: number | string | null;
         productType: string;
         baseUnit: string;
+        grade: string | null;
       }>(
         `SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox,
-                product_type AS productType, base_unit AS baseUnit
+                product_type AS productType, base_unit AS baseUnit, grade
          FROM products WHERE id = ?`,
         [data.productId]
       )[0];
@@ -187,15 +191,16 @@ export class BatchService {
       }
 
       const unitCost = round2(data.costPrice === undefined ? Number(product.costPrice) || 0 : Number(data.costPrice));
+      const grade = data.grade?.trim() || product.grade || '';
       db.run(
         `INSERT INTO product_batches
-           (id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+           (id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
             production_date, received_date, supplier_id, cost_price,
             quantity_m2, quantity_remaining_m2, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, data.productId, data.warehouseId, batchNumber, data.toneShade.trim(),
-          data.caliber?.trim() || '0', data.productionDate || null, receivedDate,
+          data.caliber?.trim() || '0', grade, data.productionDate || null, receivedDate,
           data.supplierId || null, unitCost, qtyM2, qtyM2, data.notes?.trim() || null, actor.id,
         ]
       );
@@ -232,6 +237,7 @@ export class BatchService {
     updates: Partial<{
       toneShade: string;
       caliber: string;
+      grade: string;
       productionDate: string;
       receivedDate: string;
       supplierId: string;
@@ -256,6 +262,7 @@ export class BatchService {
 
     if (updates.toneShade            !== undefined) { fields.push('tone_shade = ?');            values.push(updates.toneShade); }
     if (updates.caliber              !== undefined) { fields.push('caliber = ?');               values.push(updates.caliber); }
+    if (updates.grade                !== undefined) { fields.push('grade = ?');                 values.push(updates.grade); }
     if (updates.productionDate       !== undefined) { fields.push('production_date = ?');       values.push(updates.productionDate || null); }
     if (updates.notes                !== undefined) { fields.push('notes = ?');                 values.push(updates.notes?.trim() || null); }
 
@@ -310,6 +317,7 @@ export class BatchService {
         batchNumber: string;
         toneShade: string;
         caliber: string;
+        grade: string;
         quantityRemainingM2: number;
       }>(
         `SELECT
@@ -317,6 +325,7 @@ export class BatchService {
            batch_number             AS batchNumber,
            tone_shade               AS toneShade,
            caliber,
+           COALESCE(grade, '')      AS grade,
            quantity_remaining_m2    AS quantityRemainingM2
          FROM product_batches
          WHERE product_id = ? AND warehouse_id = ? AND quantity_remaining_m2 > 0.001
@@ -339,6 +348,7 @@ export class BatchService {
             batchNumber: b.batchNumber,
             toneShade:   b.toneShade,
             caliber:     b.caliber,
+            grade:       b.grade,
             requiredM2:  Math.round(take * 100) / 100,
           });
           remaining -= take;
@@ -349,8 +359,9 @@ export class BatchService {
 
       const tones    = new Set(used.map((b) => b.toneShade));
       const calibers = new Set(used.map((b) => b.caliber));
+      const grades   = new Set(used.map((b) => b.grade));
 
-      if (tones.size > 1 || calibers.size > 1) {
+      if (tones.size > 1 || calibers.size > 1 || grades.size > 1) {
         conflicts.push({
           productId:   item.productId,
           productName: item.productName,

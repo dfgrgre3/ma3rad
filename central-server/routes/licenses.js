@@ -171,7 +171,7 @@ router.post(
           [
             `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`, licenseId, subscriptionId,
             JSON.stringify({
-              licenseKey, tenantId, planId, startsAt: start.toISOString(), expiresAt: expires?.toISOString() ?? null,
+              licenseKey: '[REDACTED]', tenantId, planId, startsAt: start.toISOString(), expiresAt: expires?.toISOString() ?? null,
               seats: finalSeats, deviceLimit: finalDeviceLimit, branchesLimit: finalBranchesLimit,
               modules: finalModules, features: finalFeatures,
               offlineGracePeriodDays: finalOfflineGracePeriodDays, couplingMode,
@@ -190,7 +190,7 @@ router.post(
           WHERE l.id = ?
         `, [licenseId]);
 
-        await auditLicenseChange(req, 'LICENSE_ISSUED', licenseId, { tenantId, planId, licenseKey, expiresAt: expires?.toISOString() ?? null });
+        await auditLicenseChange(req, 'LICENSE_ISSUED', licenseId, { tenantId, planId, licenseKey: '[REDACTED]', expiresAt: expires?.toISOString() ?? null });
 
         res.status(201).json({
           license: {

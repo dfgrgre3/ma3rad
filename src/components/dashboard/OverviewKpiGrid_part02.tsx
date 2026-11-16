@@ -99,8 +99,12 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
           <KpiTile
             label="قيمة المخزون بالتكلفة"
             icon={Package}
-            value={formatMoney(metrics.inventoryValuationCost)}
-            hint={metrics.inventoryValuationCost > 0 ? 'تقييم المخزون الحالي' : 'لا توجد قيمة مخزون مسجلة'}
+            value={metrics.inventoryValuationUnavailable ? 'غير متاح' : formatMoney(metrics.inventoryValuationCost ?? 0)}
+            hint={metrics.inventoryValuationUnavailable 
+              ? 'تقييم المخزون غير متاح (خطأ FIFO - راجع المخزون)' 
+              : metrics.inventoryValuationCost != null && metrics.inventoryValuationCost > 0 
+                ? 'تقييم المخزون الحالي' 
+                : 'لا توجد قيمة مخزون مسجلة'}
             to="/inventory"
           />
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Menu, Search } from 'lucide-react';
+import { Bell, HelpCircle, Menu, Search } from 'lucide-react';
 import type { User } from '../../types';
 import { BranchAccessService } from '../../services/domains/auth/BranchAccessService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
@@ -18,6 +18,8 @@ interface HeaderProps {
   onLogout?: () => void;
   onSwitchUser?: (userId: string) => void;
   onOpenSidebar?: () => void;
+  /** Opens the global keyboard shortcuts help (also available with F1). */
+  onOpenShortcuts?: () => void;
   /** `header` moves the main navigation into the top bar on large screens. */
   navigationLayout?: 'sidebar' | 'header';
 }
@@ -28,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onSwitchUser,
   onOpenSidebar,
+  onOpenShortcuts,
   navigationLayout = 'sidebar',
 }) => {
   const location = useLocation();
@@ -95,8 +98,9 @@ export const Header: React.FC<HeaderProps> = ({
       <button
         type="button"
         onClick={onOpenSidebar}
-        className="win-btn win-btn--ghost lg:hidden !min-h-8 !px-2"
+        className="win-btn win-btn--ghost lg:hidden !min-h-8 !min-w-8 !px-2"
         aria-label="فتح القائمة الجانبية"
+        aria-haspopup="dialog"
       >
         <Menu className="h-4 w-4" />
       </button>
@@ -125,8 +129,8 @@ export const Header: React.FC<HeaderProps> = ({
           <HeaderNav onOpenQuickCommand={() => setSearchOpen(true)} />
         </>
       ) : (
-        /* Current page */
-        <div className="flex min-w-0 flex-col justify-center leading-tight">
+        /* Current page — hidden on narrow screens to keep the top bar uncluttered; the page itself renders its own heading. */
+        <div className="hidden min-w-0 flex-col justify-center leading-tight min-[420px]:flex">
           <h1 className="truncate text-[13px] font-semibold text-[var(--win-text)]">{page.title}</h1>
         </div>
       )}
@@ -149,6 +153,18 @@ export const Header: React.FC<HeaderProps> = ({
             Ctrl K
           </kbd>
         </button>
+
+        {onOpenShortcuts && (
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            className="win-btn win-btn--ghost hidden !min-h-8 !px-2 sm:flex"
+            title="اختصارات لوحة المفاتيح (F1)"
+            aria-label="اختصارات لوحة المفاتيح (F1)"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+        )}
 
         <button
           type="button"

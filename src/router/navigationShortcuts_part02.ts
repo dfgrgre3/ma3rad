@@ -1,9 +1,26 @@
-import { MAX_RECENT_PAGES, canonicalNavigationPath, getStorage, readShortcuts, storageKey } from './navigationShortcuts_part01';
+import {
+  MAX_RECENT_PAGES,
+  NAVIGATION_SHORTCUTS_EVENT,
+  canonicalNavigationPath,
+  getStorage,
+  readShortcuts,
+  storageKey,
+} from './navigationShortcuts_part01';
 import type { NavigationShortcuts, StoragePort } from './navigationShortcuts_part01';
+
+function notifyShortcutsChanged(userId: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent(NAVIGATION_SHORTCUTS_EVENT, { detail: { userId } }));
+  } catch {
+    // CustomEvent may be unavailable in restricted runtimes; persistence still succeeded.
+  }
+}
 
 export function writeShortcuts(userId: string, shortcuts: NavigationShortcuts, storage?: StoragePort): void {
   try {
     getStorage(storage)?.setItem(storageKey(userId), JSON.stringify(shortcuts));
+    notifyShortcutsChanged(userId);
   } catch (error) {
     console.warn('Could not save navigation shortcuts:', error);
   }

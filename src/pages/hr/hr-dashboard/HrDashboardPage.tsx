@@ -236,7 +236,7 @@ function LocationChart({ locations }: { locations: { location: string; count: nu
 }
 
 export const HrDashboardPage: React.FC = () => {
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -261,10 +261,10 @@ export const HrDashboardPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx, load]);
+  }, [refreshToken, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

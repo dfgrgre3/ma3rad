@@ -7,11 +7,15 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   Copy,
   CreditCard,
   Cpu,
   Download,
   Eye,
+  FileText,
+  Filter,
+  Globe,
   KeyRound,
   Layers3,
   LockKeyhole,
@@ -21,12 +25,14 @@ import {
   Phone,
   Plus,
   RefreshCw,
+  RotateCw,
   Search,
   Send,
-  Trash2,
   ShieldCheck,
   Smartphone,
   ScrollText,
+  Trash2,
+  Upload,
   UserPlus,
   Users,
   Wallet,
@@ -193,6 +199,16 @@ export const PlatformTenantsPage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Advanced filters state
+  const [showAdvancedFilters, setShowAdvancedFilters] = React.useState(false);
+  const [dateRange, setDateRange] = React.useState({ from: '', to: '' });
+  const [outstandingRange, setOutstandingRange] = React.useState({ min: '', max: '' });
+  const [deviceUtilizationFilter, setDeviceUtilizationFilter] = React.useState('');
+  const [healthScoreFilter, setHealthScoreFilter] = React.useState('');
+  const [filterPresets, setFilterPresets] = React.useState<Record<string, any>>(() => {
+    try { return JSON.parse(localStorage.getItem('tenantFilterPresets') || '{}'); } catch { return {}; }
+  });
+
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<PlatformTenant | null>(null);
   const [form, setForm] = React.useState<PlatformTenantInput>(emptyForm);
@@ -216,13 +232,35 @@ export const PlatformTenantsPage: React.FC = () => {
   const [editingUser, setEditingUser] = React.useState<any>(null);
   const [userForm, setUserForm] = React.useState({ fullName: '', username: '', email: '', phone: '', role: 'USER', status: 'ACTIVE', notes: '' });
 
+  // Bulk operations state
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [bulkActionOpen, setBulkActionOpen] = React.useState(false);
+  const [bulkActionType, setBulkActionType] = React.useState<'status' | 'plan' | 'activation' | 'export' | 'import'>('status');
+  const [bulkStatus, setBulkStatus] = React.useState<PlatformTenantStatus>('SUSPENDED');
+  const [bulkPlanId, setBulkPlanId] = React.useState('');
+  const [bulkMonths, setBulkMonths] = React.useState(12);
+  const [bulkChannels, setBulkChannels] = React.useState<string[]>(['EMAIL']);
+  const [bulkWorking, setBulkWorking] = React.useState(false);
+  const [csvImportOpen, setCsvImportOpen] = React.useState(false);
+  const [csvFile, setCsvFile] = React.useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = React.useState<string[][]>([]);
+  const [csvImporting, setCsvImporting] = React.useState(false);
+
   // Remote Control state
   const [remoteDevices, setRemoteDevices] = React.useState<any[]>([]);
   const [remoteConfig, setRemoteConfig] = React.useState<any[]>([]);
   const [remoteHistory, setRemoteHistory] = React.useState<any[]>([]);
+  const [remoteControlData, setRemoteControlData] = React.useState<{
+    tenant: any;
+    appliedConfig: any;
+    configPushHistory: any[];
+    devices: any[];
+    lastSync: any;
+  } | null>(null);
   const [configForm, setConfigForm] = React.useState({ key: '', value: '', scope: 'TENANT', targetDeviceIds: [] as string[] });
   const [configSending, setConfigSending] = React.useState(false);
   const [selectedDeviceIds, setSelectedDeviceIds] = React.useState<string[]>([]);
+  const [forceSyncWorking, setForceSyncWorking] = React.useState(false);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -693,6 +731,248 @@ export const PlatformTenantsPage: React.FC = () => {
     }
   };
 
+  // ─── Bulk Operations ────────────────────────────────────────────────────────
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(tenants.map(t => t.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const openBulkAction = (type: 'status' | 'plan' | 'activation' | 'export' | 'import') => {
+    if (selectedIds.size === 0 && type !== 'import') {
+      toast.error('اختر عميلاً واحداً على الأقل');
+      return;
+    }
+    setBulkActionType(type);
+    setBulkActionOpen(true);
+  };
+
+  const executeBulkAction = async () => {
+    if (selectedIds.size === 0 && bulkActionType !== 'import') {
+      toast.error('لا يوجد عملاء محددون');
+      return;
+    }
+    setBulkWorking(true);
+    try {
+      const ids = Array.from(selectedIds);
+      switch (bulkActionType) {
+        case 'status': {
+          const result = platformAdminService.bulkChangeTenantStatus(ids, bulkStatus);
+          toast.success('اكتمل تغيير الحالة', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          if (result.failed.length > 0) {
+            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+          }
+          break;
+        }
+        case 'plan': {
+          if (!bulkPlanId) { toast.error('اختر باقة'); return; }
+          const result = platformAdminService.bulkChangeTenantPlan(ids, bulkPlanId, { months: bulkMonths });
+          toast.success('اكتمل تغيير الباقة', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          if (result.failed.length > 0) {
+            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+          }
+          break;
+        }
+        case 'activation': {
+          const result = platformAdminService.bulkSendActivation(ids, bulkChannels);
+          toast.success('تم إرسال بيانات التفعيل', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          if (result.failed.length > 0) {
+            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+          }
+          break;
+        }
+        case 'export': {
+          const csv = platformAdminService.bulkExportTenants(ids);
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `platform-customers-bulk-${new Date().toISOString().slice(0,10)}.csv`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+          toast.success('تم تصدير البيانات', `${ids.length} عميل`);
+          break;
+        }
+        case 'import': {
+          // Handled by CSV import modal
+          break;
+        }
+      }
+      setBulkActionOpen(false);
+      setSelectedIds(new Set());
+      load();
+      if (detailId) loadProfile(detailId);
+    } catch (err) {
+      toast.error('فشل العملية المجمعة', err instanceof Error ? err.message : undefined);
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  // ─── CSV Import ────────────────────────────────────────────────────────────
+
+  const handleCsvFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCsvFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const lines = content.trim().split('\n');
+      const preview = lines.slice(0, 5).map(line => {
+        // Simple CSV parse
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            if (inQuotes && line[j + 1] === '"') { current += '"'; j++; }
+            else inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current.trim()); current = '';
+          } else current += char;
+        }
+        values.push(current.trim());
+        return values;
+      });
+      setCsvPreview(preview);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const executeCsvImport = async () => {
+    if (!csvFile) { toast.error('اختر ملف CSV'); return; }
+    setCsvImporting(true);
+    try {
+      const content = await csvFile.text();
+      const result = platformAdminService.bulkImportTenants(content, { skipHeader: true });
+      toast.success('اكتمل الاستيراد', `مُنشأ: ${result.created}، مُحدّث: ${result.updated}، أخطاء: ${result.errors.length}`);
+      if (result.errors.length > 0) {
+        result.errors.forEach(e => toast.error(`السطر ${e.row}`, e.error));
+      }
+      setCsvImportOpen(false);
+      setCsvFile(null);
+      setCsvPreview([]);
+      load();
+    } catch (err) {
+      toast.error('فشل الاستيراد', err instanceof Error ? err.message : undefined);
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
+  // ─── Filter Presets ────────────────────────────────────────────────────────
+
+  const saveFilterPreset = (name: string) => {
+    const preset = { search, status, planId, dateRange, outstandingRange, deviceUtilizationFilter, healthScoreFilter };
+    const next = { ...filterPresets, [name]: preset };
+    setFilterPresets(next);
+    localStorage.setItem('tenantFilterPresets', JSON.stringify(next));
+    toast.success('تم حفظ الفلتر', name);
+  };
+
+  const loadFilterPreset = (name: string) => {
+    const preset = filterPresets[name];
+    if (!preset) return;
+    setSearch(preset.search);
+    setStatus(preset.status);
+    setPlanId(preset.planId);
+    setDateRange(preset.dateRange);
+    setOutstandingRange(preset.outstandingRange);
+    setDeviceUtilizationFilter(preset.deviceUtilizationFilter);
+    setHealthScoreFilter(preset.healthScoreFilter);
+    toast.success('تم تحميل الفلتر', name);
+  };
+
+  const deleteFilterPreset = (name: string) => {
+    const next = { ...filterPresets };
+    delete next[name];
+    setFilterPresets(next);
+    localStorage.setItem('tenantFilterPresets', JSON.stringify(next));
+    toast.success('تم حذف الفلتر', name);
+  };
+
+  // ─── Remote Control - New API ──────────────────────────────────────────────
+
+  const loadRemoteControlData = React.useCallback(() => {
+    if (!detailId) return;
+    try {
+      const data = platformAdminService.getTenantRemoteControl(detailId);
+      setRemoteControlData(data);
+      setRemoteDevices(data.devices);
+      setRemoteHistory(data.configPushHistory);
+      if (data.appliedConfig) {
+        setRemoteConfig([{
+          id: data.appliedConfig.id,
+          key: 'applied_config',
+          value: JSON.stringify(data.appliedConfig.configPayload),
+          scope: 'TENANT',
+          status: 'APPLIED',
+          appliedAt: data.appliedConfig.updatedAt,
+          createdAt: data.appliedConfig.createdAt,
+        }]);
+      }
+    } catch (err) {
+      toast.error('تعذر تحميل بيانات التحكم عن بعد', err instanceof Error ? err.message : undefined);
+    }
+  }, [detailId, toast]);
+
+  const pushConfig = () => {
+    if (!detailId || !configForm.key.trim()) return;
+    if (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0) {
+      toast.error('اختر جهازاً واحداً على الأقل');
+      return;
+    }
+    setConfigSending(true);
+    try {
+      const result = platformAdminService.pushTenantConfig(detailId, JSON.stringify({
+        [configForm.key]: configForm.value,
+        targetDeviceIds: configForm.scope === 'DEVICE' ? selectedDeviceIds : undefined,
+      }));
+      toast.success('تم دفع التكوين', `معرف العملية: ${result.id}`);
+      setConfigForm({ ...configForm, key: '', value: '' });
+      setSelectedDeviceIds([]);
+      loadRemoteControlData();
+    } catch (err) {
+      toast.error('فشل دفع التكوين', err instanceof Error ? err.message : undefined);
+    } finally {
+      setConfigSending(false);
+    }
+  };
+
+  const forceSync = () => {
+    if (!detailId) return;
+    setForceSyncWorking(true);
+    try {
+      platformAdminService.forceTenantSync(detailId);
+      toast.success('تم طلب مزامنة إجبارية', 'ستبدأ المزامنة خلال ثوانٍ');
+      loadRemoteControlData();
+    } catch (err) {
+      toast.error('فشل طلب المزامنة', err instanceof Error ? err.message : undefined);
+    } finally {
+      setForceSyncWorking(false);
+    }
+  };
+
+  // Load remote data when detailId changes
+  React.useEffect(() => {
+    if (detailId && tab === 'remote') {
+      loadRemoteControlData();
+    }
+  }, [detailId, tab, loadRemoteControlData]);
+
   const exportRows = () => {
     downloadCsv('platform-customers.csv', [
       ['رقم العميل', 'Tenant ID', 'الشركة', 'النشاط', 'المسؤول', 'الهاتف', 'البريد', 'الدولة', 'المدينة', 'العنوان', 'تاريخ التسجيل', 'الباقة', 'الحالة', 'بداية الاشتراك', 'نهاية الاشتراك', 'الأجهزة المسموحة', 'الأجهزة المستخدمة', 'الفروع'],
@@ -748,6 +1028,9 @@ export const PlatformTenantsPage: React.FC = () => {
             {canManageTenants && (<Button variant="ghost" size="sm" leadingIcon={<Download className="h-3.5 w-3.5" />} onClick={exportRows}>
               تصدير CSV
             </Button>)}
+            {canManageTenants && (<Button variant="ghost" size="sm" leadingIcon={<Upload className="h-3.5 w-3.5" />} onClick={() => setCsvImportOpen(true)}>
+              استيراد CSV
+            </Button>)}
             {canManageTenants && (
               <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
                 عميل جديد
@@ -792,6 +1075,110 @@ export const PlatformTenantsPage: React.FC = () => {
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>
       )}
 
+      {/* Bulk Action Toolbar */}
+      {selectedIds.size > 0 && canManageTenants && (
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50 animate-slide-up">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 shadow-xl p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-sm font-bold text-emerald-800">{selectedIds.size} عميل محدد</span>
+              <button onClick={() => setSelectedIds(new Set())} className="text-emerald-600 hover:underline text-sm">إلغاء التحديد</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" leadingIcon={<Ban className="h-3 w-3" />} onClick={() => { setBulkActionType('status'); setBulkActionOpen(true); }}>
+                تغيير الحالة
+              </Button>
+              <Button variant="secondary" size="sm" leadingIcon={<Layers3 className="h-3 w-3" />} onClick={() => { setBulkActionType('plan'); setBulkActionOpen(true); }}>
+                تغيير الباقة
+              </Button>
+              <Button variant="secondary" size="sm" leadingIcon={<Send className="h-3 w-3" />} onClick={() => { setBulkActionType('activation'); setBulkActionOpen(true); }}>
+                إرسال تفعيل
+              </Button>
+              <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3 w-3" />} onClick={() => { setBulkActionType('export'); executeBulkAction(); }}>
+                تصدير
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Filters */}
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-emerald-700"
+          >
+            <Filter className="h-4 w-4" />
+            فلاتر متقدمة
+            <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+          </button>
+          {Object.keys(filterPresets).length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10.5px] text-slate-500">قوالب محفوظة:</span>
+              <select
+                className={`${inputClass} max-w-[150px]`}
+                onChange={(e) => loadFilterPreset(e.target.value)}
+                defaultValue=""
+              >
+                <option value="">-- اختر قالب --</option>
+                {Object.keys(filterPresets).map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <Button variant="ghost" size="sm" onClick={() => {
+                const name = prompt('اسم القالب الجديد:');
+                if (name) saveFilterPreset(name);
+              }}>
+                <Plus className="h-3.5 w-3.5" /> حفظ
+              </Button>
+            </div>
+          )}
+        </div>
+        {showAdvancedFilters && (
+          <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-5">
+            <Field label="نطاق تاريخ الإنشاء">
+              <div className="flex gap-2">
+                <input type="date" className={inputClass} value={dateRange.from} onChange={(e) => setDateRange({...dateRange, from: e.target.value})} placeholder="من" />
+                <input type="date" className={inputClass} value={dateRange.to} onChange={(e) => setDateRange({...dateRange, to: e.target.value})} placeholder="إلى" />
+              </div>
+            </Field>
+            <Field label="نطاق المستحقات">
+              <div className="flex gap-2">
+                <input type="number" className={inputClass} value={outstandingRange.min} onChange={(e) => setOutstandingRange({...outstandingRange, min: e.target.value})} placeholder="الحد الأدنى" step="0.01" />
+                <input type="number" className={inputClass} value={outstandingRange.max} onChange={(e) => setOutstandingRange({...outstandingRange, max: e.target.value})} placeholder="الحد الأقصى" step="0.01" />
+              </div>
+            </Field>
+            <Field label="استخدام الأجهزة">
+              <select className={inputClass} value={deviceUtilizationFilter} onChange={(e) => setDeviceUtilizationFilter(e.target.value)}>
+                <option value="">الكل</option>
+                <option value="unused">غير مستخدم (0%)</option>
+                <option value="low">{'منخفض (< 50%)'}</option>
+                <option value="medium">{'متوسط (50-80%)'}</option>
+                <option value="high">{'عالي (> 80%)'}</option>
+                <option value="full">ممتلئ (100%)</option>
+              </select>
+            </Field>
+            <Field label="درجة الصحة">
+              <select className={inputClass} value={healthScoreFilter} onChange={(e) => setHealthScoreFilter(e.target.value)}>
+                <option value="">الكل</option>
+                <option value="excellent">ممتاز (90-100%)</option>
+                <option value="good">جيد (70-89%)</option>
+                <option value="fair">مقبول (50-69%)</option>
+                <option value="poor">{'ضعيف (< 50%)'}</option>
+              </select>
+            </Field>
+            <div className="flex items-end">
+              <Button variant="secondary" block onClick={() => {
+                setSearch(''); setStatus(''); setPlanId('');
+                setDateRange({from: '', to: ''}); setOutstandingRange({min: '', max: ''});
+                setDeviceUtilizationFilter(''); setHealthScoreFilter('');
+              }}>
+                مسح الفلاتر
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل العملاء...</div>
@@ -806,6 +1193,9 @@ export const PlatformTenantsPage: React.FC = () => {
             <table className="w-full min-w-[1080px] text-right">
               <thead className="bg-slate-50">
                 <tr className="text-[10.5px] text-slate-500">
+                  <th className="px-3 py-2.5 font-semibold w-10">
+                    <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={handleSelectAll} />
+                  </th>
                   <th className="px-3 py-2.5 font-semibold">العميل / Tenant ID</th>
                   <th className="px-3 py-2.5 font-semibold">النشاط</th>
                   <th className="px-3 py-2.5 font-semibold">الباقة</th>
@@ -819,7 +1209,10 @@ export const PlatformTenantsPage: React.FC = () => {
               </thead>
               <tbody>
                 {tenants.slice((page - 1) * 20, page * 20).map((item) => (
-                  <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                  <tr key={item.id} className={`border-t border-slate-100 hover:bg-slate-50/60 ${selectedIds.has(item.id) ? 'bg-emerald-50/30' : ''}`}>
+                    <td className="px-3 py-2.5">
+                      <input type="checkbox" checked={selectedIds.has(item.id)} onChange={(e) => handleSelectOne(item.id, e.target.checked)} />
+                    </td>
                     <td className="px-3 py-2.5">
                       <p className="text-[12.5px] font-bold text-slate-800">{item.name}</p>
                       <p className="text-[10px] text-slate-500">
@@ -1559,12 +1952,38 @@ export const PlatformTenantsPage: React.FC = () => {
 
             {tab === 'remote' && (
               <div className="space-y-3">
+                {/* Sync Status & Actions */}
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">حالة المزامنة</p>
+                      <p className="text-[11px] text-slate-500">
+                        {remoteControlData?.lastSync ? (
+                          <>
+                            آخر مزامنة: <b>{formatDateTime(remoteControlData.lastSync.at)}</b> · حالة: <b>{remoteControlData.lastSync.status}</b>
+                          </>
+                        ) : (
+                          'لا توجد مزامنة مسجلة بعد'
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteControlData} loading={configSending}>
+                        تحديث البيانات
+                      </Button>
+                      <Button variant="primary" size="sm" leadingIcon={<RotateCw className="h-3.5 w-3.5" />} onClick={forceSync} loading={forceSyncWorking} disabled={!canManageTenants}>
+                        مزامنة إجبارية
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <SectionCard
                   title="الأجهزة المتصلة"
                   subtitle={`${remoteDevices.length} جهاز — ${remoteDevices.filter((d) => d.status === 'ACTIVE').length} نشط، ${remoteDevices.filter((d) => d.status === 'OFFLINE').length} غير متصل`}
                   icon={<Cpu className="h-4 w-4" />}
                   action={
-                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteDevices} loading={configSending}>
+                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteControlData} loading={configSending}>
                       تحديث
                     </Button>
                   }
@@ -1626,8 +2045,8 @@ export const PlatformTenantsPage: React.FC = () => {
                 </SectionCard>
 
                 <SectionCard
-                  title="إرسال إعدادات جديدة"
-                  subtitle="إرسال مفاتيح تكوين (Feature Flags، حدود، وحدات، صلاحيات) إلى أجهزة العميل المستهدفة"
+                  title="إرسال إعدادات جديدة (Push Config)"
+                  subtitle="إرسال مفاتيح تكوين (Feature Flags، حدود، وحدات، صلاحيات) إلى أجهزة العميل المستهدفة عبر outbox/sync"
                   icon={<Send className="h-4 w-4" />}
                 >
                   <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1645,8 +2064,8 @@ export const PlatformTenantsPage: React.FC = () => {
                       </select>
                     </Field>
                     <div className="flex items-end">
-                      <Button variant="primary" block leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={sendConfig} loading={configSending} disabled={!canManageTenants || !configForm.key.trim() || (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0)}>
-                        إرسال الإعداد
+                      <Button variant="primary" block leadingIcon={<Send className="h-3.5 w-3.5" />} onClick={pushConfig} loading={configSending} disabled={!canManageTenants || !configForm.key.trim() || (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0)}>
+                        دفع التكوين
                       </Button>
                     </div>
                     {configForm.scope === 'DEVICE' && selectedDeviceIds.length > 0 && (
@@ -1685,17 +2104,17 @@ export const PlatformTenantsPage: React.FC = () => {
                 </SectionCard>
 
                 <SectionCard
-                  title="سجل عمليات التحكم عن بعد"
+                  title="سجل دفع التكوين (Config Push History)"
                   subtitle={`${remoteHistory.length} عملية مسجلة`}
                   icon={<ScrollText className="h-4 w-4" />}
                   action={
-                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteHistory} loading={configSending}>
+                    <Button variant="secondary" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadRemoteControlData} loading={configSending}>
                       تحديث السجل
                     </Button>
                   }
                 >
                   {remoteHistory.length === 0 ? (
-                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا يوجد سجل عمليات" description="ستظهر هنا عمليات إرسال الإعدادات وتحديث التكوين." />
+                    <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا يوجد سجل عمليات" description="ستظهر هنا عمليات دفع التكوين عبر outbox/sync relay." />
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[800px] text-right">
@@ -1717,7 +2136,7 @@ export const PlatformTenantsPage: React.FC = () => {
                               <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{entry.key}</td>
                               <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{entry.value}</td>
                               <td className="px-3 py-1.5 text-[10.5px] text-slate-600">{entry.targetCount || 0} جهاز</td>
-                              <td className="px-3 py-1.5"><StatusBadge value={entry.status || 'SUCCESS'} label={entry.status === 'SUCCESS' ? 'نجاح' : entry.status === 'FAILED' ? 'فشل' : 'بانتظار'} /></td>
+                              <td className="px-3 py-1.5"><StatusBadge value={entry.status || 'PENDING'} label={entry.status === 'ACKNOWLEDGED' ? 'وصل' : entry.status === 'SENT' ? 'مرسل' : entry.status === 'FAILED' ? 'فشل' : 'بانتظار'} /></td>
                               <td className="px-3 py-1.5 text-[10.5px] text-slate-500" dir="ltr">{entry.error || entry.result || '—'}</td>
                               <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{formatDateTime(entry.createdAt)}</td>
                             </tr>
@@ -1885,6 +2304,128 @@ export const PlatformTenantsPage: React.FC = () => {
           <Field label="ملاحظات" className="sm:col-span-2">
             <textarea rows={2} className={inputClass} value={userForm.notes} onChange={(event) => setUserForm({ ...userForm, notes: event.target.value })} />
           </Field>
+        </div>
+      </Modal>
+
+      {/* Bulk Action Modal */}
+      <Modal
+        open={bulkActionOpen}
+        onClose={() => setBulkActionOpen(false)}
+        title={bulkActionType === 'status' ? 'تغيير حالة العملاء المحددين' :
+               bulkActionType === 'plan' ? 'تغيير باقة العملاء المحددين' :
+               bulkActionType === 'activation' ? 'إرسال بيانات تفعيل للعملاء المحددين' :
+               'تصدير بيانات العملاء'}
+        description={`سيتم تطبيق العملية على ${selectedIds.size} عميل.`}
+        size="md"
+        busy={bulkWorking}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setBulkActionOpen(false)} disabled={bulkWorking}>إلغاء</Button>
+            <Button variant="primary" onClick={executeBulkAction} loading={bulkWorking} disabled={!canManageTenants}>
+              {bulkActionType === 'status' ? 'تطبيق الحالة' :
+               bulkActionType === 'plan' ? 'تطبيق الباقة' :
+               bulkActionType === 'activation' ? 'إرسال التفعيل' : 'تصدير'}
+            </Button>
+          </div>
+        }
+      >
+        {bulkActionType === 'status' && (
+          <div className="grid gap-3">
+            <Field label="الحالة الجديدة">
+              <select className={inputClass} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value as PlatformTenantStatus)}>
+                {STATUSES.map((value) => <option key={value} value={value}>{PLATFORM_TENANT_STATUS_LABELS[value]}</option>)}
+              </select>
+            </Field>
+            <p className="text-[11px] text-amber-700">سيتم تحديث حالة العميل والتراخيص والاشتراكات المرتبطة.</p>
+          </div>
+        )}
+        {bulkActionType === 'plan' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="الباقة الجديدة" className="sm:col-span-2">
+              <select className={inputClass} value={bulkPlanId} onChange={(e) => setBulkPlanId(e.target.value)}>
+                <option value="">اختر الباقة</option>
+                {plans.filter((plan) => plan.isActive).map((plan) => (
+                  <option key={plan.id} value={plan.id}>{plan.name} — {formatMoney(plan.price, plan.currency)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="المدة (أشهر)">
+              <input type="number" min={1} className={inputClass} value={bulkMonths} onChange={(e) => setBulkMonths(Math.max(1, Number(e.target.value)))} />
+            </Field>
+            <p className="text-[11px] text-amber-700 sm:col-span-2">سيتم إلغاء التراخيص والاشتراكات الحالية وإصدار تراخيص جديدة بالباقة المختارة.</p>
+          </div>
+        )}
+        {bulkActionType === 'activation' && (
+          <div className="grid gap-3">
+            <p className="text-[11px] font-semibold text-slate-700">وسائل الإرسال</p>
+            <div className="flex flex-wrap gap-3">
+              {['EMAIL', 'SMS', 'WHATSAPP'].map((channel) => (
+                <label key={channel} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={bulkChannels.includes(channel)}
+                    onChange={(event) => setBulkChannels((current) => event.target.checked
+                      ? [...current, channel]
+                      : current.filter((item) => item !== channel))}
+                  />
+                  {channel === 'EMAIL' ? 'بريد إلكتروني' : channel === 'SMS' ? 'رسالة SMS' : 'واتساب'}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        {bulkActionType === 'export' && (
+          <p className="text-[11px] text-slate-600">سيتم تصدير بيانات العملاء المحددين إلى ملف CSV.</p>
+        )}
+      </Modal>
+
+      {/* CSV Import Modal */}
+      <Modal
+        open={csvImportOpen}
+        onClose={() => { setCsvImportOpen(false); setCsvFile(null); setCsvPreview([]); }}
+        title="استيراد عملاء من CSV"
+        description="ارفع ملف CSV لإنشاء أو تحديث عملاء بشكل مجمّع. الأعمدة المطلوبة: اسم، كود (اختياري)."
+        size="lg"
+        busy={csvImporting}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setCsvImportOpen(false); setCsvFile(null); setCsvPreview([]); }} disabled={csvImporting}>إلغاء</Button>
+            <Button variant="primary" onClick={executeCsvImport} loading={csvImporting} disabled={!csvFile || csvImporting}>
+              استيراد
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCsvFileSelect}
+              className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              disabled={csvImporting}
+            />
+            <p className="mt-2 text-[10.5px] text-slate-500">تنسيق CSV مدعوم: أعمدة بالعربية أو الإنجليزية. سيستخدم الكود لتحديث العميل إن وجد، وإلا سينشئ جديد.</p>
+          </div>
+          {csvPreview.length > 0 && (
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
+              <p className="px-3 py-2 text-[10.5px] font-semibold text-slate-700 bg-slate-50 border-b">معاينة أول 5 أسطر:</p>
+              <div className="overflow-x-auto max-h-48">
+                <table className="w-full min-w-[600px] text-right text-sm">
+                  <thead className="bg-slate-50 text-[10px] text-slate-500">
+                    <tr>{csvPreview[0].map((h, i) => <th key={i} className="px-3 py-2">{h || `عمود ${i+1}`}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.slice(1).map((row, ri) => (
+                      <tr key={ri} className="border-t border-slate-100">
+                        {row.map((cell, ci) => <td key={ci} className="px-3 py-1.5 text-[10.5px]">{cell}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

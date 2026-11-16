@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import { InboxRepository } from './InboxRepository.ts';
 import { OutboxRepository } from './OutboxRepository.ts';
 import { SyncPolicyService } from './SyncPolicyService.ts';
+import { PendingChangeService } from './PendingChangeService.ts';
 import type { SyncEvent, SyncOperation } from '../types/sync/index.ts';
 import type { EventDispatcher } from './PullChangesService.ts';
 
@@ -153,19 +154,22 @@ export class BusinessRecordSyncService {
   private readonly outbox: OutboxRepository;
   private readonly inbox: InboxRepository;
   private readonly policies: SyncPolicyService;
+  private readonly pending: PendingChangeService;
 
   constructor(db: DatabaseManager = DatabaseManager.getInstance()) {
     this.db = db;
     this.outbox = new OutboxRepository(db);
     this.inbox = new InboxRepository(db);
     this.policies = new SyncPolicyService(db);
+    this.pending = new PendingChangeService(db);
   }
 
   capture(
     transaction: DatabaseManager,
     entityType: BusinessRecordType,
     entityId: string,
-    operationType: SyncOperation = 'UPSERT'
+    operationType: SyncOperation = 'UPSERT',
+    options: { bypassApproval?: boolean } = {}
   ): string | null {
     const identity = SyncPolicyService.currentIdentity();
     if (!identity || !this.policies.canSend(entityType)) return null;
@@ -188,6 +192,21 @@ export class BusinessRecordSyncService {
       [identity.tenantId, entityType, entityId]
     )[0]?.entityVersion ?? 0;
     const entityVersion = version + 1;
+
+    // Sub-branch / linked-account edits wait for the business owner's approval
+    // before they reach the outbox and propagate to head office.
+    if (!options.bypassApproval && this.pending.isApprovalRequired()) {
+      return this.pending.stage({
+        transaction,
+        entityType,
+        entityId,
+        operationType,
+        entityVersion,
+        dataScope: this.policies.get(entityType).dataScope,
+        payload,
+      });
+    }
+
     transaction.run(
       `INSERT INTO sync_entity_versions
         (tenant_id, entity_type, entity_id, entity_version, source_branch_id, updated_at)
@@ -210,6 +229,20 @@ export class BusinessRecordSyncService {
       dataScope: this.policies.get(entityType).dataScope,
       payload,
     });
+  }
+
+  /**
+   * Re-capture an entity after its pending change was approved, bypassing the
+   * approval gate so the approved state is written to the outbox once.
+   */
+  captureApproved(
+    transaction: DatabaseManager,
+    entityType: string,
+    entityId: string,
+    operationType: SyncOperation = 'UPSERT'
+  ): string | null {
+    if (!isRecordType(entityType)) return null;
+    return this.capture(transaction, entityType, entityId, operationType, { bypassApproval: true });
   }
 
   registerHandler(dispatcher: EventDispatcher): void {

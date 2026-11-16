@@ -35,23 +35,48 @@ export function useAppSession(
     const events: Array<keyof WindowEventMap> = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
     events.forEach((event) => window.addEventListener(event, bump, { passive: true }));
 
-    const timer = window.setInterval(() => {
-      let limitMinutes = 480;
-      try {
-        const configured = SettingsService.getSettings().sessionTimeoutMinutes ?? 480;
-        limitMinutes = AppConfigService.getPolicyNumber('security.sessionTimeoutMinutes', configured);
-      } catch { /* ignore */ }
-      if (!limitMinutes || limitMinutes <= 0) return;
-      if (Date.now() - lastActivity >= limitMinutes * 60_000) {
-        AuthService.logout();
-        onSessionExpired();
-      }
-    }, 30_000);
+    // Use requestIdleCallback for non-urgent idle checking if available
+    const idleCallback = typeof window.requestIdleCallback !== 'undefined'
+      ? window.requestIdleCallback
+      : null;
 
-    return () => {
-      events.forEach((event) => window.removeEventListener(event, bump));
-      window.clearInterval(timer);
-    };
+    if (idleCallback) {
+      const idleTimer = idleCallback(() => {
+        let limitMinutes = 480;
+        try {
+          const configured = SettingsService.getSettings().sessionTimeoutMinutes ?? 480;
+          limitMinutes = AppConfigService.getPolicyNumber('security.sessionTimeoutMinutes', configured);
+        } catch { /* ignore */ }
+        if (!limitMinutes || limitMinutes <= 0) return;
+        if (Date.now() - lastActivity >= limitMinutes * 60_000) {
+          AuthService.logout();
+          onSessionExpired();
+        }
+      }, { timeout: 30000 });
+
+      return () => {
+        events.forEach((event) => window.removeEventListener(event, bump));
+        if (idleTimer) window.cancelIdleCallback(idleTimer);
+      };
+    } else {
+      const timer = window.setInterval(() => {
+        let limitMinutes = 480;
+        try {
+          const configured = SettingsService.getSettings().sessionTimeoutMinutes ?? 480;
+          limitMinutes = AppConfigService.getPolicyNumber('security.sessionTimeoutMinutes', configured);
+        } catch { /* ignore */ }
+        if (!limitMinutes || limitMinutes <= 0) return;
+        if (Date.now() - lastActivity >= limitMinutes * 60_000) {
+          AuthService.logout();
+          onSessionExpired();
+        }
+      }, 30_000);
+
+      return () => {
+        events.forEach((event) => window.removeEventListener(event, bump));
+        window.clearInterval(timer);
+      };
+    }
   }, [currentUser, onSessionExpired]);
 
   // Scheduled shifts
@@ -78,13 +103,31 @@ export function useAppSession(
   // Heartbeat & Alerts
   useEffect(() => {
     if (!currentUser) return;
-    const heartbeat = window.setInterval(() => AuthService.touchSession(), 5 * 60_000);
-    const alerts = window.setInterval(() => {
-      try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
-    }, 30 * 60_000);
-    return () => {
-      window.clearInterval(heartbeat);
-      window.clearInterval(alerts);
-    };
+
+    // Use requestIdleCallback for non-urgent heartbeat and alerts if available
+    const idleCallback = typeof window.requestIdleCallback !== 'undefined'
+      ? window.requestIdleCallback
+      : null;
+
+    if (idleCallback) {
+      const heartbeatTimer = idleCallback(() => AuthService.touchSession(), { timeout: 300000 }); // 5 min
+      const alertsTimer = idleCallback(() => {
+        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
+      }, { timeout: 1800000 }); // 30 min
+
+      return () => {
+        window.cancelIdleCallback(heartbeatTimer);
+        window.cancelIdleCallback(alertsTimer);
+      };
+    } else {
+      const heartbeat = window.setInterval(() => AuthService.touchSession(), 5 * 60_000);
+      const alerts = window.setInterval(() => {
+        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
+      }, 30 * 60_000);
+      return () => {
+        window.clearInterval(heartbeat);
+        window.clearInterval(alerts);
+      };
+    }
   }, [currentUser]);
 }

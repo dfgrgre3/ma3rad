@@ -19,8 +19,9 @@ export interface DashboardMetrics {
   netProfit: number;
   totalReceivables: number; // ديون العملاء
   totalPayables: number; // مستحقات الموردين
-  inventoryValuationCost: number; // قيمة المخزون بسعر الشراء
-  inventoryValuationSale: number; // قيمة المخزون بسعر البيع
+  inventoryValuationCost: number | null; // قيمة المخزون بسعر الشراء (null = غير متاح)
+  inventoryValuationSale: number | null; // قيمة المخزون بسعر البيع (null = غير متاح)
+  inventoryValuationUnavailable: boolean; // true إذا كانت التكلفة غير متاحة بسبب خطأ FIFO
   lowStockCount: number;
   outOfStockCount: number;
   salesCount: number;
@@ -89,11 +90,13 @@ export class AccountingService {
   public getDashboardMetrics(): DashboardMetrics {
     this.requireView('dashboard.view');
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.sales.invoices.view', '/sales');
-    PermissionService.require(actor, 'ui.purchases.invoices.view', '/purchases');
-    PermissionService.require(actor, 'ui.finance.overview.view', '/finance');
-    PermissionService.require(actor, 'ui.customers.list.view', '/customers');
-    PermissionService.require(actor, 'ui.inventory.hub.view', '/inventory');
+    // Use domain permissions (matching DashboardPage PULSE_ACCESS) instead of ui.* permissions
+    // This allows users with domain-level access to view the dashboard summary
+    PermissionService.require(actor, 'sales.view', '/sales');
+    PermissionService.require(actor, 'purchases.view', '/purchases');
+    PermissionService.require(actor, 'finance.view', '/finance');
+    PermissionService.require(actor, 'customers.view', '/customers');
+    PermissionService.require(actor, 'inventory.view', '/inventory');
     const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
     const salesScope = this.branchScope('si.branch_id');
@@ -190,10 +193,11 @@ export class AccountingService {
       WHERE pi.remaining_amount > 0 AND ${purchaseScope.clause}
     `, purchaseScope.params)[0]?.totalPayables || 0;
 
-    // 6. Inventory Valuation
+    // 6. Inventory Valuation - Handle FIFO errors gracefully
     const costingMethod = this.db.query<{ value: string }>(
       `SELECT value FROM system_settings WHERE key = 'costingMethod'`
     )[0]?.value;
+    let fifoError = false;
     if (costingMethod === 'FIFO') {
       const inconsistentStock = this.db.query<{ productId: string; warehouseId: string }>(`
         SELECT ws.product_id AS productId, ws.warehouse_id AS warehouseId
@@ -206,29 +210,35 @@ export class AccountingService {
         LIMIT 1
       `, warehouseScope.params)[0];
       if (inconsistentStock) {
-        throw new Error(
-          `FIFO cost layers exceed physical stock for product ${inconsistentStock.productId} in warehouse ${inconsistentStock.warehouseId}. Reconcile inventory before viewing valuation.`
-        );
+        fifoError = true;
+        // Don't throw - log warning and continue with valuation unavailable
+        console.warn(`FIFO cost layers exceed physical stock for product ${inconsistentStock.productId} in warehouse ${inconsistentStock.warehouseId}. Inventory valuation unavailable.`);
       }
     }
-    const invStats = this.db.query<any>(`
-      SELECT 
-        SUM(CASE WHEN ? = 'FIFO' THEN
-          COALESCE((SELECT SUM(icl.quantity_remaining * icl.unit_cost)
-            FROM inventory_cost_layers icl
-            WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)
-          + MAX(0, ws.quantity_m2 - COALESCE((SELECT SUM(icl.quantity_remaining)
-            FROM inventory_cost_layers icl
-            WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
-          ELSE ws.quantity_m2 * p.cost_price END) as valuationCost,
-        SUM(ws.quantity_m2 * p.selling_price_m2) as valuationSale,
-        COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN p.id END) as lowStock,
-        COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= 0 THEN p.id END) as outOfStock
-      FROM warehouse_stock ws
-      JOIN warehouses w ON w.id = ws.warehouse_id
-      JOIN products p ON ws.product_id = p.id
-      WHERE p.is_active = 1 AND ${warehouseScope.clause}
-    `, [costingMethod, ...warehouseScope.params])[0] || {};
+    let invStats: any = { valuationCost: null, valuationSale: null, lowStock: 0, outOfStock: 0 };
+    if (!fifoError) {
+      const invResult = this.db.query<any>(`
+        SELECT 
+          SUM(CASE WHEN ? = 'FIFO' THEN
+            COALESCE((SELECT SUM(icl.quantity_remaining * icl.unit_cost)
+              FROM inventory_cost_layers icl
+              WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)
+            + MAX(0, ws.quantity_m2 - COALESCE((SELECT SUM(icl.quantity_remaining)
+              FROM inventory_cost_layers icl
+              WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
+            ELSE ws.quantity_m2 * p.cost_price END) as valuationCost,
+          SUM(ws.quantity_m2 * p.selling_price_m2) as valuationSale,
+          COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN p.id END) as lowStock,
+          COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= 0 THEN p.id END) as outOfStock
+        FROM warehouse_stock ws
+        JOIN warehouses w ON w.id = ws.warehouse_id
+        JOIN products p ON ws.product_id = p.id
+        WHERE p.is_active = 1 AND ${warehouseScope.clause}
+      `, [costingMethod, ...warehouseScope.params])[0];
+      if (invResult) invStats = invResult;
+    }
+    // Add flag to indicate valuation is unavailable
+    invStats.valuationUnavailable = fifoError;
 
     // 7. Top customer
     const topCustomer = this.db.query<any>(`
@@ -283,8 +293,9 @@ export class AccountingService {
       netProfit: Number(monthNet.toFixed(2)),
       totalReceivables: Number(customerDebts.toFixed(2)),
       totalPayables: Number(supplierPayables.toFixed(2)),
-      inventoryValuationCost: Number((invStats.valuationCost || 0).toFixed(2)),
-      inventoryValuationSale: Number((invStats.valuationSale || 0).toFixed(2)),
+      inventoryValuationCost: invStats.valuationUnavailable ? null : Number((invStats.valuationCost || 0).toFixed(2)),
+      inventoryValuationSale: invStats.valuationUnavailable ? null : Number((invStats.valuationSale || 0).toFixed(2)),
+      inventoryValuationUnavailable: invStats.valuationUnavailable || false,
       lowStockCount: invStats.lowStock || 0,
       outOfStockCount: invStats.outOfStock || 0,
       salesCount: salesStats.todaySalesCount || 0,
@@ -299,7 +310,7 @@ export class AccountingService {
 
   public getSalesTrendLast7Days(): { date: string; sales: number; profit: number }[] {
     this.requireView('dashboard.view');
-    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     const now = new Date();
     const dates = Array.from({ length: 7 }, (_, index) => {
@@ -348,7 +359,8 @@ export class AccountingService {
   }
 
   public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
-    this.requireView('ui.sales.invoices.view');
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -594,7 +606,8 @@ export class AccountingService {
   }
 
   public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
-    this.requireView('ui.sales.invoices.view');
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
     const scope = this.branchScope('si.branch_id');
@@ -731,7 +744,7 @@ export class AccountingService {
   // New methods for enhanced dashboard analytics
   public getMonthlyComparison(): MonthlyComparison {
     this.requireView('dashboard.view');
-    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const now = new Date();
     const today = localDateString();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -992,8 +1005,9 @@ export class AccountingService {
   public getNetSalesAfterReturns(dateFrom?: string, dateTo?: string) { return this.getNetSalesAnalysis(dateFrom, dateTo); }
 
   public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
-    this.requireView('ui.customers.list.view');
-    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'customers.view', '/customers');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -1010,8 +1024,9 @@ export class AccountingService {
   }
 
   public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
-    this.requireView('ui.finance.overview.view');
-    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'finance.view', '/finance');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -1026,7 +1041,8 @@ export class AccountingService {
   }
 
   public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
-    this.requireView('ui.sales.invoices.view');
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -1045,9 +1061,9 @@ export class AccountingService {
   public getRecentActivities(limit = 10): RecentDashboardActivity[] {
     this.requireView('dashboard.view');
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.sales.invoices.view', '/sales');
-    PermissionService.require(actor, 'ui.purchases.invoices.view', '/purchases');
-    PermissionService.require(actor, 'ui.inventory.hub.view', '/inventory');
+    PermissionService.require(actor, 'sales.view', '/sales');
+    PermissionService.require(actor, 'purchases.view', '/purchases');
+    PermissionService.require(actor, 'inventory.view', '/inventory');
     const salesScope = this.branchScope('si.branch_id');
     const purchaseScope = this.branchScope('pi.branch_id');
     const stockScope = this.branchScope(

@@ -22,6 +22,13 @@ export const SUPPORTED_SYNC_ENTITIES = [
   { entityType: 'supplier_payment', label: 'سداد الموردين (نسخ تقارير)' },
   { entityType: 'stock_transfer', label: 'تحويلات المخزون (نسخ تقارير)' },
   { entityType: 'expense', label: 'المصروفات (نسخ تقارير)' },
+  { entityType: 'sales_order', label: 'طلبات البيع (نسخ تقارير)' },
+  { entityType: 'sales_quotation', label: 'عروض أسعار البيع (نسخ تقارير)' },
+  { entityType: 'held_order', label: 'أوامر الانتظار (نسخ تقارير)' },
+  { entityType: 'purchase_order', label: 'طلبات الشراء (نسخ تقارير)' },
+  { entityType: 'stock_transfer', label: 'تحويلات المخزون (نسخ تقارير)' },
+  { entityType: 'inventory_transaction', label: 'حركة مخزون (نسخ تقارير)' },
+  { entityType: 'stock_adjustment', label: 'تعديل رصيد مخزون (نسخ تقارير)' },
 ] as const;
 
 export type SupportedSyncEntity = typeof SUPPORTED_SYNC_ENTITIES[number]['entityType'];
@@ -42,11 +49,15 @@ const SUPPORTED_ENTITY_TYPES = new Set<string>(SUPPORTED_SYNC_ENTITY_TYPES);
 const REMOTE_BUSINESS_RECORD_TYPES = new Set([
   'sales_invoice',
   'sales_return',
+  'sales_order',
+  'sales_quotation',
+  'held_order',
+  'purchase_order',
   'purchase_invoice',
   'purchase_return',
   'customer_payment',
   'supplier_payment',
-  'stock_transfer', 'expense',
+  'stock_transfer', 'inventory_transaction', 'stock_adjustment', 'expense',
 ]);
 type PolicyIdentity = { tenantId: string; branchId: string; deviceId: string; canManagePolicies: boolean };
 

@@ -4,6 +4,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import type { User } from '../types';
 import { S } from './RouteGuard';
 import { getPersistedLocation } from './navigationPersistence';
+import { resolveUserLandingPath } from './userLanding';
 import { appRoutes } from './routesList';
 import { PlatformLayout } from '../pages/platform/PlatformLayout';
 import { PlatformDashboardPage } from '../pages/platform/PlatformDashboardPage';
@@ -362,7 +363,12 @@ export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout, onS
       >
         <Route
           index
-          element={<Navigate to={getPersistedLocation(currentUser.id) ?? '/dashboard'} replace />}
+          element={
+            <Navigate
+              to={resolveUserLandingPath(currentUser, getPersistedLocation(currentUser.id))}
+              replace
+            />
+          }
         />
         <Route path="crm" element={<Navigate to="/crm/dashboard" replace />} />
 

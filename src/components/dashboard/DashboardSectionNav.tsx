@@ -10,7 +10,7 @@ interface DashboardSectionNavProps {
 
 export const DashboardSectionNav: React.FC<DashboardSectionNavProps> = ({ activeTab, onSelectSection, sections }) => {
   return (
-    <nav aria-label="أقسام لوحة المعلومات" className="no-scrollbar flex gap-0.5 overflow-x-auto border-b border-[#d9d9d9] dark:border-[#3d3d3d]">
+    <nav aria-label="أقسام لوحة المعلومات" className="no-scrollbar -mx-3 flex scroll-px-3 gap-0.5 overflow-x-auto border-b border-[#d9d9d9] px-3 dark:border-[#3d3d3d] sm:mx-0 sm:px-0">
       {(sections ?? SECTIONS_CONFIG).map((section) => {
         const Icon = section.icon;
         const selected = activeTab === section.id;

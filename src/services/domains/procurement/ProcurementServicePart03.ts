@@ -51,6 +51,7 @@ type GoodsReceiptProduct = {
   metersPerBox: number | string | null;
   productType: string;
   baseUnit: string;
+  grade: string | null;
 };
 
 export abstract class ProcurementServicePart03 extends ProcurementServicePart02 {
@@ -140,7 +141,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     today: string,
   ): void {
     const product = db.query<GoodsReceiptProduct>(
-      `SELECT name, cost_price, meters_per_box, product_type, base_unit FROM products WHERE id = ?`,
+      `SELECT name, cost_price, meters_per_box, product_type, base_unit, grade FROM products WHERE id = ?`,
       [item.productId],
     )[0];
     if (!product) throw new Error(`المنتج ${item.productId} غير موجود.`);
@@ -197,7 +198,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
   ): void {
     let batchId: string | null = null;
     if (product.productType !== 'GENERAL') {
-      batchId = this.insertProductBatch(db, dto, item, actor.id, today, grnNumber, batchNumber, unitCost);
+      batchId = this.insertProductBatch(db, dto, item, product, actor.id, today, grnNumber, batchNumber, unitCost);
     }
     const metersPerBox = Number(product.metersPerBox) || 1.44;
     const boxesCount = product.productType === 'GENERAL'
@@ -227,6 +228,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     db: DatabaseManager,
     dto: GoodsReceiptInput,
     item: GoodsReceiptInputItem,
+    product: GoodsReceiptProduct,
     actorId: string,
     today: string,
     grnNumber: string,
@@ -236,12 +238,13 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     const batchId = `pb_${uuidv4().substring(0, 8)}`;
     db.run(`
       INSERT INTO product_batches (
-        id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+        id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
         production_date, received_date, supplier_id, cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       batchId, item.productId, dto.warehouseId, batchNumber,
-      item.toneShade || 'STD', item.caliber || '0', today, today, dto.supplierId,
+      item.toneShade || 'STD', item.caliber || '0', item.grade || product.grade || 'GRADE_1',
+      today, today, dto.supplierId,
       unitCost, item.acceptedQuantityM2, item.acceptedQuantityM2,
       `استلام مخزني إذن ${grnNumber}`, actorId,
     ]);

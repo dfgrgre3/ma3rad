@@ -30,7 +30,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({ id, title, subtitle, i
                 </span>
               )}
             </div>
-              <p className="truncate text-[11px] text-[#767676] dark:text-[#a6a6a6]">{subtitle}</p>
+              <p className="line-clamp-2 text-[11px] leading-4 text-[#767676] dark:text-[#a6a6a6] sm:truncate sm:leading-normal">{subtitle}</p>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../../services/domains/finance/FinanceExtrasService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -43,7 +43,7 @@ export const JournalEntriesPage: React.FC = () => {
     credit: draft.reduce((s, l) => s + Number(l.credit || 0), 0),
   }), [draft]);
 
-  const filtered = entries.filter((e) => !search.trim() || e.description.includes(search) || e.entryNumber.includes(search));
+  const filtered = entries.filter((e) => !search.trim() || e.description.includes(search) || e.entryNumber.includes(search) || (e.sourceLabel || '').includes(search));
 
   const toggleEntry = (entry: JournalEntry) => {
     if (expanded === entry.id) { setExpanded(null); return; }
@@ -71,10 +71,16 @@ export const JournalEntriesPage: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const removeEntry = (entry: JournalEntry) => {
-    if (!confirm(`حذف القيد ${entry.entryNumber}؟ سيتم عكس أثره على الأرصدة.`)) return;
-    try { service.deleteJournalEntry(entry.id); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر حذف القيد.'); }
+  const isManualEntry = (entry: JournalEntry) =>
+    !entry.referenceType || entry.referenceType === 'MANUAL_JOURNAL';
+
+  const reverseEntry = (entry: JournalEntry) => {
+    const reason = prompt(`سبب عكس القيد ${entry.entryNumber} (اختياري):`, 'تصحيح قيد');
+    if (reason === null) return;
+    try {
+      service.reverseJournalEntry(entry.id, { reason });
+      load();
+    } catch (err: any) { alert(err?.message || 'تعذر عكس القيد.'); }
   };
 
   return (
@@ -118,11 +124,15 @@ export const JournalEntriesPage: React.FC = () => {
                     <span className="font-mono text-xs font-bold text-indigo-700">{entry.entryNumber}</span>
                     <span className="text-xs text-slate-400">{entry.date}</span>
                     <span className="text-sm font-bold text-slate-800 truncate">{entry.description}</span>
+                    <span className="hidden sm:inline-flex shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{entry.sourceLabel || 'قيد يدوي'}</span>
+                    {entry.reversedByEntryId && <span className="shrink-0 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">معكوس</span>}
                   </div>
                   <div className="flex items-center gap-4 shrink-0 text-xs">
                     <span className="text-slate-500">{entry.lineCount || 0} سطور</span>
                     <span className="font-mono font-black text-slate-800">{fmt(Number(entry.totalDebit))}</span>
-                    {canManage && <button onClick={(e) => { e.stopPropagation(); removeEntry(entry); }} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {canManage && isManualEntry(entry) && !entry.reversedByEntryId && (
+                      <button onClick={(e) => { e.stopPropagation(); reverseEntry(entry); }} title="عكس القيد" aria-label={`عكس القيد ${entry.entryNumber}`} className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50"><RotateCcw className="w-3.5 h-3.5" /></button>
+                    )}
                   </div>
                 </button>
                 {expanded === entry.id && (

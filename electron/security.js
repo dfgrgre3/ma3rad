@@ -79,10 +79,24 @@ function openExternalUrl(shell, value, logger = console) {
   }
 }
 
+function guardedHandle(ipcMain, channel, handler, options = {}) {
+  if (typeof channel !== 'string' || !channel) throw new Error('guardedHandle requires a channel name');
+  return ipcMain.handle(channel, async (event, ...args) => {
+    const senderOpts = options.senderOptions || {};
+    if (!isAllowedIpcSender(event, senderOpts)) {
+      const err = new Error('IPC sender not allowed');
+      err.code = 'EIPC_SENDER';
+      throw err;
+    }
+    return handler(event, ...args);
+  });
+}
+
 module.exports = {
   getAllowedExternalUrl,
   isAllowedAppUrl,
   isAllowedIpcSender,
+  guardedHandle,
   openExternalUrl,
   sameLocalFileUrl,
   get crypto() { return require('./security/crypto'); },

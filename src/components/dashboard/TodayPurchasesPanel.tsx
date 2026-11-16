@@ -7,6 +7,7 @@ import { formatProductQuantity } from '../../utils/products/productUnits';
 import type {
   PurchaseHourlyBucket, PurchasePaymentMixItem, PurchaseTopItem, PurchaseTopSupplier,
 } from '../../types/dashboard/components';
+import type { DailyPurchaseRow } from '../../services/domains/operations/DailyOperationsService';
 
 const purchasePaymentLabels: Record<string, string> = {
   CASH: 'نقدي',

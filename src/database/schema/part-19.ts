@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS platform_tenants (
 
 CREATE INDEX IF NOT EXISTS idx_platform_tenants_status ON platform_tenants(status);
 CREATE INDEX IF NOT EXISTS idx_platform_tenants_expiry ON platform_tenants(subscription_expires_at);
+CREATE INDEX IF NOT EXISTS idx_platform_tenants_branches ON platform_tenants(branches_limit);
+CREATE INDEX IF NOT EXISTS idx_platform_tenants_plan ON platform_tenants(plan_id);
 
 CREATE TABLE IF NOT EXISTS platform_plans (
   id TEXT PRIMARY KEY,
@@ -199,6 +201,7 @@ CREATE TABLE IF NOT EXISTS platform_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_platform_subscriptions_tenant ON platform_subscriptions(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_platform_subscriptions_end ON platform_subscriptions(end_date);
+CREATE INDEX IF NOT EXISTS idx_platform_subscriptions_branches ON platform_subscriptions(branches_limit);
 
 CREATE TABLE IF NOT EXISTS platform_licenses (
   id TEXT PRIMARY KEY,
@@ -235,6 +238,10 @@ CREATE TABLE IF NOT EXISTS platform_licenses (
 
 CREATE INDEX IF NOT EXISTS idx_platform_licenses_tenant ON platform_licenses(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_platform_licenses_expiry ON platform_licenses(expires_at);
+CREATE INDEX IF NOT EXISTS idx_platform_licenses_branches ON platform_licenses(branches_limit);
+CREATE INDEX IF NOT EXISTS idx_platform_licenses_offline_grace ON platform_licenses(offline_grace_period_days);
+CREATE INDEX IF NOT EXISTS idx_platform_licenses_coupling ON platform_licenses(coupling_mode);
+CREATE INDEX IF NOT EXISTS idx_platform_licenses_starts ON platform_licenses(starts_at);
 
 CREATE TABLE IF NOT EXISTS platform_invoices (
   id TEXT PRIMARY KEY,

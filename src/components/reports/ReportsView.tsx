@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart3, Calendar, DollarSign, Package, ShoppingCart, Truck, PieChart, FileSpreadsheet, FileDown } from 'lucide-react';
 import { SalesService } from '../../services/domains/sales/SalesService';

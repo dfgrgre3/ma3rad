@@ -319,7 +319,7 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export const CrmDashboardPage: React.FC = () => {
-  const refreshCtx = useDashboardRefresh();
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const service = useMemo(() => new CrmService(), []);
   const navigate = useNavigate();
@@ -343,10 +343,10 @@ export const CrmDashboardPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx, load]);
+  }, [refreshToken, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

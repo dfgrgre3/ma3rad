@@ -5,6 +5,8 @@ import { ProductService } from '../../services/domains/products/ProductService';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { Product } from '../../types';
+import type { Warehouse } from '../../types/products/catalog';
+import type { InventoryTransaction } from '../../types/inventory/transactions';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
 import { gradeLabel } from '../products/productFormModel';

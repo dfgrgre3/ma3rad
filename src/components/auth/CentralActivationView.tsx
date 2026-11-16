@@ -3,6 +3,7 @@ import { CentralLicenseService } from '../../services/domains/licensing/CentralL
 import { CentralConfigApplier } from '../../services/domains/licensing/CentralConfigApplier';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
+import { logger } from '../../utils/logger';
 
 export const CentralActivationView: React.FC = () => {
   const [account, setAccount] = useState('');
@@ -41,7 +42,7 @@ export const CentralActivationView: React.FC = () => {
             role: local.role,
           });
         } catch (provisionError) {
-          console.error('Could not provision the local account after activation:', provisionError);
+          logger.error('Could not provision the local account after activation:', provisionError instanceof Error ? provisionError : new Error(String(provisionError)));
         }
       }
       setStatus('Activated: ' + (res.tenantId || 'ok'));

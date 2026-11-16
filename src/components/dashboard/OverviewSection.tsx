@@ -21,8 +21,7 @@ interface OverviewSectionProps {
 }
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }) => {
-  const refreshCtx = useDashboardRefresh();
-  const refreshToken = refreshCtx?.refreshToken;
+  const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const {
     metrics,
@@ -88,8 +87,9 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
     );
   }
 
-  const profitMarginPercent = metrics.monthSales > 0 ? ((metrics.netProfit / metrics.monthSales) * 100).toFixed(1) : '0';
-  const averageTicket = metrics.salesCount > 0 ? metrics.todaySales / metrics.salesCount : 0;
+  // Use metrics from AccountingService to avoid duplicate calculations
+  const profitMarginPercent = metrics.profitMargin?.toFixed(1) ?? '0';
+  const averageTicket = metrics.averageOrderValue ?? 0;
 
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
@@ -108,7 +108,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
           type="button"
           onClick={loadData}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto sm:py-1.5"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? 'جاري التحديث...' : 'تحديث البيانات'}
@@ -126,7 +126,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
       />
 
       <TodayPurchasesPanel
-        canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.invoices.view')}
+        canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')}
         todayPurchases={todayPurchases}
         isLoading={purchasesLoading}
         error={purchasesError}

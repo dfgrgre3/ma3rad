@@ -70,14 +70,15 @@ const TARGET_STATUS_LABELS: Record<string, { label: string; color: string; icon:
 
 const emptyFeature = {
   id: undefined as string | undefined,
-  code: '',
+  key: '',
   name: '',
   description: '',
   category: '',
-  isEnabled: true,
-  rolloutPercent: 100,
-  isStagingOnly: false,
-  minPlanTier: '',
+  defaultEnabled: true,
+  rolloutPercentage: 100,
+  variant: null as string | null,
+  targetPlans: [] as string[],
+  metadata: null as Record<string, unknown> | null,
 };
 
 const emptyRelease = {
@@ -85,18 +86,19 @@ const emptyRelease = {
   version: '',
   channel: 'STABLE' as PlatformRelease['channel'],
   status: 'PUBLISHED' as PlatformRelease['status'],
+  targetsSummary: null as Record<string, number> | null,
+  notes: '',
+  rollbackVersion: '',
   isMandatory: false,
   minVersion: '',
   rolloutGroup: 'ALL',
   stagingGroup: 'PRODUCTION',
   fileUrl: '',
   fileName: '',
-  fileSize: '' as string | number,
+  fileSize: '' as string,
   checksumSha256: '',
   packageSignature: '',
   changelog: '',
-  rollbackVersion: '',
-  notes: '',
   releasedAt: new Date().toISOString().slice(0, 10),
 };
 

@@ -18,16 +18,16 @@ export function usePlatformFeature(code: string): boolean {
 
   useEffect(() => {
     try {
-      const flag = platformAdminService.listFeatureFlagsForRuntime().find((item) => item.code === code);
+      const flag = platformAdminService.listFeatureFlagsForRuntime().find((item) => item.key === code);
       if (!flag) {
         setEnabled(true);
         return;
       }
-      if (!flag.isEnabled) {
+      if (!flag.isActive) {
         setEnabled(false);
         return;
       }
-      if (flag.rolloutPercent >= 100) {
+      if (flag.rolloutPercentage >= 100) {
         setEnabled(true);
         return;
       }
@@ -37,7 +37,7 @@ export function usePlatformFeature(code: string): boolean {
       for (let index = 0; index < user.length; index += 1) {
         hash = (hash * 31 + user.charCodeAt(index)) >>> 0;
       }
-      setEnabled(hash % 100 < flag.rolloutPercent);
+      setEnabled(hash % 100 < flag.rolloutPercentage);
     } catch {
       setEnabled(true);
     }
@@ -52,9 +52,9 @@ export function usePlatformFeature(code: string): boolean {
  */
 export function assertPlatformFeature(code: string, context?: { tenantId?: string; userId?: string }): void {
   try {
-    const flag = platformAdminService.listFeatureFlagsForRuntime().find((item) => item.code === code);
+    const flag = platformAdminService.listFeatureFlagsForRuntime().find((item) => item.key === code);
     if (!flag) return; // If undefined flag, default to allowing or pass
-    if (!flag.isEnabled) {
+    if (!flag.isActive) {
       throw new Error(`الميزة '${flag.name || code}' غير مفعلة في الوقت الحالي.`);
     }
 
@@ -62,23 +62,23 @@ export function assertPlatformFeature(code: string, context?: { tenantId?: strin
     const tenantId = context?.tenantId ?? (window as any)?.__ceramisysUser?.tenantId;
     if (tenantId) {
       const overrides = platformAdminService.listFeatureOverrides(flag.id);
-      const tenantOverride = overrides.find((o) => o.targetType === 'TENANT' && o.targetId === tenantId);
+      const tenantOverride = overrides.find((o) => o.tenantId === tenantId);
       if (tenantOverride) {
-        if (!tenantOverride.isEnabled) {
+        if (!tenantOverride.enabled) {
           throw new Error(`الميزة غير متاحة لحسابك وفق خطتك الحالية.`);
         }
         return;
       }
     }
 
-    if (flag.rolloutPercent >= 100) return;
+    if (flag.rolloutPercentage >= 100) return;
 
     const user = context?.userId ?? (window as any)?.__ceramisysUser?.id ?? 'anonymous';
     let hash = 0;
     for (let index = 0; index < user.length; index += 1) {
       hash = (hash * 31 + user.charCodeAt(index)) >>> 0;
     }
-    if (hash % 100 >= flag.rolloutPercent) {
+    if (hash % 100 >= flag.rolloutPercentage) {
       throw new Error(`الميزة '${flag.name || code}' غير متاحة لمجموعتك في مرحلة الإطلاق الحالية.`);
     }
   } catch (err: any) {

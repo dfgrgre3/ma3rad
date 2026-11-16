@@ -6,6 +6,7 @@ export const DatabasePersistenceStatus: React.FC = () => {
   const database = DatabaseManager.getInstance();
   const toast = useToast();
   const [state, setState] = useState(database.getPersistenceStatus());
+  const stateSignature = useRef(`${state.status}|${state.code || ''}|${state.error || ''}`);
   const [showSaved, setShowSaved] = useState(false);
   const [showUnencryptedWarning, setShowUnencryptedWarning] = useState(true);
   const previousStatus = useRef(state.status);
@@ -40,10 +41,15 @@ export const DatabasePersistenceStatus: React.FC = () => {
         lastShownPersistenceError.current = null;
       }
       previousStatus.current = next.status;
-      setState(next);
+      const signature = `${next.status}|${next.code || ''}|${next.error || ''}`;
+      if (stateSignature.current !== signature) {
+        stateSignature.current = signature;
+        setState(next);
+      }
     };
     refresh();
-    const timer = window.setInterval(refresh, 100);
+    // Poll cheaply; only commit to React state when the signature changed.
+    const timer = window.setInterval(refresh, 500);
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(warningTimeout);

@@ -15,7 +15,7 @@ export interface DashboardSectionConfig {
 export const SECTIONS_CONFIG: DashboardSectionConfig[] = [
   { id: 'all', label: 'نظرة شاملة', icon: Layers },
   { id: 'pulse', label: 'ملخص اليوم', icon: LayoutDashboard },
-  { id: 'executive', label: 'الأداء التنفيذي', icon: TrendingUp },
+  { id: 'executive', label: 'مركز القيادة', icon: TrendingUp },
   { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
   { id: 'purchases', label: 'المشتريات والمخزون', icon: ShoppingBag },
   { id: 'debts', label: 'الديون والذمم', icon: Banknote },

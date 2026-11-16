@@ -13,6 +13,7 @@ import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { usePermission } from '../../hooks/domains/auth/usePermission';
 import { ConfiguredActionButton } from '../config/ConfiguredActionButton';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
+import { logger } from '../../utils/logger';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
 import { FinanceEnterpriseService } from '../../services/domains/finance/FinanceEnterpriseService';
@@ -101,7 +102,7 @@ export const CustomersView: React.FC = () => {
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
     } catch (e) {
-      console.error(e);
+      logger.error('فشل في تحميل العملاء:', e instanceof Error ? e : new Error(String(e)));
     }
   }, [search, page, pageSize, fieldFilters, customerService, operationalFieldService]);
   const handleDeleteCustomer = (customer: any) => {

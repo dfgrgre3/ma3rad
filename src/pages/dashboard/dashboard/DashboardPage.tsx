@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Award, Banknote, LayoutDashboard, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
@@ -16,7 +16,7 @@ import { ModuleRegistryService } from '../../../services/domains/config/ModuleRe
 import { CentralFeaturePermissionService } from '../../../services/domains/licensing/CentralFeaturePermissionService';
 
 // Lazy loaded integrated dashboards
-const ExecutiveDashboard = lazy(() => import('../executive/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
+const ExecutiveCommandCenter = lazy(() => import('../executive/ExecutiveCommandCenter').then(m => ({ default: m.ExecutiveCommandCenter })));
 const SalesAnalyticsPage = lazy(() => import('../../sales/sales-analytics/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
 const PurchaseInventoryReportPage = lazy(() => import('../../reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
 const DebtsDashboardPage = lazy(() => import('../../finance/debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
@@ -30,7 +30,7 @@ const HrDashboardPage = lazy(() => import('../../hr/hr-dashboard/HrDashboardPage
  */
 const PULSE_ACCESS = ['sales.view', 'purchases.view', 'finance.view', 'customers.view', 'inventory.view'];
 const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; permissions?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string }>> = {
-  executive: { permissions: ['sales.view', 'purchases.view', 'finance.view'], scopes: { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance' }, moduleId: 'finance', path: '/finance' },
+  executive: { permissions: ['sales.view', 'purchases.view', 'finance.view', 'inventory.view'], scopes: { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance', 'inventory.view': '/inventory' }, moduleId: 'finance', path: '/finance' },
   sales: { permission: 'sales.view', moduleId: 'sales', path: '/sales' },
   purchases: { permission: 'purchases.view', moduleId: 'purchasing', path: '/purchases' },
   debts: { permission: 'finance.debts.view', moduleId: 'finance', path: '/finance' },
@@ -44,7 +44,7 @@ export const DashboardPage: React.FC = () => {
   const requestedSection = searchParams.get('sec') || searchParams.get('section') || searchParams.get('tab');
   const initialSection = requestedSection?.replace(/^sec-/, '') as SectionId | undefined;
   const [activeTab, setActiveTab] = useState<SectionId>(
-    initialSection && SECTIONS_CONFIG.some((section) => section.id === initialSection) ? initialSection : 'pulse'
+    initialSection && SECTIONS_CONFIG.some((section) => section.id === initialSection) ? initialSection : 'executive'
   );
   const [refreshToken, setRefreshToken] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -88,7 +88,7 @@ export const DashboardPage: React.FC = () => {
   const selectSection = (section: SectionId) => {
     setActiveTab(section);
     const next = new URLSearchParams(searchParams);
-    if (section === 'pulse') next.delete('sec');
+    if (section === 'executive') next.delete('sec');
     else next.set('sec', section);
     next.delete('section');
     next.delete('tab');
@@ -117,8 +117,11 @@ export const DashboardPage: React.FC = () => {
   const today = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   const isOverview = effectiveTab === 'all';
 
+  // Stable context value to prevent unnecessary re-renders of consumers
+  const refreshContextValue = useMemo(() => ({ refreshToken, refresh }), [refreshToken, refresh]);
+
   return (
-    <DashboardRefreshContext.Provider value={{ refreshToken, refresh }}>
+    <DashboardRefreshContext.Provider value={refreshContextValue}>
       <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
         <div className="space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
         <DashboardHeader
@@ -151,8 +154,8 @@ export const DashboardPage: React.FC = () => {
           </>
         )}
         {showSection('executive') && (
-          <SectionCard id="sec-executive" title="الإدارة التنفيذية" subtitle="مؤشرات الأداء والأرباح والسيولة" icon={TrendingUp} iconBg="bg-indigo-50 dark:bg-indigo-950" iconColor="text-indigo-700 dark:text-indigo-300">
-            <Suspense fallback={<DashboardLoader />}><ExecutiveDashboard /></Suspense>
+          <SectionCard id="sec-executive" title="مركز القيادة التنفيذي" subtitle="مؤشرات الأداء والأرباح والسيولة — كل رقم قابل للضغط لعرض تفاصيله" icon={TrendingUp} iconBg="bg-indigo-50 dark:bg-indigo-950" iconColor="text-indigo-700 dark:text-indigo-300">
+            <Suspense fallback={<DashboardLoader />}><ExecutiveCommandCenter /></Suspense>
           </SectionCard>
         )}
         {showSection('sales') && (

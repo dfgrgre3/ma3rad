@@ -166,6 +166,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'audit', element: <P.AuditLogView /> },
   { path: 'security', element: <P.SecurityCenterPage /> },
   { path: 'admin', element: <P.AdminPage /> },
+  { path: 'admin/sync', element: <P.SyncStatusPage /> },
   { path: 'admin/sync-conflicts', element: <P.SyncConflictsPage /> },
   { path: 'admin/data-deletion', element: <P.DataDeletionPage /> },
 

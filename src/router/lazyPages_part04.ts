@@ -19,6 +19,8 @@ export const AuditLogView = lazy(() => import('../components/admin/AuditLogView'
 
 export const SecurityCenterPage = lazy(() => import('../pages/admin/security-center/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })));
 
+export const SyncStatusPage = lazy(() => import('../pages/admin/sync/SyncStatusPage').then(m => ({ default: m.SyncStatusPage })));
+
 export const SyncConflictsPage = lazy(() => import('../pages/admin/sync-conflicts/SyncConflictsPage').then(m => ({ default: m.SyncConflictsPage })));
 
 export const AdminPage = lazy(() => import('../pages/admin/admin/AdminPage').then(m => ({ default: m.AdminPage })));

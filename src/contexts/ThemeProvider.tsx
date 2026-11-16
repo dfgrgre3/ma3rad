@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, startTransition } from 'react';
 import { SettingsService } from '../services/domains/config/SettingsService';
 import { AuthService } from '../services/domains/auth/AuthService';
 import { PermissionService } from '../services/domains/auth/PermissionService';
@@ -140,13 +140,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; ready?: boolea
   const setMode = useCallback((next: ThemeMode) => {
     const user = AuthService.getCurrentUser();
     if (user && PermissionService.can(user, 'ui.settings.hub.update')) {
-      SettingsService.update({ themeMode: next });
-      try {
-        localStorage.removeItem(LOCAL_OVERRIDE_KEY);
-      } catch {
-        // ignore
-      }
-      setLocalOverride(null);
+      // Defer the (heavy) re-render so the click stays responsive; the DB
+      // write still runs synchronously for correctness.
+      startTransition(() => {
+        SettingsService.update({ themeMode: next });
+        try {
+          localStorage.removeItem(LOCAL_OVERRIDE_KEY);
+        } catch {
+          // ignore
+        }
+        setLocalOverride(null);
+      });
       return;
     }
     try {
@@ -154,7 +158,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; ready?: boolea
     } catch {
       // ignore
     }
-    setLocalOverride(next);
+    startTransition(() => {
+      setLocalOverride(next);
+    });
   }, []);
 
   const toggleMode = useCallback(() => {
@@ -169,7 +175,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; ready?: boolea
   }, []);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ settings, mode, resolvedMode, setMode, toggleMode, refresh, applyBrand }),
+    () => ({ settings, mode, resolvedMode, isDark: resolvedMode === 'dark', setMode, toggleMode, refresh, applyBrand }),
     [settings, mode, resolvedMode, setMode, toggleMode, refresh, applyBrand]
   );
 

@@ -24,6 +24,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
     batchNumber: '',
     toneShade: '',
     caliber: '0',
+    grade: '',
     quantityM2: '',
     costPrice: '',
     receivedDate: '',
@@ -54,13 +55,14 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
         batchNumber:     form.batchNumber.trim(),
         toneShade:       form.toneShade.trim(),
         caliber:         form.caliber.trim() || '0',
+        grade:           form.grade.trim() || undefined,
         quantityM2:      Number(form.quantityM2),
         costPrice:       canUpdatePricing ? Number(form.costPrice) || 0 : undefined,
         receivedDate:    form.receivedDate   || undefined,
         productionDate:  form.productionDate  || undefined,
         notes:           form.notes.trim()    || undefined,
       });
-      setForm({ warehouseId: form.warehouseId, batchNumber: '', toneShade: '', caliber: '0', quantityM2: '', costPrice: '', receivedDate: '', productionDate: '', notes: '' });
+      setForm({ warehouseId: form.warehouseId, batchNumber: '', toneShade: '', caliber: '0', grade: '', quantityM2: '', costPrice: '', receivedDate: '', productionDate: '', notes: '' });
       setFormOpen(false);
       load();
     } catch (err: any) { alert(err?.message || 'تعذر إضافة الدفعة'); }
@@ -72,10 +74,11 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
     try { batchService.deleteBatch(id); load(); } catch (err: any) { alert(err?.message); }
   };
 
-  // تجميع الدفعات حسب مجموعات النغمة/العيار لعرض الملخص
-  const toneGroups = batches.reduce<Record<string, { tone: string; caliber: string; totalM2: number; remainingM2: number }>>((acc, b) => {
-    const key = `${b.toneShade}||${b.caliber}`;
-    if (!acc[key]) acc[key] = { tone: b.toneShade, caliber: b.caliber, totalM2: 0, remainingM2: 0 };
+  // تجميع الدفعات حسب مجموعات النغمة/العيار/الفرز لعرض الملخص
+  const toneGroups = batches.reduce<Record<string, { tone: string; caliber: string; grade: string; totalM2: number; remainingM2: number }>>((acc, b) => {
+    const grade = b.grade || '';
+    const key = `${b.toneShade}||${b.caliber}||${grade}`;
+    if (!acc[key]) acc[key] = { tone: b.toneShade, caliber: b.caliber, grade, totalM2: 0, remainingM2: 0 };
     acc[key].totalM2     += b.quantityM2;
     acc[key].remainingM2 += b.quantityRemainingM2;
     return acc;
@@ -91,10 +94,11 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
           <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2"><Palette className="w-4 h-4 text-violet-500" /> ملخص النغمات المتاحة</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {Object.values(toneGroups).map((g) => (
-              <div key={`${g.tone}-${g.caliber}`} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
+              <div key={`${g.tone}-${g.caliber}-${g.grade}`} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
                 <div className="text-xs font-bold text-slate-700 mb-1">
                   نغمة: <span className="text-violet-600">{g.tone}</span>
                   {g.caliber && g.caliber !== '0' && <span className="mr-2 text-amber-600">عيار: {g.caliber}</span>}
+                  {g.grade && <span className="mr-2 text-sky-600">فرز: {g.grade}</span>}
                 </div>
                 <div className="text-base font-black text-sky-600">{fmtM2(g.remainingM2)} م²</div>
                 <div className="text-[10px] text-slate-400">مستلم: {fmtM2(g.totalM2)} م²</div>
@@ -141,6 +145,10 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
                   <input placeholder="مثال: 0 أو 1" value={form.caliber} onChange={(e) => setForm({ ...form, caliber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">الفرز / الدرجة</label>
+                  <input placeholder="مثال: GRADE_1 أو فرز أول" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                </div>
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">الكمية (م²) *</label>
                   <input required type="number" min={0.01} step="0.01" placeholder="0.00" value={form.quantityM2} onChange={(e) => setForm({ ...form, quantityM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
@@ -184,7 +192,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
           <table className="w-full text-sm text-right">
             <thead className="bg-slate-50">
               <tr>
-                {['المخزن', 'رقم الدفعة', 'نغمة اللون', 'العيار', 'تاريخ الاستلام', 'الكمية (م²)', 'المتبقي (م²)', ...(canViewCosts ? ['التكلفة/م²'] : []), ...(canEdit ? ['حذف'] : [])].map((h) => (
+                {['المخزن', 'رقم الدفعة', 'نغمة اللون', 'العيار', 'الفرز', 'تاريخ الاستلام', 'الكمية (م²)', 'المتبقي (م²)', ...(canViewCosts ? ['التكلفة/م²'] : []), ...(canEdit ? ['حذف'] : [])].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500 text-right">{h}</th>
                 ))}
               </tr>
@@ -203,6 +211,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-amber-700 font-bold">{b.caliber || '0'}</td>
+                    <td className="px-4 py-3 text-xs">{b.grade ? <span className="inline-flex px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-700">{b.grade}</span> : <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">{b.receivedDate ? new Date(b.receivedDate).toLocaleDateString('ar-EG') : (b.createdAt ? new Date(b.createdAt).toLocaleDateString('ar-EG') : '—')}</td>
                     <td className="px-4 py-3 font-mono text-slate-700">{fmtM2(b.quantityM2)}</td>
                     <td className="px-4 py-3">

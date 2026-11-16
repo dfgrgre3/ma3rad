@@ -129,6 +129,7 @@ export { DocumentsPage } from './lazyPages_part04';
 export { NotificationsView } from './lazyPages_part04';
 export { AuditLogView } from './lazyPages_part04';
 export { SecurityCenterPage } from './lazyPages_part04';
+export { SyncStatusPage } from './lazyPages_part04';
 export { SyncConflictsPage } from './lazyPages_part04';
 export { AdminPage } from './lazyPages_part04';
 export { DataDeletionPage } from './lazyPages_part04';

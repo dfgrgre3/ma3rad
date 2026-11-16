@@ -94,7 +94,8 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     anyPerms: ['settings.view', ...DATA_IMPORT_ACCESS_PERMISSIONS],
     items: [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, anyPerms: ['admin.view', 'users.view'] },
-      { label: 'تعارضات مزامنة الفروع', to: '/admin/sync-conflicts', icon: RefreshCw, perm: 'admin.view' },
+      { label: 'مركز مزامنة الفروع والحسابات', to: '/admin/sync', icon: Network, anyPerms: ['admin.view', 'ui.admin.sync_center.view'] },
+      { label: 'تعارضات مزامنة الفروع', to: '/admin/sync-conflicts', icon: RefreshCw, anyPerms: ['admin.view', 'ui.admin.sync_conflicts.view'] },
       { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, anyPerms: DATA_IMPORT_ACCESS_PERMISSIONS },
       { label: 'أنواع البيانات الديناميكية', to: '/data-import/types', icon: FileSpreadsheet, anyPerms: ['settings.dynamic_data.view', 'settings.view'] },
       { label: 'الإشعارات', to: '/notifications', icon: Bell, perm: 'notifications.view' },

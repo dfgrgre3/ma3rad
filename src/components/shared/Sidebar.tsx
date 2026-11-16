@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Keyboard, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
 import { useSharedNavigationGroups } from '../../hooks/domains/config/useNavigationGroups';
 import { useTheme } from '../../contexts/useTheme';
 
@@ -9,6 +9,7 @@ interface SidebarProps {
   onToggleCollapsed?: () => void;
   mobile?: boolean;
   onNavigate?: () => void;
+  onOpenShortcuts?: () => void;
 }
 
 const OPEN_GROUPS_KEY = 'sidebar_open_groups';
@@ -18,6 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapsed,
   mobile = false,
   onNavigate,
+  onOpenShortcuts,
 }) => {
   const location = useLocation();
   const { resolvedMode, toggleMode } = useTheme();
@@ -153,6 +155,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             {resolvedMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             <span>{resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+          </button>
+        )}
+        {onOpenShortcuts && (
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            className="win-btn win-btn--ghost w-full !min-h-7 !justify-start !px-2 text-[11px]"
+            title="اختصارات لوحة المفاتيح (F1)"
+          >
+            <Keyboard className="h-4 w-4" />
+            <span>اختصارات لوحة المفاتيح</span>
           </button>
         )}
         {!mobile && onToggleCollapsed && (

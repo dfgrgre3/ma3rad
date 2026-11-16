@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { FinancialStatementsService } from '../../../services/domains/reports/FinancialStatementsService';
-import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine, ReconciliationCheck } from '../../../services/domains/reports/FinancialStatementsService';
+import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine, ReconciliationCheck, PartyOption, PartyStatement } from '../../../services/domains/reports/FinancialStatementsService';
 import { exportToExcel } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
 import { localDateString } from '../../../utils/shared/date';
 import { BalanceSheetPanel } from '../../../components/reports/financial-statements/BalanceSheetPanel';
 import { CashFlowPanel } from '../../../components/reports/financial-statements/CashFlowPanel';
 import { AgingPanel } from '../../../components/reports/financial-statements/AgingPanel';
+import { IncomeStatementPanel } from '../../../components/reports/financial-statements/IncomeStatementPanel';
+import type { IncomeStatement } from '../../../components/reports/financial-statements/IncomeStatementPanel';
+import { AccountingService } from '../../../services/domains/finance/AccountingService';
+import { SubledgerPanel } from '../../../components/reports/financial-statements/SubledgerPanel';
 import { GeneralLedgerPanel } from '../../../components/reports/financial-statements/GeneralLedgerPanel';
 import { ReconciliationPanel } from '../../../components/reports/financial-statements/ReconciliationPanel';
 import { FinancialStatementsHeader } from '../../../components/reports/financial-statements/FinancialStatementsHeader';
@@ -19,9 +23,14 @@ const yearStart = () => `${new Date().getFullYear()}-01-01`;
 type FinancialStatementsContentProps = {
   loading: boolean;
   tab: FinancialStatementsTab;
+  income: IncomeStatement | null;
   balance: BalanceSheet | null;
   cash: { months: CashFlowMonth[]; totals: CashFlowMonth; balances: { opening: number; closing: number } } | null;
   aging: { rows: AgingRow[]; bucket: AgingBucket } | null;
+  partyType: 'CUSTOMER' | 'SUPPLIER';
+  parties: PartyOption[];
+  partyId: string;
+  partyStatement: PartyStatement | null;
   accounts: Array<{ id: string; code: string; name: string; type: string }>;
   accountId: string;
   ledger: { opening: number; lines: LedgerLine[]; closing: number } | null;
@@ -31,23 +40,38 @@ type FinancialStatementsContentProps = {
   to: string;
   setAccountId: React.Dispatch<React.SetStateAction<string>>;
   setLedger: React.Dispatch<React.SetStateAction<{ opening: number; lines: LedgerLine[]; closing: number } | null>>;
+  onPartyTypeChange: (type: 'CUSTOMER' | 'SUPPLIER') => void;
+  onPartyChange: (partyId: string) => void;
 };
 
 const FinancialStatementsContent: React.FC<FinancialStatementsContentProps> = ({
-  loading, tab, balance, cash, aging, accounts, accountId, ledger, reconciliation,
-  service, from, to, setAccountId, setLedger,
+  loading, tab, income, balance, cash, aging, partyType, parties, partyId, partyStatement, accounts, accountId, ledger, reconciliation,
+  service, from, to, setAccountId, setLedger, onPartyTypeChange, onPartyChange,
 }) => {
   if (loading) {
     return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div>;
   }
 
   switch (tab) {
+    case 'income':
+      return income ? <IncomeStatementPanel statement={income} /> : null;
     case 'balance':
       return balance ? <BalanceSheetPanel balance={balance} /> : null;
     case 'cash':
       return cash ? <CashFlowPanel cash={cash} /> : null;
     case 'aging':
       return aging ? <AgingPanel aging={aging} /> : null;
+    case 'subledger':
+      return (
+        <SubledgerPanel
+          partyType={partyType}
+          parties={parties}
+          partyId={partyId}
+          statement={partyStatement}
+          onTypeChange={onPartyTypeChange}
+          onPartyChange={onPartyChange}
+        />
+      );
     case 'ledger':
       return (
         <GeneralLedgerPanel
@@ -69,10 +93,13 @@ const FinancialStatementsContent: React.FC<FinancialStatementsContentProps> = ({
 
 export const FinancialStatementsPage: React.FC = () => {
   const service = useMemo(() => new FinancialStatementsService(), []);
+  const accounting = useMemo(() => new AccountingService(), []);
   const toast = useToast();
   const [tab, setTab] = useState<FinancialStatementsTab>('balance');
   const [loading, setLoading] = useState(true);
   const [scopeWarning, setScopeWarning] = useState<string | null>(null);
+
+  const [income, setIncome] = useState<IncomeStatement | null>(null);
 
   const [asOf, setAsOf] = useState(today());
   const [balance, setBalance] = useState<BalanceSheet | null>(null);
@@ -93,6 +120,11 @@ export const FinancialStatementsPage: React.FC = () => {
   const [ledger, setLedger] = useState<{ opening: number; lines: LedgerLine[]; closing: number } | null>(null);
   const [reconciliation, setReconciliation] = useState<ReconciliationCheck[] | null>(null);
 
+  const [partyType, setPartyType] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER');
+  const [parties, setParties] = useState<PartyOption[]>([]);
+  const [partyId, setPartyId] = useState('');
+  const [partyStatement, setPartyStatement] = useState<PartyStatement | null>(null);
+
   const loadLedger = useCallback(() => {
     const list = accounts.length ? accounts : service.getAccountsForLedger();
     if (!accounts.length) setAccounts(list);
@@ -107,6 +139,9 @@ export const FinancialStatementsPage: React.FC = () => {
     try {
       setScopeWarning(service.getBranchScopeWarning());
       switch (tab) {
+        case 'income':
+          setIncome(accounting.getProfitAndLossReport(from, to));
+          break;
         case 'balance':
           setBalance(service.getBalanceSheet(asOf));
           break;
@@ -119,6 +154,14 @@ export const FinancialStatementsPage: React.FC = () => {
         case 'reconciliation':
           setReconciliation(service.getReconciliation());
           break;
+        case 'subledger': {
+          const list = service.getSubledgerParties(partyType);
+          setParties(list);
+          const selected = list.some((party) => party.id === partyId) ? partyId : (list[0]?.id || '');
+          if (selected !== partyId) setPartyId(selected);
+          setPartyStatement(selected ? service.getPartyStatement(partyType, selected, from, to) : null);
+          break;
+        }
         case 'ledger':
           loadLedger();
           break;
@@ -128,9 +171,26 @@ export const FinancialStatementsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [agingType, asOf, from, loadLedger, service, tab, toast, to]);
+  }, [accounting, agingType, asOf, from, loadLedger, partyId, partyType, service, tab, toast, to]);
 
   useEffect(() => { load(); }, [load]);
+
+  const changePartyType = (type: 'CUSTOMER' | 'SUPPLIER') => {
+    setPartyType(type);
+    setPartyId('');
+    setPartyStatement(null);
+    setParties([]);
+  };
+
+  const changeParty = (nextPartyId: string) => {
+    setPartyId(nextPartyId);
+    try {
+      setPartyStatement(nextPartyId ? service.getPartyStatement(partyType, nextPartyId, from, to) : null);
+    } catch (e: any) {
+      setPartyStatement(null);
+      toast.error(e?.message || 'تعذر تحميل كشف الطرف.');
+    }
+  };
 
   const exportBalance = () => {
     if (!balance) return;
@@ -210,22 +270,24 @@ export const FinancialStatementsPage: React.FC = () => {
       columns: [
         { key: 'date', label: 'التاريخ' },
         { key: 'entryNumber', label: 'رقم القيد' },
+        { key: 'referenceType', label: 'المصدر' },
         { key: 'description', label: 'البيان' },
         { key: 'debit', label: 'مدين' },
         { key: 'credit', label: 'دائن' },
         { key: 'balance', label: 'الرصيد' },
       ],
       rows: [
-        { date: '', entryNumber: '', description: 'الرصيد الافتتاحي', debit: '', credit: '', balance: ledger.opening },
+        { date: '', entryNumber: '', referenceType: '', description: 'الرصيد الافتتاحي', debit: '', credit: '', balance: ledger.opening },
         ...ledger.lines.map((line) => ({
           date: line.date,
           entryNumber: line.entryNumber,
+          referenceType: line.referenceType || '',
           description: line.description,
           debit: line.debit,
           credit: line.credit,
           balance: line.balance,
         })),
-        { date: '', entryNumber: '', description: 'الرصيد الختامي', debit: '', credit: '', balance: ledger.closing },
+        { date: '', entryNumber: '', referenceType: '', description: 'الرصيد الختامي', debit: '', credit: '', balance: ledger.closing },
       ],
     });
   };
@@ -252,18 +314,75 @@ export const FinancialStatementsPage: React.FC = () => {
     });
   };
 
+  const exportSubledger = () => {
+    if (!partyStatement) return;
+    exportToExcel({
+      title: `الأستاذ المساعد — ${partyStatement.name}`,
+      subtitle: `من ${partyStatement.from} إلى ${partyStatement.to}`,
+      fileName: `subledger-${partyStatement.partyType.toLowerCase()}`,
+      permission: 'reports.export',
+      columns: [
+        { key: 'date', label: 'التاريخ' },
+        { key: 'entryNumber', label: 'رقم القيد' },
+        { key: 'referenceType', label: 'المصدر' },
+        { key: 'description', label: 'البيان' },
+        { key: 'debit', label: 'مدين' },
+        { key: 'credit', label: 'دائن' },
+        { key: 'balance', label: 'الرصيد' },
+      ],
+      rows: [
+        { date: partyStatement.from, entryNumber: '', referenceType: '', description: 'الرصيد الافتتاحي', debit: 0, credit: 0, balance: partyStatement.opening },
+        ...partyStatement.lines.map((line) => ({
+          date: line.date,
+          entryNumber: line.entryNumber,
+          referenceType: line.referenceType,
+          description: line.description,
+          debit: line.debit,
+          credit: line.credit,
+          balance: line.balance,
+        })),
+        { date: partyStatement.to, entryNumber: '', referenceType: '', description: 'الرصيد الختامي', debit: 0, credit: 0, balance: partyStatement.closing },
+      ],
+    });
+  };
+
+  const exportIncome = () => {
+    if (!income) return;
+    exportToExcel({
+      title: 'قائمة الدخل',
+      subtitle: `من ${from} إلى ${to}`,
+      fileName: 'income-statement',
+      permission: 'reports.export',
+      columns: [{ key: 'label', label: 'البند' }, { key: 'amount', label: 'المبلغ' }],
+      rows: [
+        { label: 'إيرادات المبيعات', amount: income.merchandiseRevenue },
+        { label: 'إيرادات الشحن', amount: income.shippingRevenue },
+        { label: 'إيرادات أخرى', amount: income.otherRevenue },
+        { label: 'إجمالي الإيرادات', amount: income.revenue },
+        { label: 'تكلفة البضاعة المباعة', amount: income.costOfGoodsSold },
+        { label: 'إجمالي الربح', amount: income.grossProfit },
+        { label: 'المصروفات التشغيلية', amount: income.expenses },
+        { label: 'صافي الربح', amount: income.netProfit },
+      ],
+    });
+  };
+
   const exportCurrentTab = () => {
-    if (tab === 'balance') exportBalance();
+    if (tab === 'income') exportIncome();
+    else if (tab === 'balance') exportBalance();
     else if (tab === 'cash') exportCash();
     else if (tab === 'aging') exportAging();
+    else if (tab === 'subledger') exportSubledger();
     else if (tab === 'ledger') exportLedger();
     else exportReconciliation();
   };
-  const canExportCurrentTab = tab === 'balance' ? Boolean(balance)
-    : tab === 'cash' ? Boolean(cash)
-      : tab === 'aging' ? Boolean(aging)
-        : tab === 'ledger' ? Boolean(ledger && accountId)
-          : Boolean(reconciliation);
+  const canExportCurrentTab = tab === 'income' ? Boolean(income)
+    : tab === 'balance' ? Boolean(balance)
+      : tab === 'cash' ? Boolean(cash)
+        : tab === 'aging' ? Boolean(aging)
+          : tab === 'subledger' ? Boolean(partyStatement)
+            : tab === 'ledger' ? Boolean(ledger && accountId)
+              : Boolean(reconciliation);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -288,9 +407,14 @@ export const FinancialStatementsPage: React.FC = () => {
         <FinancialStatementsContent
           loading={loading}
           tab={tab}
+          income={income}
           balance={balance}
           cash={cash}
           aging={aging}
+          partyType={partyType}
+          parties={parties}
+          partyId={partyId}
+          partyStatement={partyStatement}
           accounts={accounts}
           accountId={accountId}
           ledger={ledger}
@@ -300,6 +424,8 @@ export const FinancialStatementsPage: React.FC = () => {
           to={to}
           setAccountId={setAccountId}
           setLedger={setLedger}
+          onPartyTypeChange={changePartyType}
+          onPartyChange={changeParty}
         />
       </div>
     </div>

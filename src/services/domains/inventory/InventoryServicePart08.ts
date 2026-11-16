@@ -45,7 +45,7 @@ public getTransferItems(transferId: string): any[] {
       SELECT a.id, a.transfer_item_id AS transferItemId,
         a.source_batch_id AS sourceBatchId, a.transit_batch_id AS transitBatchId,
         a.destination_batch_id AS destinationBatchId, a.batch_number AS batchNumber,
-        a.tone_shade AS toneShade, a.caliber, a.quantity_m2 AS quantityM2,
+        a.tone_shade AS toneShade, a.caliber, a.grade, a.quantity_m2 AS quantityM2,
         a.received_m2 AS receivedM2, a.lost_m2 AS lostM2, a.reverted_m2 AS revertedM2,
         a.unit_cost AS unitCost, sti.product_id AS productId, sti.product_name AS productName
       FROM stock_transfer_batch_allocations a

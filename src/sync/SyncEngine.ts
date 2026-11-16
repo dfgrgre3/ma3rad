@@ -8,6 +8,8 @@ import { RetryScheduler } from './RetryScheduler.ts';
 import { SyncAuditLogger } from './SyncAuditLogger.ts';
 import { EventDispatcher } from './PullChangesService.ts';
 import { EventValidator } from './EventValidator.ts';
+import { SyncPolicyService } from './SyncPolicyService.ts';
+import { SyncStatusService } from './SyncStatusService.ts';
 import type { SyncTransport, SyncStatus } from '../types/sync/index.ts';
 
 export class SyncEngine {
@@ -71,6 +73,14 @@ export class SyncEngine {
       this.health.setConnected(true);
       this.health.setLastSuccess(new Date().toISOString());
       this.health.setLastError(null);
+      // Record the successful contact so the sync center can show per-branch
+      // presence and "last contact" without querying the transport.
+      const identity = SyncPolicyService.currentIdentity();
+      if (identity) {
+        try {
+          new SyncStatusService().touchBranch(identity.branchId);
+        } catch { /* status bookkeeping must never break a sync cycle */ }
+      }
     } catch (error) {
       this.health.setConnected(false);
       this.health.setLastError(error instanceof Error ? error.message : String(error));

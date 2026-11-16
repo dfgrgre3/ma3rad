@@ -7,6 +7,8 @@ export type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;
 
 export const STORAGE_PREFIX = 'ceramisys_navigation_shortcuts_v1_';
 
+export const NAVIGATION_SHORTCUTS_EVENT = 'ceramisys:navigation-shortcuts-changed';
+
 export const MAX_RECENT_PAGES = 10;
 
 export const PATH_ALIASES: Record<string, string> = {

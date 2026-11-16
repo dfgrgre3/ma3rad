@@ -3,6 +3,7 @@ import { CheckSquare, Search, Check, X, Clock, Loader2, Plus, Filter } from 'luc
 import { ApprovalService, ApprovalRequest, ApprovalType } from '../../../services/domains/approvals/ApprovalService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { SyncChangeApprovalsPanel } from '../../../components/sync/SyncChangeApprovalsPanel';
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string }> = {
   DISCOUNT: { label: 'خصم استثنائي', color: 'text-amber-700 bg-amber-50 border-amber-200' },
@@ -124,6 +125,7 @@ export const ApprovalsPage: React.FC = () => {
   const canReject = PermissionService.can(user, 'ui.approvals.inbox.reject');
   const canCancel = PermissionService.can(user, 'ui.approvals.inbox.cancel');
   const canCreate = PermissionService.can(user, 'ui.approvals.inbox.create');
+  const isOwner = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, cancelled: 0, expired: 0 });
@@ -226,6 +228,16 @@ export const ApprovalsPage: React.FC = () => {
             <p className="text-xl font-black">{c.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Branch / linked-account edits awaiting the business owner's decision */}
+      <div className="px-4 pb-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <SyncChangeApprovalsPanel
+            canDecide={isOwner}
+            requestedBy={isOwner ? undefined : user?.id}
+          />
+        </div>
       </div>
 
       <div className="px-4 pb-3 flex flex-col md:flex-row gap-3">
