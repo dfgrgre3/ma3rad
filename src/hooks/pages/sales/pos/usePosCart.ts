@@ -302,6 +302,16 @@ export const usePosCart = ({
     });
   };
 
+  const updateCartNotes = (index: number, value: string) => {
+    setCart((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      item.notes = value;
+      updated[index] = item;
+      return updated;
+    });
+  };
+
   return {
     cart,
     setCart,
@@ -314,6 +324,7 @@ export const usePosCart = ({
     updateCartUnit,
     updateCartPrice,
     updateCartLineDiscount,
+    updateCartNotes,
     removeFromCart,
     recentlyRemoved: recentlyRemoved?.item || null,
     undoRemoveFromCart,
