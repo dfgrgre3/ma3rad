@@ -182,7 +182,7 @@ export class LoyaltyService {
     if (existing) return existing;
     const id = `cloy_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(`
         INSERT OR IGNORE INTO customer_loyalty (id, customer_id, current_points, total_points_earned, total_points_redeemed, tier_id, joined_at, last_activity_at)
         VALUES (?, ?, 0, 0, 0, NULL, ?, ?)
@@ -195,7 +195,7 @@ export class LoyaltyService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.loyalty.program.earn');
     this.validateMovementDto(dto);
-    return this.db.executeTransaction((db) => applyLoyaltyMovementInTransaction(db, {
+    return this.db.executeFinancialTransaction((db) => applyLoyaltyMovementInTransaction(db, {
       customerId: dto.customerId, points: dto.points, type: 'EARN',
       referenceType: dto.referenceType!, referenceId: dto.referenceId!,
       description: dto.description || `Earned ${dto.points} loyalty points`, actor,
@@ -206,7 +206,7 @@ export class LoyaltyService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.loyalty.program.redeem');
     this.validateMovementDto(dto);
-    return this.db.executeTransaction((db) => applyLoyaltyMovementInTransaction(db, {
+    return this.db.executeFinancialTransaction((db) => applyLoyaltyMovementInTransaction(db, {
       customerId: dto.customerId, points: dto.points, type: 'REDEEM',
       referenceType: dto.referenceType!, referenceId: dto.referenceId!,
       description: dto.description || `Redeemed ${dto.points} loyalty points`, actor,

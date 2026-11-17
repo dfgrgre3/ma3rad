@@ -126,7 +126,9 @@ function resolvePostingBranchId(db: Database, posting: LedgerPosting): string | 
     WHERE reference_id = ? AND branch_id IS NOT NULL
     ORDER BY created_at DESC LIMIT 1
   `, [referenceId])[0]?.branch_id;
-  return priorBranch ?? null;
+  // Fall back to the default branch so journal_entries.branch_id can be NOT NULL;
+  // unresolved references are still recorded, just scoped to br_main.
+  return priorBranch ?? 'br_main';
 }
 
 /**

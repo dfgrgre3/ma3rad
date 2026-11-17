@@ -24,7 +24,7 @@ public recordSpecialStock(input: {
       throw new Error('الكمية يجب أن تكون رقماً صحيحاً أكبر من صفر.');
     }
 
-    return this.db.executeTransaction((txDb) => {
+    return this.db.executeFinancialTransaction((txDb) => {
       const stock = this.getProductStock(input.productId, input.warehouseId);
       if (!stock || stock.availableM2 < input.quantityM2) {
         const unitLabel = this.getUnitLabel(input.productId);
@@ -106,7 +106,7 @@ public inspectSpecialStock(id: string, notes: string): void {
 
     const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
     const companyScope = this.branchAccess.companyScope('w.company_id', actor);
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const item = txDb.query<any>(`
         SELECT iss.id, iss.status, iss.warehouse_id AS warehouseId
         FROM inventory_special_stocks iss

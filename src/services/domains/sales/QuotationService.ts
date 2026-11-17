@@ -688,7 +688,7 @@ export class QuotationService {
         totalAmount: invoice.totalAmount,
       });
       return invoice;
-    });
+    }, { immediatePersist: true });
   }
 
   public getDefaultWarehouseId(): string | undefined {

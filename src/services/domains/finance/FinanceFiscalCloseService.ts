@@ -195,7 +195,7 @@ export abstract class FinanceFiscalCloseService extends FinancePeriodCloseServic
       }
     }
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO fiscal_years
           (id, year_code, name, start_date, end_date, status, company_id, branch_scope,
@@ -275,7 +275,7 @@ export abstract class FinanceFiscalCloseService extends FinancePeriodCloseServic
 
   public closePeriod(periodId: string, notes?: string): void {
     const actor = this.requireClose();
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const query: (sql: string, params?: any[]) => any[] = (sql, params = []) => tx.query<any>(sql, params);
       const period = this.getPeriodRow(periodId, query);
       if (period.status === 'CLOSED' || period.status === 'LOCKED') throw new Error('الفترة مقفلة بالفعل.');

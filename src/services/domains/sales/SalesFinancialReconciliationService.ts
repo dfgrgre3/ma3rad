@@ -298,7 +298,7 @@ export class SalesFinancialReconciliationService {
     const closedAt = new Date().toISOString();
     const branchId = this.branchAccess.getCurrentBranchId(actor);
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(`
         INSERT INTO sales_financial_reconciliations
           (id, branch_id, date_from, date_to, checks_json, notes, closed_by, closed_at)

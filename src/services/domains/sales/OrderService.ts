@@ -608,7 +608,7 @@ export class OrderService {
         orderNumber: order.orderNumber, receiptId, receiptNumber, deposit, totalPaid: newPaid, remaining: Math.max(0, newRemaining)
       });
       return this.getOrder(id)!;
-    });
+    }, { immediatePersist: true });
   }
 
   public refundDeposit(depositId: string, reason: string): string {
@@ -705,7 +705,7 @@ export class OrderService {
           JSON.stringify({ depositId, refundId, refundNumber, amount, paymentMethod: deposit.paymentMethod, reason: cleanReason })]
       );
       return refundId;
-    });
+    }, { immediatePersist: true });
   }
 
   public cancelOrder(id: string): void {
@@ -803,7 +803,7 @@ export class OrderService {
         totalAmount: invoice.totalAmount,
       });
       return this.sales.getInvoiceById(invoice.id)!;
-    });
+    }, { immediatePersist: true });
   }
 
   public deleteCancelledOrder(id: string): void {

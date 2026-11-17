@@ -432,7 +432,7 @@ export class PurchaseService {
     dueDate.setDate(dueDate.getDate() + paymentTermsDays);
     const dueDateString = localDateString(dueDate);
 
-    const invoice = this.db.executeTransaction((sqliteDb) => {
+    const invoice = this.db.executeFinancialTransaction((sqliteDb) => {
       const trackInventory = ModuleRegistryService.isInventoryTracked();
       const invoiceNumber = sqliteDb.nextNumber('PUR');
       const { subtotal, preparedItems } = this.preparePurchaseItems(sqliteDb, purchaseId, dto.items);
@@ -602,7 +602,7 @@ export class PurchaseService {
     const today = localDateString();
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
 
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       if (idempotencyKey) {
         const prior = db.query<any>(
           `SELECT * FROM supplier_payments WHERE idempotency_key = ?`,
@@ -677,7 +677,7 @@ export class PurchaseService {
 
     this.ensurePurchaseHasNoReturns(purchaseId);
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const trackInventory = ModuleRegistryService.isInventoryTracked();
       if (trackInventory) {
         this.validatePurchaseInventoryDeletion(db, purchaseId, invoice);

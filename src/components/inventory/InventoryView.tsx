@@ -18,7 +18,7 @@ export const InventoryView: React.FC = () => {
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [stockList, setStockList] = useState<any[]>([]);
   const [inactiveStockList, setInactiveStockList] = useState<any[]>([]);
-  const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   

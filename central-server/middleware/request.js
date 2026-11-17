@@ -18,4 +18,21 @@ function requestContext(req, res, next) {
   next();
 }
 
-module.exports = { requestContext };
+/**
+ * Enforce HTTPS in production. This middleware should be placed after the reverse proxy
+ * which terminates TLS. It checks the X-Forwarded-Proto header set by the proxy.
+ */
+function requireHttps(req, res, next) {
+  if (process.env.REQUIRE_HTTPS !== '1') {
+    return next();
+  }
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  if (proto !== 'https') {
+    return res.status(403).json({ error: 'HTTPS required. Access this endpoint via HTTPS.' });
+  }
+
+  next();
+}
+
+module.exports = { requestContext, requireHttps };

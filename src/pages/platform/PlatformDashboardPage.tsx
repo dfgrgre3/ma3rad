@@ -473,7 +473,7 @@ export const PlatformDashboardPage: React.FC = () => {
                     </p>
                     <p className="text-[10px] text-slate-500">{formatDate(release.releasedAt || release.createdAt)}</p>
                   </div>
-                  <StatusBadge value={release.status} label={StatusLabel[release.status] || release.status} />
+                  <StatusBadge value={release.status ?? ''} label={StatusLabel[release.status ?? ''] || release.status || ''} />
                 </li>
               ))}
             </ul>

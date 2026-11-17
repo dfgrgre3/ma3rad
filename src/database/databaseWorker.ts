@@ -47,7 +47,13 @@ self.addEventListener('message', async (event: MessageEvent<DbWorkerRequest>) =>
   try {
     switch (type) {
       case 'init': {
-        await DatabaseManager.getInstance().initialize();
+        const manager = DatabaseManager.getInstance();
+        // The worker only holds a replica for off-thread queries; snapshot
+        // persistence is owned by the renderer's DatabaseManager. Without this,
+        // the worker would race the main thread writing the same IndexedDB
+        // snapshot key and could overwrite newer state with a stale export.
+        manager.suppressPersistence();
+        await manager.initialize();
         isInitialized = true;
         postResponse({ type: 'ok', id, payload: undefined });
         break;

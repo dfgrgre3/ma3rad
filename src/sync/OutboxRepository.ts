@@ -87,7 +87,7 @@ export class OutboxRepository {
   }
 
   listPending(limit = 100, policyGate?: { configured: boolean; authority: boolean }): SyncEvent[] {
-    const policyEntityTypes = SUPPORTED_SYNC_ENTITY_TYPES.filter((entityType) => entityType !== 'sync_policy');
+    const policyEntityTypes = SUPPORTED_SYNC_ENTITY_TYPES.filter((entityType) => entityType !== ('sync_policy' as any));
     const entityTypePlaceholders = policyEntityTypes.map(() => '?').join(',');
     const rows = this.dbManager.query<OutboxRow>(
       `SELECT * FROM sync_outbox

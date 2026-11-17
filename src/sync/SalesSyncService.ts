@@ -117,6 +117,8 @@ export class SalesSyncService {
 
   private applySalesInvoice(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const invoiceId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -155,6 +157,8 @@ export class SalesSyncService {
 
   private applySalesReturn(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const returnId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -193,6 +197,8 @@ export class SalesSyncService {
 
   private applyCustomerPayment(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const paymentId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -231,6 +237,8 @@ export class SalesSyncService {
 
   private applySalesOrder(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const orderId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -269,6 +277,8 @@ export class SalesSyncService {
 
   private applySalesQuotation(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const quotationId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -307,6 +317,8 @@ export class SalesSyncService {
 
   private applyHeldOrder(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const orderId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;

@@ -33,7 +33,7 @@ public createBankReconciliation(input: {
     const recId = `brec_${uuidv4().substring(0, 8)}`;
     const recNumber = `BR-${input.statementDate.slice(0, 7)}-${uuidv4().substring(0, 4).toUpperCase()}`;
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO bank_reconciliations (
           id, reconciliation_number, bank_account_id, statement_date,

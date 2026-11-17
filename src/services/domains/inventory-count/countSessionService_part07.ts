@@ -16,7 +16,7 @@ export function cancelCountSession(activeSession: CountSession): void {
   if (!session) throw new Error('Count session not found.');
   branchAccess.requireWarehouseAccess(session.warehouseId, actor);
   if (session.status !== 'COUNTING') throw new Error('Only an open count session can be cancelled.');
-  db.executeTransaction(txDb => {
+  db.executeFinancialTransaction(txDb => {
     const latest = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!latest || latest.status !== 'COUNTING') throw new Error('The session status changed. Reload and try again.');
     txDb.run("UPDATE stock_counts SET status = 'CANCELLED' WHERE id = ? AND status = 'COUNTING'", [activeSession.id]);

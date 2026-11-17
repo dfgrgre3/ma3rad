@@ -8,6 +8,7 @@ const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
+const DB_ENCRYPTION_KEY_KEY = 'ceramisys_db_encryption_key';
 const SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS = 500;
 const SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS = 10000;
 const LEGACY_X86_BUILD = typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined'
@@ -36,6 +37,72 @@ function getDatabaseManagerState(): DatabaseManagerState {
   return runtime[DATABASE_MANAGER_STATE_KEY]!;
 }
 
+/**
+ * Encryption utilities for IndexedDB storage using Web Crypto API (AES-GCM).
+ * Falls back to unencrypted storage if crypto is unavailable.
+ */
+async function getOrCreateEncryptionKey(): Promise<CryptoKey | null> {
+  try {
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+      console.warn('[database] Web Crypto API not available, using unencrypted storage');
+      return null;
+    }
+
+    // Try to load existing key from localStorage
+    const storedKey = localStorage.getItem(DB_ENCRYPTION_KEY_KEY);
+    if (storedKey) {
+      const keyData = JSON.parse(storedKey);
+      return await crypto.subtle.importKey(
+        'jwk',
+        keyData,
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    // Generate new key
+    const key = await crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt']
+    );
+
+    // Export and store the key
+    const exportedKey = await crypto.subtle.exportKey('jwk', key);
+    localStorage.setItem(DB_ENCRYPTION_KEY_KEY, JSON.stringify(exportedKey));
+
+    return key;
+  } catch (error) {
+    console.warn('[database] Failed to setup encryption, using unencrypted storage:', error);
+    return null;
+  }
+}
+
+async function encryptData(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data.buffer as ArrayBuffer
+  );
+  const result = new Uint8Array(iv.length + encrypted.byteLength);
+  result.set(iv);
+  result.set(new Uint8Array(encrypted), iv.length);
+  return result;
+}
+
+async function decryptData(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
+  const iv = data.slice(0, 12);
+  const encrypted = data.slice(12);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encrypted
+  );
+  return new Uint8Array(decrypted);
+}
+
 function openDatabaseStorage(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_IDB_NAME, 1);
@@ -55,7 +122,19 @@ async function readBrowserSnapshot(): Promise<Uint8Array | null> {
         request.onerror = () => reject(request.error);
       });
       const stored = toUint8Array(value);
-      if (stored) return stored;
+      if (stored) {
+        // Try to decrypt if encryption key is available
+        const key = await getOrCreateEncryptionKey();
+        if (key) {
+          try {
+            return await decryptData(stored, key);
+          } catch (decryptError) {
+            console.warn('[database] Failed to decrypt snapshot, trying unencrypted read:', decryptError);
+            // Fall through to return raw data (might be unencrypted legacy data)
+          }
+        }
+        return stored;
+      }
     } finally { db.close(); }
   }
   return null;
@@ -65,9 +144,13 @@ async function writeBrowserSnapshot(bytes: Uint8Array, key = DB_IDB_KEY): Promis
   if (typeof indexedDB !== 'undefined') {
     const db = await openDatabaseStorage();
     try {
+      // Encrypt data if encryption key is available
+      const encryptionKey = await getOrCreateEncryptionKey();
+      const dataToWrite = encryptionKey ? await encryptData(bytes, encryptionKey) : bytes;
+
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(DB_IDB_STORE, 'readwrite');
-        transaction.objectStore(DB_IDB_STORE).put(bytes, key);
+        transaction.objectStore(DB_IDB_STORE).put(dataToWrite, key);
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error || new Error('Browser database storage write aborted'));
@@ -80,6 +163,31 @@ async function writeBrowserSnapshot(bytes: Uint8Array, key = DB_IDB_KEY): Promis
     return;
   }
   throw new Error('No browser database storage is available');
+}
+
+// Removes the browser snapshot (encrypted or plaintext) once the encrypted file backend is
+// authoritative, so no copy of the database lingers on disk.
+// Backup snapshots stored under other keys are left untouched.
+async function deleteBrowserSnapshot(): Promise<void> {
+  try {
+    if (typeof indexedDB !== 'undefined') {
+      const db = await openDatabaseStorage();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const transaction = db.transaction(DB_IDB_STORE, 'readwrite');
+          transaction.objectStore(DB_IDB_STORE).delete(DB_IDB_KEY);
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+          transaction.onabort = () => reject(transaction.error || new Error('Browser database storage delete aborted'));
+        });
+      } finally { db.close(); }
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(DB_STORAGE_KEY);
+      // Also remove encryption key when deleting snapshot for security
+      localStorage.removeItem(DB_ENCRYPTION_KEY_KEY);
+    }
+  } catch { /* best effort: a stale copy must not break the encrypted save */ }
 }
 
 function persistenceErrorMessage(error: unknown, fallbackCode: string): string {
@@ -173,6 +281,13 @@ export class DatabaseManager {
   private dirtySinceLastSave = true;
   private mutationSeq = 0;
   private lastSnapshotSeq = 0;
+  // Set when any transaction in the current stack asks for immediate
+  // persistence; consumed by the outermost COMMIT so nested financial
+  // operations still trigger an immediate snapshot write.
+  private immediatePersistRequested = false;
+  // Track when a critical financial transaction is in progress to ensure
+  // durable persistence before returning success to the user.
+  private criticalTransactionInProgress = false;
   private lastPersistError: string | null = null;
   private lastPersistErrorCode: string | null = null;
   private initializedSuccessfully = false;
@@ -188,6 +303,10 @@ export class DatabaseManager {
   // Minimum gap between full-DB exports. sql.js db.export() on a ~10 MB database
   // takes ~50-200 ms and blocks the UI thread; throttling to 3s prevents save storms.
   private readonly SAVE_MIN_INTERVAL_MS = 3000;
+  // Set inside the database Web Worker: the worker holds a replica used only
+  // for off-thread queries, so it must never write snapshots — persistence is
+  // owned exclusively by the renderer's DatabaseManager (file API / IndexedDB).
+  private persistenceSuppressed = false;
 
   private constructor() {}
 
@@ -578,9 +697,9 @@ export class DatabaseManager {
     const salesInvoices = this.db.exec('SELECT name FROM sqlite_master WHERE type = "table" AND name = "sales_invoices"');
     if ((salesInvoices[0]?.values?.length ?? 0) === 0) return false;
 
-    const columnInfo = new Map(
+    const columnInfo = new Map<string, { notNull: boolean }>(
       (this.db.exec('PRAGMA table_info(sales_invoices)')[0]?.values ?? [])
-        .map((row) => [String(row[1]), { notNull: Number(row[3]) === 1 }])
+        .map((row: unknown[]) => [String(row[1]), { notNull: Number(row[3]) === 1 }])
     );
     let changed = false;
 
@@ -595,11 +714,13 @@ export class DatabaseManager {
       changed = true;
     }
 
-    if (!columnInfo.get('payment_status')?.notNull) {
+    const paymentStatusInfo = columnInfo.get('payment_status');
+    if (paymentStatusInfo && !paymentStatusInfo.notNull) {
       this.db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
       changed = changed || this.db.getRowsModified() > 0;
     }
-    if (!columnInfo.get('invoice_status')?.notNull) {
+    const invoiceStatusInfo = columnInfo.get('invoice_status');
+    if (invoiceStatusInfo && !invoiceStatusInfo.notNull) {
       this.db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
       changed = changed || this.db.getRowsModified() > 0;
     }
@@ -712,7 +833,7 @@ export class DatabaseManager {
   }
 
   public scheduleDebouncedSave(delayMs = 3000): void {
-    if (this.transactionDepth > 0) return;
+    if (this.persistenceSuppressed || this.transactionDepth > 0) return;
     if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
     this.cancelIdleSave();
     this.debounceSaveTimer = setTimeout(() => {
@@ -745,8 +866,8 @@ export class DatabaseManager {
     }, delayMs);
   }
 
-  public saveToStorage(): void {
-    if (!this.db) return;
+  public saveToStorage(force = false): void {
+    if (this.persistenceSuppressed || !this.db) return;
     if (this.debounceSaveTimer) {
       clearTimeout(this.debounceSaveTimer);
       this.debounceSaveTimer = null;
@@ -755,8 +876,11 @@ export class DatabaseManager {
     if (!this.dirtySinceLastSave) return;
     if (this.saveInProgress) return; // Already saving; skip to avoid UI freeze
     const now = Date.now();
-    if (now - this.lastSaveStartMs < this.SAVE_MIN_INTERVAL_MS) {
-      this.dirtySinceLastSave = false;
+    if (!force && now - this.lastSaveStartMs < this.SAVE_MIN_INTERVAL_MS) {
+      // Too soon after the last save; re-schedule instead of clearing the dirty
+      // flag (clearing it here was a data-loss bug — changes could go
+      // un-persisted until the next mutation).
+      this.scheduleDebouncedSave(this.SAVE_MIN_INTERVAL_MS);
       return;
     }
     this.saveInProgress = true;
@@ -890,6 +1014,7 @@ export class DatabaseManager {
     this.storageBackend = 'file';
     this.lastPersistError = null;
     this.lastPersistErrorCode = null;
+    void deleteBrowserSnapshot();
     if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
       try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
       this.migratedLegacyStorage = false;
@@ -899,11 +1024,29 @@ export class DatabaseManager {
 
   /** Wait for all pending disk writes (used before shutdown/backup/restore). */
   public async flush(): Promise<void> {
+    if (this.persistenceSuppressed) return;
     if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null) {
       clearTimeout(this.debounceSaveTimer);
       this.debounceSaveTimer = null;
       this.cancelIdleSave();
-      this.saveToStorage();
+    }
+    // Force a final snapshot for anything still dirty — including changes that
+    // arrived while a previous save was in flight. Poll briefly because the
+    // export is scheduled on a macrotask and `persistQueue` may not include it
+    // yet when we first check. A persist failure stops the loop so flush()
+    // reports it instead of silently retrying within the same call.
+    const deadline = Date.now() + 30000;
+    // A save already in flight when flush() starts counts as this flush's
+    // attempt — if it fails we report the error instead of retrying silently.
+    let attemptedSave = this.saveInProgress || this.isPersisting || this.pendingSnapshot !== null;
+    while (this.dirtySinceLastSave && Date.now() < deadline) {
+      const saveActive = this.saveInProgress || this.isPersisting || this.pendingSnapshot !== null;
+      if (!saveActive) {
+        if (attemptedSave && this.lastPersistError) break;
+        this.saveToStorage(true);
+        attemptedSave = true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
     while (this.isPersisting || this.pendingSnapshot) {
       const queue = this.persistQueue;
@@ -930,7 +1073,9 @@ export class DatabaseManager {
     if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null || this.isPersisting || this.pendingSnapshot) {
       return { status: 'saving' };
     }
-    if (this.storageBackend === 'localStorage') return { status: 'unencrypted' };
+    if (this.storageBackend === 'localStorage' || this.storageBackend === 'indexedDB') {
+      return { status: 'unencrypted' };
+    }
     return { status: 'saved' };
   }
 
@@ -1021,31 +1166,24 @@ export class DatabaseManager {
    * يعيد نفس تنسيق النتيجة الخاص بـ `query` (مصفوفة من الكائنات بمفاتيح camelCase).
    */
   public async queryAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const { syncMainToWorkerAsync, queryAsync, syncWorkerToMainAsync } = await this.importAsyncService();
-    await syncMainToWorkerAsync();
-    const result = await queryAsync<T>(sql, params);
-    await syncWorkerToMainAsync();
-    return result;
+    const { queryAsync } = await this.importAsyncService();
+    return queryAsync<T>(sql, params);
   }
 
   /**
    * تنفيذ INSERT/UPDATE/DELETE بشكل غير متزامن في Web Worker.
    */
   public async runAsync(sql: string, params: unknown[] = []): Promise<void> {
-    const { syncMainToWorkerAsync, runAsync, syncWorkerToMainAsync } = await this.importAsyncService();
-    await syncMainToWorkerAsync();
-    await runAsync(sql, params);
-    await syncWorkerToMainAsync();
+    const { runAsync } = await this.importAsyncService();
+    return runAsync(sql, params);
   }
 
   /**
    * تنفيذ SQL خام (transactions, PRAGMA) بشكل غير متزامن في Web Worker.
    */
   public async execAsync(sql: string): Promise<void> {
-    const { syncMainToWorkerAsync, execAsync, syncWorkerToMainAsync } = await this.importAsyncService();
-    await syncMainToWorkerAsync();
-    await execAsync(sql);
-    await syncWorkerToMainAsync();
+    const { execAsync } = await this.importAsyncService();
+    return execAsync(sql);
   }
 
   /**
@@ -1053,20 +1191,16 @@ export class DatabaseManager {
    * يعيد Uint8Array يمكن حفظه في indexedDB أو ملف.
    */
   public async exportDatabaseAsync(): Promise<Uint8Array> {
-    const { syncMainToWorkerAsync, exportDatabaseFromWorkerAsync, syncWorkerToMainAsync } = await this.importAsyncService();
-    await syncMainToWorkerAsync();
-    const bytes = await exportDatabaseFromWorkerAsync();
-    await syncWorkerToMainAsync();
-    return bytes;
+    const { exportDatabaseAsync } = await this.importAsyncService();
+    return exportDatabaseAsync();
   }
 
   /**
    * استيراد قاعدة بيانات ثنائية بشكل غير متزامن إلى Web Worker والخيط الرئيسي.
    */
   public async importDatabaseAsync(bytes: Uint8Array): Promise<void> {
-    const { importDatabaseToWorkerAsync } = await this.importAsyncService();
-    this.importDatabaseBytes(bytes); // تحديث النسخة في الخيط الرئيسي أيضًا
-    await importDatabaseToWorkerAsync(bytes);
+    const { importDatabaseAsync } = await this.importAsyncService();
+    return importDatabaseAsync(bytes);
   }
 
   /**
@@ -1086,7 +1220,24 @@ export class DatabaseManager {
     return `${prefix}-${year}-${String(next).padStart(6, '0')}`;
   }
 
-  public executeTransaction<T>(callback: (db: DatabaseManager) => T): T {
+  /**
+   * executeTransaction with immediatePersist for financially critical writes
+   * (journal entries, invoices, payments, period closes). The snapshot is
+   * exported and written to durable storage right after COMMIT instead of
+   * waiting for the debounce/idle delay used by routine writes.
+   *
+   * IMPORTANT: For new financial operations, prefer executeDurableTransaction
+   * which ensures the write is durably persisted before returning success.
+   */
+  public executeFinancialTransaction<T>(callback: (db: DatabaseManager) => T): T {
+    return this.executeTransaction(callback, { immediatePersist: true });
+  }
+
+  public executeTransaction<T>(
+    callback: (db: DatabaseManager) => T,
+    options?: { immediatePersist?: boolean },
+  ): T {
+    if (options?.immediatePersist) this.immediatePersistRequested = true;
     if (this.transactionDepth === 0 && this.lastPersistError) {
       throw new AppError(
         `توقفت المعاملات لأن آخر عملية لم تُحفظ على القرص: ${this.lastPersistError}`,
@@ -1112,13 +1263,23 @@ export class DatabaseManager {
         committed = true;
         this.clearQueryCache();
         this.markDirty();
-        this.scheduleDebouncedSave();
+        const persistImmediately = this.immediatePersistRequested;
+        this.immediatePersistRequested = false;
+        if (persistImmediately) {
+          // Financial writes skip the debounce/idle delay so the snapshot
+          // reaches durable storage within ~one frame instead of seconds.
+          this.saveToStorage(true);
+          if (this.dirtySinceLastSave) this.scheduleDebouncedSave(0);
+        } else {
+          this.scheduleDebouncedSave();
+        }
       } else {
         db.exec(`RELEASE SAVEPOINT ${savepoint};`);
       }
       return result;
     } catch (error) {
       if (!depthReleased) this.transactionDepth--;
+      if (isOuterTransaction) this.immediatePersistRequested = false;
       if (!committed) this.rollbackTransaction(db, isOuterTransaction, savepoint);
       logger.error(
         committed
@@ -1141,6 +1302,62 @@ export class DatabaseManager {
       db.exec(`ROLLBACK TO SAVEPOINT ${savepoint};`);
       db.exec(`RELEASE SAVEPOINT ${savepoint};`);
     } catch { /* savepoint may already have been released */ }
+  }
+
+  /**
+   * Async variant of executeTransaction for financially critical writes.
+   * The callback may be async; the outermost COMMIT is only released after it
+   * resolves, and the method then waits until the snapshot is durably
+   * persisted (flush) before returning — so a resolved promise means the
+   * write survived a crash, not just the in-memory COMMIT.
+   * Nested calls behave like savepoints and never flush on their own.
+   */
+  public async executeDurableTransaction<T>(
+    callback: (db: DatabaseManager) => T | Promise<T>,
+  ): Promise<T> {
+    if (this.transactionDepth === 0 && this.lastPersistError) {
+      throw new AppError(
+        `توقفت المعاملات لأن آخر عملية لم تُحفظ على القرص: ${this.lastPersistError}`,
+        'DATABASE_PERSIST_FAILED',
+        true,
+      );
+    }
+    const db = this.getDatabase();
+    const depth = this.transactionDepth;
+    const isOuterTransaction = depth === 0;
+    const savepoint = `db_nested_${depth}`;
+    if (isOuterTransaction) db.exec('BEGIN TRANSACTION;');
+    else db.exec(`SAVEPOINT ${savepoint};`);
+    this.transactionDepth++;
+    let depthReleased = false;
+    let committed = false;
+    try {
+      const result = await callback(this);
+      this.transactionDepth--;
+      depthReleased = true;
+      if (isOuterTransaction) {
+        db.exec('COMMIT;');
+        committed = true;
+        this.clearQueryCache();
+        this.markDirty();
+        this.saveToStorage(true);
+        await this.flush();
+      } else {
+        db.exec(`RELEASE SAVEPOINT ${savepoint};`);
+      }
+      return result;
+    } catch (error) {
+      if (!depthReleased) this.transactionDepth--;
+      if (!committed) this.rollbackTransaction(db, isOuterTransaction, savepoint);
+      logger.error(
+        committed
+          ? 'Transaction committed in memory but could not be persisted:'
+          : 'Transaction rolled back due to error:',
+        error instanceof Error ? error : new Error(String(error)),
+        { committed }
+      );
+      throw toAppError(error, 'DATABASE_TRANSACTION_FAILED');
+    }
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {
@@ -1186,6 +1403,25 @@ export class DatabaseManager {
   private markDirty(): void {
     this.dirtySinceLastSave = true;
     this.mutationSeq++;
+  }
+
+  /**
+   * Disables all snapshot persistence. Used inside the database Web Worker,
+   * which keeps a replica solely for off-thread queries — the renderer's
+   * DatabaseManager is the single writer of database snapshots.
+   */
+  public suppressPersistence(): void {
+    this.persistenceSuppressed = true;
+    if (this.debounceSaveTimer) {
+      clearTimeout(this.debounceSaveTimer);
+      this.debounceSaveTimer = null;
+    }
+    this.cancelIdleSave();
+  }
+
+  /** Monotonic counter bumped on every mutation; used to detect main↔worker drift. */
+  public getMutationSeq(): number {
+    return this.mutationSeq;
   }
 
   private trackQuery<T>(sql: string, operation: () => T): T {
@@ -1426,10 +1662,14 @@ export class DatabaseManager {
 
       let totalRows = 0;
       let totalCells = 0;
-      const sheets = [...availableTables]
-        .filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+      const sheets: Array<{
+        name: string;
+        columns: string[];
+        rows: Array<Record<string, unknown>>;
+      }> = [...availableTables]
+        .filter((name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
         .sort()
-        .map((name) => {
+        .map((name: string) => {
           const columns = (importedDatabase.exec(`PRAGMA table_info("${name}")`)[0]?.values || [])
             .map((column: unknown[]) => String(column[1]));
           const statement = importedDatabase.prepare(`SELECT * FROM "${name}"`);

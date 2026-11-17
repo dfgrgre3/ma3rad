@@ -122,7 +122,7 @@ export class PurchaseRequestService {
     this.branchAccess.requireBranchAccess(branchId, actor);
 
     const id = `prq_${uuidv4().substring(0, 8)}`;
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const requestNumber = db.nextNumber('PRQ');
       db.run(
         `INSERT INTO purchase_requests (id, request_number, date, branch_id, warehouse_id, requested_by,

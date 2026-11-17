@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  CalendarDays, Plus, Search, Calendar, CheckCircle2,
+  CalendarDays, Plus, Search, Calendar, CheckCircle2, Check, CreditCard,
 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InstallmentService } from '../../../services/domains/finance/InstallmentService';
@@ -176,7 +176,7 @@ export const InstallmentsPage: React.FC = () => {
       const { planNumber, downPaymentReceipt } = installmentService.createPlan({ customerId: selectedCustomerId, invoiceId: selectedInvoiceId, totalAmount: totalFinanced, downPayment, installmentsCount: monthsCount, startDate });
       alert(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية).${downPaymentReceipt ? ` إيصال المقدم: ${downPaymentReceipt}` : ''}`);
       setShowCreateModal(false);
-      loadData();
+      load();
     } catch (err: any) {
       alert(`خطأ أثناء إنشاء خطة التقسيط: ${err?.message}`);
     }
@@ -191,7 +191,7 @@ export const InstallmentsPage: React.FC = () => {
     try {
       const result = installmentService.payInstallment(inst.id);
       alert(`تم تسجيل سداد القسط بنجاح!\nرقم الإيصال: ${result.receiptNumber}\nتم إضافة ${result.amount} ج إلى الخزينة.`);
-      loadData();
+      load();
     } catch (err: any) {
       alert(`خطأ أثناء سداد القسط: ${err?.message}`);
     }
@@ -203,7 +203,7 @@ export const InstallmentsPage: React.FC = () => {
     try {
       const result = installmentService.reverseInstallmentPayment(inst.id);
       alert(`تم عكس الإيصال ${result.receiptNumber} وإعادة ${fmt(result.amount)} إلى رصيد العميل.`);
-      loadData();
+      load();
     } catch (err: any) {
       alert(`تعذر عكس سداد القسط: ${err?.message}`);
     }
@@ -215,7 +215,7 @@ export const InstallmentsPage: React.FC = () => {
     try {
       const result = installmentService.cancelPlan(inst.planId);
       alert(`تم إلغاء خطة ${result.planNumber} وعكس المقدم إن وجد.`);
-      loadData();
+      load();
     } catch (err: any) {
       alert(`تعذر إلغاء الخطة: ${err?.message}`);
     }

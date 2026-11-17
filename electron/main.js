@@ -17,7 +17,7 @@ const {
 } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
 const { registerDocumentHandlers } = require('./documentHandlers');
-const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl, guardedHandle } = require('./security');
+const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 const { createHttpSyncClient, createSyncRelay } = require('./syncRelay');
 const { resolveCentralRequest, sanitizeCentralHeaders } = require('./centralApi');
@@ -450,9 +450,9 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = '3a4683def8e7fee0031589deb39d199347bddaae1cf240861083682085b2aab6';
+const PRELOAD_INTEGRITY_SHA256 = '086c0f0689710b77a031cbf6b9febdc846591ce516168451f82f83f335ce32da';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
-const SECURITY_SOURCE_INTEGRITY_SHA256 = '605a8b4f72517a8c3e5b87626f8a483ea49f71c8d66f73bd4be964d1b4526123';
+const SECURITY_SOURCE_INTEGRITY_SHA256 = '0010fb4c0e6c72bc45ab67fd8a9e10254720794afcd624643608757bdd795f0b';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
 const BYTECODE_INTEGRITY = app.isPackaged
   ? JSON.parse(fsSync.readFileSync(path.join(__dirname, 'bytecode-integrity.json'), 'utf8'))

@@ -170,7 +170,7 @@ export class PlatformConfigService {
       );
     }
 
-    const configPayload = input.configPayload ?? {};
+    const configPayload = input.configPayload ?? input.values ?? {};
 
     if (existing) {
       this.db.run(
@@ -247,10 +247,14 @@ export class PlatformConfigService {
     const now = nowIso();
     const id = `cr_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
 
+    const targetFilter: Record<string, unknown> = {};
+    if (input.targetIds?.length) targetFilter.tenantIds = input.targetIds;
+    if (typeof input.rolloutPercentage === 'number') targetFilter.percentage = input.rolloutPercentage;
+
     this.db.run(
       `INSERT INTO platform_config_rollouts (id, title, target_type, target_filter, config_snapshot, signature, status, total_tenants, received_count, applied_count, failed_count, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', 0, 0, 0, 0, ?, ?, ?)`,
-      [id, input.name, input.targetType, JSON.stringify(input.targetIds ?? {}), JSON.stringify(template.defaultValues), AuthService.getCurrentUser()?.id ?? 'system', AuthService.getCurrentUser()?.id ?? 'system', now, now]
+      [id, input.name, input.targetType, JSON.stringify(targetFilter), JSON.stringify(template.configPayload), AuthService.getCurrentUser()?.id ?? 'system', AuthService.getCurrentUser()?.id ?? 'system', now, now]
     );
 
     this.audit('إنشاء طرح إعدادات', 'CONFIG_ROLLOUT', id, { targetType: input.targetType });
@@ -353,10 +357,11 @@ export class PlatformConfigService {
       id: String(row.id),
       code: String(row.code),
       name: String(row.name),
-      description: row.description ?? null,
-      schema: row.schema ? JSON.parse(row.schema) : {},
-      defaultValues: row.default_values ? JSON.parse(row.default_values) : {},
-      category: row.category ?? null,
+      businessType: row.business_type ?? null,
+      planId: row.plan_id ?? null,
+      configPayload: row.config_payload ? JSON.parse(row.config_payload) : {},
+      version: toNumber(row.version, 1),
+      isDefault: Boolean(row.is_default),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };

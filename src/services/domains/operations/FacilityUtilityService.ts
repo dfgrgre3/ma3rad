@@ -894,7 +894,7 @@ export class FacilityUtilityService {
       Number(periodMonth.slice(5, 7)),
       0
     ).toISOString().slice(0, 10);
-    const _scope = this.branchAccess.sqlScope('b.id', undefined, actor);
+    const scope = this.branchAccess.sqlScope('b.id', undefined, actor);
     const rows = this.db.query<any>(
       `SELECT b.id AS branchId, b.name AS branchName, um.utility_type AS utilityType,
               SUM(ur.consumption) AS totalConsumption, SUM(ur.cost) AS totalCost,

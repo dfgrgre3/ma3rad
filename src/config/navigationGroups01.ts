@@ -138,6 +138,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'القيود اليومية', to: '/finance/journal', icon: FileText, perm: 'finance.view' },
       { label: 'الشيكات', to: '/finance/cheques', icon: Banknote, perm: 'finance.view' },
       { label: 'مطابقة البنك والصندوق', to: '/finance/bank-reconciliation', icon: Scale, perm: 'finance.view' },
+      { label: 'تدقيق اتساق البيانات', to: '/finance/consistency-audit', icon: ShieldCheck, perm: 'finance.view' },
       { label: 'الموازنات ومراكز التكلفة', to: '/finance/budgets-cost-centers', icon: PieChart, perm: 'finance.view' },
       { label: 'توقع التدفقات النقدية', to: '/finance/cash-forecast', icon: BarChart3, perm: 'finance.view' },
       { label: 'الدفع الإلكتروني والتسويات', to: '/finance/epayment-settlements', icon: CreditCard, perm: 'finance.view' },

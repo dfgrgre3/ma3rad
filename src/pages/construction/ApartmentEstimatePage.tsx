@@ -30,7 +30,7 @@ import {
 type Room = EstimateRoom;
 type CostLine = EstimateLine;
 type StockRow = { productId: string; availableM2: number };
-type PurchasePriceSnapshot = { id: string; date: string; invoiceNumber: string; supplierName: string; effectiveUnitCost: number; quantityM2: number };
+type PurchasePriceSnapshot = { date: string; invoiceNumber: string; supplierName: string; effectiveUnitCost: number; quantityM2: number };
 type LocalEstimate = {
   id: string; name: string; area: number; customerId: string; rooms: Room[]; lines: CostLine[];
   contingencyPercent: number; taxPercent: number; paidAmount: number; terms?: string; payments?: EstimatePayment[]; updatedAt: string;
@@ -466,7 +466,7 @@ export const ApartmentEstimatePage: React.FC = () => {
 
   const loadPurchasePriceHistory = (productId: string) => {
     try {
-      const rows = new ProcurementService().getProductPriceHistory(productId) as PurchasePriceSnapshot[];
+      const rows = new ProcurementService().getProductPriceHistory(productId);
       setPriceHistory((current) => ({ ...current, [productId]: rows }));
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'تعذر تحميل سجل أسعار الشراء.');

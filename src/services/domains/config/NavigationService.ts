@@ -11,6 +11,7 @@ import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from '../licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../licensing/CentralFeaturePermissionService';
 import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
+import { Folder } from 'lucide-react';
 
 export interface NavOverrides {
   hidden: string[];
@@ -363,9 +364,9 @@ export class NavigationService {
           return ra - rb;
         })
         .map(({ __enabled, __order, ...item }) => item);
-      return { id: g.id, label: labels[`group:${g.id}`] || g.label, items };
+      return { id: g.id, label: labels[`group:${g.id}`] || g.label, icon: Folder, color: 'text-slate-500', items };
     });
-    const allMerged = [...merged, ...customGroupsDefs];
+    const allMerged: NavGroupDef[] = [...merged, ...customGroupsDefs];
     const visibleMerged = allMerged.filter((group) => !hiddenGroupSet.has(group.id) || options.includeHidden);
     return appendLegacyGroupAliases(visibleMerged, labels);
   }
@@ -390,6 +391,7 @@ export class NavigationService {
     const actor = AuthService.requireAuth();
     NavigationService.saveOverrides({
       hidden: [],
+      hiddenGroups: [],
       labels: {},
       groupsOrder: [],
       itemsOrder: {},

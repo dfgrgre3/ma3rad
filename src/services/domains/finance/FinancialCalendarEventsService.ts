@@ -245,7 +245,7 @@ export class FinancialCalendarEventsService {
       throw new Error('لا يمكن تخفيض مبلغ الحدث إلى أقل من المبلغ المدفوع أو المحصل.');
     }
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       if (existing) {
         tx.run(`
           UPDATE financial_calendar_events
@@ -319,7 +319,7 @@ export class FinancialCalendarEventsService {
     const eventStatus = paidAmount >= Number(event.amount)
       ? (INCOME_TYPES.includes(event.eventType) ? 'COLLECTED' : 'PAID')
       : (INCOME_TYPES.includes(event.eventType) ? 'PARTIALLY_COLLECTED' : 'PARTIALLY_PAID');
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO financial_calendar_payments
           (id, event_id, company_id, amount, payment_date, reference, notes, created_by)
@@ -341,7 +341,7 @@ export class FinancialCalendarEventsService {
   public reschedule(eventId: string, dueDate: string): void {
     const { actor, branchId, companyId } = this.context(true);
     if (!isValidDate(dueDate)) throw new Error('تاريخ الاستحقاق غير صحيح.');
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const event = tx.query<any>(
         'SELECT id, status, due_date AS dueDate FROM financial_calendar_events WHERE id = ? AND branch_id = ? AND company_id = ?',
         [eventId, branchId, companyId]
@@ -356,7 +356,7 @@ export class FinancialCalendarEventsService {
 
   public cancelEvent(eventId: string): void {
     const { actor, branchId, companyId } = this.context(true);
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const event = tx.query<any>(
         'SELECT id, status FROM financial_calendar_events WHERE id = ? AND branch_id = ? AND company_id = ?',
         [eventId, branchId, companyId]
@@ -376,7 +376,7 @@ export class FinancialCalendarEventsService {
     const allowedMime = /^image\/(jpeg|png|gif|webp)$|^application\/pdf$|^application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)$/;
     if (!allowedMime.test(input.mimeType)) throw new Error('نوع الملف غير مدعوم. أرفق صورة أو ملف PDF أو Excel أو Word.');
     const id = `fca_${uuidv4()}`;
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const event = tx.query<{ id: string; status: string }>(
         'SELECT id, status FROM financial_calendar_events WHERE id = ? AND branch_id = ?',
         [eventId, branchId]

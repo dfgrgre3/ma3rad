@@ -17,7 +17,7 @@ public saveBudget(input: {
     const budgetCode = `BGT-${new Date().getFullYear()}-${uuidv4().substring(0, 4).toUpperCase()}`;
     const totalAllocated = round2(input.items.reduce((sum, item) => sum + Number(item.allocatedAmount || 0), 0));
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO budgets (id, budget_code, fiscal_year_id, cost_center_id, name, total_allocated, status, approved_by, approved_at)
         VALUES (?, ?, ?, ?, ?, ?, 'APPROVED', ?, CURRENT_TIMESTAMP)

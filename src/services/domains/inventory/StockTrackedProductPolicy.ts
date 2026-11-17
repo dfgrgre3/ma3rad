@@ -1,3 +1,4 @@
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
 
 /**
  * Single policy used by every service that creates or changes stock quantities:

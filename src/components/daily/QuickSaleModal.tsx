@@ -38,7 +38,14 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
   const [paidAmount, setPaidAmount] = useState('');
   const [discountAmount, setDiscountAmount] = useState('');
-  const [taxPercentage, setTaxPercentage] = useState('');
+  const [taxPercentage, setTaxPercentage] = useState(() => {
+    try {
+      const rate = Number(SettingsService.getSettings().defaultTaxPercentage ?? 0);
+      return Number.isFinite(rate) ? String(rate) : '';
+    } catch {
+      return '';
+    }
+  });
   const [shippingCost, setShippingCost] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<SaleLine[]>([emptyLine()]);

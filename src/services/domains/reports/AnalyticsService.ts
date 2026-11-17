@@ -215,10 +215,11 @@ export class AnalyticsService {
 
     const id = `an_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
     this.db.run(`
-      INSERT INTO analytics_snapshots (id, metric_name, metric_value, dimension, period_start, period_end, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [id, metricName, metricValue, dimension || null, periodStart, periodEnd, now]);
+      INSERT INTO analytics_snapshots (id, metric_name, metric_value, dimension, period_start, period_end, branch_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, metricName, metricValue, dimension || null, periodStart, periodEnd, branchId, now]);
   }
 
   public getSnapshots(metricName: string, periodStart: string, periodEnd: string): AnalyticsSnapshot[] {

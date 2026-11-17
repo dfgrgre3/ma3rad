@@ -14,7 +14,7 @@ public reopenPeriod(periodId: string, reason: string): void {
     if (!period) throw new Error('الفترة المالية غير موجودة.');
     if (period.status === 'LOCKED') throw new Error('الفترة مؤمنة نهائياً لا يمكن إعادة فتحها إلا بقرار إدارة عليا.');
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         UPDATE fiscal_periods
         SET status = 'OPEN', workflow_state = 'OPEN', closed_at = NULL, closed_by = NULL,
@@ -47,7 +47,7 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
     const actor = this.requireClose();
     let closingEntryId: string | null = null;
     let netProfitOrLoss = 0;
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const fy = tx.query<any>('SELECT * FROM fiscal_years WHERE id = ?', [fiscalYearId])[0];
       if (!fy) throw new Error('السنة المالية غير موجودة.');
       if (fy.status !== 'OPEN') throw new Error('السنة المالية مقفلة بالفعل.');

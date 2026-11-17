@@ -80,7 +80,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
   setSelectedWarehouseId,
   adjType,
   setAdjType,
-  _products,
+  products,
   selectedProductId,
   setSelectedProductId,
   selectedProduct,

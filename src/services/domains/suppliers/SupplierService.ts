@@ -75,7 +75,7 @@ export class SupplierService {
     const id = `sup_${uuidv4().substring(0, 8)}`;
     const code = supplier.code || `SUP-${Date.now().toString().slice(-5)}`;
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       sqliteDb.run(`
         INSERT INTO suppliers (
           id, code, name, company_name, phone, email, tax_number, commercial_record,
@@ -135,7 +135,7 @@ export class SupplierService {
       WHERE id = ?
     `;
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.companyName ?? null, updates.phone ?? null, updates.email ?? null,
         updates.taxNumber ?? null, updates.commercialRecord ?? null, updates.address ?? null,
@@ -191,7 +191,7 @@ export class SupplierService {
       throw new Error('تاريخ السداد غير صحيح.');
     }
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       if (idempotencyKey) {
         const prior = sqliteDb.query<any>(`SELECT * FROM supplier_payments WHERE idempotency_key = ?`, [idempotencyKey])[0];
         if (prior) {
@@ -519,7 +519,7 @@ export class SupplierService {
       if (cents > 0) requested.set(invoiceId, cents);
     }
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const payment = db.query<any>(`
         SELECT sp.id, sp.supplier_id AS supplierId, sp.amount,
           COALESCE(sp.branch_id, cr.branch_id) AS effectiveBranchId

@@ -250,7 +250,7 @@ export class EmployeeClearanceService {
     const clearanceNumber = `CLR-${localDateString().slice(0, 7)}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
     const id = `clr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO hr_employee_clearances
            (id, employee_id, branch_id, department_id, clearance_number,

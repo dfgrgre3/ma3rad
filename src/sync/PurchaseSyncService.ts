@@ -115,6 +115,8 @@ export class PurchaseSyncService {
 
   private applyPurchaseInvoice(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const invoiceId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -153,6 +155,8 @@ export class PurchaseSyncService {
 
   private applyPurchaseReturn(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const returnId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -191,6 +195,8 @@ export class PurchaseSyncService {
 
   private applySupplierPayment(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const paymentId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;
@@ -229,6 +235,8 @@ export class PurchaseSyncService {
 
   private applyPurchaseOrder(event: SyncEvent): void | 'DEFERRED' {
     const payload = event.payload as Record<string, unknown>;
+      if (payload.branch_id == null) delete payload.branch_id;
+      if (payload.company_id == null) delete payload.company_id;
     const orderId = event.entityId;
     const branchId = event.branchId;
     const tenantId = event.tenantId ?? null;

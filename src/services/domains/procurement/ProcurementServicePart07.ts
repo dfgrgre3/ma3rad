@@ -1,4 +1,5 @@
 import { round2 } from '../finance/financials';
+import type { SupplierScorecard, ProductPriceHistoryEntry } from '../../../types/procurement';
 import { ProcurementServicePart06 } from './ProcurementServicePart06';
 import { BranchAccessService } from '../auth/BranchAccessService';
 

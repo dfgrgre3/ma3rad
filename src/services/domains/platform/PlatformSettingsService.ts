@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { randomBytes } from 'crypto';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
@@ -6,7 +7,8 @@ import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
 import {
   PlatformSettingsMap,
-  PlatformPolicySettings,
+  PlatformPolicyDocument,
+  PlatformPolicyRetention,
   PlatformTenantActivityConfig,
   PlatformTenantActivityInput,
   PlatformTenantActivityVersion,
@@ -127,80 +129,66 @@ export class PlatformSettingsService {
 
   // ─── Platform Policies ────────────────────────────────────────────────────────
 
-  public getPlatformPolicies(): PlatformPolicySettings {
+  private defaultPolicyRetention(): PlatformPolicyRetention {
+    return {
+      auditRetentionDays: 365,
+      backupRetentionDays: 90,
+      syncLogRetentionDays: 30,
+      softDeleteGraceDays: 30,
+    };
+  }
+
+  public getPlatformPolicies(): PlatformPolicyDocument {
     PlatformSettingsService.requirePlatformAccess('policies', 'platform.policies.view');
 
-    const defaults: PlatformPolicySettings = {
-      passwordMinLength: 8,
-      passwordRequireUppercase: true,
-      passwordRequireLowercase: true,
-      passwordRequireNumbers: true,
-      passwordRequireSymbols: true,
-      passwordMaxAgeDays: 90,
-      passwordHistoryCount: 5,
-      sessionTimeoutMinutes: 480,
-      maxConcurrentSessions: 5,
-      mfaEnforcement: 'optional',
-      lockoutFailedAttempts: 5,
-      lockoutDurationMinutes: 15,
-      requireEmailVerification: true,
-      allowPasswordReset: true,
-      auditRetentionDays: 365,
-      dataRetentionDays: 2555,
-      backupRetentionDays: 90,
-      apiRateLimitPerMinute: 100,
-      webhookRetryAttempts: 3,
-      webhookTimeoutSeconds: 30,
-    };
+    const rows = this.db.query<any>(
+      `SELECT key, value FROM platform_settings WHERE key IN ('policy.terms', 'policy.privacy', 'policy.retention', 'policy.updated_at')`
+    );
+    const map = new Map(rows.map((row) => [String(row.key), String(row.value)]));
 
-    const rows = this.db.query<any>('SELECT key, value FROM platform_settings WHERE key LIKE \'policy.%\'');
-    for (const row of rows) {
-      const key = row.key.replace('policy.', '');
-      (defaults as any)[key] = this.parseValue(row.value);
+    let retention = this.defaultPolicyRetention();
+    const retentionRaw = map.get('policy.retention');
+    if (retentionRaw) {
+      try {
+        retention = { ...retention, ...(JSON.parse(retentionRaw) as Partial<PlatformPolicyRetention>) };
+      } catch {
+        // keep defaults
+      }
     }
 
-    return defaults;
+    return {
+      terms: map.get('policy.terms') ?? '',
+      privacy: map.get('policy.privacy') ?? '',
+      retention,
+      updatedAt: map.get('policy.updated_at') ?? nowIso(),
+    };
   }
 
   public savePlatformPolicies(input: {
-    passwordMinLength?: number;
-    passwordRequireUppercase?: boolean;
-    passwordRequireLowercase?: boolean;
-    passwordRequireNumbers?: boolean;
-    passwordRequireSymbols?: boolean;
-    passwordMaxAgeDays?: number;
-    passwordHistoryCount?: number;
-    sessionTimeoutMinutes?: number;
-    maxConcurrentSessions?: number;
-    mfaEnforcement?: 'off' | 'optional' | 'required';
-    lockoutFailedAttempts?: number;
-    lockoutDurationMinutes?: number;
-    requireEmailVerification?: boolean;
-    allowPasswordReset?: boolean;
-    auditRetentionDays?: number;
-    dataRetentionDays?: number;
-    backupRetentionDays?: number;
-    apiRateLimitPerMinute?: number;
-    webhookRetryAttempts?: number;
-    webhookTimeoutSeconds?: number;
-  }): PlatformPolicySettings {
+    terms?: string;
+    privacy?: string;
+    retention?: Partial<PlatformPolicyRetention>;
+  }): PlatformPolicyDocument {
     PlatformSettingsService.requirePlatformAccess('policies', 'platform.policies.update');
 
     const now = nowIso();
     const oldPolicies = this.getPlatformPolicies();
 
-    for (const [key, value] of Object.entries(input)) {
-      if (value !== undefined) {
-        const settingKey = `policy.${key}`;
-        const existing = this.db.query<any>('SELECT 1 FROM platform_settings WHERE key = ?', [settingKey])[0];
-        const stringValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);
-        if (existing) {
-          this.db.run('UPDATE platform_settings SET value = ?, updated_at = ? WHERE key = ?', [stringValue, now, settingKey]);
-        } else {
-          this.db.run('INSERT INTO platform_settings (key, value, updated_at) VALUES (?, ?, ?)', [settingKey, stringValue, now]);
-        }
+    const upsert = (key: string, value: string) => {
+      const existing = this.db.query<any>('SELECT 1 FROM platform_settings WHERE key = ?', [key])[0];
+      if (existing) {
+        this.db.run('UPDATE platform_settings SET value = ?, updated_at = ? WHERE key = ?', [value, now, key]);
+      } else {
+        this.db.run('INSERT INTO platform_settings (key, value, updated_at) VALUES (?, ?, ?)', [key, value, now]);
       }
+    };
+
+    if (input.terms !== undefined) upsert('policy.terms', input.terms);
+    if (input.privacy !== undefined) upsert('policy.privacy', input.privacy);
+    if (input.retention !== undefined) {
+      upsert('policy.retention', JSON.stringify({ ...oldPolicies.retention, ...input.retention }));
     }
+    upsert('policy.updated_at', now);
 
     this.audit('حفظ سياسات المنصة', 'PLATFORM_POLICIES', null, { oldValues: oldPolicies, newValues: input });
 
@@ -213,7 +201,7 @@ export class PlatformSettingsService {
     PlatformSettingsService.requirePlatformAccess('security', 'platform.security.keys');
 
     const now = nowIso();
-    const fingerprint = `sha256:${require('crypto').randomBytes(32).toString('hex')}`;
+    const fingerprint = `sha256:${randomBytes(32).toString('hex')}`;
 
     this.db.run('INSERT INTO platform_encryption_keys (id, fingerprint, status, created_at) VALUES (?, ?, ?, ?)', [`ek_${uuidv4().replace(/-/g, '').slice(0, 12)}`, fingerprint, 'ACTIVE', now]);
     this.db.run('UPDATE platform_encryption_keys SET status = \'ROTATED\' WHERE fingerprint <> ? AND status = \'ACTIVE\'', [fingerprint]);
@@ -225,20 +213,57 @@ export class PlatformSettingsService {
 
   // ─── Tenant Activity ──────────────────────────────────────────────────────────
 
+  private parseJsonArray(value: unknown): string[] {
+    if (Array.isArray(value)) return value.map(String);
+    if (typeof value === 'string' && value) {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  private parseJsonObject(value: unknown): Record<string, string> {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, string>;
+    if (typeof value === 'string' && value) {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  private mapTenantActivity(row: any): PlatformTenantActivityConfig {
+    return {
+      tenantId: String(row.tenant_id),
+      activityId: String(row.activity_id ?? ''),
+      familyId: row.family_id ?? null,
+      profileId: row.profile_id != null ? String(row.profile_id) : null,
+      enabledModules: this.parseJsonArray(row.enabled_modules),
+      customTerminology: this.parseJsonObject(row.custom_terminology),
+      navigationOverrides: row.navigation_overrides ?? null,
+      featuresEnabled: this.parseJsonArray(row.features_enabled),
+      customAttributes: row.custom_attributes ?? null,
+      version: toNumber(row.version, 1),
+      createdAt: String(row.created_at),
+      updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
+    };
+  }
+
   public getTenantActivity(tenantId: string): PlatformTenantActivityConfig | null {
     PlatformSettingsService.requirePlatformAccess('tenants', 'platform.tenants.view');
 
-    const rows = this.db.query<any>('SELECT * FROM platform_tenant_activity WHERE tenant_id = ? ORDER BY version DESC LIMIT 1', [tenantId]);
+    const rows = this.db.query<any>('SELECT * FROM platform_tenant_activities WHERE tenant_id = ?', [tenantId]);
     const row = rows[0];
     if (!row) return null;
 
-    return {
-      tenantId: String(row.tenant_id),
-      version: toNumber(row.version, 1),
-      config: row.config ? JSON.parse(row.config) : {},
-      createdAt: String(row.created_at),
-      createdBy: String(row.created_by),
-    };
+    return this.mapTenantActivity(row);
   }
 
   public saveTenantActivity(input: PlatformTenantActivityInput): PlatformTenantActivityConfig {
@@ -252,15 +277,46 @@ export class PlatformSettingsService {
     const now = nowIso();
     const user = AuthService.getCurrentUser()!;
 
-    // Save new version
-    const id = `ta_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const enabledModules = input.enabledModules ?? existing?.enabledModules ?? [];
+    const customTerminology = input.customTerminology ?? existing?.customTerminology ?? {};
+    const activityId = input.activityId || existing?.activityId || '';
+    const profileId = input.profileId ?? existing?.profileId ?? null;
+    const familyId = existing?.familyId ?? null;
+
+    const snapshot = {
+      activityId,
+      profileId,
+      enabledModules,
+      customTerminology,
+      navigationOverrides: existing?.navigationOverrides ?? [],
+      featuresEnabled: existing?.featuresEnabled ?? [],
+      customAttributes: existing?.customAttributes ?? [],
+    };
+
+    if (existing) {
+      this.db.run(
+        `UPDATE platform_tenant_activities
+         SET activity_id = ?, family_id = ?, profile_id = ?, enabled_modules = ?, custom_terminology = ?, version = ?, updated_at = ?
+         WHERE tenant_id = ?`,
+        [activityId, familyId, profileId, JSON.stringify(enabledModules), JSON.stringify(customTerminology), version, now, input.tenantId]
+      );
+    } else {
+      const id = `ta_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      this.db.run(
+        `INSERT INTO platform_tenant_activities (id, tenant_id, activity_id, family_id, profile_id, enabled_modules, custom_terminology, navigation_overrides, features_enabled, custom_attributes, version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, '[]', '[]', '[]', ?, ?, ?)`,
+        [id, input.tenantId, activityId, familyId, profileId, JSON.stringify(enabledModules), JSON.stringify(customTerminology), version, now, now]
+      );
+    }
+
+    const versionId = `tav_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     this.db.run(
-      `INSERT INTO platform_tenant_activity (id, tenant_id, version, config, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, input.tenantId, version, JSON.stringify(input.config), user.id, now]
+      `INSERT INTO platform_tenant_activity_versions (id, tenant_id, version, activity_id, profile_id, config_snapshot, change_summary, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [versionId, input.tenantId, version, activityId, profileId, JSON.stringify(snapshot), input.changeSummary ?? null, user.id, now]
     );
 
-    this.audit('حفظ نشاط عميل', 'TENANT_ACTIVITY', id, { tenantId: input.tenantId, version });
+    this.audit('حفظ نشاط عميل', 'TENANT_ACTIVITY', versionId, { tenantId: input.tenantId, version });
 
     return this.getTenantActivity(input.tenantId)!;
   }
@@ -268,37 +324,41 @@ export class PlatformSettingsService {
   public listTenantActivityVersions(tenantId: string): PlatformTenantActivityVersion[] {
     PlatformSettingsService.requirePlatformAccess('tenants', 'platform.tenants.view');
 
-    const rows = this.db.query<any>('SELECT * FROM platform_tenant_activity WHERE tenant_id = ? ORDER BY version DESC', [tenantId]);
+    const rows = this.db.query<any>('SELECT * FROM platform_tenant_activity_versions WHERE tenant_id = ? ORDER BY version DESC', [tenantId]);
     return rows.map((row) => ({
       id: String(row.id),
       tenantId: String(row.tenant_id),
       version: toNumber(row.version, 1),
-      config: row.config ? JSON.parse(row.config) : {},
+      activityId: String(row.activity_id ?? ''),
+      profileId: row.profile_id != null ? String(row.profile_id) : null,
+      config: row.config_snapshot ? JSON.parse(row.config_snapshot) : {},
+      changeSummary: row.change_summary ?? null,
+      createdBy: row.created_by ?? null,
       createdAt: String(row.created_at),
-      createdBy: String(row.created_by),
     }));
   }
 
   public rollbackTenantActivity(tenantId: string, targetVersion: number): PlatformTenantActivityConfig {
     PlatformSettingsService.requirePlatformAccess('tenants', 'platform.tenants.update');
 
-    const target = this.db.query<any>('SELECT * FROM platform_tenant_activity WHERE tenant_id = ? AND version = ?', [tenantId, targetVersion])[0];
+    const target = this.db.query<any>('SELECT * FROM platform_tenant_activity_versions WHERE tenant_id = ? AND version = ?', [tenantId, targetVersion])[0];
     if (!target) throw new Error('الإصدار الهدف غير موجود.')
 
-    const now = nowIso();
-    const user = AuthService.getCurrentUser()!;
-    const newVersion = (this.getTenantActivity(tenantId)?.version ?? 0) + 1;
+    let snapshot: Record<string, any> = {};
+    try {
+      snapshot = target.config_snapshot ? JSON.parse(target.config_snapshot) : {};
+    } catch {
+      snapshot = {};
+    }
 
-    const id = `ta_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    this.db.run(
-      `INSERT INTO platform_tenant_activity (id, tenant_id, version, config, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, tenantId, newVersion, target.config, user.id, now]
-    );
-
-    this.audit('استرجاع نشاط عميل', 'TENANT_ACTIVITY', id, { tenantId, targetVersion, newVersion });
-
-    return this.getTenantActivity(tenantId)!;
+    return this.saveTenantActivity({
+      tenantId,
+      activityId: String(snapshot.activityId ?? target.activity_id ?? ''),
+      profileId: snapshot.profileId ?? (target.profile_id != null ? String(target.profile_id) : undefined),
+      enabledModules: Array.isArray(snapshot.enabledModules) ? snapshot.enabledModules.map(String) : undefined,
+      customTerminology: snapshot.customTerminology && typeof snapshot.customTerminology === 'object' ? snapshot.customTerminology : undefined,
+      changeSummary: `استرجاع إلى الإصدار #${targetVersion}`,
+    });
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────

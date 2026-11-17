@@ -75,7 +75,7 @@ export class ReservationService {
     if (!(quantity > 0)) throw new Error('كمية الحجز يجب أن تكون أكبر من صفر.');
 
     const id = `res_${uuidv4().substring(0, 8)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const stock = db.query<any>(
         `SELECT ws.id, ws.quantity_m2 AS quantity, ws.reserved_m2 AS reserved,
                 p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
@@ -122,7 +122,7 @@ export class ReservationService {
     this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
     if (row.status !== 'ACTIVE') throw new Error('الحجز غير نشط بالفعل.');
 
-    this.db.executeTransaction((db) => this.releaseReservationInternal(db, row, reason));
+    this.db.executeFinancialTransaction((db) => this.releaseReservationInternal(db, row, reason));
   }
 
   /** Converts an active reservation into an actual stock deduction. */
@@ -139,7 +139,7 @@ export class ReservationService {
     const branchId = this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
     if (row.status !== 'ACTIVE') throw new Error('لا يمكن تنفيذ حجز غير نشط.');
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const currentReservation = db.query<any>(
         `SELECT id, product_id AS productId, warehouse_id AS warehouseId,
                 quantity_m2 AS quantity, reference_type AS referenceType,
@@ -220,7 +220,7 @@ export class ReservationService {
     let failed = 0;
     for (const row of rows) {
       try {
-        this.db.executeTransaction((db) => {
+        this.db.executeFinancialTransaction((db) => {
           const current = db.query<any>(
             `SELECT id, product_id AS productId, warehouse_id AS warehouseId, quantity_m2 AS quantity, status
              FROM stock_reservations WHERE id = ?`, [row.id]

@@ -28,7 +28,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
     const idempotencyKey = options.idempotencyKey?.trim() || `RECEIVE:${uuidv4()}`;
     const payloadJson = JSON.stringify(receipts);
 
-    return this.db.executeTransaction((txDb) => {
+    return this.db.executeFinancialTransaction((txDb) => {
       const transfer = txDb.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
       if (!transfer) throw new Error('طلب التحويل غير موجود.');
       this.requireTransferWarehouseAuthorization(transferId, actor);

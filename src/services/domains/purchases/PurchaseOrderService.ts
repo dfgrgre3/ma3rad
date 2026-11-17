@@ -127,7 +127,7 @@ export class PurchaseOrderService {
     const orderId = `po_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
 
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const orderNumber = db.nextNumber('PO');
       let subtotal = 0;
       const prepared = lines.map((line) => {
@@ -194,7 +194,7 @@ export class PurchaseOrderService {
     if (order.status === 'CANCELLED') throw new Error('أمر الشراء ملغي.');
     if (status === 'RECEIVED') throw new Error('استخدم زر الاستلام لترحيل الفاتورة تلقائيًا.');
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(`UPDATE purchase_orders SET status = ? WHERE id = ?`, [status, id]);
       db.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -224,7 +224,7 @@ export class PurchaseOrderService {
     const remainingValue = order.items.reduce((sum, item) => sum + Math.max(0, item.quantityM2 - item.receivedM2) * item.unitCost, 0);
     const receiptValue = lines.reduce((sum, line) => sum + line.quantity * line.item.unitCost, 0);
     const ratio = remainingValue > 0 ? receiptValue / remainingValue : 1;
-    const invoice = this.db.executeTransaction((db) => {
+    const invoice = this.db.executeFinancialTransaction((db) => {
       const prevReceipts = db.query<{ count: number }>(
         `SELECT COUNT(*) AS count FROM purchase_order_receipts WHERE purchase_order_id = ?`,
         [id]
@@ -284,7 +284,7 @@ export class PurchaseOrderService {
     const actor = AuthService.requireAuth(); PermissionService.require(actor, 'purchases.update');
     const order = this.getOrderById(id);
     if (!order || ['RECEIVED','CANCELLED'].includes(order.status)) throw new Error('لا يمكن تحديث متابعة هذا الطلب.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(`UPDATE purchase_orders SET expected_date=?,notes=? WHERE id=?`, [expectedDate || null, notes || null, id]);
       db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,old_values,new_values) VALUES (?,?,?,?,?,?,?,?)`,
         [`aud_${uuidv4().slice(0,8)}`,actor.id,actor.fullName,'تحديث متابعة توريد','PURCHASES',id,JSON.stringify({expectedDate:order.expectedDate,notes:order.notes}),JSON.stringify({expectedDate,notes})]);

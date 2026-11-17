@@ -35,7 +35,7 @@ test('advanced hr/performance/production/sales reports return structured results
      VALUES ('pip_adv', ?, '2021-06-01', '2021-08-31', 'انخفاض الإنتاجية', 'COMPLETED', 'تحسن ملحوظ')`, [employeeId]);
 
   // تدريب: دورة + مصروف
-  q(`INSERT INTO training_courses (id, name, cost, status, created_by) VALUES ('crs_adv', 'دورة تقارير', 500, 'COMPLETED', 'usr_admin')`);
+  q(`INSERT INTO training_courses (id, name, cost, status, created_by, branch_id) VALUES ('crs_adv', 'دورة تقارير', 500, 'COMPLETED', 'usr_admin', 'br_main')`);
   q(`INSERT INTO training_expenses (id, course_id, employee_id, amount, expense_date, payment_method, created_by)
      VALUES ('texp_adv', 'crs_adv', ?, 300, '2021-07-10', 'CASH', 'usr_admin')`, [employeeId]);
 

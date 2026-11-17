@@ -61,6 +61,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'sales.view', name: 'عرض المبيعات', module: 'SALES' },
   { code: 'sales.create', name: 'إنشاء فاتورة بيع', module: 'SALES' },
   { code: 'sales.discount', name: 'منح خصم استثنائي', module: 'SALES' },
+  { code: 'sales.tax.override', name: 'تعديل نسبة الضريبة على الفاتورة', module: 'SALES' },
   { code: 'sales.credit', name: 'البيع الآجل', module: 'SALES' },
   { code: 'sales.refund', name: 'مرتجعات البيع', module: 'SALES' },
   { code: 'sales.approve', name: 'اعتماد أسعار/خصومات', module: 'SALES' },

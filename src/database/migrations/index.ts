@@ -101,6 +101,14 @@ import { MIGRATION_PART_116 } from './part116';
 import { MIGRATION_PART_117 } from './part117';
 import { MIGRATION_PART_118 } from './part118';
 import { MIGRATION_PART_119 } from './part119';
+import { MIGRATION_PART_120 } from './part120';
+import { MIGRATION_PART_121 } from './part121';
+import { MIGRATION_PART_122 } from './part122';
+import { MIGRATION_PART_123 } from './part123';
+import { MIGRATION_PART_124 } from './part124';
+import { MIGRATION_PART_125 } from './part125';
+import { MIGRATION_PART_126 } from './part126';
+import { MIGRATION_PART_127 } from './part127';
 import { MIGRATION_PART_114 } from './part114';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
@@ -3491,6 +3499,14 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  MIGRATION_PART_120,
+  MIGRATION_PART_121,
+  MIGRATION_PART_122,
+  MIGRATION_PART_123,
+  MIGRATION_PART_124,
+  MIGRATION_PART_125,
+  MIGRATION_PART_126,
+  MIGRATION_PART_127,
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

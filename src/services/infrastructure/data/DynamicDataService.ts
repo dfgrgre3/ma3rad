@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../../domains/auth/AuthService';
 import { PermissionService } from '../../domains/auth/PermissionService';
+import { BranchAccessService } from '../../domains/auth/BranchAccessService';
 import { parseSpreadsheetBuffer } from './SpreadsheetImportService';
 import type { ParsedSpreadsheetSheet } from './SpreadsheetImportService';
 
@@ -45,6 +46,7 @@ const normalizedValue = (value: unknown, type: DynamicFieldType) => {
 
 export class DynamicDataService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
   private actor() { return AuthService.requireAuth(); }
   private requireView() {
     const actor = this.actor();
@@ -140,7 +142,7 @@ export class DynamicDataService {
           // Do not retain a second copy of the raw row: the batch keeps only
           // source metadata, and rollback uses source_batch_id.
           const searchText=Object.values(validatedValues).map(v=>typeof v==='object'?JSON.stringify(v):String(v??'')).join(' ').toLocaleLowerCase();
-          this.db.run('INSERT INTO dynamic_records (id,entity_type_id,values_json,search_text,source_batch_id,created_by) VALUES (?,?,?,?,?,?)',[id('drec'),entity.id,JSON.stringify(validatedValues),searchText,batchId,actor.id]); imported++;
+          this.db.run('INSERT INTO dynamic_records (id,entity_type_id,values_json,search_text,source_batch_id,created_by,branch_id) VALUES (?,?,?,?,?,?,?)',[id('drec'),entity.id,JSON.stringify(validatedValues),searchText,batchId,actor.id,this.branchAccess.getCurrentBranchId(actor)]); imported++;
         } catch(e:any){errors.push({row:index+2,message:e?.message||'تعذر حفظ الصف'});}
       });
       this.db.run('UPDATE dynamic_import_batches SET imported_count=?,status=? WHERE id=?',[imported,errors.length?'PARTIAL':'COMPLETED',batchId]);
@@ -184,7 +186,7 @@ export class DynamicDataService {
     const fields=asJSON<DynamicField[]>(entity.fieldsJson,[]);const relations=asJSON<Array<Record<string,unknown>>>(entity.relationsJson,[]);
     const validated=this.validateRecordValues(entityId,fields,relations,values);
     const searchText=Object.entries(validated).map(([,v])=>typeof v==='object'?JSON.stringify(v):String(v??'')).join(' ').toLocaleLowerCase();const recordId=id('drec');
-    this.db.executeTransaction(()=>{this.db.run('INSERT INTO dynamic_records (id,entity_type_id,values_json,search_text,created_by) VALUES (?,?,?,?,?)',[recordId,entityId,JSON.stringify(validated),searchText,actor.id]);this.audit(actor.id,'إضافة سجل ديناميكي',recordId,{entity:entity.name,values:validated});});
+    this.db.executeTransaction(()=>{this.db.run('INSERT INTO dynamic_records (id,entity_type_id,values_json,search_text,created_by,branch_id) VALUES (?,?,?,?,?,?)',[recordId,entityId,JSON.stringify(validated),searchText,actor.id,this.branchAccess.getCurrentBranchId(actor)]);this.audit(actor.id,'إضافة سجل ديناميكي',recordId,{entity:entity.name,values:validated});});
     return this.db.query<any>('SELECT * FROM dynamic_records WHERE id=?',[recordId]).map(r=>({id:r.id,entityTypeId:r.entityTypeId,values:asJSON(r.valuesJson,{}),searchText:r.searchText,sourceBatchId:r.sourceBatchId,createdAt:r.createdAt,updatedAt:r.updatedAt}))[0];
   }
 

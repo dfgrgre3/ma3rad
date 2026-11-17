@@ -62,6 +62,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   const [rolloutTitle, setRolloutTitle] = useState<string>('');
   const [rolloutTargetType, setRolloutTargetType] = useState<RolloutTargetType>('ALL');
   const [rolloutCanaryPercent, setRolloutCanaryPercent] = useState<number>(20);
+  const [rolloutTemplateId, setRolloutTemplateId] = useState<string>('');
   const [rolloutSuccess, setRolloutSuccess] = useState<boolean>(false);
 
   // Diff comparison state
@@ -78,6 +79,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       }
       const tmplList = platformAdminService.listConfigTemplates();
       setTemplates(tmplList);
+      setRolloutTemplateId((prev) => (tmplList.some((t) => t.id === prev) ? prev : tmplList[0]?.id ?? ''));
       const rList = platformAdminService.listConfigRollouts();
       setRollouts(rList);
     } catch (e) {
@@ -143,7 +145,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
       const updated = platformAdminService.saveTenantConfig({
         tenantId: selectedTenantId,
-        configPayload: parsedPayload,
+        values: parsedPayload,
         changeSummary: 'تعديل وتوقيع يدوي عبر محرر التكوين المركزي',
       });
 
@@ -183,25 +185,15 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   const handleCreateRollout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
-    if (!rolloutTitle) return;
+    if (!rolloutTitle || !rolloutTemplateId) return;
     try {
-      let payload: Record<string, unknown>;
-      try {
-        payload = JSON.parse(jsonText);
-      } catch {
-        alert('يرجى تصحيح أخطاء JSON أولاً قبل إطلاق النشر.');
-        return;
-      }
-
-      platformAdminService.createConfigRollout({
-        title: rolloutTitle,
+      const created = platformAdminService.createConfigRollout({
+        templateId: rolloutTemplateId,
+        name: rolloutTitle,
         targetType: rolloutTargetType,
-        targetFilter:
-          rolloutTargetType === 'CANARY_PERCENT'
-            ? { percentage: rolloutCanaryPercent }
-            : {},
-        configSnapshot: payload,
+        rolloutPercentage: rolloutTargetType === 'CANARY_PERCENT' ? rolloutCanaryPercent : undefined,
       });
+      platformAdminService.startConfigRollout(created.id);
 
       setRolloutSuccess(true);
       setTimeout(() => setRolloutSuccess(false), 4000);
@@ -462,6 +454,22 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">قالب التكوين المراد نشره</label>
+                <select
+                  value={rolloutTemplateId}
+                  onChange={(e) => setRolloutTemplateId(e.target.value)}
+                  className={`w-full ${inputClass}`}
+                  required
+                >
+                  {templates.map((tmpl) => (
+                    <option key={tmpl.id} value={tmpl.id}>
+                      {tmpl.name} ({tmpl.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1">شريحة النشر المستهدفة</label>
@@ -493,7 +501,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               </div>
 
               <div className="flex justify-end pt-2">
-                <Button variant="primary" type="submit" disabled={!canManageAppConfig}>
+                <Button variant="primary" type="submit" disabled={!canManageAppConfig || !rolloutTemplateId}>
                   <Play className="w-3.5 h-3.5 ml-1.5" />
                   بدء النشر الآن
                 </Button>

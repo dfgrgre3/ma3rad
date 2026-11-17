@@ -137,9 +137,9 @@ export const ProfileKpiPanel: React.FC = () => {
     fetchKpiValues();
   }, [businessType, effectiveKpis]);
 
-  if (effectiveKpis.length === 0) return null;
-
   const { isDark } = useTheme();
+
+  if (effectiveKpis.length === 0) return null;
   
   return (
     <div className={`min-w-0 rounded-xl border p-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>

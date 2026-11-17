@@ -70,22 +70,21 @@ const TARGET_STATUS_LABELS: Record<string, { label: string; color: string; icon:
 
 const emptyFeature = {
   id: undefined as string | undefined,
-  key: '',
+  code: '',
   name: '',
   description: '',
   category: '',
-  defaultEnabled: true,
-  rolloutPercentage: 100,
-  variant: null as string | null,
-  targetPlans: [] as string[],
-  metadata: null as Record<string, unknown> | null,
+  isEnabled: true,
+  rolloutPercent: 100,
+  isStagingOnly: false,
+  minPlanTier: '',
 };
 
 const emptyRelease = {
   id: undefined as string | undefined,
   version: '',
-  channel: 'STABLE' as PlatformRelease['channel'],
-  status: 'PUBLISHED' as PlatformRelease['status'],
+  channel: 'STABLE' as string,
+  status: 'PUBLISHED' as string,
   targetsSummary: null as Record<string, number> | null,
   notes: '',
   rollbackVersion: '',
@@ -270,14 +269,15 @@ export const PlatformProductPage: React.FC = () => {
             id: release.id,
             version: release.version,
             channel: release.channel,
-            status: release.status,
-            isMandatory: release.isMandatory,
+            status: release.status ?? 'PUBLISHED',
+            targetsSummary: release.targetsSummary ?? null,
+            isMandatory: release.isMandatory ?? false,
             minVersion: release.minVersion ?? '',
             rolloutGroup: release.rolloutGroup || 'ALL',
             stagingGroup: release.stagingGroup || 'PRODUCTION',
             fileUrl: release.fileUrl ?? '',
             fileName: release.fileName ?? '',
-            fileSize: release.fileSize ?? '',
+            fileSize: release.fileSize != null ? String(release.fileSize) : '',
             checksumSha256: release.checksumSha256 ?? '',
             packageSignature: release.packageSignature ?? '',
             changelog: release.changelog ?? '',
@@ -338,7 +338,9 @@ export const PlatformProductPage: React.FC = () => {
   const markTargetStatus = (targetId: string, status: PlatformReleaseTarget['status']) => {
     if (!selectedReleaseForTargets) return;
     try {
-      platformAdminService.updateReleaseTargetStatus(targetId, status);
+      const target = releaseTargets.find((t) => t.id === targetId);
+      if (!target) return;
+      platformAdminService.updateReleaseTargetStatus(selectedReleaseForTargets.id, target.tenantId, status);
       toast.success('تم تحديث حالة العميل');
       setReleaseTargets(platformAdminService.listReleaseTargets(selectedReleaseForTargets.id));
       load();
@@ -562,7 +564,7 @@ export const PlatformProductPage: React.FC = () => {
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9.5px] font-bold text-slate-600">
                           {CHANNEL_LABELS[release.channel]}
                         </span>
-                        <StatusBadge value={release.status} label={RELEASE_STATUS_LABELS[release.status]} />
+                        <StatusBadge value={release.status ?? ''} label={RELEASE_STATUS_LABELS[release.status ?? '']} />
                         {release.isMandatory && (
                           <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[9.5px] font-bold text-rose-700">
                             تحديث إلزامي
@@ -851,7 +853,7 @@ export const PlatformProductPage: React.FC = () => {
             </select>
           </Field>
           <Field label="الحالة (Status)">
-            <select className={inputClass} value={releaseForm.status} onChange={(e) => setReleaseForm({ ...releaseForm, status: e.target.value as PlatformRelease['status'] })}>
+            <select className={inputClass} value={releaseForm.status} onChange={(e) => setReleaseForm({ ...releaseForm, status: e.target.value })}>
               {Object.entries(RELEASE_STATUS_LABELS).map(([val, lbl]) => (
                 <option key={val} value={val}>
                   {lbl}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Barcode, Plus, Search, RefreshCw, Printer, 
-  Eye
+  Eye, Edit3, Trash2, X
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../services/domains/products/ProductService';

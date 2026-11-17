@@ -98,7 +98,7 @@ public recordGatewaySettlement(input: {
     bankAccountId: string;
     notes?: string;
   }): string {
-    const _actor = this.requireManage();
+    const actor = this.requireManage();
     const gateway = this.db.query<any>('SELECT * FROM payment_gateways WHERE id = ?', [input.gatewayId])[0];
     if (!gateway) throw new Error('بوابة الدفع غير موجودة.');
     const bank = this.db.query<any>('SELECT * FROM bank_accounts WHERE id = ?', [input.bankAccountId])[0];
@@ -114,7 +114,7 @@ public recordGatewaySettlement(input: {
     const settlementNumber = `SETTLE-${input.settlementDate.replace(/-/g, '')}-${uuidv4().substring(0, 4).toUpperCase()}`;
 
     let jvId: string | null = null;
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       // 1. Post JV:
       // Dr Bank Account (1102): net
       // Dr Payment Gateway Fees (5207): comm + tax

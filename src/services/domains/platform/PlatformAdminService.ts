@@ -41,6 +41,7 @@ import { centralAuditService } from './CentralAuditService';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
+import { PlatformBootstrapService } from './PlatformBootstrapService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import {
   PlatformTenant,
@@ -100,7 +101,8 @@ import {
   PlatformStaffDataScopeState,
   PlatformRoleMatrix,
   PlatformSettingsMap,
-  PlatformPolicySettings,
+  PlatformPolicyDocument,
+  PlatformPolicyRetention,
   PlatformTenantActivityConfig,
   PlatformTenantActivityInput,
   PlatformTenantActivityVersion,
@@ -259,7 +261,7 @@ export class PlatformAdminService {
 
   public auditPlatformOwnerAccounts(): any {
     PlatformAdminService.requirePlatformOwner();
-    return new (require('./PlatformBootstrapService').PlatformBootstrapService)(require('../../../database/repositories/databaseManager').DatabaseManager.getInstance()).auditOwnerAccounts();
+    return new PlatformBootstrapService(DatabaseManager.getInstance()).auditOwnerAccounts();
   }
 
   // Tenant Management - Delegate to PlatformTenantService
@@ -398,6 +400,7 @@ export class PlatformAdminService {
     options: {
       months?: number;
       price?: number;
+      seats?: number;
       branchesLimit?: number;
       couponCode?: string;
       coupling?: 'FULL' | 'EXPIRY_ONLY' | 'NONE';
@@ -416,6 +419,7 @@ export class PlatformAdminService {
     options: {
       months?: number;
       price?: number;
+      seats?: number;
       branchesLimit?: number;
       couponCode?: string;
       coupling?: 'FULL' | 'EXPIRY_ONLY' | 'NONE';
@@ -506,10 +510,37 @@ export class PlatformAdminService {
     status?: string;
     from?: string;
     to?: string;
-  }): string {
-    // Delegate to PlatformInvoiceService or implement here
-    const invoices = platformInvoiceService.listInvoices(filters.status ?? '', '');
-    return JSON.stringify(invoices, null, 2);
+    includeActivations?: boolean;
+    includeChanges?: boolean;
+  }): { licenses: any[]; summary: { totalLicenses: number; activeLicenses: number; suspendedLicenses: number; expiredLicenses: number; revokedLicenses: number } } {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filters.tenantId) { conditions.push('l.tenant_id = ?'); params.push(filters.tenantId); }
+    if (filters.planId) { conditions.push('l.plan_id = ?'); params.push(filters.planId); }
+    if (filters.status) { conditions.push('l.status = ?'); params.push(filters.status); }
+    if (filters.from) { conditions.push('l.issued_at >= ?'); params.push(filters.from); }
+    if (filters.to) { conditions.push('l.issued_at <= ?'); params.push(filters.to); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const licenses = this.db.query<any>(
+      `SELECT l.*, t.name AS tenantName, p.name AS planName
+       FROM platform_licenses l
+       LEFT JOIN platform_tenants t ON t.id = l.tenant_id
+       LEFT JOIN platform_plans p ON p.id = l.plan_id
+       ${where}
+       ORDER BY l.issued_at DESC`,
+      params as any[]
+    );
+
+    const summary = {
+      totalLicenses: licenses.length,
+      activeLicenses: licenses.filter((l) => l.status === 'ACTIVE' || l.status === 'ISSUED').length,
+      suspendedLicenses: licenses.filter((l) => l.status === 'SUSPENDED').length,
+      expiredLicenses: licenses.filter((l) => l.status === 'EXPIRED').length,
+      revokedLicenses: licenses.filter((l) => l.status === 'REVOKED').length,
+    };
+
+    return { licenses, summary };
   }
 
   public listPayments(limit = 200): PlatformPayment[] {
@@ -547,11 +578,13 @@ export class PlatformAdminService {
 
   public setFeatureOverride(input: {
     featureId: string;
+    targetType?: 'TENANT' | 'PLAN' | 'STAGING_GROUP';
+    targetId?: string | null;
     tenantId?: string | null;
-    enabled: boolean;
+    isEnabled?: boolean;
+    enabled?: boolean;
+    customRolloutPercent?: number | null;
     rolloutPercentage?: number;
-    variant?: string;
-    metadata?: Record<string, unknown>;
   }): PlatformFeatureOverride {
     return platformModuleFeatureService.setFeatureOverride(input);
   }
@@ -565,15 +598,19 @@ export class PlatformAdminService {
   }
 
   public upsertFeatureFlag(input: {
-    key: string;
+    id?: string;
+    key?: string;
+    code?: string;
     name: string;
     description?: string;
-    defaultEnabled?: boolean;
+    category?: string;
+    isEnabled?: boolean;
     isActive?: boolean;
+    defaultEnabled?: boolean;
+    rolloutPercent?: number;
     rolloutPercentage?: number;
-    variant?: string;
-    targetPlans?: string[];
-    metadata?: Record<string, unknown>;
+    isStagingOnly?: boolean;
+    minPlanTier?: string | null;
   }): PlatformFeatureFlag {
     return platformModuleFeatureService.upsertFeatureFlag(input);
   }
@@ -607,17 +644,31 @@ export class PlatformAdminService {
   }
 
   public upsertRelease(input: {
+    id?: string;
     version: string;
+    channel?: string;
+    status?: string | null;
+    isMandatory?: boolean | null;
+    minVersion?: string | null;
+    rolloutGroup?: string | null;
+    notes?: string | null;
+    releasedAt?: string | null;
+    fileUrl?: string | null;
+    fileName?: string | null;
+    fileSize?: number | null;
+    checksumSha256?: string | null;
+    packageSignature?: string | null;
+    changelog?: string | null;
+    rollbackVersion?: string | null;
+    stagingGroup?: string | null;
     name?: string;
     description?: string;
-    channel?: string;
     releaseDate?: string;
     isActive?: boolean;
     minClientVersion?: string;
     maxClientVersion?: string;
     artifactUrl?: string;
     artifactHash?: string;
-    changelog?: string;
   }): PlatformRelease {
     return platformModuleFeatureService.upsertRelease(input);
   }
@@ -712,7 +763,14 @@ export class PlatformAdminService {
     return platformLicenseService.getDevice(deviceId);
   }
 
-  public detectCloneDevices(): { suspected: PlatformDevice[]; groups: Array<{ hardwareId: string; devices: PlatformDevice[] }>; alerts: Array<{ type: string; message: string; hardwareId: string; tenantName: string }> } {
+  public detectCloneDevices(): {
+    suspected: PlatformDevice[];
+    groups: Array<{ hardwareId: string; devices: PlatformDevice[] }>;
+    alerts: Array<{ type: string; message: string; hardwareId: string; tenantName: string }>;
+    duplicateHwids: Array<{ hardwareId: string; tenants: string[]; tenantCount: number }>;
+    overLimitLicenses: Array<{ licenseId: string; licenseKey: string; tenantId: string; deviceCount: number; deviceLimit: number }>;
+    suspiciousTransfers: Array<{ licenseId: string; tenantId: string; transferCount: number }>;
+  } {
     const result = platformLicenseService.detectCloneDevices();
     const alerts = result.suspected.map(device => ({
       type: 'DEVICE_CLONE_SUSPECTED',
@@ -720,7 +778,43 @@ export class PlatformAdminService {
       hardwareId: device.hardwareId,
       tenantName: '', // Would need tenant lookup
     }));
-    return { ...result, alerts };
+
+    const duplicateHwids = result.groups.map((group) => {
+      const tenants = Array.from(new Set(group.devices.map((d) => d.tenantId).filter(Boolean)));
+      return { hardwareId: group.hardwareId, tenants, tenantCount: tenants.length };
+    });
+
+    const overLimitLicenses = this.db.query<any>(
+      `SELECT l.id AS licenseId, l.license_key AS licenseKey, l.tenant_id AS tenantId,
+              COUNT(d.id) AS deviceCount, l.device_limit AS deviceLimit
+       FROM platform_licenses l
+       LEFT JOIN platform_devices d ON d.license_id = l.id AND d.status IN ('ACTIVE','SUSPENDED')
+       WHERE l.status IN ('ACTIVE','ISSUED')
+       GROUP BY l.id
+       HAVING COUNT(d.id) > l.device_limit`
+    ).map((row) => ({
+      licenseId: String(row.licenseId),
+      licenseKey: String(row.licenseKey),
+      tenantId: String(row.tenantId),
+      deviceCount: Number(row.deviceCount) || 0,
+      deviceLimit: Number(row.deviceLimit) || 0,
+    }));
+
+    const suspiciousTransfers = this.db.query<any>(
+      `SELECT id AS licenseId, tenant_id AS tenantId, transfer_count AS transferCount
+       FROM platform_licenses
+       WHERE transfer_count >= 3`
+    ).map((row) => ({
+      licenseId: String(row.licenseId),
+      tenantId: String(row.tenantId),
+      transferCount: Number(row.transferCount) || 0,
+    }));
+
+    return { ...result, alerts, duplicateHwids, overLimitLicenses, suspiciousTransfers };
+  }
+
+  public detectCloneDevicesCentral() {
+    return this.detectCloneDevices();
   }
 
   // Support - Delegate to PlatformSupportService
@@ -731,9 +825,10 @@ export class PlatformAdminService {
   public createSupportTicket(input: {
     tenantId: string;
     subject: string;
-    description: string;
+    description?: string;
     category?: string;
     priority?: PlatformSupportTicket['priority'];
+    assignedTo?: string | null;
   }): PlatformSupportTicket {
     return platformSupportService.createSupportTicket(input);
   }
@@ -764,10 +859,16 @@ export class PlatformAdminService {
 
   public addSupportMessage(input: {
     ticketId: string;
-    authorId: string;
-    authorType: 'STAFF' | 'TENANT';
+    authorId?: string;
+    authorType?: 'STAFF' | 'TENANT';
+    authorName?: string;
+    authorRole?: 'CUSTOMER' | 'SUPPORT' | 'SYSTEM';
     body: string;
     internal?: boolean;
+    isInternal?: boolean;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentSize?: string | null;
   }): PlatformSupportMessage {
     return platformSupportService.addSupportMessage(input);
   }
@@ -790,8 +891,9 @@ export class PlatformAdminService {
 
   public startRemoteSession(input: {
     ticketId: string;
-    staffId: string;
-    tenantId: string;
+    staffId?: string;
+    tenantId?: string;
+    technicianName?: string;
     durationMinutes?: number;
   }): PlatformRemoteSession {
     return platformSupportService.startRemoteSession(input);
@@ -1048,32 +1150,15 @@ export class PlatformAdminService {
     return platformSettingsService.updateSettings(input);
   }
 
-  public getPlatformPolicies(): PlatformPolicySettings {
+  public getPlatformPolicies(): PlatformPolicyDocument {
     return platformSettingsService.getPlatformPolicies();
   }
 
   public savePlatformPolicies(input: {
-    passwordMinLength?: number;
-    passwordRequireUppercase?: boolean;
-    passwordRequireLowercase?: boolean;
-    passwordRequireNumbers?: boolean;
-    passwordRequireSymbols?: boolean;
-    passwordMaxAgeDays?: number;
-    passwordHistoryCount?: number;
-    sessionTimeoutMinutes?: number;
-    maxConcurrentSessions?: number;
-    mfaEnforcement?: 'off' | 'optional' | 'required';
-    lockoutFailedAttempts?: number;
-    lockoutDurationMinutes?: number;
-    requireEmailVerification?: boolean;
-    allowPasswordReset?: boolean;
-    auditRetentionDays?: number;
-    dataRetentionDays?: number;
-    backupRetentionDays?: number;
-    apiRateLimitPerMinute?: number;
-    webhookRetryAttempts?: number;
-    webhookTimeoutSeconds?: number;
-  }): PlatformPolicySettings {
+    terms?: string;
+    privacy?: string;
+    retention?: Partial<PlatformPolicyRetention>;
+  }): PlatformPolicyDocument {
     return platformSettingsService.savePlatformPolicies(input);
   }
 
@@ -1161,6 +1246,10 @@ export class PlatformAdminService {
 
   public createConfigRollout(input: PlatformConfigRolloutInput): PlatformConfigRollout {
     return platformConfigService.createConfigRollout(input);
+  }
+
+  public startConfigRollout(id: string): PlatformConfigRollout {
+    return platformConfigService.startConfigRollout(id);
   }
 
   public listConfigRollouts(): PlatformConfigRollout[] {
@@ -1258,19 +1347,19 @@ export class PlatformAdminService {
     return platformAnalyticsService.getBusinessPerformance(period, planId);
   }
 
-  public getCustomerMetrics(planId?: string): PlatformCustomerMetrics {
+  public getCustomerMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformCustomerMetrics {
     return platformAnalyticsService.getCustomerMetrics(planId);
   }
 
-  public getSubscriptionMetrics(): PlatformSubscriptionMetrics {
+  public getSubscriptionMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformSubscriptionMetrics {
     return platformAnalyticsService.getSubscriptionMetrics();
   }
 
-  public getLicenseMetrics(): PlatformLicenseMetrics {
+  public getLicenseMetrics(period: PlatformPeriod = '30d', planId?: string): PlatformLicenseMetrics {
     return platformAnalyticsService.getLicenseMetrics();
   }
 
-  public getOperationsMetrics(): PlatformOperationsMetrics {
+  public getOperationsMetrics(period: PlatformPeriod = '30d'): PlatformOperationsMetrics {
     return platformAnalyticsService.getOperationsMetrics();
   }
 
@@ -1318,12 +1407,12 @@ export class PlatformAdminService {
     return { success, failed };
   }
 
-  public async bulkChangeTenantPlan(input: { tenantIds: string[]; planId: string; months?: number; price?: number; coupling?: 'FULL' | 'EXPIRY_ONLY' | 'NONE'; reason?: string }): Promise<{ success: number; failed: Array<{ tenantId: string; error: string }> }> {
+  public async bulkChangeTenantPlan(input: { tenantIds: string[]; planId: string; months?: number; price?: number; seats?: number; coupling?: 'FULL' | 'EXPIRY_ONLY' | 'NONE'; reason?: string }): Promise<{ success: number; failed: Array<{ tenantId: string; error: string }> }> {
     let success = 0;
     const failed: Array<{ tenantId: string; error: string }> = [];
     for (const tenantId of input.tenantIds) {
       try {
-        await this.changeSubscriptionPlan(tenantId, input.planId, { months: input.months, price: input.price, coupling: input.coupling, reason: input.reason });
+        await this.changeSubscriptionPlan(tenantId, input.planId, { months: input.months, price: input.price, seats: input.seats, coupling: input.coupling, reason: input.reason });
         success++;
       } catch (e) {
         failed.push({ tenantId, error: String(e) });
@@ -1346,8 +1435,12 @@ export class PlatformAdminService {
     return { success, failed };
   }
 
-  public bulkExportTenants(filters: { status?: string; planId?: string }): string {
-    const tenants = this.listTenants('', filters.status ?? '', filters.planId ?? '');
+  public bulkExportTenants(filters: { tenantIds?: string[]; status?: string; planId?: string }): string {
+    let tenants = this.listTenants('', filters.status ?? '', filters.planId ?? '');
+    if (filters.tenantIds && filters.tenantIds.length > 0) {
+      const wanted = new Set(filters.tenantIds);
+      tenants = tenants.filter((tenant) => wanted.has(tenant.id));
+    }
     return JSON.stringify(tenants, null, 2);
   }
 
@@ -1365,6 +1458,93 @@ export class PlatformAdminService {
     return { success, failed };
   }
 
+  public importTenantsCsv(content: string, options?: { skipHeader?: boolean }): { created: number; updated: number; errors: Array<{ row: number; error: string }> } {
+    const headerMap: Record<string, keyof PlatformTenantInput> = {
+      name: 'name', 'الاسم': 'name', tenantname: 'name',
+      code: 'code', 'الكود': 'code', tenantcode: 'code',
+      contactname: 'contactName', 'جهة الاتصال': 'contactName', contact: 'contactName',
+      email: 'email', 'البريد': 'email',
+      phone: 'phone', 'الهاتف': 'phone', mobile: 'phone',
+      country: 'country', 'الدولة': 'country',
+      city: 'city', 'المدينة': 'city',
+      address: 'address', 'العنوان': 'address',
+      businesstype: 'businessType', 'نوع النشاط': 'businessType', activity: 'businessType',
+      status: 'status', 'الحالة': 'status',
+      planid: 'planId', 'plan': 'planId', 'الباقة': 'planId',
+      seatslimit: 'seatsLimit', 'seats': 'seatsLimit', 'المقاعد': 'seatsLimit',
+      brancheslimit: 'branchesLimit', 'branches': 'branchesLimit', 'الفروع': 'branchesLimit',
+      deviceslimit: 'devicesLimit', 'devices': 'devicesLimit', 'الأجهزة': 'devicesLimit',
+      notes: 'notes', 'ملاحظات': 'notes',
+    };
+
+    const parseLine = (line: string): string[] => {
+      const values: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let j = 0; j < line.length; j += 1) {
+        const char = line[j];
+        if (char === '"') {
+          if (inQuotes && line[j + 1] === '"') { current += '"'; j += 1; }
+          else inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+      return values;
+    };
+
+    const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    const startIndex = options?.skipHeader && lines.length > 0 ? 1 : 0;
+    const resolvedHeaders = lines.length > 0
+      ? parseLine(lines[0]).map((h) => headerMap[h.trim().toLowerCase()] ?? null)
+      : [];
+    let created = 0;
+    let updated = 0;
+    const errors: Array<{ row: number; error: string }> = [];
+
+    for (let i = startIndex; i < lines.length; i += 1) {
+      const rowNumber = i + 1;
+      try {
+        const values = parseLine(lines[i]);
+        const input: PlatformTenantInput = { name: '' };
+        values.forEach((value, index) => {
+          const field = resolvedHeaders[index];
+          if (!field || value === '') return;
+          if (field === 'name' || field === 'code' || field === 'contactName' || field === 'email' || field === 'phone' || field === 'country' || field === 'city' || field === 'address' || field === 'businessType' || field === 'notes') {
+            (input as any)[field] = value;
+          } else if (field === 'status') {
+            input.status = value.toUpperCase() as PlatformTenantStatus;
+          } else if (field === 'planId') {
+            const plan = this.listPlans().find((p) => p.code === value || p.id === value || p.name === value);
+            input.planId = plan?.id ?? value;
+          } else if (field === 'seatsLimit' || field === 'branchesLimit' || field === 'devicesLimit') {
+            const num = Number(value);
+            if (!Number.isNaN(num)) (input as any)[field] = num;
+          }
+        });
+        if (!input.name) throw new Error('اسم العميل مطلوب');
+
+        const existing = this.listTenants('', '', '').find((t) =>
+          (input.email && t.email === input.email) || (input.code && t.code === input.code) || t.name === input.name
+        );
+        if (existing) {
+          this.updateTenant(existing.id, input);
+          updated += 1;
+        } else {
+          this.createTenant(input);
+          created += 1;
+        }
+      } catch (e) {
+        errors.push({ row: rowNumber, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return { created, updated, errors };
+  }
+
   // Remote Control
   public getTenantRemoteControl(tenantId: string): any {
     const tenant = this.getTenant(tenantId);
@@ -1372,8 +1552,8 @@ export class PlatformAdminService {
     return { tenantId, tenantName: tenant.name, status: tenant.status, planId: tenant.planId, devices: this.listDevices(tenantId).length };
   }
 
-  public pushTenantConfig(tenantId: string, config: Record<string, unknown>): void {
-    this.saveTenantConfig({ tenantId, values: config });
+  public pushTenantConfig(tenantId: string, config: Record<string, unknown>): PlatformTenantConfig {
+    return this.saveTenantConfig({ tenantId, values: config });
   }
 
   public forceTenantSync(tenantId: string): void {

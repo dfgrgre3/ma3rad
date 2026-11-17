@@ -56,7 +56,6 @@ export const App: React.FC = () => {
     }
 
     let active = true;
-    let progress = 0;
     const totalSteps = 6;
     void CentralLicenseService.hasCompletedFirstRunActivation().then((complete) => {
       if (active) setActivationComplete(complete);

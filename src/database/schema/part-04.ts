@@ -1,4 +1,12 @@
 export const SCHEMA_PART_04 = String.raw`
+-- IMPORTANT SECURITY NOTE: Financial amounts in this schema use REAL type which
+-- can have floating-point precision errors. A future migration should change these to
+-- INTEGER (storing amounts in smallest currency unit, e.g., cents) or TEXT with decimal
+-- arithmetic. See: https://sqlite.org/quirks.html#floating_point_arithmetic
+-- Affected columns: quantity_m2, boxes_count, unit_cost, total_cost, meters_per_box,
+-- landed_cost_share, effective_unit_cost, ordered_unit_cost, grn_accepted_qty, amount,
+-- paid_amount, discount_amount, tax_amount, grand_total, remaining_balance, etc.
+
 CREATE TABLE IF NOT EXISTS purchase_invoice_items (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL,

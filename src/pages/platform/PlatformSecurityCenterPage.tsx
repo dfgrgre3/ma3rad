@@ -870,7 +870,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => handleRotateKey(k.keyAlias)}
+                    onClick={() => k.keyAlias && handleRotateKey(k.keyAlias)}
                     disabled={!canManageSecurity}
                     leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}
                   >

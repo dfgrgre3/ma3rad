@@ -347,7 +347,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.smtpPort || 587}
-                  onChange={(e) => setSettings({ ...settings, smtpPort: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, smtpPort: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -480,7 +480,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.defaultTaxRate || 14}
-                  onChange={(e) => setSettings({ ...settings, defaultTaxRate: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, defaultTaxRate: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -499,7 +499,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.defaultTrialDays}
-                  onChange={(e) => setSettings({ ...settings, defaultTrialDays: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, defaultTrialDays: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -507,7 +507,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.licenseGracePeriodDays || 7}
-                  onChange={(e) => setSettings({ ...settings, licenseGracePeriodDays: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, licenseGracePeriodDays: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -554,8 +554,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="checkbox"
                   id="enforceHttps"
-                  checked={settings.enforceHttps !== false}
-                  onChange={(e) => setSettings({ ...settings, enforceHttps: e.target.checked })}
+                  checked={settings.enforceHttps !== 'false'}
+                  onChange={(e) => setSettings({ ...settings, enforceHttps: e.target.checked ? 'true' : 'false' })}
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <label htmlFor="enforceHttps" className="text-xs font-semibold text-slate-700 cursor-pointer">
@@ -579,7 +579,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.sessionTimeoutMinutes || 30}
-                  onChange={(e) => setSettings({ ...settings, sessionTimeoutMinutes: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, sessionTimeoutMinutes: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -587,7 +587,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.maxFailedLogins || 5}
-                  onChange={(e) => setSettings({ ...settings, maxFailedLogins: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, maxFailedLogins: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -595,7 +595,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.passwordMinLength || 10}
-                  onChange={(e) => setSettings({ ...settings, passwordMinLength: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, passwordMinLength: e.target.value })}
                   className={inputClass}
                 />
               </Field>
@@ -606,8 +606,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="checkbox"
                   id="enforceMfa"
-                  checked={Boolean(settings.enforceMfa)}
-                  onChange={(e) => setSettings({ ...settings, enforceMfa: e.target.checked })}
+                  checked={settings.enforceMfa === 'true'}
+                  onChange={(e) => setSettings({ ...settings, enforceMfa: e.target.checked ? 'true' : 'false' })}
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <label htmlFor="enforceMfa" className="text-xs font-semibold text-slate-700 cursor-pointer">
@@ -619,8 +619,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="checkbox"
                   id="passwordRequireComplex"
-                  checked={settings.passwordRequireComplex !== false}
-                  onChange={(e) => setSettings({ ...settings, passwordRequireComplex: e.target.checked })}
+                  checked={settings.passwordRequireComplex !== 'false'}
+                  onChange={(e) => setSettings({ ...settings, passwordRequireComplex: e.target.checked ? 'true' : 'false' })}
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <label htmlFor="passwordRequireComplex" className="text-xs font-semibold text-slate-700 cursor-pointer">
@@ -689,7 +689,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <input
                   type="number"
                   value={settings.backupRetentionDays || 90}
-                  onChange={(e) => setSettings({ ...settings, backupRetentionDays: Number(e.target.value) })}
+                  onChange={(e) => setSettings({ ...settings, backupRetentionDays: e.target.value })}
                   className={inputClass}
                 />
               </Field>

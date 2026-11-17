@@ -399,7 +399,7 @@ export class FinanceExtrasService {
     const referenceType = input.referenceType?.trim() || 'MANUAL_JOURNAL';
     const referenceId = input.referenceId?.trim() || `manual-${uuidv4()}`;
     let entryId = '';
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       entryId = postLedgerEntry(db.getDb(), {
         date: input.date,
         description: input.description,
@@ -424,7 +424,7 @@ export class FinanceExtrasService {
     const entry = this.getScopedJournalEntry(id);
     if (entry.isPosted) throw new Error('لا يمكن حذف قيد مرحّل؛ أنشئ قيدًا عكسيًا لتصحيحه.');
     const lines = this.getJournalLines(id);
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       for (const line of lines) {
         db.run('UPDATE chart_of_accounts SET balance = ROUND(balance - ?, 2) WHERE id = ?', [line.debit - line.credit, line.accountId]);
       }
@@ -450,7 +450,7 @@ export class FinanceExtrasService {
     const date = options.date || localDateString();
     this.assertPostingDate(date);
     let reversalId = '';
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       reversalId = reverseLedgerEntry(db.getDb(), id, {
         date,
         description: `عكس القيد ${entry.entryNumber}${options.reason?.trim() ? ` — ${options.reason.trim()}` : ''}`,
@@ -766,7 +766,7 @@ export class FinanceExtrasService {
       const allowed = this.branchAccess.getAccessibleBranchIds(actor);
       if (!this.db.query('SELECT id FROM branches WHERE id = ? AND is_active = 1', [branchId]).length ||
           (allowed !== null && !allowed.includes(branchId))) throw new Error('الفرع المحدد غير متاح أو خارج نطاق صلاحيتك.');
-      this.db.executeTransaction((db) => {
+      this.db.executeFinancialTransaction((db) => {
         db.run(
           `INSERT INTO fixed_assets (id, code, name, category, purchase_date, purchase_cost, salvage_value,
              useful_life_years, status, location, notes, depreciation_method, declining_rate, expected_units,
@@ -904,7 +904,7 @@ export class FinanceExtrasService {
     const amount = Number(currentPeriod?.amount || 0);
     if (amount <= 0) throw new Error('لا توجد قيمة قابلة للإهلاك.');
     const requestId = `fadr_${uuidv4().substring(0, 12)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO fixed_asset_depreciation_requests
          (id, asset_id, period, posting_date, amount, usage_quantity, requested_by)
@@ -973,7 +973,7 @@ export class FinanceExtrasService {
     }
     const periodId = `fad_${uuidv4().substring(0, 8)}`;
     let result: FixedAssetDepreciationPeriod | undefined;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const current = db.query<{ status: string; requestedBy: string }>(
         'SELECT status, requested_by AS requestedBy FROM fixed_asset_depreciation_requests WHERE id = ?',
         [requestId]
@@ -1132,7 +1132,7 @@ export class FinanceExtrasService {
       throw new Error('المستخدم المسؤول غير موجود أو غير نشط.');
     }
     const id = `fat_${uuidv4().substring(0, 8)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO fixed_asset_transfers
          (id, asset_id, transfer_date, from_branch_id, to_branch_id, from_department_id, to_department_id,
@@ -1184,7 +1184,7 @@ export class FinanceExtrasService {
     if (!['OPERATIONAL', 'CAPITALIZED'].includes(input.treatment)) throw new Error('معالجة التكلفة غير صحيحة.');
     if (input.treatment === 'CAPITALIZED' && input.cost <= 0) throw new Error('قيمة التحسين الرأسمالي يجب أن تكون أكبر من صفر.');
     const id = `fam_${uuidv4().substring(0, 8)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       let journalEntryId: string | null = null;
       if (input.treatment === 'OPERATIONAL') {
         journalEntryId = postLedgerEntry(db.getDatabase(), {
@@ -1292,7 +1292,7 @@ export class FinanceExtrasService {
     }
     if (input.checksum && !/^[a-f0-9]{64}$/i.test(input.checksum)) throw new Error('بصمة الملف غير صالحة.');
     const id = `faatt_${uuidv4().substring(0, 12)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO fixed_asset_attachments
          (id, asset_id, document_type, file_name, mime_type, file_size, checksum, storage_name, uploaded_by)
@@ -1346,7 +1346,7 @@ export class FinanceExtrasService {
     ];
     const disposalId = `fadsp_${uuidv4().substring(0, 8)}`;
     let result: FixedAssetDisposal | undefined;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       let settlementAccountCode = '1101';
       let currentBalance = 0;
       if (input.settlementType === 'CASH_REGISTER') {
@@ -1490,17 +1490,17 @@ export class FinanceExtrasService {
     const names = new Set(columns.map((column) => String(column.name ?? '')));
 
     if (!names.has('registered_status')) {
-      this.db.executeTransaction((db) => {
+      this.db.executeFinancialTransaction((db) => {
         db.run("ALTER TABLE fixed_asset_count_snapshots ADD COLUMN registered_status TEXT NOT NULL DEFAULT 'UNKNOWN'");
       });
     }
     if (!names.has('registered_location')) {
-      this.db.executeTransaction((db) => {
+      this.db.executeFinancialTransaction((db) => {
         db.run('ALTER TABLE fixed_asset_count_snapshots ADD COLUMN registered_location TEXT');
       });
     }
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `UPDATE fixed_asset_count_snapshots
          SET registered_status = (
@@ -1576,7 +1576,7 @@ export class FinanceExtrasService {
 
     const campaignId = `fac_${uuidv4().substring(0, 8)}`;
     const location = input.location?.trim() || null;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         'INSERT INTO fixed_asset_count_campaigns (id, branch_id, location, count_date, created_by) VALUES (?, ?, ?, ?, ?)',
         [campaignId, input.branchId, location, input.date, actor.id]
@@ -1617,7 +1617,7 @@ export class FinanceExtrasService {
     ).length) throw new Error('تم تسجيل هذا الأصل في الحملة بالفعل.');
     const countStatus = snapshot ? 'FOUND' : 'UNREGISTERED';
     const observationId = `faco_${uuidv4().substring(0, 8)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO fixed_asset_count_observations
          (id, campaign_id, asset_id, scanned_code, count_status, condition, notes, actor_id)
@@ -1640,7 +1640,7 @@ export class FinanceExtrasService {
     const allowed = this.branchAccess.getAccessibleBranchIds(actor);
     if (allowed !== null && !allowed.includes(campaign.branchId)) throw new Error('ليس لديك صلاحية الوصول إلى حملة الجرد.');
     if (campaign.status !== 'OPEN') throw new Error('تم اعتماد هذه الحملة بالفعل.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO fixed_asset_count_observations
          (id, campaign_id, asset_id, scanned_code, count_status, actor_id)
@@ -1684,7 +1684,7 @@ export class FinanceExtrasService {
       throw new Error('لا يمكن حذف أصل مرتبط بحركة محاسبية.');
     }
     const acquisition = this.db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [id])[0];
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       if (acquisition) {
         const cashLine = db.query<any>(`SELECT 1 AS found FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=? AND a.code='1101' AND l.credit>0`, [acquisition.id])[0];
         reverseLedgerEntry(db.getDatabase(), acquisition.id, {

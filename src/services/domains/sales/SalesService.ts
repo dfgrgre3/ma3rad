@@ -220,7 +220,7 @@ export class SalesService {
       });
 
       return { return: ret, invoice: newInvoice };
-    });
+    }, { immediatePersist: true });
   }
 
   /** Void a completed sales invoice with full reversal (brief §67/§220). */

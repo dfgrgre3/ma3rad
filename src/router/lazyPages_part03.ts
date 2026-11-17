@@ -50,6 +50,8 @@ export const FiscalClosingPage = lazy(() => import('../pages/finance/fiscal-clos
 
 export const BankReconciliationPage = lazy(() => import('../pages/finance/bank-reconciliation/BankReconciliationPage').then(m => ({ default: m.BankReconciliationPage })));
 
+export const ConsistencyAuditPage = lazy(() => import('../pages/finance/consistency-audit/ConsistencyAuditPage').then(m => ({ default: m.ConsistencyAuditPage })));
+
 export const BudgetsCostCentersPage = lazy(() => import('../pages/finance/budgets-cost-centers/BudgetsCostCentersPage').then(m => ({ default: m.BudgetsCostCentersPage })));
 
 export const CashFlowForecastPage = lazy(() => import('../pages/finance/cash-flow-forecast/CashFlowForecastPage').then(m => ({ default: m.CashFlowForecastPage })));

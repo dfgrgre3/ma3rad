@@ -139,7 +139,7 @@ function getUnitLabel(product: any): string {
   });
 }
 
-function validateProductPricing(sqliteDb: any, dto: CreateSaleDTO, item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number, quantityM2: number): void {
+function validateProductPricing(sqliteDb: { query: <T = any>(sql: string, params?: any[]) => T[] }, dto: CreateSaleDTO, item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number, quantityM2: number): void {
   if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) throw new Error('سعر بيع الصنف غير صحيح.');
   if (item.pricingSource === 'ORDER') {
     const agreed = dto.orderId && item.orderItemId ? sqliteDb.query<any>(
@@ -820,6 +820,14 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   return ctx.db.executeTransaction((sqliteDb) => {
     const sysSettings = SettingsService.getSettings();
     const costingMethod = sysSettings.costingMethod;
+    // Tax rate is owned by settings: an omitted rate means "use the configured
+    // default". An explicit rate that differs requires an override permission —
+    // the backend still recomputes taxAmount from the rate, never from the UI.
+    const configuredTaxPercentage = Number(sysSettings.defaultTaxPercentage ?? 0);
+    const taxPercentage = dto.taxPercentage ?? configuredTaxPercentage;
+    if (Math.abs(taxPercentage - configuredTaxPercentage) > 0.0001) {
+      PermissionService.require(actor, 'sales.tax.override');
+    }
     const allowNegativeStock = sysSettings.enableNegativeStock === true;
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory, allowNegativeStock);
@@ -830,7 +838,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     // Do NOT trust dto.taxAmount from the frontend — it can be manipulated.
     const subtotal = round2(preparedItems.reduce((sum, p) => sum + p.totalPrice, 0));
     const taxableBase = round2(Math.max(0, subtotal - headerDiscount));
-    const computedTaxAmount = round2(taxableBase * (dto.taxPercentage || 0) / 100);
+    const computedTaxAmount = round2(taxableBase * taxPercentage / 100);
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({
         lineTotal: p.totalPrice,
@@ -871,7 +879,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     `, [
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, shiftId || null,
       dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null,
-      totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
+      totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, taxPercentage, totals.taxAmount,
       totals.shippingCost, totals.extraFees, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id
     ]);
@@ -1005,5 +1013,5 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     });
 
     return ctx.getInvoiceById(invoiceId)!;
-  });
+  }, { immediatePersist: true });
 }

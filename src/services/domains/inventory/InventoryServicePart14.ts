@@ -128,7 +128,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     const adjustmentId = `adj_${uuidv4().substring(0, 8)}`;
     const date = localDateString();
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const currentProduct = this.getAdjustmentProduct(txDb, input.productId);
       if (!currentProduct) throw new Error('الصنف المحدد غير موجود.');
       this.validateAdjustmentStock(txDb, input.warehouseId, input.productId, input.type, input.quantity);
@@ -238,6 +238,9 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
       if (itemValue > 0) postLedgerEntry(txDb.getDatabase(), {
         date: localDateString(), description: `Inventory adjustment ${current.adjustmentNumber}: ${current.reason}`,
         referenceType: 'INVENTORY_ADJUSTMENT', referenceId: adjustmentId, createdBy: actor.id,
+        branchId: txDb.query<{ branchId: string | null }>(
+          `SELECT branch_id AS branchId FROM warehouses WHERE id = ?`, [current.warehouseId]
+        )[0]?.branchId ?? null,
         lines: sign > 0 ? [
           { accountCode: '1104', debit: itemValue, credit: 0 }, { accountCode: '5201', debit: 0, credit: itemValue },
         ] : [
@@ -264,7 +267,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     }
     if (adjustment.createdBy === actor.id) throw new Error('لا يمكن لمنشئ التسوية اعتمادها.');
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const current = this.getAdjustmentHeader(txDb, adjustmentId);
       if (!current || current.status !== 'PENDING_APPROVAL' || current.approvalStatus === 'APPROVED') {
         throw new Error('تم تحديث حالة التسوية؛ أعد تحميلها.');
@@ -295,7 +298,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
       throw new Error('يجب اعتماد التسوية قبل ترحيلها.');
     }
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const current = this.getAdjustmentHeader(txDb, adjustmentId);
       if (!current || current.status !== 'PENDING_APPROVAL' || current.approvalStatus !== 'APPROVED') {
         throw new Error('تم تحديث حالة التسوية؛ أعد تحميلها.');
@@ -372,6 +375,9 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
             referenceType: 'INVENTORY_ADJUSTMENT',
             referenceId: adjustmentId,
             createdBy: actor.id,
+            branchId: txDb.query<{ branchId: string | null }>(
+              `SELECT branch_id AS branchId FROM warehouses WHERE id = ?`, [current.warehouseId]
+            )[0]?.branchId ?? null,
             lines: sign > 0
               ? [
                 { accountCode: '1104', debit: itemValue, credit: 0 },

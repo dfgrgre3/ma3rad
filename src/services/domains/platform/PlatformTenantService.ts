@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
@@ -428,7 +429,7 @@ export class PlatformTenantService {
 
     const username = input.username?.trim() || this.generateUsername(tenant.name);
     const temporaryPassword = input.password || generateTemporaryPassword();
-    const passwordHash = require('bcryptjs').hashSync(temporaryPassword, 10);
+    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
     const activationCode = generateActivationCode();
     const id = `acc_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
@@ -469,7 +470,7 @@ export class PlatformTenantService {
     const pwd = temporaryPassword || generateTemporaryPassword();
     if (pwd.length < 8) throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
 
-    const passwordHash = require('bcryptjs').hashSync(pwd, 10);
+    const passwordHash = bcrypt.hashSync(pwd, 10);
     const activationCode = generateActivationCode();
     const now = nowIso();
 
@@ -545,7 +546,7 @@ export class PlatformTenantService {
     const id = `tu_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
     const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = require('bcryptjs').hashSync(temporaryPassword, 10);
+    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
     const activationCode = generateActivationCode();
 
     this.db.run(
@@ -634,7 +635,7 @@ export class PlatformTenantService {
     if (!existing) throw new Error('المستخدم غير موجود.');
 
     const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = require('bcryptjs').hashSync(temporaryPassword, 10);
+    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
     const activationCode = generateActivationCode();
     const now = nowIso();
 

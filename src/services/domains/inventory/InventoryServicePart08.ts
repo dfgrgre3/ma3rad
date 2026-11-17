@@ -93,7 +93,7 @@ public createTransferRequest(input: {
       throw new Error('يجب إضافة صنف واحد على الأقل للتحويل.');
     }
 
-    return this.db.executeTransaction((txDb) => {
+    return this.db.executeFinancialTransaction((txDb) => {
       let totalQty = 0;
       let totalCost = 0;
       const transferId = `trf_${uuidv4().substring(0, 8)}`;
@@ -186,7 +186,7 @@ public approveTransfer(transferId: string): void {
   if (transfer.status !== 'REQUESTED') throw new Error('لا يمكن اعتماد تحويل ليس في حالة الطلب.');
   if (transfer.createdBy === actor.id) throw new Error('لا يمكن لمنشئ طلب التحويل اعتماده.');
 
-  this.db.executeTransaction((txDb) => {
+  this.db.executeFinancialTransaction((txDb) => {
     const current = txDb.query<{ status: string; createdBy: string }>(
       `SELECT status, created_by AS createdBy FROM stock_transfers WHERE id = ?`,
       [transferId]

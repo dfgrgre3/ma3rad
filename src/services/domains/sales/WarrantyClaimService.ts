@@ -601,7 +601,7 @@ export class WarrantyClaimService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [`wce_${uuidv4()}`, id, action.toUpperCase(), claim.status, config.to, cleanNotes || null, actor.id, now]
       );
-    });
+    }, { immediatePersist: true });
 
     return this.scopedClaim(id)!;
   }

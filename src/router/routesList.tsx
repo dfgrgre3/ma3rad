@@ -108,6 +108,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'finance/cheques', element: <P.ChequesPage /> },
   { path: 'finance/fiscal-closing', element: <P.FiscalClosingPage /> },
   { path: 'finance/bank-reconciliation', element: <P.BankReconciliationPage /> },
+  { path: 'finance/consistency-audit', element: <P.ConsistencyAuditPage /> },
   { path: 'finance/budgets-cost-centers', element: <P.BudgetsCostCentersPage /> },
   { path: 'finance/cash-forecast', element: <P.CashFlowForecastPage /> },
   { path: 'finance/epayment-settlements', element: <P.EPaymentSettlementPage /> },

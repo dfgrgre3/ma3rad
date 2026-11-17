@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
-import { PlatformAuthorizationService } from './PlatformAuthorizationService';
+import { PlatformAuthorizationService, PLATFORM_ROLE_DEFINITIONS, PLATFORM_PERMISSION_SECTIONS_FOR_UI as PLATFORM_PERMISSION_SECTIONS } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
 import {
   PlatformStaff,
@@ -26,6 +26,7 @@ import {
   PlatformCentralSecurityOverview,
 } from './platformTypes';
 import { nowIso, toNumber, randomToken, generateTemporaryPassword, safeJsonArray, formatDate } from './platformUtils';
+import { STANDARD_ACTION_LABELS } from './platformPermissionCatalog';
 
 const PLATFORM_ROLE_CODES_SET: ReadonlySet<string> = new Set([
   'SUPER_ADMIN',
@@ -142,7 +143,6 @@ export class PlatformStaffService {
 
   public listPlatformStaffRoles(): PlatformStaffRoleDefinition[] {
     PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.view');
-    const { PLATFORM_ROLE_DEFINITIONS } = require('./PlatformAuthorizationService');
     return Object.values(PLATFORM_ROLE_DEFINITIONS);
   }
 
@@ -853,18 +853,16 @@ export class PlatformStaffService {
   public getRolePermissionMatrix(): PlatformRoleMatrix {
     PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.permissions');
 
-    const { PLATFORM_ROLE_DEFINITIONS } = require('./PlatformAuthorizationService');
     const matrix: Record<string, string[]> = {};
 
-    for (const [role, def] of Object.entries(PLATFORM_ROLE_DEFINITIONS) as [string, { permissions: string[] }][]) {
-      const permissions = def.permissions ?? [];
+    for (const [role, def] of Object.entries(PLATFORM_ROLE_DEFINITIONS)) {
+      const permissions = (def as any).permissions ?? [];
       const rows = this.db.query<any>('SELECT permission_codes FROM platform_role_permissions WHERE role = ?', [role])[0];
       const customCodes = rows ? safeJsonArray(rows.permission_codes) : [];
       matrix[role] = [...new Set([...permissions, ...customCodes])].sort();
     }
 
     // Build sections from PLATFORM_PERMISSION_SECTIONS
-    const { PLATFORM_PERMISSION_SECTIONS, STANDARD_ACTION_LABELS } = require('./PlatformAuthorizationService');
     const sections = Object.entries(PLATFORM_PERMISSION_SECTIONS).map(([module, section]: [string, any]) => ({
       module,
       title: section.title,

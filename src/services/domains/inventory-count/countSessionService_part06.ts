@@ -21,7 +21,7 @@ export function approveCountSession(activeSession: CountSession): boolean {
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
   if (sessionRow.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد اعتماده.');
   const countWarehouseId = sessionRow.warehouseId;
-  db.executeTransaction((txDb) => {
+  db.executeFinancialTransaction((txDb) => {
     const currentSession = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!currentSession || currentSession.status !== 'REVIEW') {
       throw new Error('تم ترحيل الجلسة أو إغلاقها بالفعل. أعد تحميل البيانات قبل المتابعة.');
@@ -58,7 +58,7 @@ export function rejectCountSession(activeSession: CountSession, reason: string):
   if (session.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد مراجعته.');
   const cleanReason = reason.trim();
   if (!cleanReason) throw new Error('سبب الرفض مطلوب.');
-  db.executeTransaction(txDb => {
+  db.executeFinancialTransaction(txDb => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!current || current.status !== 'REVIEW') throw new Error('تم تحديث حالة الجلسة؛ أعد تحميلها.');
     txDb.run("UPDATE stock_counts SET status = 'COUNTING', approval_status = 'REJECTED', rejection_reason = ? WHERE id = ? AND status = 'REVIEW'", [cleanReason, activeSession.id]);

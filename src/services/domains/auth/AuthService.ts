@@ -275,27 +275,31 @@ export class AuthService {
 
   /**
    * Read-only lockout state for a username. Safe to call from the login screen:
-   * never throws, never requires authentication, and returns a disabled state
-   * when the security settings are unavailable.
+   * never throws, never requires authentication. Uses a conservative fail-closed
+   * policy when security settings are unavailable to prevent bypassing protection.
    */
   public static getLoginGuardStatus(username: string): LoginGuardStatus {
-    const disabled: LoginGuardStatus = {
-      maxAttempts: 0,
+    // Conservative default: apply strict lockout when settings are unavailable
+    const safeDefault: LoginGuardStatus = {
+      maxAttempts: 5, // Conservative default
       failedAttempts: 0,
-      remainingAttempts: null,
+      remainingAttempts: 5,
       isLocked: false,
       lockedUntil: null,
       windowMinutes: LOGIN_LOCKOUT_WINDOW_MINUTES,
     };
-    if (!username) return disabled;
+    if (!username) return safeDefault;
 
     try {
       const db = DatabaseManager.getInstance();
       const maxRow = db.query<{ value: string }>(
         `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
       )[0];
-      const maxAttempts = Number(maxRow?.value ?? 0);
-      if (!Number.isFinite(maxAttempts) || maxAttempts <= 0) return disabled;
+      const maxAttempts = Number(maxRow?.value ?? 5); // Default to 5 if not configured
+      if (!Number.isFinite(maxAttempts) || maxAttempts <= 0) {
+        // Treat 0 or invalid as "use conservative default" instead of disabled
+        return { ...safeDefault, maxAttempts: 5, remainingAttempts: 5 };
+      }
 
       const windowMs = LOGIN_LOCKOUT_WINDOW_MINUTES * 60_000;
       const cutoff = new Date(Date.now() - windowMs).toISOString();
@@ -329,8 +333,10 @@ export class AuthService {
         windowMinutes: LOGIN_LOCKOUT_WINDOW_MINUTES,
       };
     } catch {
-      // Login must still work if the security settings table is unavailable.
-      return disabled;
+      // Fail-closed: apply conservative lockout when security settings are unavailable
+      // This prevents bypassing protection during database errors
+      console.warn('[AuthService] Security settings unavailable, using conservative lockout policy');
+      return safeDefault;
     }
   }
 

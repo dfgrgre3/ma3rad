@@ -216,6 +216,14 @@ async function start() {
     app.listen(PORT, () => {
       console.log(`Central server running on http://localhost:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/v1/health`);
+      console.log('');
+      console.log('PRODUCTION SECURITY NOTE:');
+      console.log('This server uses HTTP directly. For production deployment:');
+      console.log('1. Place this server behind a reverse proxy (nginx, Apache, or a load balancer)');
+      console.log('2. Configure TLS/HTTPS at the reverse proxy layer with valid certificates');
+      console.log('3. Update CORS_ALLOWED_ORIGINS to use HTTPS URLs only');
+      console.log('4. Ensure CENTRAL_API_URL in Electron clients uses HTTPS');
+      console.log('5. Consider IP whitelisting and firewall rules for the central server');
     });
   } catch (err) {
     console.error('Failed to start server:', err);

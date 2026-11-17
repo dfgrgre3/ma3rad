@@ -567,7 +567,7 @@ export class PlatformHealthService {
   public createOpsJob(input: { type: string; tenantId?: string; payload?: Record<string, unknown>; priority?: number; scheduledAt?: string }): PlatformOpsJob {
     PlatformHealthService.requirePlatformAccess('operations', 'platform.operations.jobs');
 
-    const id = `opj_${require('uuid').v4().replace(/-/g, '').slice(0, 12)}`;
+    const id = `opj_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
 
     this.db.run(
@@ -625,7 +625,7 @@ export class PlatformHealthService {
   public createMaintenanceWindow(input: { title: string; description?: string; startsAt: string; endsAt: string; affectedServices?: string[] }): PlatformMaintenanceWindow {
     PlatformHealthService.requirePlatformAccess('operations', 'platform.operations.maintenance');
 
-    const id = `mw_${require('uuid').v4().replace(/-/g, '').slice(0, 12)}`;
+    const id = `mw_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
 
     this.db.run(
@@ -671,7 +671,7 @@ export class PlatformHealthService {
   public requestOpApproval(input: { opType: string; opPayload?: Record<string, unknown> }): PlatformOpApproval {
     PlatformHealthService.requirePlatformAccess('operations', 'platform.operations.approvals');
 
-    const id = `opa_${require('uuid').v4().replace(/-/g, '').slice(0, 12)}`;
+    const id = `opa_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
 
     this.db.run(
@@ -750,7 +750,7 @@ export class PlatformHealthService {
   public logSyncEvent(input: { tenantId?: string; deviceId?: string; syncType: string; status: PlatformSyncStatus; recordsSynced?: number; errorDetail?: string }): PlatformSyncLogEntry {
     PlatformHealthService.requirePlatformAccess('operations', 'platform.operations.sync');
 
-    const id = `sl_${require('uuid').v4().replace(/-/g, '').slice(0, 12)}`;
+    const id = `sl_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
 
     this.db.run(

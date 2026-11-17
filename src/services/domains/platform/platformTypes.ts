@@ -20,7 +20,6 @@ export const PLATFORM_INVOICE_STATUS_LABELS: Record<PlatformInvoiceStatus, strin
 };
 export type PlatformLicenseStatus = 'ISSUED' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'EXPIRED';
 export type PlatformSubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED';
-export type PlatformInvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID';
 export type PlatformPaymentMethod = 'CASH' | 'BANK' | 'CARD' | 'WALLET' | 'OTHER';
 export type PlatformBillingCycle = 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'LIFETIME';
 /** How subscription and license changes are coupled. */
@@ -381,15 +380,16 @@ export interface PlatformModule {
 
 export interface PlatformFeatureFlag {
   id: string;
-  key: string;
+  /** Feature code/key used at runtime (e.g. sales.quick_invoice). */
+  code: string;
   name: string;
   description?: string | null;
-  defaultEnabled: boolean;
-  isActive: boolean;
-  rolloutPercentage: number;
-  variant?: string | null;
-  targetPlans: string[];
-  metadata?: Record<string, unknown> | null;
+  category?: string | null;
+  isEnabled: boolean;
+  rolloutPercent: number;
+  isStagingOnly?: boolean;
+  minPlanTier?: string | null;
+  overridesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -397,11 +397,11 @@ export interface PlatformFeatureFlag {
 export interface PlatformFeatureOverride {
   id: string;
   featureId: string;
-  tenantId?: string | null;
-  enabled: boolean;
-  rolloutPercentage: number;
-  variant?: string | null;
-  metadata?: Record<string, unknown> | null;
+  targetType: 'TENANT' | 'PLAN' | 'STAGING_GROUP';
+  targetId: string;
+  targetName?: string | null;
+  isEnabled: boolean;
+  customRolloutPercent?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -409,24 +409,22 @@ export interface PlatformFeatureOverride {
 export interface PlatformRelease {
   id: string;
   version: string;
-  name?: string | null;
-  description?: string | null;
   channel: string;
-  releaseDate?: string | null;
-  isActive: boolean;
   status?: string | null;
-  targetsSummary?: Record<string, number> | null;
-  notes?: string | null;
-  rollbackVersion?: string | null;
   isMandatory?: boolean | null;
   minVersion?: string | null;
   rolloutGroup?: string | null;
-  minClientVersion?: string | null;
-  maxClientVersion?: string | null;
-  artifactUrl?: string | null;
-  artifactHash?: string | null;
+  notes?: string | null;
+  releasedAt?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  checksumSha256?: string | null;
+  packageSignature?: string | null;
   changelog?: string | null;
-  rolledBackTo?: string | null;
+  rollbackVersion?: string | null;
+  stagingGroup?: string | null;
+  targetsSummary?: Record<string, number> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1035,24 +1033,38 @@ export interface PlatformSettingsMap {
 
 export interface PlatformTenantActivityConfig {
   tenantId: string;
+  activityId: string;
+  familyId?: string | null;
+  profileId?: string | null;
+  enabledModules: string[];
+  customTerminology: Record<string, string>;
+  navigationOverrides?: unknown;
+  featuresEnabled?: string[];
+  customAttributes?: unknown;
   version: number;
-  config: Record<string, unknown>;
   createdAt: string;
-  createdBy: string;
+  updatedAt?: string;
 }
 
 export interface PlatformTenantActivityVersion {
   id: string;
   tenantId: string;
   version: number;
-  config: Record<string, unknown>;
+  activityId: string;
+  profileId?: string | null;
+  config?: Record<string, unknown>;
+  changeSummary?: string | null;
+  createdBy?: string | null;
   createdAt: string;
-  createdBy: string;
 }
 
 export interface PlatformTenantActivityInput {
   tenantId: string;
-  config: Record<string, unknown>;
+  activityId: string;
+  profileId?: string;
+  enabledModules?: string[];
+  customTerminology?: Record<string, string>;
+  changeSummary?: string;
 }
 
 // ─── Time Period & Analytics ───────────────────────────────────────────────────
@@ -1707,10 +1719,11 @@ export interface PlatformConfigTemplate {
   id: string;
   code: string;
   name: string;
-  description?: string | null;
-  schema: Record<string, unknown>;
-  defaultValues: Record<string, unknown>;
-  category?: string | null;
+  businessType?: string | null;
+  planId?: string | null;
+  configPayload: Record<string, unknown>;
+  version: number;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1800,6 +1813,13 @@ export interface PlatformServerTelemetry {
   redisStatus: 'CONNECTED' | 'DISCONNECTED' | 'DEGRADED';
   activeConnections: number;
   recordedAt: string;
+}
+
+export interface PlatformPolicyDocument {
+  terms: string;
+  privacy: string;
+  retention: PlatformPolicyRetention;
+  updatedAt: string;
 }
 
 export interface PlatformPolicyRetention {
@@ -1933,6 +1953,8 @@ export interface PlatformStaff {
   role: PlatformStaffRole;
   passwordHash?: string;
   isActive: boolean;
+  mustChangePassword?: boolean;
+  permissionsOverride?: string[];
   mfaEnabled: boolean;
   mfaEnforcement: 'off' | 'optional' | 'required';
   totpSecret?: string | null;
@@ -1949,7 +1971,7 @@ export interface PlatformStaff {
 }
 
 export interface PlatformStaffInput {
-  username: string;
+  username?: string;
   fullName: string;
   email: string;
   phone?: string;
@@ -2023,7 +2045,6 @@ export interface PlatformSigningKey {
   alias: string;
   keyAlias?: string;
   privateKey?: string;
-  publicKey?: string;
   publicKey?: string;
   algorithm: string;
   version: number;

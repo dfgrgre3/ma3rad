@@ -216,7 +216,7 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
       throw new Error(`سعة الرف الوجهة غير كافية (المشغول ${round2(occupied)} m² من ${maxCapacity} m²).`);
     }
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       InventoryLocationStockService.transferBetweenBins(txDb, {
         warehouseId: input.warehouseId,
         productId: input.productId,

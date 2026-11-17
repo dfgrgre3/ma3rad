@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
@@ -36,7 +37,7 @@ public resolveSpecialStock(
     const totalCost = Number(item.totalCost ?? item.total_cost ?? (quantityM2 * unitCost));
     const specialNumber = item.specialNumber ?? item.special_number ?? item.id;
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const today = localDateString();
       const current = txDb.query<any>(`
         SELECT status FROM inventory_special_stocks WHERE id = ?
@@ -52,6 +53,9 @@ public resolveSpecialStock(
             referenceType: 'INVENTORY_WRITE_OFF',
             referenceId: item.id,
             createdBy: actor.id,
+            branchId: txDb.query<{ branchId: string | null }>(
+              `SELECT branch_id AS branchId FROM warehouses WHERE id = ?`, [warehouseId]
+            )[0]?.branchId ?? null,
             lines: [
               { accountCode: '5201', debit: totalCost, credit: 0 },
               { accountCode: '1104', debit: 0, credit: totalCost },
@@ -160,7 +164,7 @@ public setSpecialStockSalePrice(id: string, discountedUnitPrice: number): void {
   if (!Number.isFinite(price) || price <= 0 || price >= Number(item.sellingPrice || 0)) {
     throw new Error('يجب تحديد سعر بيع مخفض موجب وأقل من سعر البيع الأساسي.');
   }
-  this.db.executeTransaction((txDb) => {
+  this.db.executeFinancialTransaction((txDb) => {
     const current = txDb.query<any>(`
       SELECT status, discounted_unit_price AS discountedUnitPrice
       FROM inventory_special_stocks WHERE id = ?

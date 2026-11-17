@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { platformAdminService } from '../platform/PlatformAdminService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import type { PlatformNotification } from '../platform/platformTypes';
@@ -145,7 +146,6 @@ export class LicenseNotificationService {
     channels: string[];
     metadata: Record<string, unknown>;
   }): void {
-    const { v4: uuidv4 } = require('uuid');
     const id = `notif_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = new Date().toISOString();
 

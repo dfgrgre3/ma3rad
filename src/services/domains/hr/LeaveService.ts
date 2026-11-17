@@ -833,7 +833,7 @@ export class LeaveService {
     }
 
     const id = `lbal_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.executeTransaction(() => {
+    this.db.executeFinancialTransaction(() => {
       this.db.run(
         `INSERT INTO employee_leave_balance_transactions
          (id, employee_id, branch_id, leave_year, days_delta, transaction_type, effective_date, reason, created_by)
@@ -973,7 +973,7 @@ export class LeaveService {
       prorateOnService: input.prorateOnService ? 1 : 0,
     };
 
-    this.db.executeTransaction(() => {
+    this.db.executeFinancialTransaction(() => {
       this.db.run(
         `INSERT INTO employee_leave_accrual_policies (
            id, branch_id, employee_id, scope_key, effective_from,
@@ -1029,7 +1029,7 @@ export class LeaveService {
        FROM employee_leave_type_policies WHERE branch_id = ? AND leave_type = ?`,
       [branchId, leaveType]
     )[0]?.maxDaysPerYear ?? null;
-    this.db.executeTransaction(() => {
+    this.db.executeFinancialTransaction(() => {
       this.db.run(
         `INSERT INTO employee_leave_type_policies (branch_id, leave_type, max_days_per_year, updated_by)
          VALUES (?, ?, ?, ?)
@@ -1172,7 +1172,7 @@ export class LeaveService {
     }
 
     const id = `leave_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `INSERT INTO employee_leave_requests (
            id, employee_id, branch_id, leave_type, start_date, end_date, days, reason,
@@ -1214,7 +1214,7 @@ export class LeaveService {
         );
       }
     }
-    this.db.executeTransaction(() => {
+    this.db.executeFinancialTransaction(() => {
       if (decision === 'APPROVED') this.applyApprovedLeaveAttendance(request, actor);
       this.db.run(
         `UPDATE employee_leave_requests
@@ -1256,7 +1256,7 @@ export class LeaveService {
     if (!canManage && !isRequester) {
       throw new Error('ليس لديك صلاحية إلغاء هذا الطلب.');
     }
-    this.db.executeTransaction(() => {
+    this.db.executeFinancialTransaction(() => {
       if (request.status === 'APPROVED') this.restoreLeaveAttendance(request.id, request.employeeId, actor);
       this.db.run(
         `UPDATE employee_leave_requests

@@ -199,7 +199,7 @@ export const PayrollCalendarPage: React.FC = () => {
               )}
             </div>
 
-            {view?.events.length === 0 ? (
+            {!view || view.events.length === 0 ? (
               <div className="px-6 py-12 text-center text-slate-500">
                 <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 <p className="text-sm font-medium">لا توجد دورات رواتب لهذه الفترة</p>

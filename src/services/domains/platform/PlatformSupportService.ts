@@ -121,9 +121,10 @@ export class PlatformSupportService {
   public createSupportTicket(input: {
     tenantId: string;
     subject: string;
-    description: string;
+    description?: string;
     category?: string;
     priority?: PlatformSupportTicket['priority'];
+    assignedTo?: string | null;
   }): PlatformSupportTicket {
     PlatformSupportService.requirePlatformAccess('support', 'platform.support.create');
 
@@ -135,9 +136,9 @@ export class PlatformSupportService {
 
     this.db.run(
       `INSERT INTO platform_support_tickets
-        (id, tenant_id, subject, description, category, priority, status, assigned_to, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'OPEN', NULL, ?, ?)`,
-      [id, input.tenantId, input.subject.trim(), input.description.trim(), input.category ?? null, input.priority ?? 'MEDIUM', now, now]
+        (id, tenant_id, subject, description, priority, status, assigned_to, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)`,
+      [id, input.tenantId, input.subject.trim(), input.description?.trim() ?? null, input.priority ?? 'MEDIUM', input.assignedTo ?? null, now, now]
     );
 
     this.audit('إنشاء تذكرة دعم', 'SUPPORT_TICKET', id, { tenantId: input.tenantId, subject: input.subject });
@@ -224,7 +225,7 @@ export class PlatformSupportService {
 
     const now = nowIso();
     this.db.run(
-      'UPDATE platform_support_tickets SET rating = ?, rating_feedback = ?, updated_at = ? WHERE id = ?',
+      'UPDATE platform_support_tickets SET rating = ?, feedback = ?, updated_at = ? WHERE id = ?',
       [rating, feedback ?? null, now, id]
     );
 
@@ -243,7 +244,7 @@ export class PlatformSupportService {
 
     const now = nowIso();
     this.db.run(
-      'UPDATE platform_support_tickets SET remote_access_requested = ?, remote_access_duration = ?, updated_at = ? WHERE id = ?',
+      'UPDATE platform_support_tickets SET remote_access_requested = ?, remote_access_duration_minutes = ?, updated_at = ? WHERE id = ?',
       [requested ? 1 : 0, requested ? durationMinutes : null, now, id]
     );
 
@@ -277,24 +278,43 @@ export class PlatformSupportService {
 
   public addSupportMessage(input: {
     ticketId: string;
-    authorId: string;
-    authorType: 'STAFF' | 'TENANT';
+    authorId?: string;
+    authorType?: 'STAFF' | 'TENANT';
+    authorName?: string;
+    authorRole?: 'CUSTOMER' | 'SUPPORT' | 'SYSTEM';
     body: string;
     internal?: boolean;
+    isInternal?: boolean;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentSize?: string | null;
   }): PlatformSupportMessage {
     PlatformSupportService.requirePlatformAccess('support', 'platform.support.message');
 
     const ticket = this.getSupportTicket(input.ticketId);
     if (!ticket) throw new Error('التذكرة غير موجودة.');
 
+    const actor = AuthService.getCurrentUser();
+    let authorName = input.authorName?.trim() || '';
+    if (!authorName && input.authorId) {
+      const staff = this.db.query<any>('SELECT full_name, username FROM platform_staff WHERE id = ?', [input.authorId])[0];
+      if (staff) authorName = String(staff.full_name || staff.username || '');
+    }
+    if (!authorName && actor) authorName = String((actor as any).fullName || (actor as any).username || (actor as any).email || '');
+    if (!authorName) authorName = input.authorType === 'TENANT' ? 'العميل' : 'فريق الدعم';
+
+    const authorRole: 'CUSTOMER' | 'SUPPORT' | 'SYSTEM' =
+      input.authorRole ?? (input.authorType === 'TENANT' ? 'CUSTOMER' : 'SUPPORT');
+
     const id = `sm_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
+    const isInternal = input.internal ?? input.isInternal ?? false;
 
     this.db.run(
       `INSERT INTO platform_support_messages
-        (id, ticket_id, author_id, author_type, body, internal, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, input.ticketId, input.authorId, input.authorType, input.body.trim(), input.internal ? 1 : 0, now]
+        (id, ticket_id, author_name, author_role, body, attachment_url, attachment_name, is_internal, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.ticketId, authorName, authorRole, input.body.trim(), input.attachmentUrl ?? null, input.attachmentName ?? null, isInternal ? 1 : 0, now]
     );
 
     // Update ticket timestamp
@@ -354,7 +374,7 @@ export class PlatformSupportService {
 
   public listCannedReplies(): PlatformCannedReply[] {
     PlatformSupportService.requirePlatformAccess('support', 'platform.support.canned');
-    const rows = this.db.query<any>('SELECT * FROM platform_canned_replies ORDER BY category, title');
+    const rows = this.db.query<any>('SELECT * FROM platform_support_canned_replies ORDER BY category, title');
     return rows.map(this.mapCannedReply);
   }
 
@@ -365,9 +385,9 @@ export class PlatformSupportService {
     const now = nowIso();
 
     this.db.run(
-      `INSERT INTO platform_canned_replies (id, title, category, body, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, input.title.trim(), input.category ?? null, input.body.trim(), now, now]
+      `INSERT INTO platform_support_canned_replies (id, title, category, body, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, input.title.trim(), input.category ?? 'GENERAL', input.body.trim(), now]
     );
 
     this.audit('إنشاء رد جاهز', 'CANNED_REPLY', id, { title: input.title });
@@ -378,7 +398,7 @@ export class PlatformSupportService {
   }
 
   public getCannedReply(id: string): PlatformCannedReply | null {
-    const row = this.db.query<any>('SELECT * FROM platform_canned_replies WHERE id = ?', [id])[0];
+    const row = this.db.query<any>('SELECT * FROM platform_support_canned_replies WHERE id = ?', [id])[0];
     return row ? this.mapCannedReply(row) : null;
   }
 
@@ -386,8 +406,9 @@ export class PlatformSupportService {
 
   public startRemoteSession(input: {
     ticketId: string;
-    staffId: string;
-    tenantId: string;
+    staffId?: string;
+    tenantId?: string;
+    technicianName?: string;
     durationMinutes?: number;
   }): PlatformRemoteSession {
     PlatformSupportService.requirePlatformAccess('support', 'platform.support.remote');
@@ -396,18 +417,30 @@ export class PlatformSupportService {
     if (!ticket) throw new Error('التذكرة غير موجودة.');
     if (!ticket.remoteAccessApproved) throw new Error('الوصول عن بعد غير مصرح به لهذه التذكرة.');
 
+    const tenantId = input.tenantId ?? ticket.tenantId;
+    const durationMinutes = input.durationMinutes ?? ticket.remoteAccessDurationMinutes ?? 60;
+
+    let technicianName = input.technicianName?.trim() || '';
+    if (!technicianName && input.staffId) {
+      const staff = this.db.query<any>('SELECT full_name, username FROM platform_staff WHERE id = ?', [input.staffId])[0];
+      if (staff) technicianName = String(staff.full_name || staff.username || '');
+    }
+    if (!technicianName) {
+      const actor = AuthService.getCurrentUser();
+      technicianName = String((actor as any)?.fullName || (actor as any)?.username || 'فني المنصة');
+    }
+
     const id = `rs_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
-    const expiresAt = new Date(Date.now() + (input.durationMinutes ?? 60) * 60 * 1000).toISOString();
 
     this.db.run(
       `INSERT INTO platform_remote_sessions
-        (id, ticket_id, staff_id, tenant_id, status, started_at, expires_at, created_at)
-       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
-      [id, input.ticketId, input.staffId, input.tenantId, now, expiresAt, now]
+        (id, ticket_id, tenant_id, technician_name, started_at, duration_minutes, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE')`,
+      [id, input.ticketId, tenantId, technicianName, now, durationMinutes]
     );
 
-    this.audit('بدء جلسة وصول عن بعد', 'REMOTE_SESSION', id, { ticketId: input.ticketId, tenantId: input.tenantId });
+    this.audit('بدء جلسة وصول عن بعد', 'REMOTE_SESSION', id, { ticketId: input.ticketId, tenantId });
 
     const session = this.getRemoteSession(id);
     if (!session) throw new Error('فشل بدء الجلسة.');
@@ -422,8 +455,8 @@ export class PlatformSupportService {
 
     const now = nowIso();
     this.db.run(
-      'UPDATE platform_remote_sessions SET status = \'ENDED\', ended_at = ?, actions_summary = ?, updated_at = ? WHERE id = ?',
-      [now, actionsSummary ?? null, now, sessionId]
+      'UPDATE platform_remote_sessions SET status = \'COMPLETED\', ended_at = ?, actions_summary = ? WHERE id = ?',
+      [now, actionsSummary ?? null, sessionId]
     );
 
     this.audit('إنهاء جلسة وصول عن بعد', 'REMOTE_SESSION', sessionId, { actionsSummary });
@@ -458,9 +491,9 @@ export class PlatformSupportService {
       assignedTo: row.assigned_to ?? null,
       remoteAccessRequested: Boolean(row.remote_access_requested),
       remoteAccessApproved: Boolean(row.remote_access_approved),
-      remoteAccessDurationMinutes: row.remote_access_duration ?? null,
+      remoteAccessDurationMinutes: row.remote_access_duration_minutes ?? null,
       rating: row.rating ?? null,
-      feedback: row.rating_feedback ?? null,
+      feedback: row.feedback ?? null,
       resolvedAt: row.resolved_at ?? null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
@@ -471,12 +504,15 @@ export class PlatformSupportService {
     return {
       id: String(row.id),
       ticketId: String(row.ticket_id),
-      authorId: String(row.author_id),
-      authorType: row.author_type,
-      authorName: row.author_name ?? '',
+      authorId: String(row.author_name ?? ''),
+      authorType: row.author_role === 'CUSTOMER' ? 'TENANT' : 'STAFF',
+      authorName: String(row.author_name ?? ''),
       authorRole: row.author_role ?? 'SUPPORT',
       body: String(row.body),
-      isInternal: Boolean(row.internal),
+      isInternal: Boolean(row.is_internal),
+      attachmentUrl: row.attachment_url ?? null,
+      attachmentName: row.attachment_name ?? null,
+      attachmentSize: row.attachment_size ?? null,
       createdAt: String(row.created_at),
     };
   }
@@ -485,10 +521,10 @@ export class PlatformSupportService {
     return {
       id: String(row.id),
       title: String(row.title),
-      category: row.category ?? null,
+      category: row.category ?? 'GENERAL',
       body: String(row.body),
       createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
+      updatedAt: row.updated_at != null ? String(row.updated_at) : String(row.created_at),
     };
   }
 
@@ -496,15 +532,15 @@ export class PlatformSupportService {
     return {
       id: String(row.id),
       ticketId: String(row.ticket_id),
-      staffId: String(row.staff_id),
       tenantId: String(row.tenant_id),
+      staffId: '',
+      technicianName: String(row.technician_name ?? ''),
       status: row.status,
       startedAt: String(row.started_at),
       endedAt: row.ended_at ?? null,
-      expiresAt: String(row.expires_at),
-      durationMinutes: toNumber(row.duration_minutes, 0),
+      expiresAt: null,
+      durationMinutes: toNumber(row.duration_minutes, 60),
       actionsSummary: row.actions_summary ?? null,
-      technicianName: row.technician_name ?? '',
     };
   }
 }

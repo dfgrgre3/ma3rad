@@ -348,5 +348,5 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     }
 
     return ctx.getInvoiceById(invoiceId)!;
-  });
+  }, { immediatePersist: true });
 }

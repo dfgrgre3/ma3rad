@@ -332,7 +332,7 @@ export class PurchaseReturnService {
     const today = localDateString();
     const isCash = dto.refundMethod === 'CASH';
 
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const returnNumber = db.nextNumber('PRET');
       db.run(`
         INSERT INTO purchase_returns (

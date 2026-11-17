@@ -277,7 +277,7 @@ export class PayrollTaxService {
       companyId, id || '', input.effectiveFrom, input.effectiveTo || null, isActive
     );
     const ruleId = id || `ptr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       if (id) {
         db.run(
           `UPDATE payroll_tax_rules SET name = ?, jurisdiction = ?, taxable_basis = ?,
@@ -340,7 +340,7 @@ export class PayrollTaxService {
       [id, companyId]
     )[0];
     if (!rule) throw new Error('قاعدة الضريبة غير موجودة.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run('DELETE FROM payroll_tax_brackets WHERE rule_id = ?', [id]);
       db.run('DELETE FROM payroll_tax_rules WHERE id = ? AND company_id = ?', [id, companyId]);
       db.run(

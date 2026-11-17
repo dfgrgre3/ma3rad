@@ -3,6 +3,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
+import type { SupplierClaimRow, SupplierClaimItem } from '../../../types/procurement';
 import { ProcurementServicePart05 } from './ProcurementServicePart05';
 import { BranchAccessService } from '../auth/BranchAccessService';
 
@@ -108,7 +109,7 @@ public settleClaim(
     const value = round2(agreedAmount);
     const today = localDateString();
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       // 1. If Debit Note, deduct from supplier balance & create accounting entry
       if (resolutionType === 'DEBIT_NOTE' && value > 0) {
         db.run(`

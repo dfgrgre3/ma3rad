@@ -28,7 +28,7 @@ public transitionChequeStatus(
     const actionDate = options.date || localDateString();
     let journalEntryId: string | null = null;
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const dbInstance = tx.getDatabase();
 
       if (toStatus === 'CLEARED') {

@@ -5,6 +5,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
 import { scheduleAutomaticBackupChecks } from '../../../services/infrastructure/backup/BackupScheduler';
+import { ConsistencyAuditService } from '../../../services/domains/finance/ConsistencyAuditService';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
 import { LicenseNotificationService } from '../../../services/domains/notifications/LicenseNotificationService';
 import { ReservationService } from '../../../services/domains/sales/ReservationService';
@@ -66,6 +67,13 @@ export function useAppStartup() {
           } catch (error) {
             console.error('Scheduled notifications could not be refreshed:', error);
           }
+          // Run the financial/inventory consistency audit once per day
+          try {
+            new ConsistencyAuditService().runDailyCheck();
+          } catch (error) {
+            console.error('Daily consistency audit could not run:', error);
+          }
+
           // Run license/subscription expiry check daily
           try {
             const licenseNotificationService = LicenseNotificationService.getInstance();

@@ -103,7 +103,7 @@ export class CommissionService {
     let created = 0;
     let skipped = 0;
     let amount = 0;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       for (const invoice of invoices) {
         const employeeId = invoice.salesRepId || invoice.assignedRepId;
         if (!employeeId) { skipped++; continue; }
@@ -178,7 +178,7 @@ export class CommissionService {
     const amount = round2(Number(row.amount));
     if (amount <= 0) throw new Error('Commission amount must be greater than zero.');
     const today = localDateString();
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const current = db.query<{ status: CommissionRow['status'] }>(
         'SELECT status FROM commissions WHERE id = ?',
         [id]
@@ -288,7 +288,7 @@ export class CommissionService {
       throw new Error('العمولة مرتبطة بدورة رواتب معتمدة؛ لا يمكن حذفها.');
     }
     if (row.status === 'PAID') throw new Error('لا يمكن حذف عمولة مدفوعة.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const accrual = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
       if (accrual) reverseLedgerEntry(db.getDatabase(), accrual.id, {
         date: localDateString(), description: `Reverse deleted commission ${id}`,

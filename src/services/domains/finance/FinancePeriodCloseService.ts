@@ -907,7 +907,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (initialBlocking.length) {
       throw new Error(`تعذر اعتماد الإقفال: ${initialBlocking.length} فحصًا حاجبًا لم يُستوفَ (${initialBlocking.map((check) => check.label).join('، ')}).`);
     }
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const period = this.getPeriodRow(periodId, (sql, params = []) => tx.query(sql, params));
       const workflow = this.resolveWorkflowState(period.status, period.workflowState);
       if (workflow === 'CLOSED' || workflow === 'LOCKED') throw new Error('الفترة مقفلة بالفعل.');
@@ -941,7 +941,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
   public lockPeriod(periodId: string): void {
     const actor = this.requireCloseControl();
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const period = this.getPeriodRow(periodId, (sql, params = []) => tx.query(sql, params));
       const workflow = this.resolveWorkflowState(period.status, period.workflowState);
       if (workflow !== 'CLOSED') throw new Error('لا يمكن تأمين الفترة نهائيًا قبل إقفالها واعتمادها.');
@@ -966,7 +966,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     actor: { id: string; fullName: string },
     extra: () => Record<string, any>,
   ): void {
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const period = this.getPeriodRow(periodId, (sql, params = []) => tx.query(sql, params));
       const workflow = this.resolveWorkflowState(period.status, period.workflowState);
       if (!from.includes(workflow)) {
@@ -1327,7 +1327,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     }
     const id = `pct_${uuidv4().slice(0, 8)}`;
     const now = new Date().toISOString();
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO period_close_tasks
           (id, fiscal_period_id, title, description, department, category, assignee_user_id,
@@ -1357,7 +1357,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const period = this.getPeriodRow(periodId);
     const dueDate = period.endDate;
     let created = 0;
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       for (const task of DEFAULT_CLOSE_TASKS) {
         const id = `pct_${uuidv4().slice(0, 8)}`;
         const now = new Date().toISOString();
@@ -1418,7 +1418,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       fields.approved_at = now;
       fields.approved_by = actor.id;
     }
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const assignments = Object.keys(fields).map((key) => `${key} = ?`).join(', ');
       tx.run(`UPDATE period_close_tasks SET ${assignments} WHERE id = ?`, [...Object.values(fields), taskId]);
       this.fiscalAudit(tx, actor, 'TASK', taskId, 'UPDATE_TASK', task.status, fields.status, null, {
@@ -1434,7 +1434,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (task.status === 'COMPLETED' || task.status === 'APPROVED') {
       throw new Error('لا يمكن حذف مهمة مكتملة أو معتمدة؛ يمكن إلغاؤها بدلًا من ذلك.');
     }
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run('DELETE FROM period_close_tasks WHERE id = ?', [taskId]);
       this.fiscalAudit(tx, actor, 'TASK', taskId, 'DELETE_TASK', task.status, null);
     });
@@ -1469,7 +1469,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       if (!account) throw new Error(`حساب التسوية ${code} غير موجود أو غير نشط.`);
     }
     const id = `padj_${uuidv4().slice(0, 8)}`;
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO period_adjustments
           (id, fiscal_period_id, adjustment_type, description, amount,
@@ -1491,7 +1491,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const actor = this.requireManage();
     const adjustment = this.requireAdjustment(adjustmentId);
     if (adjustment.status !== 'DRAFT') throw new Error('لا يمكن إرسال تسوية إلا من حالة المسودة.');
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         UPDATE period_adjustments
         SET status = 'PENDING_APPROVAL', submitted_by = ?, submitted_at = ?
@@ -1508,7 +1508,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (adjustment.createdBy === actor.id) {
       throw new Error('يجب أن يعتمد التسوية مستخدم آخر غير مُنشئها (فصل المهام).');
     }
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       const now = new Date().toISOString();
       tx.run(`
         UPDATE period_adjustments
@@ -1528,7 +1528,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (!reason.trim()) throw new Error('سبب رفض التسوية إلزامي.');
     const adjustment = this.requireAdjustment(adjustmentId);
     if (adjustment.status === 'POSTED') throw new Error('لا يمكن رفض تسوية مرحّلة؛ استخدم قيد عكسي.');
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         UPDATE period_adjustments
         SET status = 'REJECTED', approved_by = ?, approved_at = ?, rejection_reason = ?
@@ -1547,7 +1547,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       throw new Error('لا يمكن ترحيل تسوية داخل فترة مقفلة؛ أعد فتح الفترة أولًا.');
     }
     let entryId = '';
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       entryId = postLedgerEntry(tx.getDatabase(), {
         date: period.endDate,
         description: `تسوية شهرية (${adjustment.adjustmentType}): ${adjustment.description}`,
@@ -1747,7 +1747,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       throw new Error(`الأرصدة الافتتاحية غير متزنة (مدين ${this.money(debitTotal)} / دائن ${this.money(creditTotal)}).`);
     }
 
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       for (const row of rows) {
         tx.run(`
           INSERT INTO fiscal_year_openings

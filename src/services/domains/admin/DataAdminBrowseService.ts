@@ -38,7 +38,28 @@ export class DataAdminBrowseService extends DataAdminBaseService {
     if (!IDENTIFIER.test(table)) throw new Error('اسم الجدول غير صالح.');
     const limit = Math.min(Math.max(Math.floor(options.limit || 50), 1), 500);
     const offset = Math.max(Math.floor(options.offset || 0), 0);
-    return this.db.query(`SELECT * FROM "${table}" LIMIT ? OFFSET ?`, [limit, offset]);
+
+    let sql = `SELECT * FROM "${table}"`;
+    const params: unknown[] = [];
+
+    if (options.search && options.search.trim()) {
+      const columns = this.getColumns(table);
+      const searchableColumns = columns
+        .filter(col => col.type.includes('TEXT') || col.type.includes('CHAR'))
+        .map(col => col.name);
+
+      if (searchableColumns.length > 0) {
+        const searchConditions = searchableColumns.map(col => `"${col}" LIKE ?`).join(' OR ');
+        sql += ` WHERE ${searchConditions}`;
+        const searchTerm = `%${options.search.trim()}%`;
+        searchableColumns.forEach(() => params.push(searchTerm));
+      }
+    }
+
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    return this.db.query(sql, params);
   }
 
   getStorageStats(): StorageStats {

@@ -122,6 +122,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/finance/cheques', any: ['finance.cheques.view', 'finance.view'] },
   { path: '/finance/fiscal-closing', any: ['finance.view', 'finance.close'] },
   { path: '/finance/bank-reconciliation', any: ['finance.bank_reconciliation.view', 'finance.view'] },
+  { path: '/finance/consistency-audit', any: ['finance.view'] },
   { path: '/finance/budgets-cost-centers', any: ['finance.budgets.view', 'finance.view'] },
   { path: '/finance/cash-forecast', any: ['finance.cash_forecast.view', 'finance.view'] },
   { path: '/finance/epayment-settlements', any: ['finance.epayments.view', 'finance.view'] },

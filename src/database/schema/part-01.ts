@@ -1,6 +1,13 @@
 export const SCHEMA_PART_01 = String.raw`
 
 -- PRAGMAS
+-- IMPORTANT SECURITY NOTE: Financial amounts are currently stored as REAL type which
+-- can have floating-point precision errors. A future migration should change these to
+-- INTEGER (storing amounts in smallest currency unit, e.g., cents) or TEXT with decimal
+-- arithmetic. See: https://sqlite.org/quirks.html#floating_point_arithmetic
+-- Affected columns: cost_price, selling_price_m2, selling_price_box, wholesale_price_m2,
+-- min_selling_price_m2, min_stock_level, max_stock_level, quantity_m2, cost_price, etc.
+
 -- 1. USERS & ROLES
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

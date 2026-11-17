@@ -21,7 +21,7 @@ public rejectTransfer(transferId: string, reason: string): void {
       throw new Error('لا يمكن رفض تحويل مستلم أو مرفوض بالفعل.');
     }
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const current = txDb.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
       if (!current) throw new Error('التحويل غير موجود.');
       if (['RECEIVED_FULL', 'RECEIVED_PARTIAL', 'COMPLETED', 'REJECTED'].includes(current.status)) {

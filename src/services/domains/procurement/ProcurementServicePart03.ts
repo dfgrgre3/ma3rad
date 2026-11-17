@@ -63,7 +63,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     const grnId = `grn_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
 
-    return this.db.executeTransaction(db => this.createGoodsReceiptInTransaction(db, dto, actor, grnId, today));
+    return this.db.executeFinancialTransaction(db => this.createGoodsReceiptInTransaction(db, dto, actor, grnId, today));
   }
 
   private createGoodsReceiptInTransaction(

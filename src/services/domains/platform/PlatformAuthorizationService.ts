@@ -306,17 +306,29 @@ export class PlatformAuthorizationService {
     const db = DatabaseManager.getInstance();
     const row = db.query<any>('SELECT * FROM platform_staff WHERE email = ? AND is_active = 1 AND deleted_at IS NULL', [email.toLowerCase().trim()])[0];
     if (!row) return null;
+    const permissionsOverrideRaw = row.permissions_override ?? row.permissionsOverride;
     return {
       id: String(row.id),
-      fullName: String(row.fullName),
-      email: String(row.email),
+      username: String(row.username ?? ''),
+      fullName: String(row.full_name ?? row.fullName ?? ''),
+      email: String(row.email ?? ''),
       phone: row.phone ?? null,
       role: row.role as PlatformStaffRole,
-      permissionsOverride: row.permissionsOverride ? JSON.parse(row.permissionsOverride) : [],
-      isActive: Boolean(row.isActive),
-      lastLoginAt: row.lastLoginAt ?? null,
-      createdAt: String(row.createdAt),
-      updatedAt: String(row.updatedAt),
+      isActive: Boolean(row.is_active ?? row.isActive),
+      mustChangePassword: Boolean(row.must_change_password ?? row.mustChangePassword),
+      permissionsOverride: permissionsOverrideRaw
+        ? (typeof permissionsOverrideRaw === 'string' ? JSON.parse(permissionsOverrideRaw) : permissionsOverrideRaw)
+        : [],
+      mfaEnabled: Boolean(row.mfa_enabled ?? row.mfaEnabled),
+      mfaEnforcement: (row.mfa_enforcement ?? row.mfaEnforcement ?? 'off') as PlatformStaff['mfaEnforcement'],
+      dataScope: (row.data_scope ?? row.dataScope ?? 'ALL') as PlatformStaff['dataScope'],
+      dataScopeTenantIds: row.data_scope_tenant_ids
+        ? (typeof row.data_scope_tenant_ids === 'string' ? JSON.parse(row.data_scope_tenant_ids) : row.data_scope_tenant_ids)
+        : null,
+      lastLoginAt: row.last_login_at ?? row.lastLoginAt ?? null,
+      failedLoginAttempts: Number(row.failed_login_attempts ?? row.failedLoginAttempts ?? 0) || 0,
+      createdAt: String(row.created_at ?? row.createdAt),
+      updatedAt: String(row.updated_at ?? row.updatedAt),
     };
   }
 }

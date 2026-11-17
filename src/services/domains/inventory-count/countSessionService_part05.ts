@@ -95,7 +95,7 @@ export function submitCountSession(activeSession: CountSession, sessionItems: Co
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.inventory.counts.count');
-  db.executeTransaction(txDb => {
+  db.executeFinancialTransaction(txDb => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!current || current.status !== 'COUNTING') throw new Error('الجلسة ليست قيد العد.');
     txDb.run("UPDATE stock_counts SET status = 'REVIEW', approval_status = 'PENDING', rejection_reason = NULL WHERE id = ? AND status = 'COUNTING'", [activeSession.id]);

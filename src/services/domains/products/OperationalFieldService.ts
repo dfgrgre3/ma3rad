@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { BranchAccessService } from '../auth/BranchAccessService';
 import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
 import {
   normalizeDynamicAttributeValue,
@@ -61,11 +62,26 @@ const FIELD_TYPES = new Set<DynamicAttributeDataType>([
 export class OperationalFieldService {
   private readonly db = DatabaseManager.getInstance();
   private readonly sync = new MasterDataSyncService(this.db);
+  private readonly branchAccess = new BranchAccessService();
 
   private getEntity(entityType: string): OperationalEntityType {
     const entity = OPERATIONAL_ENTITY_TYPES.find((item) => item.value === entityType);
     if (!entity) throw new Error('نوع السجل غير مدعوم للحقول الإضافية.');
     return entity;
+  }
+
+  // operational_field_values is polymorphic; entityType is already
+  // validated against OPERATIONAL_ENTITY_TYPES (real table names).
+  private resolveRecordBranchId(entityType: string, recordId: string): string | null {
+    if (!/^[a-z_]+$/.test(entityType)) return null;
+    const hasBranch = this.db.query<{ name: string }>(
+      `SELECT name FROM pragma_table_info('${entityType}') WHERE name = 'branch_id'`,
+    ).length > 0;
+    if (!hasBranch) return null;
+    return this.db.query<{ branchId: string | null }>(
+      `SELECT branch_id AS branchId FROM "${entityType}" WHERE id = ?`,
+      [recordId],
+    )[0]?.branchId ?? null;
   }
 
   private requireDefinitionManagement(): void {
@@ -278,11 +294,14 @@ export class OperationalFieldService {
     operation: 'create' | 'update' = 'update',
   ): void {
     const entity = this.getEntity(entityType);
+    const actor = AuthService.requireAuth();
     const permission = operation === 'create'
       ? entity.permission.replace(/\.update$/, '.create')
       : entity.permission;
-    PermissionService.require(AuthService.requireAuth(), permission);
+    PermissionService.require(actor, permission);
     if (!recordId.trim()) throw new Error('معرّف السجل مطلوب.');
+    const branchId = this.resolveRecordBranchId(entityType, recordId)
+      ?? this.branchAccess.getCurrentBranchId(actor);
     this.validateRecordValues(entityType, values, operation, recordId);
     const definitions = this.getDefinitions(entityType);
     const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
@@ -327,10 +346,10 @@ export class OperationalFieldService {
         }
       });
       normalized.forEach((value, fieldId) => tx.run(
-        `INSERT INTO operational_field_values(id, entity_type, record_id, field_id, value)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(entity_type, record_id, field_id) DO UPDATE SET value = excluded.value`,
-        [`op_val_${uuidv4().slice(0, 12)}`, entityType, recordId, fieldId, value],
+        `INSERT INTO operational_field_values(id, entity_type, record_id, field_id, value, branch_id)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(entity_type, record_id, field_id) DO UPDATE SET value = excluded.value, branch_id = excluded.branch_id`,
+        [`op_val_${uuidv4().slice(0, 12)}`, entityType, recordId, fieldId, value, branchId],
       ));
       normalized.forEach((_value, fieldId) => {
         const row = tx.query<{ id: string }>(

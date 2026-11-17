@@ -75,7 +75,7 @@ export class InstallmentService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || Number.isNaN(parsedStartDate.getTime()) || localDateString(parsedStartDate) !== startDate) throw new Error('Start date is invalid.');
     const monthlyAmount = Math.round((financed / installmentsCount) * 100) / 100;
     const planId = uuidv4();
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const invoice = db.query<any>(`SELECT id,customerId,invoiceNumber,remainingAmount,invoiceStatus FROM sales_invoices WHERE id=?`, [invoiceId])[0];
       if (!invoice || invoice.customerId !== customerId || invoice.invoiceStatus === 'VOID') throw new Error('Select a valid invoice for this customer.');
       if (Math.abs(Number(invoice.remainingAmount) - totalAmount) > 0.009 || Number(invoice.remainingAmount) <= 0) throw new Error('The invoice balance changed. Reload the invoice and try again.');
@@ -128,7 +128,7 @@ export class InstallmentService {
     if (!installment) throw new Error('Installment not found.');
     this.branchAccess.requireBranchAccess(installment.branchId, actor);
     const registerId = this.branchAccess.getDefaultRegisterId(installment.branchId, actor);
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.installments_count,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst) throw new Error('Installment not found.');
       if (inst.status === 'PAID' || inst.status === 'WAIVED') throw new Error('Installment is already paid or waived.');
@@ -184,7 +184,7 @@ export class InstallmentService {
     )[0];
     if (!installment) throw new Error('This installment has no payment to reverse.');
     this.branchAccess.requireBranchAccess(installment.branchId, actor);
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst || inst.status !== 'PAID' || !inst.paymentId) throw new Error('This installment has no payment to reverse.');
       const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [inst.paymentId])[0];
@@ -222,7 +222,7 @@ export class InstallmentService {
     )[0];
     if (!planScope) throw new Error('This installment plan cannot be cancelled.');
     this.branchAccess.requireBranchAccess(planScope.branchId, actor);
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const plan = db.query<any>(`SELECT * FROM installment_plans WHERE id=?`, [planId])[0];
       if (!plan || !['ACTIVE', 'DEFAULTED'].includes(plan.status)) throw new Error('This installment plan cannot be cancelled.');
       const paid = db.query<any>(`SELECT COUNT(*) AS count FROM installments WHERE plan_id=? AND status='PAID'`, [planId])[0]?.count || 0;

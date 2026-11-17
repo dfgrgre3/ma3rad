@@ -142,3 +142,99 @@ test('flush forces fallback idle timer persistence and status reports it as savi
     else host.requestIdleCallback = originalRequestIdleCallback;
   }
 });
+
+test('financial transactions persist immediately after COMMIT without flush()', async () => {
+  let persistedSnapshot: Uint8Array | null = null;
+  let saveCalls = 0;
+  (globalThis as any).window.ceramisys = {
+    db: {
+      load: async () => persistedSnapshot,
+      save: async (bytes: Uint8Array) => {
+        saveCalls++;
+        persistedSnapshot = bytes;
+        return { ok: true };
+      },
+    },
+  };
+
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  await manager.flush();
+  const savesBefore = saveCalls;
+
+  manager.executeFinancialTransaction((transaction) => {
+    transaction.run(
+      `INSERT INTO system_settings (key, value) VALUES ('immediate_persist_sentinel', 'written')`,
+    );
+  });
+
+  // The debounced path would wait ~3s + idle; the financial path must offer the
+  // snapshot to storage within a few macrotasks, without any flush() call.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.ok(saveCalls > savesBefore, 'financial transaction must trigger a snapshot save immediately');
+  await manager.flush();
+  assert.equal(manager.getPersistenceStatus().status, 'saved');
+});
+
+test('executeDurableTransaction resolves only after the snapshot is durable', async () => {
+  let persistedSnapshot: Uint8Array | null = null;
+  let failNextSave = false;
+  let holdNextSave = false;
+  let unblockSave: (() => void) | null = null;
+  (globalThis as any).window.ceramisys = {
+    db: {
+      load: async () => persistedSnapshot,
+      save: async (bytes: Uint8Array) => {
+        if (failNextSave) {
+          failNextSave = false;
+          return { ok: false, code: 'EIO', error: 'simulated power loss during write' };
+        }
+        if (holdNextSave) {
+          holdNextSave = false;
+          await new Promise<void>((resolve) => { unblockSave = resolve; });
+        }
+        persistedSnapshot = bytes;
+        return { ok: true };
+      },
+    },
+  };
+
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  await manager.flush();
+
+  // Successful durable transaction: the returned promise must not resolve while
+  // the storage write is still in flight.
+  holdNextSave = true;
+  let resolved = false;
+  const pending = manager.executeDurableTransaction((transaction) => {
+    transaction.run(
+      `INSERT INTO system_settings (key, value) VALUES ('durable_tx_sentinel', 'persisted')`,
+    );
+    return 'ok';
+  }).then((value) => { resolved = true; return value; });
+
+  // Wait until the storage write is actually in flight and blocked.
+  for (let i = 0; i < 100 && !unblockSave; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(unblockSave, 'the durable transaction must reach the storage write');
+  assert.equal(resolved, false, 'durable transaction must wait for the storage write');
+  unblockSave!();
+  unblockSave = null;
+  await pending;
+  assert.equal(resolved, true);
+
+  // Failed durable transaction: rejects and leaves the sentinel unpersisted.
+  const beforeFailure = persistedSnapshot;
+  failNextSave = true;
+  await assert.rejects(
+    manager.executeDurableTransaction((transaction) => {
+      transaction.run(
+        `INSERT INTO system_settings (key, value) VALUES ('durable_tx_failed', 'lost')`,
+      );
+    }),
+    (error: any) => error.code === 'DATABASE_PERSIST_FAILED' || /simulated power loss/.test(error.message),
+  );
+  assert.equal(persistedSnapshot, beforeFailure, 'a failed durable write leaves the prior snapshot unchanged');
+});

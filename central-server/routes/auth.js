@@ -9,6 +9,7 @@ const { recordAuditEvent, recordLoginAttempt } = require('../lib/audit');
 const { authenticatePlatformUser } = require('../middleware/auth');
 const { resolveEffectivePermissions, getTenantScopes } = require('../identity');
 const { verifyTotp, provisioningUri, generateSecret, generateBackupCodes } = require('../totp');
+const { countRecentFailures, countRecentMfaFailures, LOGIN_IP_MAX_FAILURES, LOGIN_USERNAME_MAX_FAILURES, MFA_MAX_FAILURES, LOGIN_WINDOW_MINUTES } = require('../lib/rateLimit');
 
 const router = express.Router();
 
@@ -49,6 +50,18 @@ router.post('/login', async (req, res, next) => {
     }
     const normalizedUsername = String(username).trim();
 
+    const ipFailures = await countRecentFailures({ ipAddress, windowMinutes: LOGIN_WINDOW_MINUTES });
+    if (ipFailures >= LOGIN_IP_MAX_FAILURES) {
+      await recordLoginAttempt({ username: normalizedUsername, success: false, failureReason: 'IP_RATE_LIMITED', ipAddress, userAgent });
+      return res.status(429).json({ error: 'Too many login attempts from this IP. Try again later.', code: 'IP_RATE_LIMITED' });
+    }
+
+    const usernameFailures = await countRecentFailures({ username: normalizedUsername, windowMinutes: LOGIN_WINDOW_MINUTES });
+    if (usernameFailures >= LOGIN_USERNAME_MAX_FAILURES) {
+      await recordLoginAttempt({ username: normalizedUsername, success: false, failureReason: 'USERNAME_RATE_LIMITED', ipAddress, userAgent });
+      return res.status(429).json({ error: 'Too many failed attempts for this username. Try again later.', code: 'USERNAME_RATE_LIMITED' });
+    }
+
     const platformUser = await db.get(
       'SELECT * FROM platform_users WHERE username = ? AND is_active = 1 AND deleted_at IS NULL',
       [normalizedUsername]
@@ -87,6 +100,13 @@ router.post('/login', async (req, res, next) => {
       if (!code) {
         return res.json({ mfaRequired: true });
       }
+
+      const mfaFailures = await countRecentMfaFailures({ username: normalizedUsername, ipAddress });
+      if (mfaFailures >= MFA_MAX_FAILURES) {
+        await recordLoginAttempt({ username: normalizedUsername, userId: platformUser.id, success: false, failureReason: 'MFA_RATE_LIMITED', ipAddress, userAgent });
+        return res.status(429).json({ error: 'Too many MFA attempts. Try again later.', code: 'MFA_RATE_LIMITED' });
+      }
+
       let mfaOk = verifyTotp(mfa.secret, code);
       if (!mfaOk) {
         mfaOk = await consumeBackupCode(mfa, code, { id: platformUser.id, full_name: platformUser.full_name });

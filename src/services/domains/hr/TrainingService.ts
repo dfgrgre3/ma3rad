@@ -40,8 +40,8 @@ export class TrainingService {
   static createCourse(input: { name: string; description?: string; trainerId?: string | null; startDate?: string | null; endDate?: string | null; cost?: number; status?: string }): TrainingCourse {
     const actor = this.requireManage();
     const id = `crs_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO training_courses (id, name, description, trainer_id, start_date, end_date, cost, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, input.name.trim(), input.description?.trim() || null, input.trainerId || null, input.startDate || null, input.endDate || null, Math.max(0, Number(input.cost) || 0), input.status || 'PLANNED', actor.id]);
+    this.db.run(`INSERT INTO training_courses (id, name, description, trainer_id, start_date, end_date, cost, status, created_by, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.name.trim(), input.description?.trim() || null, input.trainerId || null, input.startDate || null, input.endDate || null, Math.max(0, Number(input.cost) || 0), input.status || 'PLANNED', actor.id, this.branchAccess.getCurrentBranchId(actor)]);
     this.audit(actor, 'إضافة دورة تدريبية', id, input);
     return this.getCourses().find((r) => r.id === id)!;
   }

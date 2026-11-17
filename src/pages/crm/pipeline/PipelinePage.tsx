@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Workflow, Phone, Clock, User, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';

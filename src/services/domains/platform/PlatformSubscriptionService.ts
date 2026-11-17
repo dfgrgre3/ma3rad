@@ -596,7 +596,7 @@ export class PlatformSubscriptionService {
   private validateCoupon(code: string, subtotal: number): { coupon: PlatformCoupon; discount: number } | null {
     const row = this.db.query<any>('SELECT * FROM platform_coupons WHERE code = ?', [code])[0];
     if (!row) return null;
-    if (!Boolean(row.is_active)) return null;
+    if (!row.is_active) return null;
     if (row.expires_at && new Date(row.expires_at) < new Date()) return null;
     if (row.starts_at && new Date(row.starts_at) > new Date()) return null;
     if (row.max_uses && toNumber(row.used_count) >= toNumber(row.max_uses)) return null;

@@ -617,12 +617,13 @@ export class OperationsService {
       const deliveryNumber = db.nextNumber('DLV');
       db.run(
         `INSERT INTO deliveries (id, delivery_number, date, customer_id, warehouse_id, driver_id, vehicle_id,
-          address, city, scheduled_at, delivery_fee, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+          address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
         [
           id, deliveryNumber, input.date || localDateString(), input.customerId,
           warehouse.id, input.driverId || null, input.vehicleId || null, input.address.trim(),
           input.city || null, input.scheduledAt || null, input.deliveryFee || 0, input.notes || null, actor.id,
+          this.branchAccess.getCurrentBranchId(actor),
         ]
       );
       return this.getDeliveries().find((d) => d.id === id)!;

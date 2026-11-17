@@ -1,3 +1,23 @@
+/**
+ * DATABASE SCHEMA SECURITY NOTICE
+ *
+ * Financial amounts in this schema use REAL type which can have floating-point
+ * precision errors. This is a known limitation that requires a future migration.
+ *
+ * Recommended fix: Change financial columns to INTEGER (storing amounts in
+ * smallest currency unit, e.g., cents/piastres) or TEXT with decimal arithmetic.
+ *
+ * Reference: https://sqlite.org/quirks.html#floating_point_arithmetic
+ *
+ * Affected columns include: cost_price, selling_price_m2, total_cost, amount,
+ * credit_limit, current_balance, quantity_m2, and many other financial fields.
+ *
+ * Until migration is complete, application code should:
+ * 1. Round calculations to 2 decimal places for display
+ * 2. Use integer arithmetic where possible
+ * 3. Validate that accumulated errors stay within acceptable bounds
+ */
+
 import { SCHEMA_PART_01 } from './part-01';
 import { SCHEMA_PART_02 } from './part-02';
 import { SCHEMA_PART_03 } from './part-03';

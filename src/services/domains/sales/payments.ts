@@ -192,7 +192,7 @@ export function recordInvoicePaymentEntry(
       performedBy: actor.id,
       createdAt: new Date().toISOString(),
     };
-  });
+  }, { immediatePersist: true });
 }
 
 /** Record a mixed invoice collection as individually posted tender receipts atomically. */
@@ -228,7 +228,7 @@ export function recordInvoicePaymentComponentsEntry(
       paymentDate,
       component.bankAccountId,
     )
-  ));
+  ), { immediatePersist: true });
 }
 
 /** Record one receipt allocated across several open invoices in one transaction. */
@@ -342,7 +342,7 @@ export function recordCustomerPaymentAllocationsEntry(
     db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
       [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'تحصيل دفعة موزعة على فواتير', 'SALES', groupId, JSON.stringify({ customerId, allocations: entries, total, date, reference, receipts })]);
     return { groupId, total, receipts };
-  });
+  }, { immediatePersist: true });
 }
 
 function assertPaymentIsNotInstallmentLinked(ctx: SalesContext, paymentId: string, invoiceId: string): void {
@@ -418,7 +418,7 @@ function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], acto
           receiptNumber: row.receiptNumber, invoiceId: row.invoiceId, amount: row.amount,
         })))]
     );
-  });
+  }, { immediatePersist: true });
 }
 
 function reverseSingleInvoicePayment(
@@ -470,7 +470,7 @@ function reverseSingleInvoicePayment(
         JSON.stringify({ invoiceNumber: invoice.invoiceNumber }),
       ]
     );
-  });
+  }, { immediatePersist: true });
 }
 
 export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string): void {

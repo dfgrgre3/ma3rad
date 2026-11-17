@@ -84,7 +84,7 @@ function guardedHandle(ipcMain, channel, handler, options = {}) {
   return ipcMain.handle(channel, async (event, ...args) => {
     const senderOpts = options.senderOptions || {};
     if (!isAllowedIpcSender(event, senderOpts)) {
-      const err = new Error('IPC sender not allowed');
+      const err = /** @type {Error & { code?: string }} */ (new Error('IPC sender not allowed'));
       err.code = 'EIPC_SENDER';
       throw err;
     }

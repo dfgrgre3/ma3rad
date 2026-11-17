@@ -161,7 +161,7 @@ export class CustomerService {
     const id = `cust_${uuidv4().substring(0, 8)}`;
     const requestedCode = customer.code?.trim();
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       let code = requestedCode;
       if (!code) {
         do {
@@ -172,13 +172,18 @@ export class CustomerService {
       sqliteDb.run(`
         INSERT INTO customers (
           id, code, name, phone, phone2, national_id, address, city,
-          customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes, company_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+          customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes, company_id, branch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
       `, [
         id, code, customer.name, customer.phone, customer.phone2 || null,
         customer.nationalId || null, customer.address || null, customer.city || null,
         customer.customerType || 'RETAIL', customer.creditLimit || 0, customer.paymentTermsDays || 0, customer.initialBalance || 0,
-        customer.notes || null, this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth())?.[0] ?? null
+        customer.notes || null,
+        sqliteDb.query<{ companyId: string | null }>(
+          `SELECT company_id AS companyId FROM branches WHERE id = ?`,
+          [this.branchAccess.getCurrentBranchId(actor)]
+        )[0]?.companyId ?? (this.branchAccess.getAccessibleCompanyIds(actor) || ['cmp_main'])[0],
+        this.branchAccess.getCurrentBranchId(actor)
       ]);
       this.sync.capture(sqliteDb, 'customer', id, 'CREATE');
 
@@ -200,7 +205,7 @@ export class CustomerService {
     if (Math.abs(balance) > 1e-6) throw new Error('لا يمكن حذف عميل لديه رصيد.');
     const invoices = this.db.query<{ c: number }>('SELECT COUNT(*) AS c FROM sales_invoices WHERE customer_id = ?', [id])[0]?.c ?? 0;
     if (invoices > 0) throw new Error('لا يمكن حذف عميل لديه فواتير. يمكن إيقاف استخدامه بدلًا من الحذف.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run('DELETE FROM customers WHERE id = ?', [id]);
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
@@ -246,7 +251,7 @@ export class CustomerService {
       WHERE id = ?
     `;
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.phone ?? null, updates.phone2 ?? null, updates.nationalId ?? null,
         updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.isActive ?? null,
@@ -292,7 +297,7 @@ export class CustomerService {
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
     const today = paymentDate || localDateString();
 
-    return this.db.executeTransaction((sqliteDb) => {
+    return this.db.executeFinancialTransaction((sqliteDb) => {
       const prior = idempotencyKey
         ? sqliteDb.query<CustomerPayment>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey])
         : [];
@@ -400,7 +405,7 @@ export class CustomerService {
     if (downPaymentPlan) throw new Error('This receipt is the down payment for an installment plan. Cancel the plan from the installments screen first.');
 
     const amount = round2(payment.amount);
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run(
         `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [amount, payment.customerId]

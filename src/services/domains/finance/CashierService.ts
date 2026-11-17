@@ -202,7 +202,7 @@ export class CashierService {
       `, [`aud_${uuidv4().substring(0, 8)}`, userId, shiftId]);
 
       return this.getActiveShift(userId)!;
-    });
+    }, { immediatePersist: true });
   }
 
   private validateOperationShiftLink(operationShiftId: string, branchId: string): string {
@@ -393,7 +393,7 @@ export class CashierService {
       ]);
 
       return this.db.query<CashShift>(`SELECT * FROM cash_shifts WHERE id = ?`, [shiftId])[0];
-    });
+    }, { immediatePersist: true });
   }
 
   public getExpenseCategories(): ExpenseCategory[] {
@@ -506,7 +506,7 @@ export class CashierService {
         performedBy,
         createdAt: new Date().toISOString()
       };
-    });
+    }, { immediatePersist: true });
   }
 
   public updateExpense(
@@ -581,7 +581,7 @@ export class CashierService {
         ]
       );
       new BusinessRecordSyncService(db).capture(db, 'expense', id, 'UPDATE');
-    });
+    }, { immediatePersist: true });
   }
 
   public deleteExpense(id: string): void {
@@ -631,6 +631,6 @@ export class CashierService {
           JSON.stringify({ category: expense.category, amount: expense.amount, description: expense.description }),
         ]
       );
-    });
+    }, { immediatePersist: true });
   }
 }

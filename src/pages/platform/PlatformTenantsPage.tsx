@@ -409,7 +409,7 @@ export const PlatformTenantsPage: React.FC = () => {
       const next = platformAdminService.getTenantProfile(detailId);
       setProfile(next);
       setAccountOpen(false);
-      setActivation(buildActivation(next, created.temporaryPassword));
+      setActivation(buildActivation(next, created.temporaryPassword ?? null));
       setActivationOpen(true);
       toast.success('تم إنشاء حساب العميل وتوليد بيانات التفعيل');
       load();
@@ -429,7 +429,7 @@ export const PlatformTenantsPage: React.FC = () => {
       const reset = platformAdminService.resetTenantAccountPassword(detailId);
       const next = platformAdminService.getTenantProfile(detailId);
       setProfile(next);
-      setActivation(buildActivation(next, reset.temporaryPassword));
+      setActivation(buildActivation(next, reset.temporaryPassword ?? null));
       setActivationOpen(true);
       toast.success('تم إعادة تعيين كلمة المرور');
     } catch (err) {
@@ -706,7 +706,9 @@ export const PlatformTenantsPage: React.FC = () => {
           createdAt: o.createdAt,
         }));
         setRemoteConfig(configs);
-      } catch {}
+      } catch {
+        // Remote config fetch is best-effort; ignore failures.
+      }
     }
   }, [detailId, loadRemoteDevices, loadRemoteHistory]);
 
@@ -719,7 +721,7 @@ export const PlatformTenantsPage: React.FC = () => {
     }
     setWorking(true);
     try {
-      const details = platformAdminService.sendTenantActivation(detailId, channels);
+      const details = platformAdminService.sendTenantActivation(detailId);
       setActivation(details);
       setActivationOpen(true);
       setProfile(platformAdminService.getTenantProfile(detailId));
@@ -769,32 +771,32 @@ export const PlatformTenantsPage: React.FC = () => {
       const ids = Array.from(selectedIds);
       switch (bulkActionType) {
         case 'status': {
-          const result = platformAdminService.bulkChangeTenantStatus(ids, bulkStatus);
-          toast.success('اكتمل تغيير الحالة', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          const result = platformAdminService.bulkChangeTenantStatus({ tenantIds: ids, status: bulkStatus });
+          toast.success('اكتمل تغيير الحالة', `نجح: ${result.success}، فشل: ${result.failed.length}`);
           if (result.failed.length > 0) {
-            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+            result.failed.forEach(f => toast.error(`فشل ${f.tenantId}`, f.error));
           }
           break;
         }
         case 'plan': {
           if (!bulkPlanId) { toast.error('اختر باقة'); return; }
-          const result = platformAdminService.bulkChangeTenantPlan(ids, bulkPlanId, { months: bulkMonths });
-          toast.success('اكتمل تغيير الباقة', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          const result = await platformAdminService.bulkChangeTenantPlan({ tenantIds: ids, planId: bulkPlanId, months: bulkMonths });
+          toast.success('اكتمل تغيير الباقة', `نجح: ${result.success}، فشل: ${result.failed.length}`);
           if (result.failed.length > 0) {
-            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+            result.failed.forEach(f => toast.error(`فشل ${f.tenantId}`, f.error));
           }
           break;
         }
         case 'activation': {
-          const result = platformAdminService.bulkSendActivation(ids, bulkChannels);
-          toast.success('تم إرسال بيانات التفعيل', `نجح: ${result.success.length}، فشل: ${result.failed.length}`);
+          const result = platformAdminService.bulkSendActivation({ tenantIds: ids });
+          toast.success('تم إرسال بيانات التفعيل', `نجح: ${result.success}، فشل: ${result.failed.length}`);
           if (result.failed.length > 0) {
-            result.failed.forEach(f => toast.error(`فشل ${f.id}`, f.error));
+            result.failed.forEach(f => toast.error(`فشل ${f.tenantId}`, f.error));
           }
           break;
         }
         case 'export': {
-          const csv = platformAdminService.bulkExportTenants(ids);
+          const csv = platformAdminService.bulkExportTenants({ tenantIds: ids });
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
@@ -857,7 +859,7 @@ export const PlatformTenantsPage: React.FC = () => {
     setCsvImporting(true);
     try {
       const content = await csvFile.text();
-      const result = platformAdminService.bulkImportTenants(content, { skipHeader: true });
+      const result = platformAdminService.importTenantsCsv(content, { skipHeader: true });
       toast.success('اكتمل الاستيراد', `مُنشأ: ${result.created}، مُحدّث: ${result.updated}، أخطاء: ${result.errors.length}`);
       if (result.errors.length > 0) {
         result.errors.forEach(e => toast.error(`السطر ${e.row}`, e.error));
@@ -937,10 +939,10 @@ export const PlatformTenantsPage: React.FC = () => {
     }
     setConfigSending(true);
     try {
-      const result = platformAdminService.pushTenantConfig(detailId, JSON.stringify({
+      const result = platformAdminService.pushTenantConfig(detailId, {
         [configForm.key]: configForm.value,
         targetDeviceIds: configForm.scope === 'DEVICE' ? selectedDeviceIds : undefined,
-      }));
+      });
       toast.success('تم دفع التكوين', `معرف العملية: ${result.id}`);
       setConfigForm({ ...configForm, key: '', value: '' });
       setSelectedDeviceIds([]);
@@ -1194,7 +1196,7 @@ export const PlatformTenantsPage: React.FC = () => {
               <thead className="bg-slate-50">
                 <tr className="text-[10.5px] text-slate-500">
                   <th className="px-3 py-2.5 font-semibold w-10">
-                    <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={handleSelectAll} />
+                    <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={(e) => handleSelectAll(e.target.checked)} />
                   </th>
                   <th className="px-3 py-2.5 font-semibold">العميل / Tenant ID</th>
                   <th className="px-3 py-2.5 font-semibold">النشاط</th>

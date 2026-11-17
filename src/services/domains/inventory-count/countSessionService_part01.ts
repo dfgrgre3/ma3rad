@@ -26,7 +26,7 @@ export function startCountSession(input: StartCountSessionInput): void {
   if (!['FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND'].includes(countType)) throw new Error('Invalid count type.');
   if (countType !== 'FULL' && selectedProductIds.length === 0 && !locationId) throw new Error('Select at least one product for a partial count.');
   const db = DatabaseManager.getInstance();
-  db.executeTransaction((txDb) => {
+  db.executeFinancialTransaction((txDb) => {
     // Validate the location belongs to this warehouse when a bin count is requested.
     if (locationId) {
       const loc = txDb.query<{ warehouseId: string; isActive: number }>(`

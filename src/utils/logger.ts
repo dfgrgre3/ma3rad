@@ -1,5 +1,3 @@
-import { AppError } from '../errors/appError';
-
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogEntry {
@@ -29,7 +27,7 @@ class Logger {
     maxHistory?: number;
   } = {}) {
     this.minLevel = options.minLevel ?? 'info';
-    this.isProduction = options.isProduction ?? (import.meta.env?.PROD === true);
+    this.isProduction = options.isProduction ?? (typeof window !== 'undefined' && window.location?.hostname !== 'localhost');
     this.maxHistory = options.maxHistory ?? 100;
   }
 
@@ -55,7 +53,7 @@ class Logger {
     const entry: LogEntry = { level: 'debug', message, timestamp: new Date().toISOString(), context };
     this.addToHistory(entry);
     if (!this.isProduction) {
-      // eslint-disable-next-line no-console
+       
       console.debug(this.formatMessage('debug', message, context));
     }
   }
@@ -65,7 +63,7 @@ class Logger {
     const entry: LogEntry = { level: 'info', message, timestamp: new Date().toISOString(), context };
     this.addToHistory(entry);
     if (!this.isProduction) {
-      // eslint-disable-next-line no-console
+       
       console.info(this.formatMessage('info', message, context));
     }
   }
@@ -75,7 +73,7 @@ class Logger {
     const entry: LogEntry = { level: 'warn', message, timestamp: new Date().toISOString(), context };
     this.addToHistory(entry);
     if (!this.isProduction) {
-      // eslint-disable-next-line no-console
+       
       console.warn(this.formatMessage('warn', message, context));
     }
   }
@@ -85,7 +83,7 @@ class Logger {
     const entry: LogEntry = { level: 'error', message, timestamp: new Date().toISOString(), context, error };
     this.addToHistory(entry);
     if (!this.isProduction) {
-      // eslint-disable-next-line no-console
+       
       console.error(this.formatMessage('error', message, context), error ? error.stack : '');
     } else {
       // في الإنتاج: يمكن إرسال السجلات إلى خدمة مراقبة خارجية هنا

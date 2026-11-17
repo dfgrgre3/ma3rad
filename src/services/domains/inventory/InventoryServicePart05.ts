@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { baseQuantityAsM2 } from '../../../utils/products/uom';
@@ -26,7 +27,7 @@ public assignProductLocation(locationId: string, productId: string, quantityM2: 
     `, [productId])[0];
     if (!prod) throw new Error('المنتج غير موجود.');
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const current = txDb.query<{ id: string; quantityM2: number }>(`
         SELECT id, quantity_m2 AS quantityM2
         FROM product_location_stock WHERE location_id = ? AND product_id = ?

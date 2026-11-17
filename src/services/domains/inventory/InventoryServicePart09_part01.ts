@@ -18,7 +18,7 @@ public dispatchTransfer(transferId: string, idempotencyKey?: string): void {
       return;
     }
 
-    this.db.executeTransaction((txDb) => {
+    this.db.executeFinancialTransaction((txDb) => {
       const transfer = txDb.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
       if (!transfer) throw new Error('طلب التحويل غير موجود.');
       this.requireTransferWarehouseAuthorization(transferId, actor);

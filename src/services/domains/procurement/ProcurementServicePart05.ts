@@ -3,7 +3,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
-import type { LandedCostBreakdownItem } from '../../../types/procurement';
+import type { LandedCostBreakdownItem, SupplierClaimRow } from '../../../types/procurement';
 import { ProcurementServicePart04 } from './ProcurementServicePart04';
 import { BranchAccessService } from '../auth/BranchAccessService';
 
@@ -130,7 +130,7 @@ public createClaim(dto: {
     const claimId = `sclm_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
 
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const claimNumber = db.nextNumber('CLM');
 
       db.run(`

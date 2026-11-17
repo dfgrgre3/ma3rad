@@ -167,7 +167,7 @@ export function createSaleReturn(
       actor,
       trackInventory,
     }, requestedByProduct);
-  });
+  }, { immediatePersist: true });
 }
 
 function validateReturnShift(

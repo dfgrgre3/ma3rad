@@ -11,6 +11,8 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export type WorkforcePlanStatus = 'DRAFT' | 'APPROVED' | 'CLOSED';
 export type HiringRequisitionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 

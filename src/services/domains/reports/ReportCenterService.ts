@@ -3245,7 +3245,7 @@ export class ReportCenterService {
     };
   }
 
-  public workforceAnalytics({ _from, _to }: ReportParams): ReportResult {
+  public workforceAnalytics({ from, to }: ReportParams): ReportResult {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
@@ -3278,7 +3278,7 @@ export class ReportCenterService {
     };
   }
 
-  public assetAnalytics({ _from, _to }: ReportParams): ReportResult {
+  public assetAnalytics({ from, to }: ReportParams): ReportResult {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('fa.branch_id', undefined, actor);
 

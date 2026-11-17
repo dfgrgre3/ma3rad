@@ -329,6 +329,7 @@ export class FacilityCleaningService {
 
   static updateCleaningSchedule(id: string, input: Partial<CleaningScheduleInput>): CleaningSchedule {
     const actor = this.requireManage();
+    const companyId = this.currentCompanyId(actor);
     const schedule = this.db.query<{ id: string }>(
       'SELECT id FROM facility_cleaning_schedules WHERE id = ? AND company_id = ?',
       [id, companyId]

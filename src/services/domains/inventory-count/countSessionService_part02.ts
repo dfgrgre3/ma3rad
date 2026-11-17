@@ -18,7 +18,7 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
   if (!sessionRow) throw new Error('جلسة الجرد غير موجودة.');
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
   if (activeSession.status !== 'COUNTING') throw new Error('لا يمكن تعديل جلسة جرد غير مفتوحة.');
-  db.executeTransaction((txDb) => {
+  db.executeFinancialTransaction((txDb) => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!current || current.status !== 'COUNTING') throw new Error('Session is no longer open. Reload it before saving.');
     const members = new Set(txDb.query<{ id: string }>('SELECT id FROM stock_count_items WHERE count_id = ?', [activeSession.id]).map(row => row.id));

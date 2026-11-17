@@ -1,6 +1,9 @@
 import '../integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import { DatabaseManager } from '../../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../../src/services/domains/auth/PermissionService.ts';
@@ -47,8 +50,7 @@ test('clock tamper: system clock rollback detected by monotonic marker', async (
   await boot(db);
   asUser(admin);
 
-  const timeCheckPath = require('node:path').join(require('node:os').tmpdir(), 'ceramisys_clock_test.json');
-  const fs = require('node:fs');
+  const timeCheckPath = path.join(os.tmpdir(), 'ceramisys_clock_test.json');
 
   const now = Date.now();
   fs.writeFileSync(timeCheckPath, JSON.stringify({ lastSeen: now }));

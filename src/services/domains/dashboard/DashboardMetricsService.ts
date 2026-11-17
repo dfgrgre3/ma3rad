@@ -13,6 +13,7 @@ import type {
   TopCustomerItem, TopSellingProduct,
 } from '../../../types/dashboard/components';
 import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
+import type { DailyPurchaseResult } from '../operations/DailyOperationsService';
 
 /**
  * Unified Dashboard Metrics Service
@@ -52,28 +53,7 @@ export interface OverviewDashboardData {
   gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[];
   paymentDistribution: PaymentDistributionItem[];
   recentActivities: RecentActivityItem[];
-  todayPurchases: {
-    rows: Array<{
-      id: string;
-      supplierId: string;
-      supplierName: string;
-      total: number;
-      paid: number;
-      paymentType: string;
-      createdAt: string;
-      invoiceNumber: string;
-    }>;
-    items: Array<{
-      productId: string;
-      productName: string;
-      productType: 'CERAMIC' | 'GENERAL';
-      baseUnit: string;
-      customUnit?: string;
-      quantityM2: number;
-      totalCost: number;
-      purchaseId: string;
-    }>;
-  } | null;
+  todayPurchases: DailyPurchaseResult | null;
   purchasesLoading: boolean;
   purchasesError: string | null;
   purchaseHourly: PurchaseHourlyBucket[];
@@ -446,7 +426,7 @@ export class DashboardMetricsService {
     try {
       if (PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')) {
         const dailyOps = await import('../operations/DailyOperationsService').then(m => new m.DailyOperationsService());
-        todayPurchases = dailyOps.getPurchases() as unknown as OverviewDashboardData['todayPurchases'];
+        todayPurchases = dailyOps.getPurchases();
         purchasesError = null;
       }
     } catch (error: any) {

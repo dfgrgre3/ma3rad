@@ -33,6 +33,23 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+const emptyRelease: PlatformRelease = {
+  id: '',
+  version: '',
+  channel: 'STABLE',
+  status: 'PUBLISHED',
+  isMandatory: false,
+  minVersion: '1.0.0',
+  rolloutGroup: 'ALL',
+  notes: '',
+  fileUrl: '',
+  fileName: '',
+  checksumSha256: '',
+  changelog: '',
+  createdAt: '',
+  updatedAt: '',
+};
+
 export const PlatformReleasesPage: React.FC = () => {
   const [releases, setReleases] = useState<PlatformRelease[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
@@ -157,19 +174,7 @@ export const PlatformReleasesPage: React.FC = () => {
             <Button
               size="sm"
               onClick={() => {
-                setReleaseForm({
-                  version: '',
-                  channel: 'STABLE',
-                  status: 'PUBLISHED',
-                  isMandatory: false,
-                  minVersion: '1.0.0',
-                  rolloutGroup: 'ALL',
-                  notes: '',
-                  fileUrl: '',
-                  fileName: '',
-                  checksumSha256: '',
-                  changelog: '',
-                });
+                setReleaseForm({ ...emptyRelease });
                 setIsUpsertOpen(true);
               }}
               leadingIcon={<Plus className="h-4 w-4" />}
@@ -426,7 +431,7 @@ export const PlatformReleasesPage: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-300 mb-1">رابط تحميل الحزمة (URL)</label>
               <input
                 type="text"
-                value={releaseForm.fileUrl}
+                value={releaseForm.fileUrl ?? ''}
                 onChange={(e) => setReleaseForm({ ...releaseForm, fileUrl: e.target.value })}
                 placeholder="https://releases.ceramisys.com/v2.1.0.tar.gz"
                 className={inputClass}
@@ -436,7 +441,7 @@ export const PlatformReleasesPage: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-300 mb-1">بصمة التحقق SHA256</label>
               <input
                 type="text"
-                value={releaseForm.checksumSha256}
+                value={releaseForm.checksumSha256 ?? ''}
                 onChange={(e) => setReleaseForm({ ...releaseForm, checksumSha256: e.target.value })}
                 placeholder="hash..."
                 className={inputClass}
@@ -448,7 +453,7 @@ export const PlatformReleasesPage: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-300 mb-1">ملاحظات الإصدار / التغييرات</label>
             <textarea
               rows={3}
-              value={releaseForm.changelog}
+              value={releaseForm.changelog ?? ''}
               onChange={(e) => setReleaseForm({ ...releaseForm, changelog: e.target.value })}
               placeholder="تفاصيل التحديث والميزات الجديدة..."
               className={inputClass}
@@ -459,7 +464,7 @@ export const PlatformReleasesPage: React.FC = () => {
             <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 mt-1">
               <input
                 type="checkbox"
-                checked={releaseForm.isMandatory}
+                checked={releaseForm.isMandatory ?? false}
                 onChange={(e) => setReleaseForm({ ...releaseForm, isMandatory: e.target.checked })}
                 className="rounded border-slate-700 text-sky-500 focus:ring-sky-500"
               />

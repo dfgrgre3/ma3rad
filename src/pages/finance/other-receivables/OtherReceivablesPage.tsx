@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, History, Pencil, Plus, Search, Save } from "lucide-react";
 import { DatabaseManager } from "../../../database/repositories/databaseManager";
 import { AuthService } from "../../../services/domains/auth/AuthService";

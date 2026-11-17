@@ -139,7 +139,7 @@ export class HistoricalReturnReconciliationService {
     const reviewId = `srrv_${uuidv4().slice(0, 10)}`;
     const reviewedAt = new Date().toISOString();
     const snapshotJson = JSON.stringify({ candidates });
-    this.db.executeTransaction((tx) => {
+    this.db.executeFinancialTransaction((tx) => {
       tx.run(
         `INSERT INTO sales_return_reconciliation_reviews
            (id, reviewed_by, reviewed_at, candidate_count, snapshot_json)
@@ -206,7 +206,7 @@ export class HistoricalReturnReconciliationService {
     const taxReduction = candidate.calculatedTax;
     const customerPurchaseTaxReduction = input.taxAlreadyIncludedInCustomerPurchases ? 0 : taxReduction;
 
-    const correctionEntryId = this.db.executeTransaction((tx) => {
+    const correctionEntryId = this.db.executeFinancialTransaction((tx) => {
       const fresh = this.pendingRows(input.returnId, tx.getDatabase())[0];
       if (!fresh) throw new Error('تغيرت حالة المرتجع أثناء المراجعة. أعد تحميل قائمة التسويات.');
       const freshCandidate = this.toCandidate(fresh);

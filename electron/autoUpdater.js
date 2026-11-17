@@ -102,7 +102,7 @@ function isNewerRelease(currentVersion, version) {
 
 function configureAutoUpdater({
   app,
-  updater,
+  updater = null,
   ipcMain,
   validateIpcSender = /** @type {(event: unknown) => void} */ (() => {}),
   getWindow = () => null,

@@ -193,7 +193,7 @@ export const PlatformLicensesPage: React.FC = () => {
     }
     try {
       const result = platformAdminService.detectCloneDevices();
-      setCloneAlerts(result.alerts);
+      setCloneAlerts(result.alerts.map((a) => a.message));
       if (result.alerts.length > 0) {
         toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
       } else {

@@ -543,7 +543,7 @@ export class PartnerService {
       );
     }
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const profitSharesAligned = ownershipMode === 'AUTO'
         && this.areProfitSharesAligned(db, companyId);
       db.run(`
@@ -632,7 +632,7 @@ export class PartnerService {
       throw new Error('لا يمكن إيقاف شريك له رصيد قائم. سوِّ رصيده أولًا ثم أوقفه.');
     }
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const profitSharesAligned = ownershipMode === 'AUTO'
         && draft.profitSharePercent === undefined
         && this.areProfitSharesAligned(db, current.companyId);
@@ -709,7 +709,7 @@ export class PartnerService {
     const partner = this.getPartnerById(draft.partnerId);
     if (!partner.isActive) throw new Error('لا يمكن تسجيل حركات على حساب شريك غير نشط.');
 
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const transactionId = this.postTransactionInDb(db, actor, draft, partner);
       return this.getPartnerStatement(draft.partnerId).transactions
         .find((transaction) => transaction.id === transactionId)!;
@@ -770,7 +770,7 @@ export class PartnerService {
 
     const reversalId = `ptx_${uuidv4().slice(0, 10)}`;
     const transactionDate = localDateString();
-    return this.db.executeTransaction((db) => {
+    return this.db.executeFinancialTransaction((db) => {
       const journalEntryId = reverseLedgerEntry(db.getDatabase(), original.journalEntryId, {
         date: transactionDate,
         description: `عكس ${this.transactionLabel(original.transactionType)} - ${cleanReason}`,
@@ -860,7 +860,7 @@ export class PartnerService {
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     const batchId = `pdist_${uuidv4().slice(0, 10)}`;
     const cleanNotes = String(notes || '').trim();
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       for (const allocation of normalized.filter((item) => item.amount > 0)) {
         const transactionId = `ptx_${uuidv4().slice(0, 10)}`;
         const partner = partners.find((item) => item.id === allocation.partnerId)!;

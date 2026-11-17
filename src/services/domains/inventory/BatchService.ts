@@ -163,7 +163,7 @@ export class BatchService {
     const batchNumber = data.batchNumber.trim();
     const receivedDate = data.receivedDate || localDateString();
 
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       const duplicate = db.query<{ id: string }>(
         `SELECT id FROM product_batches WHERE product_id = ? AND batch_number = ? AND warehouse_id = ?`,
         [data.productId, batchNumber, data.warehouseId]

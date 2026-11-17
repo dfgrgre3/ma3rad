@@ -236,7 +236,7 @@ export class PayrollSocialInsuranceService {
     }
 
     const ruleId = id || `psi_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       if (id) {
         db.run(
           `UPDATE payroll_social_insurance_rules SET name = ?, effective_from = ?, effective_to = ?,
@@ -284,7 +284,7 @@ export class PayrollSocialInsuranceService {
       [id, companyId]
     )[0];
     if (!rule) throw new Error('قاعدة التأمينات الاجتماعية غير موجودة.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run('DELETE FROM payroll_social_insurance_contributions WHERE rule_id = ?', [id]);
       db.run('DELETE FROM payroll_social_insurance_rules WHERE id = ? AND company_id = ?', [id, companyId]);
       db.run(
@@ -475,7 +475,7 @@ export class PayrollSocialInsuranceService {
     }
 
     const ruleId = id || `eos_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       if (id) {
         db.run(
           `UPDATE payroll_end_of_service_rules SET name = ?, system_type = ?, effective_from = ?,
@@ -519,7 +519,7 @@ export class PayrollSocialInsuranceService {
       [id, companyId]
     )[0];
     if (!rule) throw new Error('قاعدة نهاية الخدمة غير موجودة.');
-    this.db.executeTransaction((db) => {
+    this.db.executeFinancialTransaction((db) => {
       db.run('DELETE FROM payroll_end_of_service_settlements WHERE rule_id = ?', [id]);
       db.run('DELETE FROM payroll_end_of_service_rules WHERE id = ? AND company_id = ?', [id, companyId]);
       db.run(

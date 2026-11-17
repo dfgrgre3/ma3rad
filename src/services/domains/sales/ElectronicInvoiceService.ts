@@ -243,7 +243,7 @@ export class ElectronicInvoiceService {
     const id = `einv_${uuidv4().substring(0, 8)}`;
     const invoiceNumber = `EINV-${localDateString().replace(/-/g, '')}-${Date.now().toString().slice(-6)}`;
     const now = new Date().toISOString();
-    this.db.executeTransaction((sqliteDb) => {
+    this.db.executeFinancialTransaction((sqliteDb) => {
       sqliteDb.run(`INSERT INTO electronic_invoices (
         id, invoice_number, sales_invoice_id, customer_id, status, total_tax, total_amount,
         created_by, created_at, updated_at

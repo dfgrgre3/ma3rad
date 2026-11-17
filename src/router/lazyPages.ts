@@ -109,6 +109,7 @@ export { JournalEntriesPage } from './lazyPages_part03';
 export { ChequesPage } from './lazyPages_part03';
 export { FiscalClosingPage } from './lazyPages_part03';
 export { BankReconciliationPage } from './lazyPages_part03';
+export { ConsistencyAuditPage } from './lazyPages_part03';
 export { BudgetsCostCentersPage } from './lazyPages_part03';
 export { CashFlowForecastPage } from './lazyPages_part03';
 export { EPaymentSettlementPage } from './lazyPages_part03';
