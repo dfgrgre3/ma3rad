@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Shield, Globe, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Shield, Globe, Lock, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 
@@ -103,6 +104,15 @@ export const LicenseModeSettingsPage: React.FC = () => {
                   الترخيص مرتبط بالحساب والبيانات المرسلة من المنصة المركزية، ويمكن تثبيت البرنامج
                   وتشغيله على أي جهاز بعد التفعيل باستخدام مفتاح الترخيص.
                 </p>
+                {mode === 'account' && (
+                  <Link
+                    to="/central-activation"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-400 hover:underline"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    تفعيل الترخيص المركزي على هذا الجهاز
+                  </Link>
+                )}
               </div>
               <button
                 type="button"
