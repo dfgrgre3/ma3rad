@@ -24,6 +24,7 @@ interface EmployeeFormModalProps {
   editingEmployee: Employee | null;
   form: EmployeeFormState;
   branches: EmployeeBranchOption[];
+  repBranches: EmployeeBranchOption[];
   departments: DepartmentOption[];
   jobTitles: JobTitleOption[];
   managers: Employee[];
@@ -52,6 +53,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   editingEmployee,
   form,
   branches,
+  repBranches,
   departments,
   jobTitles,
   managers,
@@ -300,6 +302,84 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
             </div>
             {editingEmployee?.terminatedAt && (
               <p className="mt-3 text-xs text-slate-500">تاريخ انتهاء الخدمة: {editingEmployee.terminatedAt} (يُدار من دورة إنهاء العقد)</p>
+            )}
+          </section>
+
+          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <h3 className="mb-3 text-xs font-black text-slate-700">بيانات المندوب / المبيعات</h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.isSalesRep}
+                disabled={isSaving}
+                onChange={(e) => onFormChange((prev) => ({
+                  ...prev,
+                  isSalesRep: e.target.checked,
+                  additionalBranchIds: e.target.checked ? prev.additionalBranchIds : [],
+                }))}
+                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+              />
+              <span className="text-sm font-bold text-slate-700">مندوب مبيعات</span>
+            </label>
+            {form.isSalesRep && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label>
+                  <span className={labelClass}>نسبة العمولة ٪</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    value={form.commissionPercentage}
+                    onChange={(e) => onFormChange((prev) => ({ ...prev, commissionPercentage: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                    className={fieldClass}
+                  />
+                </label>
+                <label>
+                  <span className={labelClass}>المستهدف الشهري للمبيعات</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.monthlyTarget}
+                    onChange={(e) => onFormChange((prev) => ({ ...prev, monthlyTarget: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                    className={fieldClass}
+                  />
+                </label>
+                <div className="sm:col-span-2">
+                  <span className={labelClass}>فروع إضافية يخدمها المندوب</span>
+                  <p className="mb-2 text-[11px] text-slate-500">
+                    الفرع الرئيسي: «{branches.find((b) => b.id === form.branchId)?.name || '—'}» — يمكن اختيار المندوب في أي فرع، وهذه الفروع تُستخدم للتنظيم والتقارير.
+                  </p>
+                  <div className="grid grid-cols-1 gap-1.5 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2">
+                    {repBranches
+                      .filter((branch) => branch.id !== form.branchId)
+                      .map((branch) => {
+                        const checked = form.additionalBranchIds.includes(branch.id);
+                        return (
+                          <label key={branch.id} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={isSaving}
+                              onChange={(e) => onFormChange((prev) => ({
+                                ...prev,
+                                additionalBranchIds: e.target.checked
+                                  ? [...prev.additionalBranchIds, branch.id]
+                                  : prev.additionalBranchIds.filter((id) => id !== branch.id),
+                              }))}
+                              className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                            />
+                            {branch.name}
+                          </label>
+                        );
+                      })}
+                    {!repBranches.some((branch) => branch.id !== form.branchId) && (
+                      <span className="text-[11px] text-slate-400">لا توجد فروع إضافية متاحة ضمن صلاحياتك.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </section>
 

@@ -18,6 +18,9 @@ import {
   Search,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
@@ -94,14 +97,17 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Load Tenants & Profiles
-  const loadBootstrap = useCallback(() => {
+  const loadBootstrap = useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     try {
-      const tList = platformAdminService.listTenants();
+      const [tList, pList] = await Promise.all([
+        centralState.active ? centralPlatformClient.listTenants() : platformAdminService.listTenants(),
+        centralState.active ? centralPlatformClient.listUiProfiles() : platformAdminService.listUiProfiles(),
+      ]);
       setTenants(tList);
       if (tList.length > 0 && !selectedTenantId) {
         setSelectedTenantId(tList[0].id);
       }
-      const pList = platformAdminService.listUiProfiles();
       setProfiles(pList);
     } catch (e) {
       console.error('Failed to load bootstrap data:', e);
@@ -109,19 +115,28 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   }, [selectedTenantId]);
 
   // Load Tenant UI Config
-  const loadTenantUi = useCallback((tenantId: string) => {
+  const loadTenantUi = useCallback(async (tenantId: string) => {
     if (!tenantId) return;
     setLoading(true);
+    const centralState = getCentralDataSourceState();
     try {
-      const data = platformAdminService.getTenantUiCustomization(tenantId);
+      let data: any;
+      let vList: any[] = [];
+
+      if (centralState.active) {
+        data = await centralPlatformClient.getTenantUiCustomization(tenantId);
+        vList = await centralPlatformClient.listTenantUiVersions(tenantId);
+      } else {
+        data = platformAdminService.getTenantUiCustomization(tenantId);
+        vList = platformAdminService.listTenantUiVersions(tenantId);
+      }
+
       setHiddenPages(data.hiddenPages || []);
       setHiddenActions(data.hiddenActions || []);
       setCustomLabels(data.customLabels || {});
       setFormFieldRules(data.formFieldRules || {});
       setSelectedProfileId(data.profileId || '');
       setCurrentVersion(data.version);
-
-      const vList = platformAdminService.listTenantUiVersions(tenantId);
       setVersions(vList);
     } catch (e) {
       console.error('Failed to load tenant UI config:', e);
@@ -176,22 +191,33 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
     setSelectedProfileId(profile.id);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
+    const centralState = getCentralDataSourceState();
     try {
-      const tenantObj = tenants.find((t) => t.id === selectedTenantId);
-      const updated = platformAdminService.saveTenantUiCustomization({
-        tenantId: selectedTenantId,
+      const uiInput = {
         profileId: selectedProfileId || undefined,
         hiddenPages,
         hiddenActions,
         customLabels,
         formFieldRules,
-        changeSummary: `تحديث تخصيصات الواجهة للعميل ${tenantObj?.name || selectedTenantId}`,
-      });
+      };
+
+      let updated: any;
+      if (centralState.active) {
+        updated = await centralPlatformClient.saveTenantUiCustomization(selectedTenantId, uiInput);
+      } else {
+        const tenantObj = tenants.find((t) => t.id === selectedTenantId);
+        updated = platformAdminService.saveTenantUiCustomization({
+          tenantId: selectedTenantId,
+          ...uiInput,
+          changeSummary: `تحديث تخصيصات الواجهة للعميل ${tenantObj?.name || selectedTenantId}`,
+        });
+      }
+
       setCurrentVersion(updated.version);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
@@ -203,11 +229,16 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
     }
   };
 
-  const handleRollback = (ver: number) => {
+  const handleRollback = async (ver: number) => {
     if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع تخصيصات الواجهة للإصدار #${ver}؟`)) return;
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.rollbackTenantUi(selectedTenantId, ver);
+      if (centralState.active) {
+        await centralPlatformClient.rollbackTenantUi(selectedTenantId, ver);
+      } else {
+        platformAdminService.rollbackTenantUi(selectedTenantId, ver);
+      }
       loadTenantUi(selectedTenantId);
       alert(`تم استرجاع الإصدار #${ver} بنجاح.`);
     } catch (err) {

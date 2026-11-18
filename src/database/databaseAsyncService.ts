@@ -165,13 +165,14 @@ async function ensureWorkerInitialized(): Promise<void> {
  * يصدّر قاعدة البيانات من الخيط الرئيسي ويدفعها إلى العامل (Transferable،
  * بدون نسخ). يُستدعى فقط عند وجود تغييرات لم يصلها العامل بعد.
  */
-async function pushMainToWorker(): Promise<void> {
+async function pushMainToWorker(): Promise<Uint8Array> {
   const db = DatabaseManager.getInstance();
   const bytes = db.exportDatabaseBytes();
   await post<void>({ type: 'import', bytes }, [bytes.buffer as ArrayBuffer]);
   lastSyncedSeq = db.getMutationSeq();
   workerDirty = false;
-}
+  return bytes;
+}  
 
 /**
  * يضمن أن العامل لديه أحدث حالة لقاعدة البيانات. تكلفته صفرية عندما لا

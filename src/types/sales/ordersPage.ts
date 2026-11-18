@@ -18,6 +18,7 @@ export type Line = { productId: string; uom: string; quantity: number; unitPrice
 export interface FormState {
   customerId: string;
   warehouseId: string;
+  salesRepId: string;
   deliveryDate: string;
   notes: string;
   shipping: string;
@@ -27,7 +28,7 @@ export interface FormState {
 }
 
 export const emptyForm = (): FormState => ({
-  customerId: '', warehouseId: '', deliveryDate: '', notes: '',
+  customerId: '', warehouseId: '', salesRepId: '', deliveryDate: '', notes: '',
   shipping: '', discount: '', tax: '',
   lines: [{ productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }],
 });

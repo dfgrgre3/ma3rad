@@ -196,7 +196,7 @@ export class PlatformCouponService {
     return { coupon, discount };
   }
 
-  public applyCoupon(code: string): PlatformCoupon {
+  public applyCoupon(code: string, planId?: string): PlatformCoupon {
     PlatformCouponService.requirePlatformAccess('coupons', 'platform.coupons.use');
 
     const row = this.db.query<any>('SELECT * FROM platform_coupons WHERE code = ?', [code])[0];
@@ -209,9 +209,16 @@ export class PlatformCouponService {
     if (coupon.startsAt && new Date(coupon.startsAt) > new Date()) throw new Error('الكوبون لم يبدأ سريانه بعد.');
     if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) throw new Error('تم استنفاد استخدامات الكوبون.');
 
+    // Validate plan restriction if applicablePlans is set and planId is provided
+    if (coupon.applicablePlans.length > 0 && planId) {
+      if (!coupon.applicablePlans.includes(planId)) {
+        throw new Error('هذا الكوبون غير متاح للخطة المحددة.');
+      }
+    }
+
     this.db.run('UPDATE platform_coupons SET used_count = used_count + 1, updated_at = ? WHERE id = ?', [nowIso(), coupon.id]);
 
-    this.audit('استخدام كوبون', 'COUPON', coupon.id, { code });
+    this.audit('استخدام كوبون', 'COUPON', coupon.id, { code, planId });
 
     return coupon;
   }

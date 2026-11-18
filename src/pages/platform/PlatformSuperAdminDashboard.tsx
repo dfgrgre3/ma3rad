@@ -71,6 +71,9 @@ import {
   StatusBadge,
   EmptyState,
 } from './components/PlatformUI';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import {
   LineChart,
   MetricCard,
@@ -152,10 +155,15 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
   const loadOverview = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    const centralState = getCentralDataSourceState();
     try {
-      // Use the new method with period and plan filter
-      const data = platformAdminService.getOverviewWithPeriod(period as PlatformPeriod, planFilter || undefined);
-      setOverview(data);
+      if (centralState.active) {
+        const data = await centralPlatformClient.getOverview();
+        setOverview(data as PlatformOverview);
+      } else {
+        const data = platformAdminService.getOverviewWithPeriod(period as PlatformPeriod, planFilter || undefined);
+        setOverview(data);
+      }
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');

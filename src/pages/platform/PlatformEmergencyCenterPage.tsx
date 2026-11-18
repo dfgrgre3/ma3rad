@@ -14,6 +14,9 @@ import {
   Boxes,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
@@ -53,15 +56,27 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
 
   const canManageEmergency = canPlatform('emergency');
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const t = platformAdminService.listTenants();
-      const k = platformAdminService.listApiKeys();
-      const r = platformAdminService.listReleases();
-      setTenants(t);
-      setApiKeys(k);
-      setReleases(r);
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [t, k, r] = await Promise.all([
+          centralPlatformClient.listTenants(),
+          centralPlatformClient.listApiKeys(),
+          centralPlatformClient.listReleases(),
+        ]);
+        setTenants(t as any);
+        setApiKeys(k as any);
+        setReleases(r as any);
+      } else {
+        const t = platformAdminService.listTenants();
+        const k = platformAdminService.listApiKeys();
+        const r = platformAdminService.listReleases();
+        setTenants(t);
+        setApiKeys(k);
+        setReleases(r);
+      }
     } finally {
       setLoading(false);
     }
@@ -139,6 +154,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
 
   return (
     <div className="space-y-4 text-right">
+      <CentralUnsupportedNotice feature="مركز الطوارئ (إجراءات الطوارئ)" />
       <PageHeader
         title="مركز إجراءات الطوارئ والحماية (Emergency Response & Killswitch)"
         description="إجراءات العزل السريع: إيقاف العملاء المنتهكين، سحب المفاتيح المخترقة، إيقاف الإصدارات، وفصل الجلسات المشبوهة."

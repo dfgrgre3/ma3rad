@@ -334,13 +334,9 @@ export class SecurityService {
 
   async createEncryptedBackup(backupData: Uint8Array, password: string): Promise<Uint8Array> {
     try {
-      // في التطبيق الفعلي، سيتم استدعاء backupEncryption.ts
-      // هذا نموذج مبسط
       if (this.config.auditLogging) {
         auditLogger.log('system', 'backup', 'backup_created', 'backup', 'backup', 'تم إنشاء نسخة احتياطية مشفرة', null, true);
       }
-      // يجب حاليًا تنفيذ التشفير الفعلي
-      // يمكن استخدام encryptBackupWithSignature المتقدم
       if (!password) throw new Error('كلمة مرور النسخة الاحتياطية مطلوبة.');
       return await encryptExternalBackup(backupData, password);
     } catch (error: any) {

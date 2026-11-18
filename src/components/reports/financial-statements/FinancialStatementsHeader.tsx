@@ -4,7 +4,7 @@ import { FileSpreadsheet, Wallet, TrendingUp, BookOpen, RefreshCw, Calendar, Sca
 export type FinancialStatementsTab = 'income' | 'balance' | 'cash' | 'aging' | 'subledger' | 'ledger' | 'reconciliation';
 export type AgingType = 'customer' | 'supplier';
 
-const tabs = [
+const tabs: readonly [FinancialStatementsTab, string, React.ComponentType<{ className?: string }>][] = [
   ['income', 'قائمة الدخل', BarChart3],
   ['balance', 'الميزانية العمومية', Wallet],
   ['cash', 'التدفقات النقدية', TrendingUp],
@@ -12,7 +12,7 @@ const tabs = [
   ['subledger', 'الأستاذ المساعد', Users],
   ['ledger', 'دفتر الأستاذ', BookOpen],
   ['reconciliation', 'المصالحة', GitCompare],
-] as const;
+];
 
 export function FinancialStatementsHeader({
   tab,
@@ -22,6 +22,7 @@ export function FinancialStatementsHeader({
   to,
   loading,
   onTabChange,
+  visibleTabs,
   onAgingTypeChange,
   onAsOfChange,
   onFromChange,
@@ -42,7 +43,9 @@ export function FinancialStatementsHeader({
   onToChange: (date: string) => void;
   onRefresh: () => void;
   onExport?: () => void;
+  visibleTabs?: FinancialStatementsTab[];
 }) {
+  const availableTabs = visibleTabs ? tabs.filter(([key]) => visibleTabs.includes(key as FinancialStatementsTab)) : tabs;
   return (
     <>
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -113,7 +116,7 @@ export function FinancialStatementsHeader({
       </div>
 
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 overflow-x-auto">
-        {tabs.map(([key, label, Icon]) => (
+        {availableTabs.map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => onTabChange(key)}

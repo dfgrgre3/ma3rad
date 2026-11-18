@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Webhook,
   CreditCard,
@@ -18,6 +18,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { platformAdminApiClient } from '../../services/domains/platform/PlatformAdminApiClient';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -187,23 +189,48 @@ export const PlatformIntegrationsPage: React.FC = () => {
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
 
   const loadPaymentConfig = useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     setPaymentsLoading(true);
+    setPaymentsError(null);
     try {
-      const settings = await platformAdminApiClient.getFeaturePermissions({ tenantId: null, planId: null });
-      // The platform settings (payment gateway keys) are read through the
-      // central settings endpoint. Here we surface only what the UI needs,
-      // masking secret values so they are never exposed in plain text.
-      setPaymentConfig((prev) => ({
-        ...prev,
-      }));
+      if (centralState.active) {
+        const providers = await centralPlatformClient.listIntegrationProviders();
+        const fawry = providers.payments.find((p: any) => p.provider_code === 'FAWRY');
+        const paymob = providers.payments.find((p: any) => p.provider_code === 'PAYMOB');
+        const sms = providers.sms[0];
+        if (fawry?.config) {
+          const cfg = typeof fawry.config === 'string' ? JSON.parse(fawry.config) : fawry.config;
+          setPaymentConfig(prev => ({
+            ...prev,
+            fawryMerchantCode: cfg.merchantCode || '',
+            fawrySecurityKey: cfg.securityKey ? '••••••••' + String(cfg.securityKey).slice(-4) : '',
+            paymobApiKey: cfg.apiKey ? '••••••••' + String(cfg.apiKey).slice(-4) : '',
+            paymobIntegrationId: cfg.integrationId || '',
+            paymobIframeId: cfg.iframeId || '',
+          }));
+        }
+        if (sms) {
+          setSmsConfig(prev => ({
+            ...prev,
+            provider: sms.provider_code || 'VIOMIS',
+            senderId: sms.sender_id || 'CeramiSys',
+            apiKey: sms.config?.apiKey ? '••••••••' + String(sms.config.apiKey).slice(-4) : '',
+            dailyQuota: sms.daily_quota || 5000,
+          }));
+        }
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذر تحميل إعدادات الدفع';
-      setPaymentsError(msg);
-      toast.error('تعذر تحميل إعدادات الدفع', msg);
+      setPaymentsError(err instanceof Error ? err.message : 'تعذر تحميل إعدادات التكاملات');
     } finally {
       setPaymentsLoading(false);
     }
-  }, [toast]);
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'PAYMENTS' || tab === 'SMS') {
+      void loadPaymentConfig();
+    }
+  }, [tab, loadPaymentConfig]);
 
   // Note: full payment provider credentials are managed on the central server
   // (platform_settings) and are never returned in full to the renderer. The UI
@@ -215,13 +242,58 @@ export const PlatformIntegrationsPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    // Secrets (payment gateway keys, SMS tokens) must be configured on the
-    // central server/secret store and must never be persisted from browser
-    // state. This UI does not transmit credentials to avoid accidental exposure.
-    toast.info(
-      'حفظ بيانات الاعتماد غير متاح من الواجهة',
-      'يجب تهيئة مفاتيح بوابات الدفع ومزودي الرسائل على الخادم المركزي (Secret Store) عبر قناة إدارية آمنة. لا يتم إرسال الأسرار من المتصفح.',
-    );
+    const centralState = getCentralDataSourceState();
+    if (!centralState.active) {
+      toast.info(
+        'غير متاح في الوضع المحلي',
+        'إعدادات التكاملات متاحة فقط في الوضع المركزي.',
+      );
+      return;
+    }
+    setPaymentsLoading(true);
+    try {
+      // Save Fawry
+      await centralPlatformClient.updateIntegrationProvider({
+        type: 'payment',
+        providerCode: 'FAWRY',
+        providerName: 'Fawry',
+        isEnabled: true,
+        config: {
+          merchantCode: paymentConfig.fawryMerchantCode,
+          securityKey: paymentConfig.fawrySecurityKey.startsWith('••••') ? undefined : paymentConfig.fawrySecurityKey,
+        },
+      });
+      // Save Paymob
+      await centralPlatformClient.updateIntegrationProvider({
+        type: 'payment',
+        providerCode: 'PAYMOB',
+        providerName: 'Paymob',
+        isEnabled: true,
+        config: {
+          apiKey: paymentConfig.paymobApiKey.startsWith('••••') ? undefined : paymentConfig.paymobApiKey,
+          integrationId: paymentConfig.paymobIntegrationId,
+          iframeId: paymentConfig.paymobIframeId,
+        },
+      });
+      // Save SMS
+      await centralPlatformClient.updateIntegrationProvider({
+        type: 'sms',
+        providerCode: smsConfig.provider,
+        providerName: smsConfig.provider,
+        isEnabled: true,
+        senderId: smsConfig.senderId,
+        dailyQuota: smsConfig.dailyQuota,
+        config: {
+          apiKey: smsConfig.apiKey.startsWith('••••') ? undefined : smsConfig.apiKey,
+        },
+      });
+      toast.success('تم حفظ إعدادات التكاملات');
+      void loadPaymentConfig();
+    } catch (err) {
+      toast.error('تعذر حفظ إعدادات التكاملات', err instanceof Error ? err.message : undefined);
+    } finally {
+      setPaymentsLoading(false);
+    }
   };
 
   // ── SMS Providers State ────────────────────────────────────────────────────

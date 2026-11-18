@@ -42,6 +42,7 @@ export const EmployeesPage: React.FC = () => {
   const [payrollPayables, setPayrollPayables] = useState<PayrollPayable[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employeeBranches, setEmployeeBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const [assignableBranches, setAssignableBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [departments, setDepartments] = useState<Array<{
     id: string;
     name: string;
@@ -56,7 +57,7 @@ export const EmployeesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  const loadAll = useCallback(() => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const branchAccess = new BranchAccessService();
@@ -66,26 +67,33 @@ export const EmployeesPage: React.FC = () => {
           .filter((branch) => branch.id === currentBranchId)
           .map(({ id, name }) => ({ id, name }))
       );
+      setAssignableBranches(
+        branchAccess.getSelectableBranches().map(({ id, name }) => ({ id, name }))
+      );
       const organizationService = new EmployeeOrganizationService();
       setDepartments(organizationService.getDepartments(currentBranchId));
       setJobTitles(organizationService.getJobTitles());
-      const currentEmployees = EmployeeService.getAll() as unknown as Employee[];
+      const [currentEmployeesRaw, transactionsRaw, payrollPayables, attendanceRaw] = await Promise.all([
+        EmployeeService.getAllAsync(),
+        canManageEmployees ? EmployeeService.getTransactionsAsync() : Promise.resolve([]),
+        canManageEmployees ? EmployeeService.getPayrollPayablesAsync() : Promise.resolve([]),
+        canViewAttendance ? EmployeeService.getAllAttendanceAsync() : Promise.resolve([]),
+      ]);
+      const currentEmployees = currentEmployeesRaw as unknown as Employee[];
       setEmployees(currentEmployees);
       const fieldService = new OperationalFieldService();
       setOperationalFields(fieldService.getDefinitions('employees'));
       setValuesByEmployee(fieldService.getRecordValuesForRecords('employees', currentEmployees.map((employee) => employee.id)));
-      setTransactions(canManageEmployees
-        ? EmployeeService.getTransactions() as unknown as FinancialTransaction[]
-        : []);
-      setPayrollPayables(canManageEmployees ? EmployeeService.getPayrollPayables() : []);
-      setAttendance(EmployeeService.getAllAttendance() as unknown as AttendanceRecord[]);
+      setTransactions(transactionsRaw as unknown as FinancialTransaction[]);
+      setPayrollPayables(payrollPayables);
+      setAttendance(attendanceRaw as unknown as AttendanceRecord[]);
       setDbError(null);
     } catch (e: any) {
       setDbError(e?.message || 'تعذر تحميل بيانات الموظفين.');
     } finally {
       setLoading(false);
     }
-  }, [canManageEmployees]);
+  }, [canManageEmployees, canViewAttendance]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { setSearchQuery(searchParams.get('search') || ''); }, [searchParams]);
@@ -115,7 +123,11 @@ export const EmployeesPage: React.FC = () => {
   // --- Active Tab ---
   const [activeTab, setActiveTab] = useState<EmployeeTab>('directory');
   // تبويب الحضور يتطلب صلاحية الحضور المنفصلة — الدليل متاح لكل من يملك عرض الموظفين.
-  const viewTab: EmployeeTab = activeTab === 'attendance' && !canViewAttendance ? 'directory' : activeTab;
+  const viewTab: EmployeeTab =
+    (activeTab === 'attendance' && !canViewAttendance)
+    || ((activeTab === 'finance' || activeTab === 'analytics') && !canManageEmployees)
+      ? 'directory'
+      : activeTab;
 
   // --- Filtering & Search ---
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -170,6 +182,10 @@ export const EmployeesPage: React.FC = () => {
     status: 'ACTIVE' as Employee['status'],
     joinedDate: localDateString(),
     notes: '',
+    isSalesRep: false,
+    commissionPercentage: 0,
+    monthlyTarget: 0,
+    additionalBranchIds: [],
   });
 
   const [txForm, setTxForm] = useState<TransactionFormState>({
@@ -225,6 +241,10 @@ export const EmployeesPage: React.FC = () => {
       status: 'ACTIVE',
       joinedDate: localDateString(),
       notes: '',
+      isSalesRep: false,
+      commissionPercentage: 0,
+      monthlyTarget: 0,
+      additionalBranchIds: [],
     });
     setIsEmployeeModalOpen(true);
   };
@@ -270,6 +290,10 @@ export const EmployeesPage: React.FC = () => {
       status: emp.status,
       joinedDate: emp.joinedDate,
       notes: emp.notes || '',
+      isSalesRep: Boolean(emp.isSalesRep),
+      commissionPercentage: Number(emp.commissionPercentage) || 0,
+      monthlyTarget: Number(emp.monthlyTarget) || 0,
+      additionalBranchIds: [...(emp.additionalBranchIds || [])],
     });
     setIsEmployeeModalOpen(true);
   };
@@ -593,6 +617,7 @@ export const EmployeesPage: React.FC = () => {
         editingEmployee={editingEmployee}
         form={empForm}
         branches={employeeBranches}
+        repBranches={assignableBranches}
         departments={departments.filter((department) =>
           !department.branchId || department.branchId === empForm.branchId
         )}

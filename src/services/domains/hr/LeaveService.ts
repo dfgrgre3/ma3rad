@@ -442,6 +442,45 @@ export class LeaveService {
     return this.getChargeableDates(employeeId, branchId, startDate, endDate).length;
   }
 
+  private async getChargeableDatesAsync(employeeId: string, branchId: string, startDate: string, endDate: string): Promise<string[]> {
+    const [shifts, holidayRows] = await Promise.all([
+      this.db.queryAsync<LeaveScheduleRow>(
+        `SELECT a.effective_from AS effectiveFrom, a.effective_to AS effectiveTo,
+                s.workdays_json AS workdaysJson
+         FROM employee_shift_assignments a
+         JOIN attendance_shifts s ON s.id = a.shift_id AND s.is_active = 1
+         WHERE a.employee_id = ? AND a.effective_from <= ?
+           AND (a.effective_to IS NULL OR a.effective_to >= ?)
+         ORDER BY a.effective_from DESC`,
+        [employeeId, endDate, startDate]
+      ),
+      this.db.queryAsync<{ date: string }>(
+        `SELECT date FROM attendance_holidays
+         WHERE branch_id = ? AND date BETWEEN ? AND ?`,
+        [branchId, startDate, endDate]
+      ),
+    ]);
+    const holidays = new Set(holidayRows.map((row) => row.date));
+
+    const dates: string[] = [];
+    for (let date = startDate; date <= endDate; date = dateOffset(date, 1)) {
+      if (holidays.has(date)) continue;
+      const shift = shifts.find((row) =>
+        row.effectiveFrom <= date && (!row.effectiveTo || row.effectiveTo >= date)
+      );
+      if (shift) {
+        const weekdays = JSON.parse(shift.workdaysJson) as number[];
+        if (!weekdays.includes(new Date(`${date}T00:00:00Z`).getUTCDay())) continue;
+      }
+      dates.push(date);
+    }
+    return dates;
+  }
+
+  private async getChargeableDaysAsync(employeeId: string, branchId: string, startDate: string, endDate: string): Promise<number> {
+    return (await this.getChargeableDatesAsync(employeeId, branchId, startDate, endDate)).length;
+  }
+
   private getYearlyRequests(
     employeeId: string,
     leaveType: LeaveType,
@@ -481,6 +520,50 @@ export class LeaveService {
       if (start > end) return total;
       return total + this.getChargeableDays(employeeId, request.branchId, start, end);
     }, 0);
+  }
+
+  private async getYearlyRequestsAsync(
+    employeeId: string,
+    leaveType: LeaveType,
+    year: number,
+    excludeId?: string,
+    status: 'PENDING' | 'APPROVED' | 'ALL' = 'ALL'
+  ): Promise<Array<{ id: string; branchId: string; startDate: string; endDate: string }>> {
+    const statusCondition = status === 'ALL' ? "status IN ('PENDING', 'APPROVED')" : 'status = ?';
+    const params: Array<string> = [employeeId, leaveType];
+    if (status !== 'ALL') params.push(status);
+    params.push(yearEnd(year), yearStart(year));
+    if (excludeId) params.push(excludeId);
+    return this.db.queryAsync(
+      `SELECT id, branch_id AS branchId, start_date AS startDate, end_date AS endDate
+       FROM employee_leave_requests
+       WHERE employee_id = ? AND leave_type = ?
+         AND ${statusCondition}
+         AND start_date <= ? AND end_date >= ?
+         ${excludeId ? 'AND id != ?' : ''}
+       ORDER BY start_date`,
+      params
+    );
+  }
+
+  private async getYearlyRequestDaysAsync(
+    employeeId: string,
+    leaveType: LeaveType,
+    year: number,
+    excludeId?: string,
+    status: 'PENDING' | 'APPROVED' | 'ALL' = 'ALL',
+    asOfDate = yearEnd(year)
+  ): Promise<number> {
+    const requests = await this.getYearlyRequestsAsync(employeeId, leaveType, year, excludeId, status);
+    let total = 0;
+    for (const request of requests) {
+      const start = request.startDate > yearStart(year) ? request.startDate : yearStart(year);
+      const requestEnd = request.endDate < yearEnd(year) ? request.endDate : yearEnd(year);
+      const end = requestEnd < asOfDate ? requestEnd : asOfDate;
+      if (start > end) continue;
+      total += await this.getChargeableDaysAsync(employeeId, request.branchId, start, end);
+    }
+    return total;
   }
 
   private assertAnnualBalance(
@@ -1136,6 +1219,49 @@ export class LeaveService {
     );
   }
 
+  public async getRequestsAsync(filters: LeaveFilters = {}): Promise<EmployeeLeaveRequest[]> {
+    const actor = this.require('hr.leave.view');
+    const scope = this.employeeDataScope(actor);
+    const conditions = [scope.clause];
+    const params: Array<string | number> = [...scope.params];
+
+    if (filters.status && filters.status !== 'ALL') {
+      conditions.push('l.status = ?');
+      params.push(filters.status);
+    }
+    if (filters.type && filters.type !== 'ALL') {
+      conditions.push('l.leave_type = ?');
+      params.push(filters.type);
+    }
+    if (filters.employeeId) {
+      conditions.push('l.employee_id = ?');
+      params.push(filters.employeeId);
+    }
+    if (filters.from) {
+      assertDate(filters.from, 'تاريخ البداية');
+      conditions.push('l.end_date >= ?');
+      params.push(filters.from);
+    }
+    if (filters.to) {
+      assertDate(filters.to, 'تاريخ النهاية');
+      conditions.push('l.start_date <= ?');
+      params.push(filters.to);
+    }
+
+    return this.db.queryAsync<EmployeeLeaveRequest>(
+      `SELECT l.*, e.name AS employee_name, b.name AS branch_name,
+              ru.full_name AS requester_name, du.full_name AS decider_name
+       FROM employee_leave_requests l
+       JOIN employees e ON e.id = l.employee_id
+       LEFT JOIN branches b ON b.id = l.branch_id
+       LEFT JOIN users ru ON ru.id = l.requested_by
+       LEFT JOIN users du ON du.id = l.decided_by
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY l.start_date DESC, l.created_at DESC`,
+      params
+    );
+  }
+
   public getRequest(id: string): EmployeeLeaveRequest {
     const actor = this.require('hr.leave.view');
     return this.requireRequestExists(actor, id);
@@ -1307,6 +1433,113 @@ export class LeaveService {
         const start = row.startDate > yearStart(targetYear) ? row.startDate : yearStart(targetYear);
         const end = row.endDate < yearEnd(targetYear) ? row.endDate : yearEnd(targetYear);
         const days = this.getChargeableDays(row.employeeId, row.branchId, start, end);
+        summary.approvedDays += days;
+        summary.daysByType[row.leaveType] += days;
+      }
+      if (row.status === 'REJECTED') summary.rejected += 1;
+      if (row.status === 'CANCELLED') summary.cancelled += 1;
+    }
+    return summary;
+  }
+
+  public async getTypePoliciesAsync(): Promise<LeaveTypePolicy[]> {
+    const actor = this.require('hr.leave.view');
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
+    const rows = await this.db.queryAsync<{ leaveType: LeaveType; maxDaysPerYear: number | null }>(
+      `SELECT leave_type AS leaveType, max_days_per_year AS maxDaysPerYear
+       FROM employee_leave_type_policies WHERE branch_id = ?`,
+      [branchId]
+    );
+    const byType = new Map(rows.map((row) => [row.leaveType, row.maxDaysPerYear]));
+    return LEAVE_TYPES.map((leaveType) => ({
+      leaveType,
+      maxDaysPerYear: byType.get(leaveType) ?? null,
+    }));
+  }
+
+  public async getCalendarAsync(period: string): Promise<LeaveCalendarEntry[]> {
+    const actor = this.require('hr.leave.view');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
+    const start = `${period}-01`;
+    const month = Number(period.slice(5, 7));
+    const year = Number(period.slice(0, 4));
+    const end = `${period}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, '0')}`;
+    const scope = this.employeeDataScope(actor);
+    const [requests, absences] = await Promise.all([
+      this.db.queryAsync<{
+        employeeId: string; employeeName: string; branchId: string; leaveType: LeaveType;
+        status: 'PENDING' | 'APPROVED'; startDate: string; endDate: string;
+      }>(
+        `SELECT l.employee_id AS employeeId, e.name AS employeeName,
+                l.branch_id AS branchId, l.leave_type AS leaveType, l.status,
+                l.start_date AS startDate, l.end_date AS endDate
+         FROM employee_leave_requests l JOIN employees e ON e.id = l.employee_id
+         WHERE l.status IN ('PENDING', 'APPROVED') AND l.start_date <= ? AND l.end_date >= ?
+           AND ${scope.clause}
+         ORDER BY l.start_date, e.name`,
+        [end, start, ...scope.params]
+      ),
+      this.db.queryAsync<{ date: string; employeeId: string; employeeName: string }>(
+        `SELECT a.date, a.employee_id AS employeeId, e.name AS employeeName
+         FROM attendance a JOIN employees e ON e.id = a.employee_id
+         WHERE a.status = 'ABSENT' AND a.date BETWEEN ? AND ? AND ${scope.clause}
+         ORDER BY a.date, e.name`,
+        [start, end, ...scope.params]
+      ),
+    ]);
+    const leaveEntries: LeaveCalendarEntry[] = [];
+    for (const request of requests) {
+      const rangeStart = request.startDate > start ? request.startDate : start;
+      const rangeEnd = request.endDate < end ? request.endDate : end;
+      const dates = await this.getChargeableDatesAsync(request.employeeId, request.branchId, rangeStart, rangeEnd);
+      for (const date of dates) {
+        leaveEntries.push({
+          date,
+          employeeId: request.employeeId,
+          employeeName: request.employeeName,
+          leaveType: request.leaveType,
+          status: request.status,
+        });
+      }
+    }
+    const absenceEntries = absences.map((row) => ({ ...row, leaveType: null, status: 'ABSENT' as const }));
+    return [...leaveEntries, ...absenceEntries].sort((a, b) => a.date.localeCompare(b.date) || a.employeeName.localeCompare(b.employeeName));
+  }
+
+  public async getSummaryAsync(year?: number): Promise<LeaveSummary> {
+    const actor = this.require('hr.leave.view');
+    const targetYear = year ?? new Date().getFullYear();
+    if (!Number.isInteger(targetYear) || targetYear < 2000 || targetYear > 2100) {
+      throw new Error('السنة غير صالحة.');
+    }
+    const scope = this.employeeDataScope(actor);
+    const rows = await this.db.queryAsync<{
+      id: string; employeeId: string; branchId: string; status: LeaveStatus; leaveType: LeaveType;
+      startDate: string; endDate: string; days: number;
+    }>(
+      `SELECT l.id, l.employee_id AS employeeId, l.branch_id AS branchId,
+              l.status, l.leave_type AS leaveType, l.start_date AS startDate,
+              l.end_date AS endDate, l.days
+       FROM employee_leave_requests l
+       JOIN employees e ON e.id = l.employee_id
+       WHERE ${scope.clause} AND l.start_date <= ? AND l.end_date >= ?`,
+      [...scope.params, yearEnd(targetYear), yearStart(targetYear)]
+    );
+    const summary: LeaveSummary = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      cancelled: 0,
+      approvedDays: 0,
+      daysByType: { ANNUAL: 0, SICK: 0, UNPAID: 0, OTHER: 0 },
+    };
+    for (const row of rows) {
+      if (row.status === 'PENDING') summary.pending += 1;
+      if (row.status === 'APPROVED') {
+        summary.approved += 1;
+        const start = row.startDate > yearStart(targetYear) ? row.startDate : yearStart(targetYear);
+        const end = row.endDate < yearEnd(targetYear) ? row.endDate : yearEnd(targetYear);
+        const days = await this.getChargeableDaysAsync(row.employeeId, row.branchId, start, end);
         summary.approvedDays += days;
         summary.daysByType[row.leaveType] += days;
       }

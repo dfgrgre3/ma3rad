@@ -181,6 +181,8 @@ export const ProductsView: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedCustomField, setSelectedCustomField] = useState('');
   const [selectedCustomFieldValue, setSelectedCustomFieldValue] = useState('');
+  const [selectedAttribute, setSelectedAttribute] = useState('');
+  const [selectedAttributeValue, setSelectedAttributeValue] = useState('');
   const [stockStatus, setStockStatus] = useState<'all' | 'in' | 'low' | 'out'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'newest' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc'>('name');
   const [productStatus, setProductStatus] = useState<'active' | 'inactive' | 'all'>('active');
@@ -314,6 +316,9 @@ export const ProductsView: React.FC = () => {
           customFieldFilters: selectedCustomField && selectedCustomFieldValue
             ? { [selectedCustomField]: selectedCustomFieldValue }
             : undefined,
+          attributeFilters: selectedAttribute && selectedAttributeValue
+            ? { [selectedAttribute]: selectedAttributeValue }
+            : undefined,
           stockStatus: stockStatus === 'all' ? undefined : stockStatus,
           sortBy,
           includeInactive: productStatus === 'all',
@@ -335,7 +340,7 @@ export const ProductsView: React.FC = () => {
     } finally {
       if (seq === productsLoadSeq.current) setIsLoading(false);
     }
-  }, [search, selectedCategory, selectedBrand, page, pageSize, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, operationalFieldService, productService]);
+  }, [search, selectedCategory, selectedBrand, page, pageSize, selectedGrade, selectedCustomField, selectedCustomFieldValue, selectedAttribute, selectedAttributeValue, stockStatus, sortBy, productStatus, operationalFieldService, productService]);
 
   useEffect(() => {
     loadLookups();
@@ -344,11 +349,11 @@ export const ProductsView: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
-  }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize, loadProducts]);
+  }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, selectedAttribute, selectedAttributeValue, stockStatus, sortBy, productStatus, page, pageSize, loadProducts]);
 
-  useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize]);
+  useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, selectedAttribute, selectedAttributeValue, stockStatus, sortBy, productStatus, page, pageSize]);
 
-  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus]);
+  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, selectedAttribute, selectedAttributeValue, stockStatus, sortBy, productStatus]);
 
   useEffect(() => { localStorage.setItem('products_view_mode', viewMode); }, [viewMode]);
 
@@ -1017,6 +1022,9 @@ export const ProductsView: React.FC = () => {
             customFieldFilters: selectedCustomField && selectedCustomFieldValue
               ? { [selectedCustomField]: selectedCustomFieldValue }
               : undefined,
+            attributeFilters: selectedAttribute && selectedAttributeValue
+              ? { [selectedAttribute]: selectedAttributeValue }
+              : undefined,
             stockStatus: stockStatus === 'all' ? undefined : stockStatus,
             sortBy,
             status: productStatus,
@@ -1403,6 +1411,41 @@ export const ProductsView: React.FC = () => {
                 )}
               </FormField>
             ))}
+            {attributes
+              .filter((attribute) => attribute.isFilterable && (
+                !attribute.appliesToCategoryId || !selectedCategory || attribute.appliesToCategoryId === selectedCategory
+              ))
+              .map((attribute) => (
+                <FormField key={attribute.id} label={attribute.name} visuallyHidden>
+                  {['SELECT', 'BOOLEAN'].includes(attribute.dataType) ? (
+                    <select
+                      value={selectedAttribute === attribute.id ? selectedAttributeValue : ''}
+                      onChange={(event) => {
+                        setSelectedAttribute(attribute.id);
+                        setSelectedAttributeValue(event.target.value);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                    >
+                      <option value="">كل القيم — {attribute.name}</option>
+                      {attribute.dataType === 'BOOLEAN'
+                        ? <><option value="true">نعم</option><option value="false">لا</option></>
+                        : attribute.values.map((option) => (
+                          <option key={option.id} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={selectedAttribute === attribute.id ? selectedAttributeValue : ''}
+                      onChange={(event) => {
+                        setSelectedAttribute(attribute.id);
+                        setSelectedAttributeValue(event.target.value);
+                      }}
+                      placeholder={`تصفية حسب ${attribute.name}`}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                    />
+                  )}
+                </FormField>
+              ))}
             <FormField label="حالة المخزون" visuallyHidden>
             <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="all">حالة المخزون: الكل</option>
@@ -1428,7 +1471,7 @@ export const ProductsView: React.FC = () => {
               <option value="all">كل الأصناف</option>
             </select>
             </FormField>
-            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setSelectedCustomField(''); setSelectedCustomFieldValue(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
+            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setSelectedCustomField(''); setSelectedCustomFieldValue(''); setSelectedAttribute(''); setSelectedAttributeValue(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
           </div>
         )}
       </FilterToolbar>

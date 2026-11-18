@@ -28,15 +28,20 @@ export interface ApprovalOperationDefinition {
 
 // Policies are available for the major operations in the application. `integrated`
 // marks the operations whose service currently pauses and applies the business effect.
+// The remaining entries stay settings-only on purpose: some have no concrete service
+// call site yet (finance.income.create, finance.transfer.create), some already have a
+// dedicated four-eyes workflow (inventory.count.post), some are ambiguous mappings
+// (inventory.return.create), and some need UI approval-id plumbing or operation-level
+// permissions before they can be enforced without breaking existing flows.
 export const APPROVAL_OPERATIONS: ApprovalOperationDefinition[] = [
   { code: 'inventory.adjustment.create', label: 'إضافة أو تسوية المخزون', category: 'المخزون والمستودعات', permission: 'inventory.adjust', integrated: true },
-  { code: 'inventory.transfer.create', label: 'نقل المخزون بين المستودعات', category: 'المخزون والمستودعات', permission: 'inventory.transfer', integrated: false },
+  { code: 'inventory.transfer.create', label: 'نقل المخزون بين المستودعات', category: 'المخزون والمستودعات', permission: 'inventory.transfer', integrated: true },
   { code: 'inventory.count.post', label: 'ترحيل الجرد', category: 'المخزون والمستودعات', permission: 'inventory.count', integrated: false },
   { code: 'inventory.return.create', label: 'إرجاع المنتجات للمخزون', category: 'المخزون والمستودعات', permission: 'inventory.adjust', integrated: false },
-  { code: 'products.create', label: 'إضافة منتج', category: 'المنتجات', permission: 'ui.products.catalog.create', integrated: false },
-  { code: 'products.update', label: 'تعديل بيانات المنتج', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: false },
+  { code: 'products.create', label: 'إضافة منتج', category: 'المنتجات', permission: 'ui.products.catalog.create', integrated: true },
+  { code: 'products.update', label: 'تعديل بيانات المنتج', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: true },
   { code: 'products.price.update', label: 'تعديل أسعار المنتج فوق الحد المسموح', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: true },
-  { code: 'products.delete', label: 'حذف منتج', category: 'المنتجات', permission: 'ui.products.catalog.delete', integrated: false },
+  { code: 'products.delete', label: 'حذف منتج', category: 'المنتجات', permission: 'ui.products.catalog.delete', integrated: true },
   { code: 'sales.invoice.create', label: 'إنشاء فاتورة وخصم استثنائي', category: 'المبيعات', permission: 'ui.sales.invoices.create', integrated: false },
   { code: 'sales.price.override', label: 'البيع تحت الحد الأدنى', category: 'المبيعات', permission: 'ui.sales.invoices.create', integrated: true },
   { code: 'sales.invoice.update', label: 'تعديل فاتورة', category: 'المبيعات', permission: 'ui.sales.invoices.update', integrated: false },
@@ -53,9 +58,9 @@ export const APPROVAL_OPERATIONS: ApprovalOperationDefinition[] = [
   { code: 'finance.income.create', label: 'إضافة إيراد أو صرف أموال', category: 'الحسابات والخزينة', permission: 'finance.approve', integrated: false },
   { code: 'finance.transfer.create', label: 'تحويل أموال أو تعديل أرصدة', category: 'الحسابات والخزينة', permission: 'finance.approve', integrated: false },
   { code: 'finance.journal.delete', label: 'حذف قيد مالي', category: 'الحسابات والخزينة', permission: 'finance.journal.post', integrated: false },
-  { code: 'users.create', label: 'إنشاء مستخدم', category: 'المستخدمون والإدارة', permission: 'ui.users.users.create', integrated: false },
-  { code: 'users.update', label: 'تعديل مستخدم أو دور', category: 'المستخدمون والإدارة', permission: 'ui.users.users.update', integrated: false },
-  { code: 'users.delete', label: 'حذف مستخدم', category: 'المستخدمون والإدارة', permission: 'ui.users.users.delete', integrated: false },
+  { code: 'users.create', label: 'إنشاء مستخدم', category: 'المستخدمون والإدارة', permission: 'ui.users.users.create', integrated: true },
+  { code: 'users.update', label: 'تعديل مستخدم أو دور', category: 'المستخدمون والإدارة', permission: 'ui.users.users.update', integrated: true },
+  { code: 'users.delete', label: 'حذف مستخدم', category: 'المستخدمون والإدارة', permission: 'ui.users.users.delete', integrated: true },
   { code: 'branches.manage', label: 'إدارة الفروع', category: 'المستخدمون والإدارة', permission: 'ui.branches.branches.manage', integrated: false },
 ];
 

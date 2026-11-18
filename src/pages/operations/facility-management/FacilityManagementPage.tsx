@@ -234,8 +234,32 @@ export const FacilityManagementPage: React.FC = () => {
           inventoryTransactionId: editForm.inventoryTransactionId || undefined,
         });
       }
-      // contracts and safety edit forms are not yet exposed via dedicated service methods;
-      // they can be extended in a later phase.
+      if (activeTab === 'contracts') {
+        service.updateContract({
+          id: editingId,
+          title: editForm.title || undefined,
+          vendorName: editForm.vendorName || undefined,
+          startsAt: editForm.startsAt || undefined,
+          endsAt: editForm.endsAt || undefined,
+          nextPaymentDate: editForm.nextPaymentDate || undefined,
+          paymentAmount: editForm.paymentAmount ? Number(editForm.paymentAmount) : undefined,
+          paymentCycle: editForm.paymentCycle as any,
+          expenseReference: editForm.expenseReference || undefined,
+          status: editForm.status as any,
+        });
+      }
+      if (activeTab === 'safety') {
+        service.updateSafetyRecord({
+          id: editingId,
+          title: editForm.title || undefined,
+          checklistName: editForm.checklistName || undefined,
+          result: editForm.result || undefined,
+          riskLevel: editForm.riskLevel || undefined,
+          observations: editForm.observations || undefined,
+          correctiveAction: editForm.correctiveAction || undefined,
+          dueDate: editForm.dueDate || undefined,
+        });
+      }
       setModalOpen(false);
       setEditingId(null);
       setEditForm({});
@@ -263,6 +287,18 @@ export const FacilityManagementPage: React.FC = () => {
     if (tab === 'assets') {
       const item = assets.find((i) => i.id === id);
       if (item) setEditForm({ name: item.name, code: item.code, category: item.category, serialNumber: item.serialNumber || '', responsibleUserId: item.responsibleUserId || '', warrantyExpiresAt: item.warrantyExpiresAt || '', notes: item.notes || '' });
+    }
+    if (tab === 'maintenance') {
+      const item = workOrders.find((i) => i.id === id);
+      if (item) setEditForm({ title: item.title, description: item.description || '', priority: item.priority, scheduledDate: item.scheduledDate || '', vendorName: item.vendorName || '', laborCost: String(item.laborCost || ''), partsCost: String(item.partsCost || ''), serviceCost: String(item.serviceCost || ''), expenseId: item.expenseId || '', inventoryTransactionId: item.inventoryTransactionId || '' });
+    }
+    if (tab === 'contracts') {
+      const item = contracts.find((i) => i.id === id);
+      if (item) setEditForm({ title: item.title, vendorName: item.vendorName, startsAt: item.startsAt || '', endsAt: item.endsAt || '', nextPaymentDate: item.nextPaymentDate || '', paymentAmount: String(item.paymentAmount / 100), paymentCycle: item.paymentCycle, expenseReference: item.expenseReference || '', status: item.status });
+    }
+    if (tab === 'safety') {
+      const item = safetyRecords.find((i) => i.id === id);
+      if (item) setEditForm({ title: item.title, checklistName: item.checklistName || '', result: item.result, riskLevel: item.riskLevel || '', observations: item.observations || '', correctiveAction: item.correctiveAction || '', dueDate: item.dueDate || '' });
     }
     if (tab === 'maintenance') {
       const item = workOrders.find((i) => i.id === id);

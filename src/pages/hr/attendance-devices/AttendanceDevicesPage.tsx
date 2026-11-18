@@ -10,8 +10,16 @@ import {
 } from '../../../services/domains/hr/AttendanceDeviceService';
 import { EmployeeService, Employee } from '../../../services/domains/hr/EmployeeService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'devices' | 'records' | 'import' | 'mobile';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  devices: ['hr.attendance.manage', 'employees.attendance.manage'],
+  records: ['employees.attendance.view', 'employees.attendance.manage', 'employees.attendance.approve', 'hr.attendance.manage'],
+  import: ['employees.attendance.manage', 'hr.attendance.manage'],
+  mobile: ['employees.attendance.view', 'employees.attendance.manage', 'employees.attendance.approve', 'hr.attendance.manage'],
+};
 
 const localDateTime = () => {
   const now = new Date();
@@ -77,6 +85,16 @@ const emptyDeviceForm = (): AttendanceDeviceInput & { port: number | null } => (
 
 export const AttendanceDevicesPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('devices');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['devices', 'records', 'import', 'mobile'] as Tab[]).some(canTab);
+  const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
+    { id: 'devices', label: 'الأجهزة', icon: <Cpu className="h-4 w-4" /> },
+    { id: 'records', label: 'سجلات البصمة', icon: <Fingerprint className="h-4 w-4" /> },
+    { id: 'import', label: 'استيراد السجلات', icon: <Upload className="h-4 w-4" /> },
+    { id: 'mobile', label: 'حضور الجوال', icon: <Smartphone className="h-4 w-4" /> },
+  ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -103,14 +121,14 @@ export const AttendanceDevicesPage: React.FC = () => {
 
   const branchAccess = useMemo(() => new BranchAccessService(), []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const list = AttendanceDeviceService.getAttendanceDevices();
       setDevices(list);
       setStats(AttendanceDeviceService.getDeviceStats());
-      setEmployees(EmployeeService.getAll({}));
+      setEmployees(await EmployeeService.getAllAsync({}));
       try {
         setBranches(branchAccess.getSelectableBranches().map((branch) => ({ id: branch.id, name: branch.name })));
       } catch { /* branch list is optional */ }
@@ -124,9 +142,10 @@ export const AttendanceDevicesPage: React.FC = () => {
     }
   }, [branchAccess]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const loadRecords = useCallback(() => {
+    if (!canTab('records')) return;
     setError(null);
     try {
       setRecords(AttendanceDeviceService.getDeviceRecords({
@@ -142,6 +161,7 @@ export const AttendanceDevicesPage: React.FC = () => {
   }, [recordFilter]);
 
   const loadMobile = useCallback(() => {
+    if (!canTab('mobile')) return;
     setError(null);
     try {
       setMobileSessions(AttendanceDeviceService.getMobileAttendanceSessions(mobileFilter || undefined));
@@ -150,8 +170,8 @@ export const AttendanceDevicesPage: React.FC = () => {
     }
   }, [mobileFilter]);
 
-  useEffect(() => { if (tab === 'records') loadRecords(); }, [tab, loadRecords]);
-  useEffect(() => { if (tab === 'mobile') loadMobile(); }, [tab, loadMobile]);
+  useEffect(() => { if (activeTab === 'records' && canTab('records')) loadRecords(); }, [activeTab, loadRecords, canTab]);
+  useEffect(() => { if (activeTab === 'mobile' && canTab('mobile')) loadMobile(); }, [activeTab, loadMobile, canTab]);
 
   const run = (action: () => void, success?: string) => {
     setError(null);
@@ -298,13 +318,6 @@ export const AttendanceDevicesPage: React.FC = () => {
     }
   };
 
-  const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-    { id: 'devices', label: 'الأجهزة', icon: <Cpu className="h-4 w-4" /> },
-    { id: 'records', label: 'سجلات البصمة', icon: <Fingerprint className="h-4 w-4" /> },
-    { id: 'import', label: 'استيراد السجلات', icon: <Upload className="h-4 w-4" /> },
-    { id: 'mobile', label: 'حضور الجوال', icon: <Smartphone className="h-4 w-4" /> },
-  ];
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
@@ -329,16 +342,16 @@ export const AttendanceDevicesPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${tab === item.id ? 'bg-cyan-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-cyan-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
-          <button onClick={() => { load(); if (tab === 'records') loadRecords(); if (tab === 'mobile') loadMobile(); }} className="mr-auto flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700">
+          <button onClick={() => { load(); if (activeTab === 'records' && canTab('records')) loadRecords(); if (activeTab === 'mobile' && canTab('mobile')) loadMobile(); }} className="mr-auto flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         </div>
@@ -347,7 +360,7 @@ export const AttendanceDevicesPage: React.FC = () => {
           <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-cyan-500" /></div>
         ) : (
           <>
-            {tab === 'devices' && (
+            {activeTab === 'devices' && canTab('devices') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_380px]">
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <div className="border-b border-slate-100 px-4 py-3">
@@ -450,7 +463,7 @@ export const AttendanceDevicesPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'records' && (
+            {activeTab === 'records' && canTab('records') && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
                   <label className="text-[10px] font-bold text-slate-500">الجهاز
@@ -519,7 +532,7 @@ export const AttendanceDevicesPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'import' && (
+            {activeTab === 'import' && canTab('import') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
                   <h2 className="flex items-center gap-1.5 text-sm font-black"><Upload className="h-4 w-4 text-cyan-600" /> استيراد سجلات البصمة</h2>
@@ -561,7 +574,7 @@ export const AttendanceDevicesPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'mobile' && (
+            {activeTab === 'mobile' && canTab('mobile') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">

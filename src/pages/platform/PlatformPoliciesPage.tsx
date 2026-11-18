@@ -10,6 +10,9 @@ import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { inputClass, formatDateTime } from './components/PlatformUI';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 
 export const PlatformPoliciesPage: React.FC = () => {
   const [tab, setTab] = useState<'TERMS' | 'PRIVACY' | 'RETENTION'>('TERMS');
@@ -43,26 +46,35 @@ export const PlatformPoliciesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = platformAdminService.getPlatformPolicies();
-      if (saved.terms) setTerms(saved.terms);
-      if (saved.privacy) setPrivacy(saved.privacy);
-      setRetention(saved.retention);
-      setLastSaved(saved.updatedAt);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل سياسات المنصة.');
-    }
+    const loadPolicies = async () => {
+      const centralState = getCentralDataSourceState();
+      try {
+        const saved = centralState.active
+          ? await centralPlatformClient.getPlatformPolicies()
+          : platformAdminService.getPlatformPolicies();
+        if (saved.terms) setTerms(saved.terms);
+        if (saved.privacy) setPrivacy(saved.privacy);
+        setRetention(saved.retention);
+        setLastSaved(saved.updatedAt);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'تعذر تحميل سياسات المنصة.');
+      }
+    };
+    loadPolicies();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canManagePolicies) {
       alert('لا تملك صلاحية تعديل سياسات المنصة.');
       return;
     }
     setSaving(true);
+    const centralState = getCentralDataSourceState();
     try {
-      const saved = platformAdminService.savePlatformPolicies({ terms, privacy, retention });
+      const saved = centralState.active
+        ? await centralPlatformClient.savePlatformPolicies({ terms, privacy, retention })
+        : platformAdminService.savePlatformPolicies({ terms, privacy, retention });
       setTerms(saved.terms);
       setPrivacy(saved.privacy);
       setRetention(saved.retention);

@@ -31,6 +31,7 @@ export const PayslipsPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
+    void (async () => {
     try {
       if (!canViewPayroll) {
         setPeriods([]);
@@ -39,7 +40,7 @@ export const PayslipsPage: React.FC = () => {
         setError(null);
         return;
       }
-      const allRuns = EmployeeService.getAllPayrollRuns();
+      const allRuns = await EmployeeService.getAllPayrollRunsAsync();
       setPeriods(allRuns.map((r) => r.period));
       const current = localDateString().slice(0, 7);
       const defaultPeriod = allRuns.find((r) => r.period === current) ?? allRuns[0] ?? null;
@@ -56,14 +57,16 @@ export const PayslipsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+    })();
   }, [canViewPayroll]);
 
   useEffect(() => { load(); }, [load]);
 
   const loadPeriod = useCallback((period: string) => {
     setLoading(true);
+    void (async () => {
     try {
-      const loadedRun = EmployeeService.getPayrollRun(period);
+      const loadedRun = await EmployeeService.getPayrollRunAsync(period);
       setRun(loadedRun);
       setSelectedPeriod(period);
       setError(null);
@@ -73,6 +76,7 @@ export const PayslipsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+    })();
   }, []);
 
   const printPayslip = (item: PayrollRunItem) => {

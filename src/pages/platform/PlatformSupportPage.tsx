@@ -184,13 +184,27 @@ export const PlatformSupportPage: React.FC = () => {
   const loadTicketDetails = useCallback((id: string) => {
     setDetailsLoading(true);
     if (centralActive) {
-      centralPlatformClient.getSupportTicket(id)
-        .then((data: any) => {
+      Promise.all([
+        centralPlatformClient.getSupportTicket(id),
+        centralPlatformClient.listRemoteSessions(id).catch(() => []),
+      ])
+        .then(([data, sessions]: [any, any[]]) => {
           const ticket = mapCentralTicket({ ...(data.ticket ?? data), messages: data.messages });
           setDetails({
             ticket,
             messages: (Array.isArray(data.messages) ? data.messages : []).map(mapCentralMessage),
-            remoteSessions: [],
+            remoteSessions: sessions.map((s: any) => ({
+              id: s.id,
+              ticketId: s.ticket_id,
+              tenantId: s.tenant_id || '',
+              staffId: s.staff_id || '',
+              technicianName: s.technician_name,
+              status: s.status === 'ENDED' ? 'COMPLETED' : s.status === 'EXPIRED' ? 'TERMINATED' : 'ACTIVE',
+              startedAt: s.started_at,
+              endedAt: s.ended_at,
+              durationMinutes: s.duration_minutes || 60,
+              actionsSummary: s.summary,
+            })),
             tenant: data.tenantName ? {
               id: data.tenantId ?? ticket.tenantId,
               code: data.tenantCode ?? '',
@@ -338,12 +352,15 @@ export const PlatformSupportPage: React.FC = () => {
     alert(`${feature} غير متاح في الوضع المركزي بعد — متاح على المصدر المحلي فقط.`);
   };
 
-  const handleToggleRemoteRequest = (requested: boolean) => {
+  const handleToggleRemoteRequest = async (requested: boolean) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
-    if (centralActive) { centralOnlyLocal('الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
-      platformAdminService.requestRemoteAccess(selectedTicketId, requested, 60);
+      if (centralActive) {
+        await centralPlatformClient.requestRemoteAccess(selectedTicketId, requested, 60);
+      } else {
+        platformAdminService.requestRemoteAccess(selectedTicketId, requested, 60);
+      }
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
@@ -351,12 +368,15 @@ export const PlatformSupportPage: React.FC = () => {
     }
   };
 
-  const handleApproveRemoteAccess = (approved: boolean) => {
+  const handleApproveRemoteAccess = async (approved: boolean) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
-    if (centralActive) { centralOnlyLocal('الموافقة على الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
-      platformAdminService.approveRemoteAccess(selectedTicketId, approved);
+      if (centralActive) {
+        await centralPlatformClient.approveRemoteAccess(selectedTicketId, approved);
+      } else {
+        platformAdminService.approveRemoteAccess(selectedTicketId, approved);
+      }
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
@@ -365,16 +385,19 @@ export const PlatformSupportPage: React.FC = () => {
   };
 
   // Start Remote Session
-  const handleStartRemoteSession = () => {
+  const handleStartRemoteSession = async () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
-    if (centralActive) { centralOnlyLocal('جلسات الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
-      platformAdminService.startRemoteSession({
-        ticketId: selectedTicketId,
-        technicianName,
-        durationMinutes: sessionDuration,
-      });
+      if (centralActive) {
+        await centralPlatformClient.startRemoteSession(selectedTicketId, technicianName, sessionDuration);
+      } else {
+        platformAdminService.startRemoteSession({
+          ticketId: selectedTicketId,
+          technicianName,
+          durationMinutes: sessionDuration,
+        });
+      }
       setIsRemoteSessionOpen(false);
       loadTicketDetails(selectedTicketId);
       loadTickets();
@@ -384,12 +407,15 @@ export const PlatformSupportPage: React.FC = () => {
   };
 
   // End Remote Session
-  const handleEndRemoteSession = (sessionId: string) => {
+  const handleEndRemoteSession = async (sessionId: string) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
-    if (centralActive) { centralOnlyLocal('جلسات الوصول عن بُعد'); return; }
     const summary = prompt('أدخل ملخص إنهاء جلسة الوصول عن بُعد:');
     try {
-      platformAdminService.endRemoteSession(sessionId, summary || undefined);
+      if (centralActive) {
+        await centralPlatformClient.endRemoteSession(sessionId, summary || undefined);
+      } else {
+        platformAdminService.endRemoteSession(sessionId, summary || undefined);
+      }
       if (selectedTicketId) loadTicketDetails(selectedTicketId);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر إنهاء جلسة الوصول.');

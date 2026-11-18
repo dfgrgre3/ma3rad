@@ -461,7 +461,7 @@ export class ReportCenterService {
       LEFT JOIN customers c ON c.id = si.customer_id
       LEFT JOIN warehouses w ON w.id = si.warehouse_id
       LEFT JOIN orders o ON o.invoice_id = si.id
-      LEFT JOIN employees e ON e.id = o.sales_rep_id
+      LEFT JOIN employees e ON e.id = COALESCE(si.sales_rep_id, o.sales_rep_id)
       LEFT JOIN users u ON u.id = si.created_by
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
 
@@ -2264,6 +2264,11 @@ export class ReportCenterService {
       const rows = await this.db.queryAsync<any>(`
         SELECT
           COALESCE(e.full_name, u.full_name, 'غير محدد') AS repName,
+          (SELECT GROUP_CONCAT(bx.name, '، ') FROM (
+             SELECT e.branch_id AS bid
+             UNION
+             SELECT a.branch_id FROM employee_branch_assignments a WHERE a.employee_id = e.id
+           ) cov JOIN branches bx ON bx.id = cov.bid) AS repBranches,
           COUNT(si.id) AS invoiceCount,
           COALESCE(SUM(si.total_amount), 0) / 100.0 AS totalSales,
           COALESCE(SUM(si.paid_amount), 0) / 100.0 AS totalCollected,
@@ -2271,7 +2276,7 @@ export class ReportCenterService {
           COALESCE(SUM(si.gross_profit), 0) / 100.0 AS estimatedProfit
         FROM sales_invoices si
         LEFT JOIN orders o ON o.invoice_id = si.id
-        LEFT JOIN employees e ON e.id = o.sales_rep_id
+        LEFT JOIN employees e ON e.id = COALESCE(si.sales_rep_id, o.sales_rep_id)
         LEFT JOIN users u ON u.id = si.created_by
         WHERE si.date BETWEEN ? AND ?
           AND si.invoice_status != 'VOID'
@@ -2293,6 +2298,7 @@ export class ReportCenterService {
 
         return {
           repName: r.repName,
+          repBranches: r.repBranches || '—',
           invoiceCount: num(r.invoiceCount),
           totalSales: round2(sales),
           totalCollected: round2(col),
@@ -2313,6 +2319,7 @@ export class ReportCenterService {
         ],
         columns: [
           { key: 'repName', label: 'مندوب المبيعات' },
+          { key: 'repBranches', label: 'الفروع' },
           { key: 'invoiceCount', label: 'عدد الفواتير', type: 'number' },
           { key: 'totalSales', label: 'إجمالي المبيعات', type: 'currency' },
           { key: 'totalCollected', label: 'المحصل', type: 'currency' },
@@ -3159,12 +3166,16 @@ export class ReportCenterService {
   public async salesTargetKpis({ from, to }: ReportParams): Promise<ReportResult> {
     const daysInRange = Math.max(1, Math.round((new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86400000) + 1);
     const rows = await this.db.queryAsync<any>(`
-      SELECT COALESCE(e.name, e.full_name, '—') AS repName, e.monthly_target AS monthlyTarget,
+      SELECT COALESCE(e.name, e.full_name, '—') AS repName, e.monthly_target / 100.0 AS monthlyTarget,
         e.commission_percentage AS commissionPct,
+        (SELECT b2.name FROM branches b2 WHERE b2.id = e.branch_id) AS homeBranchName,
+        (SELECT GROUP_CONCAT(b3.name, '، ') FROM employee_branch_assignments a3
+           JOIN branches b3 ON b3.id = a3.branch_id WHERE a3.employee_id = e.id) AS extraBranchNames,
         COALESCE(SUM(CASE WHEN si.date BETWEEN ? AND ? THEN si.total_amount ELSE 0 END), 0) / 100.0 AS totalSales
       FROM employees e
-      LEFT JOIN orders o ON o.sales_rep_id = e.id
-      LEFT JOIN sales_invoices si ON si.id = o.invoice_id AND si.invoice_status != 'VOID'
+      LEFT JOIN sales_invoices si ON si.invoice_status != 'VOID'
+        AND COALESCE(si.sales_rep_id,
+             (SELECT o.sales_rep_id FROM orders o WHERE o.id = si.order_id)) = e.id
       WHERE e.is_sales_rep = 1 AND e.is_active = 1
       GROUP BY e.id
       ORDER BY totalSales DESC
@@ -3174,8 +3185,11 @@ export class ReportCenterService {
       const proratedTarget = round2(monthlyTarget * daysInRange / 30);
       const sales = round2(num(row.totalSales));
       const achievement = proratedTarget > 0 ? round2((sales / proratedTarget) * 100) : null;
+      const branchNames = [row.homeBranchName, ...(row.extraBranchNames ? String(row.extraBranchNames).split('، ') : [])]
+        .filter(Boolean).join('، ');
       return {
         repName: row.repName,
+        branches: branchNames || '—',
         monthlyTarget: round2(monthlyTarget),
         proratedTarget,
         totalSales: sales,
@@ -3197,6 +3211,7 @@ export class ReportCenterService {
       ],
       columns: [
         { key: 'repName', label: 'المندوب' },
+        { key: 'branches', label: 'الفروع' },
         { key: 'monthlyTarget', label: 'المستهدف الشهري', type: 'currency' },
         { key: 'proratedTarget', label: 'المستهدف للفترة', type: 'currency' },
         { key: 'totalSales', label: 'المحقق', type: 'currency' },

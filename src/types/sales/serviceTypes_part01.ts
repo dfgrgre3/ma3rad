@@ -6,6 +6,8 @@ export interface CreateSaleDTO {
   shiftId?: string;
   orderId?: string;
   quotationId?: string;
+  /** Employee recorded as the sales representative for commissions/reporting. */
+  salesRepId?: string;
   restaurantOrderId?: string;
   projectId?: string;
   items: {

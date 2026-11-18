@@ -209,14 +209,15 @@ test('auth guard: remaining attempts are reported before lockout and the lock li
   }
 });
 
-test('auth guard: disabled lockout returns a neutral state', async () => {
+test('auth guard: a disabled lockout setting falls back to the conservative default', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
   try {
     const status = AuthService.getLoginGuardStatus('admin');
-    assert.equal(status.maxAttempts, 0);
-    assert.equal(status.remainingAttempts, null);
+    // A zero or invalid setting must never switch lockout off.
+    assert.equal(status.maxAttempts, 5);
+    assert.equal(status.remainingAttempts, 5);
     assert.equal(status.isLocked, false);
     assert.equal(status.lockedUntil, null);
   } finally {
@@ -229,6 +230,10 @@ test('security center: login history can be read with request metadata fields', 
   await db.initialize();
 
   const user = AuthService.login('admin', 'admin123');
+  // The built-in admin keeps mustChangePassword while using the default
+  // password. This test only exercises login-history metadata, so simulate a
+  // completed setup session before calling a service that requires full setup.
+  AuthService.setCurrentUser({ ...user, mustChangePassword: false });
   try {
     const history = SecurityService.getInstance().getLoginHistory({ limit: 10 });
     assert.ok(history.some((record) => record.username === user.username && record.succeeded));

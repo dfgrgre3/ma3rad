@@ -2,11 +2,24 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { GraduationCap, Users, BookOpen, Award, Target, AlertTriangle } from 'lucide-react';
 import { TrainingService, TrainingTrainer, TrainingCourse, TrainingEnrollment, Skill, JobSkill, TrainingGap } from '../../../services/domains/hr/TrainingService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'trainers' | 'courses' | 'enrollments' | 'skills' | 'gaps' | 'certificates' | 'expenses';
 
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  trainers: ['hr.training.manage'],
+  courses: ['hr.training.manage'],
+  enrollments: ['hr.training.manage'],
+  skills: ['hr.training.manage'],
+  gaps: ['hr.training.manage'],
+  certificates: ['hr.training.manage'],
+  expenses: ['hr.training.manage'],
+};
+
 export const TrainingPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('courses');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['trainers', 'courses', 'enrollments', 'skills', 'gaps', 'certificates', 'expenses'] as Tab[]).some(canTab);
   const [trainers, setTrainers] = useState<TrainingTrainer[]>([]);
   const [courses, setCourses] = useState<TrainingCourse[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -41,7 +54,7 @@ export const TrainingPage: React.FC = () => {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const createTrainer = () => { try { TrainingService.createTrainer(trainerForm); setTrainerForm({ name: '', specialty: '', contact: '' }); load(); } catch (e: any) { setError(e?.message); } };
   const createCourse = () => { try { TrainingService.createCourse({ name: courseForm.name, description: courseForm.description, trainerId: courseForm.trainerId || null, startDate: courseForm.startDate || null, endDate: courseForm.endDate || null, cost: Number(courseForm.cost) || 0, status: courseForm.status }); setCourseForm({ name: '', description: '', trainerId: '', startDate: '', endDate: '', cost: '0', status: 'PLANNED' }); load(); } catch (e: any) { setError(e?.message); } };
@@ -70,6 +83,8 @@ export const TrainingPage: React.FC = () => {
     { id: 'certificates', label: 'الشهادات', icon: <Award className="h-4 w-4" /> },
     { id: 'expenses', label: 'المصروفات', icon: <Award className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -85,15 +100,15 @@ export const TrainingPage: React.FC = () => {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === t.id ? 'bg-amber-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-amber-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
         {loading ? <div className="py-16 flex justify-center"><GraduationCap className="w-6 h-6 animate-spin text-amber-500" /></div> : (
           <>
-            {tab === 'trainers' && (
+            {activeTab === 'trainers' && canTab('trainers') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المدربون</h3>
@@ -108,7 +123,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'courses' && (
+            {activeTab === 'courses' && canTab('courses') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الدورات</h3>
@@ -137,7 +152,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'enrollments' && (
+            {activeTab === 'enrollments' && canTab('enrollments') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">تسجيل موظف</h3>
@@ -161,7 +176,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'skills' && (
+            {activeTab === 'skills' && canTab('skills') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المهارات</h3>
@@ -189,7 +204,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'gaps' && (
+            {activeTab === 'gaps' && canTab('gaps') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">فجوات التدريب</h3>
@@ -207,7 +222,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'certificates' && (
+            {activeTab === 'certificates' && canTab('certificates') && (
               <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                 <h3 className="text-sm font-black">الشهادات منتهية (30 يوم)</h3>
                 {expiring.map((e) => (
@@ -219,7 +234,7 @@ export const TrainingPage: React.FC = () => {
                 {!expiring.length && <div className="text-xs text-slate-400">لا توجد شهادات منتهية.</div>}
               </div>
             )}
-            {tab === 'expenses' && (
+            {activeTab === 'expenses' && canTab('expenses') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المصروفات</h3>

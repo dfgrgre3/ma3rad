@@ -145,6 +145,7 @@ export const APP_ROUTE_PATHS = [
   "data-import",
   "settings",
   "settings/approvals",
+  "settings/license-mode",
   "settings/app-configuration",
   "settings/configuration-studio",
   "users",

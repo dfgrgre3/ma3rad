@@ -23,6 +23,9 @@ import {
   Filter,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
@@ -70,17 +73,20 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   const [diffVersionB, setDiffVersionB] = useState<number>(1);
 
   // Bootstrap data
-  const loadBootstrap = useCallback(() => {
+  const loadBootstrap = useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     try {
-      const tList = platformAdminService.listTenants();
+      const [tList, tmplList, rList] = await Promise.all([
+        centralState.active ? centralPlatformClient.listTenants() : platformAdminService.listTenants(),
+        centralState.active ? centralPlatformClient.listConfigTemplates() : platformAdminService.listConfigTemplates(),
+        centralState.active ? centralPlatformClient.listConfigRollouts() : platformAdminService.listConfigRollouts(),
+      ]);
       setTenants(tList);
       if (tList.length > 0 && !selectedTenantId) {
         setSelectedTenantId(tList[0].id);
       }
-      const tmplList = platformAdminService.listConfigTemplates();
       setTemplates(tmplList);
       setRolloutTemplateId((prev) => (tmplList.some((t) => t.id === prev) ? prev : tmplList[0]?.id ?? ''));
-      const rList = platformAdminService.listConfigRollouts();
       setRollouts(rList);
     } catch (e) {
       console.error('Failed to load bootstrap config:', e);
@@ -88,16 +94,29 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   }, [selectedTenantId]);
 
   // Load tenant configuration
-  const loadTenantConfig = useCallback((tenantId: string) => {
+  const loadTenantConfig = useCallback(async (tenantId: string) => {
     if (!tenantId) return;
     setLoading(true);
     setJsonError(null);
+    const centralState = getCentralDataSourceState();
     try {
-      const cfg = platformAdminService.getTenantConfig(tenantId);
-      setCurrentConfig(cfg);
-      setJsonText(JSON.stringify(cfg.configPayload, null, 2));
+      let cfg: any;
+      let vList: any[] = [];
+      let ackList: any[] = [];
 
-      const vList = platformAdminService.listTenantConfigVersions(tenantId);
+      if (centralState.active) {
+        cfg = await centralPlatformClient.getTenantConfig(tenantId);
+        vList = await centralPlatformClient.listTenantConfigVersions(tenantId);
+        // Acks are per-rollout, not per-tenant in central model
+        ackList = [];
+      } else {
+        cfg = platformAdminService.getTenantConfig(tenantId);
+        vList = platformAdminService.listTenantConfigVersions(tenantId);
+        ackList = platformAdminService.listConfigAcks(tenantId);
+      }
+
+      setCurrentConfig(cfg);
+      setJsonText(JSON.stringify(cfg.configPayload || cfg.values || {}, null, 2));
       setVersions(vList);
       if (vList.length >= 2) {
         setDiffVersionA(vList[0].version);
@@ -106,8 +125,6 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         setDiffVersionA(vList[0].version);
         setDiffVersionB(vList[0].version);
       }
-
-      const ackList = platformAdminService.listConfigAcks(tenantId);
       setAcks(ackList);
     } catch (e) {
       console.error('Failed to load tenant config:', e);
@@ -127,12 +144,13 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   }, [selectedTenantId, loadTenantConfig]);
 
   // Handle Save & Sign
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
     setJsonError(null);
+    const centralState = getCentralDataSourceState();
     try {
       let parsedPayload: Record<string, unknown>;
       try {
@@ -143,11 +161,18 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         return;
       }
 
-      const updated = platformAdminService.saveTenantConfig({
-        tenantId: selectedTenantId,
-        values: parsedPayload,
-        changeSummary: 'تعديل وتوقيع يدوي عبر محرر التكوين المركزي',
-      });
+      let updated: any;
+      if (centralState.active) {
+        updated = await centralPlatformClient.saveTenantConfig(selectedTenantId, {
+          configPayload: parsedPayload,
+        });
+      } else {
+        updated = platformAdminService.saveTenantConfig({
+          tenantId: selectedTenantId,
+          values: parsedPayload,
+          changeSummary: 'تعديل وتوقيع يدوي عبر محرر التكوين المركزي',
+        });
+      }
 
       setCurrentConfig(updated);
       setSavedSuccess(true);
@@ -169,11 +194,16 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   };
 
   // Handle Rollback
-  const handleRollback = (ver: number) => {
+  const handleRollback = async (ver: number) => {
     if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع التكوين للإصدار #${ver} وتطبيقه فورياً؟`)) return;
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.rollbackTenantConfig(selectedTenantId, ver);
+      if (centralState.active) {
+        await centralPlatformClient.rollbackTenantConfig(selectedTenantId, ver);
+      } else {
+        platformAdminService.rollbackTenantConfig(selectedTenantId, ver);
+      }
       loadTenantConfig(selectedTenantId);
       alert(`تم استرجاع الإصدار #${ver} وتوقيعه بنجاح.`);
     } catch (err) {
@@ -182,18 +212,28 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   };
 
   // Handle Create Rollout
-  const handleCreateRollout = (e: React.FormEvent) => {
+  const handleCreateRollout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!rolloutTitle || !rolloutTemplateId) return;
+    const centralState = getCentralDataSourceState();
     try {
-      const created = platformAdminService.createConfigRollout({
-        templateId: rolloutTemplateId,
-        name: rolloutTitle,
-        targetType: rolloutTargetType,
-        rolloutPercentage: rolloutTargetType === 'CANARY_PERCENT' ? rolloutCanaryPercent : undefined,
-      });
-      platformAdminService.startConfigRollout(created.id);
+      let created: any;
+      if (centralState.active) {
+        created = await centralPlatformClient.createConfigRollout({
+          templateId: rolloutTemplateId,
+          targetTenants: rolloutTargetType === 'SPECIFIC_TENANTS' ? [selectedTenantId] : [],
+        });
+        await centralPlatformClient.startConfigRollout(created.id);
+      } else {
+        created = platformAdminService.createConfigRollout({
+          templateId: rolloutTemplateId,
+          name: rolloutTitle,
+          targetType: rolloutTargetType,
+          rolloutPercentage: rolloutTargetType === 'CANARY_PERCENT' ? rolloutCanaryPercent : undefined,
+        });
+        platformAdminService.startConfigRollout(created.id);
+      }
 
       setRolloutSuccess(true);
       setTimeout(() => setRolloutSuccess(false), 4000);

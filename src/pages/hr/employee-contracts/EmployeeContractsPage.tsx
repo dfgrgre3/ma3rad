@@ -87,7 +87,7 @@ export const EmployeeContractsPage: React.FC = () => {
   const [lifecycleHistory, setLifecycleHistory] = useState<EmployeeLifecycleHistory | null>(null);
   const [historyEmployeeName, setHistoryEmployeeName] = useState('');
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setRows(service.getContracts({ status, employeeId: employeeFilter || undefined }));
@@ -95,7 +95,7 @@ export const EmployeeContractsPage: React.FC = () => {
       const data = service.getSummary();
       setSummary({ active: data.active, expiring: data.expiring, expired: data.expired, draft: data.draft });
       if (canManage && can('employees.view')) {
-        setEmployees(EmployeeService.getAll()
+        setEmployees((await EmployeeService.getAllAsync())
           .filter((employee) => !['RESIGNED', 'TERMINATED'].includes(employee.status))
           .map((employee) => ({ id: employee.id, name: employee.name })));
       }

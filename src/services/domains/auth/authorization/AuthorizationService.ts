@@ -81,59 +81,118 @@ interface AmountLimitRow {
   scope_id: string;
 }
 
+type ScopeMode = 'ALL' | 'LIMITED' | 'DENIED' | 'UNRESOLVED';
+
+interface ScopeResolution {
+  branchMode: ScopeMode;
+  /** grants فارغة = بدون قائمة بيضاء مخازن (تُقيَّم عبر الفرع). */
+  warehouseMode: 'RESOLVED' | 'UNRESOLVED';
+  branches: Set<string>;
+  warehouses: Set<string>;
+}
+
 export class AuthorizationService {
   /** أبعاد Scope المخبأة لكل مستخدم — تُبطل مع PermissionChecker.invalidate. */
-  private static scopeCache = new Map<string, { branches: Set<string>; warehouses: Set<string> }>();
+  private static scopeCache = new Map<string, ScopeResolution>();
 
   public static invalidate(userId?: string): void {
     if (userId) AuthorizationService.scopeCache.delete(userId);
     else AuthorizationService.scopeCache.clear();
   }
 
-  private static scopeSets(user: User): { branches: Set<string>; warehouses: Set<string> } {
+  /**
+   * يحسم نطاق الفروع/المخازن بشكل صريح — لا يوجد «فارغ = مسموح» ناتج عن
+   * فشل استعلام. الدلالة مطابقة لـ BranchAccessService:
+   *   ADMIN/SUPER_ADMIN             → ALL
+   *   users.branch_scope='ALL'      → ALL بشرط صلاحية branches.access_all
+   *   users.branch_scope='ASSIGNED' → LIMITED على users_branches
+   *   غياب الصف/فشل الاستعلام       → UNRESOLVED (رفض في checkScope)
+   * user_warehouse_grants: قائمة بيضاء عند عدم فراغها؛ الفراغ يعني
+   * التقييم عبر فرع المخزن (وليس سماحًا مطلقًا).
+   */
+  private static scopeResolution(user: User): ScopeResolution {
     const cached = AuthorizationService.scopeCache.get(user.id);
     if (cached) return cached;
 
     const db = DatabaseManager.getInstance();
-    let branches = new Set<string>();
-    let warehouses = new Set<string>();
-    try {
-      branches = new Set(
-        db
-          .query<{ branch_id: string }>('SELECT branch_id FROM users_branches WHERE user_id = ?', [user.id])
-          .map((row) => row.branch_id)
-      );
-    } catch {
-      // الجدول قد لا يوجد في قواعد قديمة — اعتبر النطاق غير مقيّد.
+    const resolution: ScopeResolution = {
+      branchMode: 'UNRESOLVED',
+      warehouseMode: 'UNRESOLVED',
+      branches: new Set<string>(),
+      warehouses: new Set<string>(),
+    };
+
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      resolution.branchMode = 'ALL';
+    } else {
+      let branchScope: string | null = null;
+      let scopeRowFound = false;
+      try {
+        const row = db.query<{ branchScope: string }>(
+          'SELECT branch_scope AS branchScope FROM users WHERE id = ? AND is_active = 1',
+          [user.id]
+        )[0];
+        scopeRowFound = Boolean(row);
+        branchScope = row?.branchScope ?? null;
+      } catch {
+        // عمود/جدول غير متاح — يبقى UNRESOLVED.
+      }
+      if (branchScope === 'ALL') {
+        resolution.branchMode = PermissionChecker.hasRoleGrant(user, 'branches.access_all')
+          ? 'ALL'
+          : 'DENIED';
+      } else if (scopeRowFound && branchScope === 'ASSIGNED') {
+        try {
+          resolution.branches = new Set(
+            db
+              .query<{ branch_id: string }>('SELECT branch_id FROM users_branches WHERE user_id = ?', [user.id])
+              .map((row) => row.branch_id)
+          );
+          resolution.branchMode = 'LIMITED';
+        } catch {
+          resolution.branchMode = 'UNRESOLVED';
+        }
+      }
+      // غياب الصف أو قيمة branch_scope غير معروفة → UNRESOLVED (رفض).
     }
+
     try {
-      warehouses = new Set(
+      resolution.warehouses = new Set(
         db
           .query<{ warehouse_id: string }>('SELECT warehouse_id FROM user_warehouse_grants WHERE user_id = ?', [
             user.id,
           ])
           .map((row) => row.warehouse_id)
       );
+      resolution.warehouseMode = 'RESOLVED';
     } catch {
-      // نفس المنطق — غياب الجدول = لا تقييد.
+      resolution.warehouseMode = 'UNRESOLVED';
     }
-    const sets = { branches, warehouses };
-    AuthorizationService.scopeCache.set(user.id, sets);
-    return sets;
+
+    AuthorizationService.scopeCache.set(user.id, resolution);
+    return resolution;
   }
 
   /**
-   *_scope غير المقيّد = مجموعة فارغة (كل الفروع/المخازن). مجموعة غير فارغة
-   * تعني قائمة بيضاء صريحة. المخزن يُقبل أيضاً إذا كان فرعه ضمن فروع المستخدم
-   * المسموحة (عبر branch_warehouses).
+   * *_scope: ALL = وصول مركزي صريح؛ LIMITED = قائمة بيضاء من users_branches
+   * (فارغة = لا فروع)؛ DENIED = branch_scope=ALL بلا صلاحية؛ UNRESOLVED =
+   * تعذر حسم النطاق → رفض. المخزن يُقبل إذا كان ضمن منح user_warehouse_grants
+   * أو إذا كان فرعه ضمن الفروع المسموحة (عبر warehouses.branch_id ثم
+   * branch_warehouses).
    */
   private static checkScope(user: User, ctx: AuthContext): Decision | null {
     if (!ctx.branchId && !ctx.warehouseId && !(ctx.warehouseIds && ctx.warehouseIds.length)) return null;
-    const { branches, warehouses } = AuthorizationService.scopeSets(user);
+    const scope = AuthorizationService.scopeResolution(user);
+    if (scope.branchMode === 'UNRESOLVED' || scope.warehouseMode === 'UNRESOLVED') {
+      return deny('تعذر تحديد نطاق الفروع والمخازن للمستخدم', 'scope', 'scope');
+    }
+    if (scope.branchMode === 'DENIED') {
+      return deny('لا تملك صلاحية الوصول المركزي إلى جميع الفروع', 'scope.branch', 'scope');
+    }
     const db = DatabaseManager.getInstance();
 
-    if (ctx.branchId && branches.size > 0 && !branches.has(ctx.branchId)) {
-      return deny('الفرع المطلوب خارج نطاق صلاحياتك', ctx.branchId ? 'scope.branch' : '', 'scope');
+    if (ctx.branchId && scope.branchMode === 'LIMITED' && !scope.branches.has(ctx.branchId)) {
+      return deny('الفرع المطلوب خارج نطاق صلاحياتك', 'scope.branch', 'scope');
     }
 
     const warehouseIds = [ctx.warehouseId, ...(ctx.warehouseIds ?? [])].filter(
@@ -141,7 +200,7 @@ export class AuthorizationService {
     );
     if (warehouseIds.length > 0) {
       for (const warehouseId of warehouseIds) {
-        const denied = AuthorizationService.checkWarehouseScope(db, branches, warehouses, warehouseId);
+        const denied = AuthorizationService.checkWarehouseScope(db, scope, warehouseId);
         if (denied) return denied;
       }
     }
@@ -150,29 +209,39 @@ export class AuthorizationService {
 
   private static checkWarehouseScope(
     db: DatabaseManager,
-    branches: Set<string>,
-    warehouses: Set<string>,
+    scope: ScopeResolution,
     warehouseId: string
   ): Decision | null {
-    if (warehouses.size > 0) {
-      if (!warehouses.has(warehouseId)) {
+    if (scope.warehouses.size > 0) {
+      if (!scope.warehouses.has(warehouseId)) {
         return deny('المخزن المطلوب خارج نطاق صلاحياتك', 'scope.warehouse', 'scope');
       }
       return null;
     }
-    if (branches.size === 0) return null;
+    if (scope.branchMode === 'ALL') return null;
     // لا منح مخازن صريحة — اسمح فقط إذا كان المخزن يتبع فرعاً مسموحاً.
+    // فشل قراءة الربط أو غياب أي فرع مرتبط = رفض (fail-closed).
     let warehouseBranch: string | null = null;
     try {
       warehouseBranch =
-        db.query<{ branch_id: string }>(
-          'SELECT branch_id FROM branch_warehouses WHERE warehouse_id = ? LIMIT 1',
+        db.query<{ branch_id: string | null }>(
+          'SELECT branch_id FROM warehouses WHERE id = ? LIMIT 1',
           [warehouseId]
         )[0]?.branch_id ?? null;
+      if (!warehouseBranch) {
+        warehouseBranch =
+          db.query<{ branch_id: string }>(
+            'SELECT branch_id FROM branch_warehouses WHERE warehouse_id = ? ORDER BY is_primary DESC, branch_id ASC LIMIT 1',
+            [warehouseId]
+          )[0]?.branch_id ?? null;
+      }
     } catch {
-      warehouseBranch = null;
+      return deny('تعذر تحديد فرع المخزن المطلوب', 'scope.warehouse', 'scope');
     }
-    if (warehouseBranch && !branches.has(warehouseBranch)) {
+    if (!warehouseBranch) {
+      return deny('المخزن المطلوب غير مرتبط بفرع مسموح', 'scope.warehouse', 'scope');
+    }
+    if (!scope.branches.has(warehouseBranch)) {
       return deny('المخزن يتبع فرعاً خارج نطاق صلاحياتك', 'scope.warehouse', 'scope');
     }
     return null;
@@ -254,15 +323,24 @@ export class AuthorizationService {
     if (!operation) return null;
 
     const db = DatabaseManager.getInstance();
+    // سياسة حدود المبالغ جزء من سلامة المخطط — غياب الجدول أو فشل قراءة
+    // الحدود يعني عدم القدرة على فرض الحد، لذا نرفض بدل السماح (fail-closed).
+    // الحالة الوحيدة المسموحة هي: الجدول موجود ولا يوجد حد معرّف للعملية.
     let rows: AmountLimitRow[] = [];
     try {
+      const table = db.query<{ name: string }>(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'permission_amount_limits' LIMIT 1`
+      );
+      if (table.length === 0) {
+        return deny('سياسة حدود المبالغ غير مهيأة في قاعدة البيانات', operation, 'amount');
+      }
       rows = db.query<AmountLimitRow>(
         `SELECT max_amount / 100.0 AS max_amount, currency, on_exceed, scope_type, scope_id FROM permission_amount_limits
          WHERE permission_code = ? AND ((scope_type = 'USER' AND scope_id = ?) OR (scope_type = 'ROLE' AND scope_id = ?))`,
         [operation, user.id, user.role]
       );
     } catch {
-      return null; // الجدول قد لا يكون مُرحَّلاً بعد — لا تقييد.
+      return deny('تعذر تحميل سياسة حدود المبالغ', operation, 'amount');
     }
     if (rows.length === 0) return null;
 

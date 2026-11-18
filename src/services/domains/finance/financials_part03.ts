@@ -54,7 +54,7 @@ export function computeSaleTotals(input: SaleTotalsInput): SaleTotalsResult {
 /**
  * Weighted-average cost (brief §33). New unit cost =
  * (prevQty*prevCost + addQty*addCost) / (prevQty + addQty).
- * FIFO is represented by the same call but is not yet lot-tracked (see roadmap).
+ * FIFO uses inventory_cost_layers for lot-level tracking (see migrations).
  */
 export function computeWeightedAverageCost(
   prevQty: number,

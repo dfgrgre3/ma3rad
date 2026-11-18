@@ -25,14 +25,24 @@ export const ReportsView: React.FC = () => {
   const accountingService = useMemo(() => new AccountingService(), []);
 
   const loadData = useCallback(() => {
-    try {
-      setInvoices(salesService.getAllInvoices(undefined, dateFrom || undefined, dateTo || undefined));
-      setPurchaseReport(accountingService.getPurchaseReport(dateFrom || undefined, dateTo || undefined));
-      setExpenseReport(accountingService.getExpenseReport(dateFrom || undefined, dateTo || undefined));
-      setInventoryReport(accountingService.getInventoryValuationReport());
-      setCategoryReport(accountingService.getCategorySalesReport(dateFrom || undefined, dateTo || undefined));
-      setBrandReport(accountingService.getBrandSalesReport(dateFrom || undefined, dateTo || undefined));
-    } catch (e) { console.error(e); }
+    void (async () => {
+      try {
+        const [invoiceRows, purchase, expense, inventory, category, brand] = await Promise.all([
+          salesService.getAllInvoicesAsync(undefined, dateFrom || undefined, dateTo || undefined),
+          accountingService.getPurchaseReportAsync(dateFrom || undefined, dateTo || undefined),
+          accountingService.getExpenseReportAsync(dateFrom || undefined, dateTo || undefined),
+          accountingService.getInventoryValuationReportAsync(),
+          accountingService.getCategorySalesReportAsync(dateFrom || undefined, dateTo || undefined),
+          accountingService.getBrandSalesReportAsync(dateFrom || undefined, dateTo || undefined),
+        ]);
+        setInvoices(invoiceRows);
+        setPurchaseReport(purchase);
+        setExpenseReport(expense);
+        setInventoryReport(inventory);
+        setCategoryReport(category);
+        setBrandReport(brand);
+      } catch (e) { console.error(e); }
+    })();
   }, [dateFrom, dateTo, accountingService, salesService]);
 
   useEffect(() => { loadData(); }, [dateFrom, dateTo, loadData]);

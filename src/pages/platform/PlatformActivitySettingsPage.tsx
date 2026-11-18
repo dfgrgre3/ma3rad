@@ -16,6 +16,9 @@ import {
   Info,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformTenant,
@@ -63,9 +66,12 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   const [customTerminology, setCustomTerminology] = React.useState<Record<string, string>>({});
   const [changeSummary, setChangeSummary] = React.useState('');
 
-  const loadTenants = React.useCallback(() => {
+  const loadTenants = React.useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     try {
-      const list = platformAdminService.listTenants();
+      const list = centralState.active
+        ? await centralPlatformClient.listTenants()
+        : platformAdminService.listTenants();
       setTenants(list);
       if (list.length > 0 && !selectedTenantId) {
         setSelectedTenantId(list[0].id);
@@ -82,17 +88,27 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   }, [loadTenants]);
 
   // Load activity config when selected tenant changes
-  const loadTenantActivity = React.useCallback((tenantId: string) => {
+  const loadTenantActivity = React.useCallback(async (tenantId: string) => {
     if (!tenantId) return;
+    const centralState = getCentralDataSourceState();
     try {
-      const config = platformAdminService.getTenantActivity(tenantId);
+      let config: any;
+      let vList: any[] = [];
+
+      if (centralState.active) {
+        config = await centralPlatformClient.getTenantActivity(tenantId);
+        vList = await centralPlatformClient.listTenantActivityVersions(tenantId);
+      } else {
+        config = platformAdminService.getTenantActivity(tenantId);
+        vList = platformAdminService.listTenantActivityVersions(tenantId);
+      }
+
       setActivityConfig(config);
       if (config) {
         setSelectedActivityId(config.activityId);
-        setEnabledModules([...config.enabledModules]);
-        setCustomTerminology({ ...config.customTerminology });
+        setEnabledModules([...config.enabledModules || []]);
+        setCustomTerminology({ ...(config.customTerminology || {}) });
       }
-      const vList = platformAdminService.listTenantActivityVersions(tenantId);
       setVersions(vList);
     } catch (err) {
       toast.error('تعذر استرجاع نشاط العميل');
@@ -113,20 +129,32 @@ export const PlatformActivitySettingsPage: React.FC = () => {
     toast.info(`تم تحميل قالب [${act.label}]. اضغط "حفظ النشاط" لتطبيقه على هذا العميل.`);
   };
 
-  const handleSaveActivity = () => {
+  const handleSaveActivity = async () => {
     if (!canManageActivity) { toast.error('لا تملك صلاحية إدارة الأنشطة'); return; }
     if (!selectedTenantId || !selectedActivityId) return;
     setSaving(true);
+    const centralState = getCentralDataSourceState();
     try {
       const act = allActivities.find((a) => a.id === selectedActivityId);
-      const updated = platformAdminService.saveTenantActivity({
-        tenantId: selectedTenantId,
-        activityId: selectedActivityId,
-        profileId: act?.profileId || selectedActivityId,
-        enabledModules,
-        customTerminology,
-        changeSummary: changeSummary.trim() || undefined,
-      });
+      let updated: any;
+
+      if (centralState.active) {
+        updated = await centralPlatformClient.saveTenantActivity(selectedTenantId, {
+          activityId: selectedActivityId,
+          enabledModules,
+          customTerminology,
+        });
+      } else {
+        updated = platformAdminService.saveTenantActivity({
+          tenantId: selectedTenantId,
+          activityId: selectedActivityId,
+          profileId: act?.profileId || selectedActivityId,
+          enabledModules,
+          customTerminology,
+          changeSummary: changeSummary.trim() || undefined,
+        });
+      }
+
       setActivityConfig(updated);
       setChangeSummary('');
       toast.success(`تم حفظ وتحديث إعدادات النشاط بنجاح (إصدار #${updated.version})`);
@@ -138,14 +166,20 @@ export const PlatformActivitySettingsPage: React.FC = () => {
     }
   };
 
-  const handleRollback = (ver: number) => {
+  const handleRollback = async (ver: number) => {
     if (!canManageActivity) { toast.error('لا تملك صلاحية إدارة الأنشطة'); return; }
     if (!window.confirm(`هل أنت متأكد من استرجاع إعدادات النشاط إلى الإصدار #${ver}؟`)) {
       return;
     }
     setSaving(true);
+    const centralState = getCentralDataSourceState();
     try {
-      const restored = platformAdminService.rollbackTenantActivity(selectedTenantId, ver);
+      let restored: any;
+      if (centralState.active) {
+        restored = await centralPlatformClient.rollbackTenantActivity(selectedTenantId, ver);
+      } else {
+        restored = platformAdminService.rollbackTenantActivity(selectedTenantId, ver);
+      }
       setActivityConfig(restored);
       toast.success(`تم استرجاع إعدادات النشاط بنجاح إلى النسخة #${ver}`);
       loadTenantActivity(selectedTenantId);
@@ -180,6 +214,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
+      <CentralUnsupportedNotice feature="إعدادات الأنشطة (Activity Settings)" />
       <PageHeader
         title="إدارة الأنشطة والقوالب التجارية للعملاء"
         description="تخصيص نشاط كل عميل بمعزل تام: قوالب الأنشطة، الوحدات، المصطلحات، وسجل استرجاع الإصدارات السابقة."

@@ -40,6 +40,7 @@ export const TodayPurchasesPage: React.FC = () => {
   const canCreate = can('purchases.create');
   const canDelete = can('purchases.delete');
   const canPay = can('suppliers.payment');
+  const canViewPayments = canPay || can('finance.debts.view') || can('finance.view');
 
   const [date, setDate] = useState(() => service.today());
   const [data, setData] = useState<DailyPurchaseResult | null>(null);
@@ -216,6 +217,8 @@ export const TodayPurchasesPage: React.FC = () => {
     });
   };
 
+  const activeTab: TabKey = tab === 'payments' && !canViewPayments ? 'invoices' : tab;
+
   const tabCounts: Record<TabKey, number> = {
     invoices: filteredRows.length,
     items: filteredItems.length,
@@ -297,7 +300,8 @@ export const TodayPurchasesPage: React.FC = () => {
 
               <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                 <PurchasesTabsBar
-                  tab={tab}
+                  tab={activeTab}
+                  canViewPayments={canViewPayments}
                   tabCounts={tabCounts}
                   onTabChange={setTab}
                   onExportInvoices={exportInvoices}
@@ -307,7 +311,7 @@ export const TodayPurchasesPage: React.FC = () => {
                   plain={plain}
                 />
 
-                {tab === 'invoices' && (
+                {activeTab === 'invoices' && (
                   <InvoicesPanel
                     rows={rows}
                     pageRows={pageRows}
@@ -338,15 +342,15 @@ export const TodayPurchasesPage: React.FC = () => {
                   />
                 )}
 
-                {tab === 'items' && (
+                {activeTab === 'items' && (
                   <ItemsPanel items={filteredItems} onDetails={openDetails} fmt={fmt} plain={plain} />
                 )}
 
-                {tab === 'suppliers' && (
+                {activeTab === 'suppliers' && (
                   <SuppliersPanel supplierStats={supplierStats} onNavigate={navigate} fmt={fmt} plain={plain} />
                 )}
 
-                {tab === 'payments' && (
+                {activeTab === 'payments' && (
                   <PaymentsPanel payments={filteredPayments} fmt={fmt} plain={plain} />
                 )}
               </section>

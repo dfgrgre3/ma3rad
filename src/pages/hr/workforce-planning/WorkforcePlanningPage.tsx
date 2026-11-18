@@ -9,8 +9,15 @@ import {
 } from '../../../services/domains/hr/WorkforcePlanningService';
 import { EmployeeOrganizationService, EmployeeDepartment } from '../../../services/domains/hr/EmployeeOrganizationService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'plans' | 'requisitions' | 'comparison';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  plans: ['hr.workforce.manage'],
+  requisitions: ['hr.workforce.manage'],
+  comparison: ['hr.workforce.manage'],
+};
 
 interface JobPlanRow {
   jobTitle: string;
@@ -59,6 +66,8 @@ const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: Re
 
 export const WorkforcePlanningPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('plans');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['plans', 'requisitions', 'comparison'] as Tab[]).some(canTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -112,7 +121,7 @@ export const WorkforcePlanningPage: React.FC = () => {
   }, [periodFilter]);
 
   useEffect(() => { loadBranches(); }, [loadBranches]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   useEffect(() => {
     if (!planForm.branchId) { setDepartments([]); return; }
@@ -124,7 +133,7 @@ export const WorkforcePlanningPage: React.FC = () => {
   }, [organization, planForm.branchId]);
 
   useEffect(() => {
-    if (tab !== 'comparison') return;
+    if (activeTab !== 'comparison') return;
     try {
       setSummary(WorkforcePlanningService.getHeadcountComparison(comparisonMonth));
     } catch (e: any) {
@@ -260,6 +269,8 @@ export const WorkforcePlanningPage: React.FC = () => {
     { id: 'requisitions', label: 'طلبات التوظيف', icon: <ClipboardList className="h-4 w-4" /> },
     { id: 'comparison', label: 'المخطط مقابل الفعلي', icon: <Scale className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
@@ -286,11 +297,11 @@ export const WorkforcePlanningPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${tab === item.id ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
             >
               {item.icon} {item.label}
             </button>
@@ -316,7 +327,7 @@ export const WorkforcePlanningPage: React.FC = () => {
           <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-violet-500" /></div>
         ) : (
           <>
-            {tab === 'plans' && (
+            {activeTab === 'plans' && canTab('plans') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_380px]">
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <div className="border-b border-slate-100 px-4 py-3">
@@ -453,7 +464,7 @@ export const WorkforcePlanningPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'requisitions' && (
+            {activeTab === 'requisitions' && canTab('requisitions') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <div className="border-b border-slate-100 px-4 py-3">
@@ -560,7 +571,7 @@ export const WorkforcePlanningPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'comparison' && (
+            {activeTab === 'comparison' && canTab('comparison') && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
                   <label className="text-[10px] font-bold text-slate-500">فترة المقارنة

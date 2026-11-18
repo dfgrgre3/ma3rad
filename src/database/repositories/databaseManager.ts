@@ -8,7 +8,14 @@ const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
+const DB_IDB_KEY_STORE = 'keys';
+const DB_IDB_ENCRYPTION_KEY_ID = 'main';
+const DB_IDB_VERSION = 2;
 const DB_ENCRYPTION_KEY_KEY = 'ceramisys_db_encryption_key';
+// Tracks whether the last persisted browser snapshot was ciphertext. Updated
+// on every browser write/read so getPersistenceStatus() can report the real
+// at-rest encryption state instead of assuming IndexedDB is always plaintext.
+let lastKnownBrowserSnapshotEncrypted: boolean | null = null;
 const SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS = 500;
 const SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS = 10000;
 const LEGACY_X86_BUILD = typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined'
@@ -73,29 +80,85 @@ async function getOrCreateEncryptionKey(): Promise<CryptoKey | null> {
       return null;
     }
 
-    // Try to load existing key from localStorage
-    const storedKey = localStorage.getItem(DB_ENCRYPTION_KEY_KEY);
-    if (storedKey) {
-      const keyData = JSON.parse(storedKey);
-      return await crypto.subtle.importKey(
-        'jwk',
-        keyData,
+    // Preferred: a non-extractable CryptoKey persisted in IndexedDB. Page
+    // script can use it for encrypt/decrypt but can never export the raw key
+    // material, unlike a JWK stored in localStorage next to the data.
+    if (typeof indexedDB !== 'undefined') {
+      try {
+        const db = await openDatabaseStorage();
+        try {
+          const stored = await new Promise<unknown>((resolve, reject) => {
+            const request = db
+              .transaction(DB_IDB_KEY_STORE, 'readonly')
+              .objectStore(DB_IDB_KEY_STORE)
+              .get(DB_IDB_ENCRYPTION_KEY_ID);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          if (stored instanceof CryptoKey) return stored;
+        } finally {
+          db.close();
+        }
+      } catch {
+        // Fall through to the legacy localStorage key or generate a new one.
+      }
+    }
+
+    // Legacy path: existing installs keep an exportable JWK in localStorage.
+    if (typeof localStorage !== 'undefined') {
+      const storedKey = localStorage.getItem(DB_ENCRYPTION_KEY_KEY);
+      if (storedKey) {
+        const keyData = JSON.parse(storedKey);
+        return await crypto.subtle.importKey(
+          'jwk',
+          keyData,
+          { name: 'AES-GCM', length: 256 },
+          true,
+          ['encrypt', 'decrypt']
+        );
+      }
+    }
+
+    // Generate a fresh non-extractable key and persist the CryptoKey object
+    // itself in IndexedDB (structured clone keeps it non-exportable).
+    const key = await crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+
+    if (typeof indexedDB !== 'undefined') {
+      try {
+        const db = await openDatabaseStorage();
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const transaction = db.transaction(DB_IDB_KEY_STORE, 'readwrite');
+            transaction.objectStore(DB_IDB_KEY_STORE).put(key, DB_IDB_ENCRYPTION_KEY_ID);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error || new Error('Browser key storage write aborted'));
+          });
+        } finally {
+          db.close();
+        }
+        return key;
+      } catch (error) {
+        console.warn('[database] Could not persist encryption key in IndexedDB; falling back to localStorage JWK:', error);
+      }
+    }
+
+    // Last resort for environments without IndexedDB: exportable JWK in
+    // localStorage (legacy behaviour, weaker threat model).
+    if (typeof localStorage !== 'undefined') {
+      const exportableKey = await crypto.subtle.generateKey(
         { name: 'AES-GCM', length: 256 },
         true,
         ['encrypt', 'decrypt']
       );
+      const exportedKey = await crypto.subtle.exportKey('jwk', exportableKey);
+      localStorage.setItem(DB_ENCRYPTION_KEY_KEY, JSON.stringify(exportedKey));
+      return exportableKey;
     }
-
-    // Generate new key
-    const key = await crypto.subtle.generateKey(
-      { name: 'AES-GCM', length: 256 },
-      true,
-      ['encrypt', 'decrypt']
-    );
-
-    // Export and store the key
-    const exportedKey = await crypto.subtle.exportKey('jwk', key);
-    localStorage.setItem(DB_ENCRYPTION_KEY_KEY, JSON.stringify(exportedKey));
 
     return key;
   } catch (error) {
@@ -130,8 +193,12 @@ async function decryptData(data: Uint8Array, key: CryptoKey): Promise<Uint8Array
 
 function openDatabaseStorage(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_IDB_NAME, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(DB_IDB_STORE);
+    const request = indexedDB.open(DB_IDB_NAME, DB_IDB_VERSION);
+    request.onupgradeneeded = () => {
+      const result = request.result;
+      if (!result.objectStoreNames.contains(DB_IDB_STORE)) result.createObjectStore(DB_IDB_STORE);
+      if (!result.objectStoreNames.contains(DB_IDB_KEY_STORE)) result.createObjectStore(DB_IDB_KEY_STORE);
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('Could not open browser database storage'));
   });
@@ -152,17 +219,21 @@ async function readBrowserSnapshot(): Promise<Uint8Array | null> {
         const key = await getOrCreateEncryptionKey();
         if (key) {
           try {
-            return await decryptData(stored, key);
+            const plaintext = await decryptData(stored, key);
+            lastKnownBrowserSnapshotEncrypted = true;
+            return plaintext;
           } catch (decryptError) {
             // Only accept plaintext when it is recognizably a legacy SQLite
             // image — never feed ciphertext back into sql.js as if it were data.
             if (isSqliteImage(stored)) {
               console.warn('[database] Snapshot is not decryptable; treating it as legacy unencrypted data:', decryptError);
+              lastKnownBrowserSnapshotEncrypted = false;
               return stored;
             }
             throw new Error('Database snapshot could not be decrypted and is not a valid SQLite image', { cause: decryptError });
           }
         }
+        lastKnownBrowserSnapshotEncrypted = false;
         return stored;
       }
     } finally { db.close(); }
@@ -192,11 +263,23 @@ async function writeBrowserSnapshot(bytes: Uint8Array, key = DB_IDB_KEY): Promis
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error || new Error('Browser database storage write aborted'));
       });
+      lastKnownBrowserSnapshotEncrypted = encryptionKey != null;
     } finally { db.close(); }
     return;
   }
   if (typeof localStorage !== 'undefined') {
+    // The legacy localStorage path stores a plaintext base64 snapshot. That
+    // is tolerable for development previews/tests, but a production build
+    // must never expose the whole business database as readable text — fail
+    // the save instead of silently downgrading to plaintext.
+    if (isProductionBuild()) {
+      throw new Error(
+        'Refusing to persist the database snapshot in plaintext localStorage in a production build. ' +
+        'Encrypted IndexedDB storage or the desktop file backend is required.'
+      );
+    }
     localStorage.setItem(key === DB_IDB_KEY ? DB_STORAGE_KEY : key, bytesToBase64(bytes));
+    lastKnownBrowserSnapshotEncrypted = false;
     return;
   }
   throw new Error('No browser database storage is available');
@@ -217,6 +300,16 @@ async function deleteBrowserSnapshot(): Promise<void> {
           transaction.onerror = () => reject(transaction.error);
           transaction.onabort = () => reject(transaction.error || new Error('Browser database storage delete aborted'));
         });
+        if (db.objectStoreNames.contains(DB_IDB_KEY_STORE)) {
+          await new Promise<void>((resolve, reject) => {
+            const transaction = db.transaction(DB_IDB_KEY_STORE, 'readwrite');
+            transaction.objectStore(DB_IDB_KEY_STORE).delete(DB_IDB_ENCRYPTION_KEY_ID);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error || new Error('Browser key storage delete aborted'));
+          });
+        }
+        lastKnownBrowserSnapshotEncrypted = null;
       } finally { db.close(); }
     }
     if (typeof localStorage !== 'undefined') {
@@ -312,7 +405,7 @@ export class DatabaseManager {
   private readonly queryCacheMaxEntryBytes = LEGACY_X86_BUILD ? 256 * 1024 : 512 * 1024;
   private readonly queryCacheMaxSizeBytes = LEGACY_X86_BUILD ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
   private persistQueue: Promise<void> = Promise.resolve();
-  private pendingSnapshot: Uint8Array | null = null;
+  private pendingSnapshot: { bytes: Uint8Array; seq: number } | null = null;
   private isPersisting = false;
   // Full-DB snapshot export (sql.js `db.export()`) is synchronous and runs on
   // the renderer UI thread. Skip exports when nothing changed since the last
@@ -326,6 +419,14 @@ export class DatabaseManager {
   // persistence; consumed by the outermost COMMIT so nested financial
   // operations still trigger an immediate snapshot write.
   private immediatePersistRequested = false;
+  // Set when any transaction in the stack demands a synchronous durable write
+  // (executeFinancialTransaction). Consumed by the outermost COMMIT: on the
+  // Electron file backend the snapshot is written through a blocking IPC so a
+  // resolved financial operation is already on disk.
+  private durableSyncRequested = false;
+  // Highest mutationSeq already persisted through the synchronous durable
+  // path; queued async snapshots at or below it are redundant and skipped.
+  private lastSyncPersistedSeq = -1;
   // Track when a critical financial transaction is in progress to ensure
   // durable persistence before returning success to the user.
   private criticalTransactionInProgress = false;
@@ -999,7 +1100,7 @@ export class DatabaseManager {
           bytes: snapshot.byteLength,
         }));
       }
-      this.persist(snapshot);
+      this.persist(snapshot, requestedSeq);
       return;
     } catch (workerError) {
       console.warn('[database] Worker snapshot export unavailable; falling back to main-thread export.', workerError);
@@ -1024,15 +1125,17 @@ export class DatabaseManager {
         bytes: snapshot.byteLength,
       }));
     }
-    this.persist(snapshot);
+    this.persist(snapshot, this.lastSnapshotSeq);
   }
 
   /**
    * Serializes writes so a slow disk (or concurrent transaction) can never
-   * overwrite a newer snapshot with an older one.
+   * overwrite a newer snapshot with an older one. `seq` is the mutationSeq the
+   * snapshot was exported at, used to drop snapshots superseded by a
+   * synchronous durable write.
    */
-  private persist(snapshot: Uint8Array): void {
-    this.pendingSnapshot = snapshot;
+  private persist(snapshot: Uint8Array, seq: number): void {
+    this.pendingSnapshot = { bytes: snapshot, seq };
     if (this.isPersisting) return;
     this.isPersisting = true;
     this.persistQueue = this.persistQueue
@@ -1040,16 +1143,19 @@ export class DatabaseManager {
         while (this.pendingSnapshot) {
           const nextSnapshot = this.pendingSnapshot;
           this.pendingSnapshot = null;
-          await this.persistSnapshot(nextSnapshot);
+          await this.persistSnapshot(nextSnapshot.bytes, nextSnapshot.seq);
         }
       })
       .finally(() => {
         this.isPersisting = false;
-        if (this.pendingSnapshot) this.persist(this.pendingSnapshot);
+        if (this.pendingSnapshot) this.persist(this.pendingSnapshot.bytes, this.pendingSnapshot.seq);
       });
   }
 
-  private async persistSnapshot(snapshot: Uint8Array): Promise<void> {
+  private async persistSnapshot(snapshot: Uint8Array, seq: number): Promise<void> {
+    // A synchronous durable write already landed a newer (or equal) snapshot —
+    // persisting this older export would only waste a multi-megabyte write.
+    if (seq >= 0 && seq <= this.lastSyncPersistedSeq) return;
     const persistStartedAt = performance.now();
     let persistSucceeded = false;
     try {
@@ -1184,16 +1290,35 @@ export class DatabaseManager {
     return this.lastPersistError;
   }
 
-  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string; code?: string } {
+  public getPersistenceStatus(): {
+    status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable';
+    encryption?: 'encrypted-at-rest' | 'plaintext' | 'file-encrypted' | 'unknown';
+    error?: string;
+    code?: string;
+  } {
     if (this.lastPersistError) return { status: 'error', error: this.lastPersistError, code: this.lastPersistErrorCode || 'DATABASE_PERSIST_FAILED' };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
     if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null || this.isPersisting || this.pendingSnapshot || this.saveInProgress) {
       return { status: 'saving' };
     }
-    if (this.storageBackend === 'localStorage' || this.storageBackend === 'indexedDB') {
-      return { status: 'unencrypted' };
+    if (this.storageBackend === 'file') {
+      return { status: 'saved', encryption: 'file-encrypted' };
     }
-    return { status: 'saved' };
+    if (this.storageBackend === 'localStorage') {
+      return { status: 'unencrypted', encryption: 'plaintext' };
+    }
+    if (this.storageBackend === 'indexedDB') {
+      // IndexedDB snapshots are AES-GCM ciphertext whenever the Web Crypto
+      // key is available; only report 'unencrypted' when we actually wrote or
+      // read a plaintext snapshot.
+      return lastKnownBrowserSnapshotEncrypted === true
+        ? { status: 'saved', encryption: 'encrypted-at-rest' }
+        : {
+            status: 'unencrypted',
+            encryption: lastKnownBrowserSnapshotEncrypted === false ? 'plaintext' : 'unknown',
+          };
+    }
+    return { status: 'saved', encryption: 'unknown' };
   }
 
   public getDatabase(): Database {
@@ -1282,10 +1407,31 @@ export class DatabaseManager {
   public importDatabaseBytes(bytes: Uint8Array): void {
     if (!this.SQL) throw new Error('SQL engine not loaded');
     const candidate = new this.SQL.Database(bytes);
-    const integrity = candidate.exec('PRAGMA integrity_check')[0]?.values[0]?.[0];
-    if (integrity !== 'ok') {
+    try {
+      const integrity = candidate.exec('PRAGMA integrity_check')[0]?.values[0]?.[0];
+      if (integrity !== 'ok') {
+        throw new Error('Imported database failed integrity check');
+      }
+      // Schema invariant: the snapshot must contain the core application
+      // tables before it is allowed to replace the live database.
+      const tables = candidate.exec("SELECT name FROM sqlite_master WHERE type = 'table'");
+      const names = new Set((tables[0]?.values || []).map((row: unknown[]) => String(row[0])));
+      const requiredTables = ['users', 'products', 'system_settings', 'sales_invoices'];
+      const missingTables = requiredTables.filter((name) => !names.has(name));
+      if (missingTables.length > 0) {
+        throw new Error(`Imported database is missing required tables: ${missingTables.join(', ')}`);
+      }
+      const foreignKeyResults = candidate.exec('PRAGMA foreign_key_check');
+      const violationCount = foreignKeyResults.reduce(
+        (total: number, result: { values?: unknown[] }) => total + (result?.values?.length ?? 0),
+        0,
+      );
+      if (violationCount > 0) {
+        throw new Error(`Imported database contains ${violationCount} foreign key violation(s)`);
+      }
+    } catch (error) {
       candidate.close();
-      throw new Error('Imported database failed integrity check');
+      throw error;
     }
     this.db = candidate;
     this.databaseFacade = null;
@@ -1365,23 +1511,94 @@ export class DatabaseManager {
   }
 
   /**
-   * executeTransaction with immediatePersist for financially critical writes
-   * (journal entries, invoices, payments, period closes). The snapshot is
-   * exported and written to durable storage right after COMMIT instead of
-   * waiting for the debounce/idle delay used by routine writes.
-   *
-   * IMPORTANT: For new financial operations, prefer executeDurableTransaction
-   * which ensures the write is durably persisted before returning success.
+   * Synchronously exports the current snapshot and writes it through the
+   * Electron `db:save-sync` IPC channel, which performs the encrypted file
+   * write in the main process before replying. Only used by
+   * executeFinancialTransaction; any failure throws so the caller never sees
+   * a successful result for a write that is not on disk.
+   */
+  private persistSnapshotSynchronously(): void {
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (typeof fileApi?.saveSync !== 'function' || !this.db) {
+      // No synchronous durable channel (browser build, tests, older Electron
+      // preload): degrade to the immediate async persist. Durability is then
+      // best-effort — callers needing a hard guarantee must use
+      // executeDurableTransaction.
+      this.saveToStorage(true);
+      if (this.dirtySinceLastSave) this.scheduleDebouncedSave(0);
+      return;
+    }
+
+    const snapshot = this.exportSnapshot();
+    const seq = this.mutationSeq;
+    this.lastSnapshotSeq = seq;
+
+    let result: { ok?: boolean; code?: string; retryable?: boolean; error?: string } | undefined;
+    try {
+      result = fileApi.saveSync(snapshot);
+    } catch (error) {
+      result = {
+        ok: false,
+        code: 'DATABASE_SAVE_FAILED',
+        retryable: true,
+        error: persistenceErrorMessage(error, 'DATABASE_SAVE_FAILED'),
+      };
+    }
+
+    if (result?.code === 'DATABASE_SYNC_UNAVAILABLE') {
+      // Electron without synchronous secure-storage APIs cannot offer a
+      // blocking durable write; degrade rather than break every commit.
+      console.warn('[database] Synchronous durable save unavailable; falling back to async persist.');
+      this.saveToStorage(true);
+      if (this.dirtySinceLastSave) this.scheduleDebouncedSave(0);
+      return;
+    }
+
+    if (!result?.ok) {
+      const failure = new AppError(
+        result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
+        result?.code || 'DATABASE_SAVE_FAILED',
+        result?.retryable !== false,
+      );
+      this.lastPersistError = persistenceErrorMessage(result?.error, failure.code);
+      this.lastPersistErrorCode = failure.code;
+      throw failure;
+    }
+
+    this.lastSyncPersistedSeq = seq;
+    this.storageBackend = 'file';
+    this.lastPersistError = null;
+    this.lastPersistErrorCode = null;
+    void deleteBrowserSnapshot();
+    if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
+      this.migratedLegacyStorage = false;
+    }
+    this.dirtySinceLastSave = false;
+  }
+
+  /**
+   * executeTransaction for financially critical writes (journal entries,
+   * invoices, payments, period closes). On the Electron file backend the
+   * snapshot is exported and written through a blocking IPC before this
+   * method returns, so a resolved call means the write is already durable on
+   * disk — a persistence failure throws instead of reporting success.
+   * Nested calls propagate the requirement to the outermost COMMIT and never
+   * flush independently. In browser/test environments without the synchronous
+   * file channel the write falls back to the immediate async persist path
+   * (best-effort durability); use executeDurableTransaction when an async
+   * boundary is available and a guaranteed flush is required.
    */
   public executeFinancialTransaction<T>(callback: (db: DatabaseManager) => T): T {
-    return this.executeTransaction(callback, { immediatePersist: true });
+    return this.executeTransaction(callback, { immediatePersist: true, durableSync: true });
   }
 
   public executeTransaction<T>(
     callback: (db: DatabaseManager) => T,
-    options?: { immediatePersist?: boolean },
+    options?: { immediatePersist?: boolean; durableSync?: boolean },
   ): T {
     if (options?.immediatePersist) this.immediatePersistRequested = true;
+    if (options?.durableSync) this.durableSyncRequested = true;
     if (this.transactionDepth === 0 && this.lastPersistError) {
       throw new AppError(
         `توقفت المعاملات لأن آخر عملية لم تُحفظ على القرص: ${this.lastPersistError}`,
@@ -1408,8 +1625,16 @@ export class DatabaseManager {
         this.clearQueryCache();
         this.markDirty();
         const persistImmediately = this.immediatePersistRequested;
+        const durableSync = this.durableSyncRequested;
         this.immediatePersistRequested = false;
-        if (persistImmediately) {
+        this.durableSyncRequested = false;
+        if (durableSync) {
+          // Financial writes demand a synchronous durable snapshot: on the
+          // Electron file backend this blocks until the encrypted file write
+          // completes (or throws). Throws propagate through the catch below
+          // with committed=true so callers see an honest failure.
+          this.persistSnapshotSynchronously();
+        } else if (persistImmediately) {
           // Financial writes skip the debounce/idle delay so the snapshot
           // reaches durable storage within ~one frame instead of seconds.
           this.saveToStorage(true);
@@ -1423,7 +1648,10 @@ export class DatabaseManager {
       return result;
     } catch (error) {
       if (!depthReleased) this.transactionDepth--;
-      if (isOuterTransaction) this.immediatePersistRequested = false;
+      if (isOuterTransaction) {
+        this.immediatePersistRequested = false;
+        this.durableSyncRequested = false;
+      }
       if (!committed) this.rollbackTransaction(db, isOuterTransaction, savepoint);
       logger.error(
         committed

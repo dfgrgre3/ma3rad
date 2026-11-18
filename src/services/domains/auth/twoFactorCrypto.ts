@@ -98,12 +98,23 @@ function hmacSha1(key: Uint8Array, message: Uint8Array): Uint8Array {
 
 export function generateRandomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
+  // Prefer Web Crypto API (browser/Electron)
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
     crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+    return bytes;
   }
-  return bytes;
+  // Node.js crypto fallback (for tests/server contexts)
+  if (typeof require !== 'undefined') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const nodeCrypto = require('crypto');
+      const buf = nodeCrypto.randomBytes(length);
+      bytes.set(buf);
+      return bytes;
+    } catch { /* fall through */ }
+  }
+  // Last resort: throw rather than use insecure Math.random for secrets
+  throw new Error('Secure random number generator is not available. Cannot generate cryptographic secrets.');
 }
 
 export function base32Decode(input: string): Uint8Array {

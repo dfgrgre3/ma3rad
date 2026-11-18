@@ -6,8 +6,15 @@ import {
   PayrollSocialInsuranceService, SocialInsuranceRule, EndOfServiceRule,
   SocialInsuranceSystemType, SocialInsuranceCalculation, EndOfServiceCalculation,
 } from '../../../services/domains/hr/PayrollSocialInsuranceService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'insurance' | 'eos' | 'calculator';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  insurance: ['hr.insurance.manage'],
+  eos: ['hr.insurance.manage'],
+  calculator: ['hr.insurance.manage', 'hr.payroll.view', 'employees.payroll.view', 'employees.payroll.manage'],
+};
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -72,6 +79,8 @@ const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: Re
 
 export const PayrollSocialInsurancePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('insurance');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['insurance', 'eos', 'calculator'] as Tab[]).some(canTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -107,7 +116,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const run = (action: () => void, success?: string) => {
     setError(null);
@@ -240,6 +249,8 @@ export const PayrollSocialInsurancePage: React.FC = () => {
     { id: 'eos', label: 'نهاية الخدمة', icon: <ShieldCheck className="h-4 w-4" /> },
     { id: 'calculator', label: 'الحاسبة', icon: <Calculator className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
@@ -265,11 +276,11 @@ export const PayrollSocialInsurancePage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${tab === item.id ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
             >
               {item.icon} {item.label}
             </button>
@@ -283,7 +294,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
           <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-indigo-500" /></div>
         ) : (
           <>
-            {tab === 'insurance' && (
+            {activeTab === 'insurance' && canTab('insurance') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_400px]">
                 <div className="space-y-3">
                   {siRules.map((rule) => (
@@ -359,7 +370,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'eos' && (
+            {activeTab === 'eos' && canTab('eos') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_380px]">
                 <div className="space-y-3">
                   {eosRules.map((rule) => (
@@ -433,7 +444,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'calculator' && (
+            {activeTab === 'calculator' && canTab('calculator') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
                   <h2 className="flex items-center gap-1.5 text-sm font-black"><Calculator className="h-4 w-4 text-indigo-600" /> حاسبة التأمينات الاجتماعية</h2>

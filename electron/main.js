@@ -485,7 +485,7 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = '086c0f0689710b77a031cbf6b9febdc846591ce516168451f82f83f335ce32da';
+const PRELOAD_INTEGRITY_SHA256 = 'dec5790f71d984e2033583d609414574db31e761c9a2e0d583757d52c0b8877c';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = '0010fb4c0e6c72bc45ab67fd8a9e10254720794afcd624643608757bdd795f0b';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';

@@ -16,6 +16,7 @@ import { GeneralLedgerPanel } from '../../../components/reports/financial-statem
 import { ReconciliationPanel } from '../../../components/reports/financial-statements/ReconciliationPanel';
 import { FinancialStatementsHeader } from '../../../components/reports/financial-statements/FinancialStatementsHeader';
 import type { AgingType, FinancialStatementsTab } from '../../../components/reports/financial-statements/FinancialStatementsHeader';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 const today = () => localDateString();
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
@@ -95,7 +96,23 @@ export const FinancialStatementsPage: React.FC = () => {
   const service = useMemo(() => new FinancialStatementsService(), []);
   const accounting = useMemo(() => new AccountingService(), []);
   const toast = useToast();
+  const can = usePermission();
+  const canViewFinancial = can('finance.view') || can('finance.reports.view');
+  const canViewInventory = can('inventory.view');
+  const canViewAging = can('finance.view') || can('finance.receivables.view') || can('finance.payables.view');
   const [tab, setTab] = useState<FinancialStatementsTab>('balance');
+  const TAB_PERMISSIONS: Record<FinancialStatementsTab, string> = {
+    income: 'finance.reports.view',
+    balance: 'finance.reports.view',
+    cash: 'finance.reports.view',
+    aging: 'finance.receivables.view',
+    subledger: 'finance.receivables.view',
+    ledger: 'finance.reports.view',
+    reconciliation: 'finance.reports.view',
+  };
+  const canTab = (t: FinancialStatementsTab) => can(TAB_PERMISSIONS[t] || 'finance.view');
+  const visibleTabs = (Object.keys(TAB_PERMISSIONS) as FinancialStatementsTab[]).filter(canTab);
+  const activeTab: FinancialStatementsTab = canTab(tab) ? tab : (visibleTabs[0] ?? 'balance');
   const [loading, setLoading] = useState(true);
   const [scopeWarning, setScopeWarning] = useState<string | null>(null);
 
@@ -140,7 +157,7 @@ export const FinancialStatementsPage: React.FC = () => {
       setScopeWarning(service.getBranchScopeWarning());
       switch (tab) {
         case 'income':
-          setIncome(await accounting.getProfitAndLossReport(from, to));
+          setIncome(await accounting.getProfitAndLossReportAsync(from, to));
           break;
         case 'balance':
           setBalance(await service.getBalanceSheet(asOf));
@@ -173,6 +190,7 @@ export const FinancialStatementsPage: React.FC = () => {
     }
   }, [accounting, agingType, asOf, from, loadLedger, partyId, partyType, service, tab, toast, to]);
 
+  useEffect(() => { if (!canTab(tab) && visibleTabs[0]) setTab(visibleTabs[0]); }, [tab, visibleTabs, canTab]);
   useEffect(() => { load(); }, [load]);
 
   const changePartyType = (type: 'CUSTOMER' | 'SUPPLIER') => {
@@ -387,7 +405,8 @@ export const FinancialStatementsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       <FinancialStatementsHeader
-        tab={tab}
+        tab={activeTab}
+        visibleTabs={visibleTabs}
         agingType={agingType}
         asOf={asOf}
         from={from}
@@ -406,7 +425,7 @@ export const FinancialStatementsPage: React.FC = () => {
         {scopeWarning && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{scopeWarning}</div>}
         <FinancialStatementsContent
           loading={loading}
-          tab={tab}
+          tab={activeTab}
           income={income}
           balance={balance}
           cash={cash}

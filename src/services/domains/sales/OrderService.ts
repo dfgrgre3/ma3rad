@@ -42,6 +42,7 @@ export interface Order {
   paidAmount: number;
   remainingAmount: number;
   status: OrderStatus;
+  salesRepId?: string | null;
   deliveryStatus?: 'PENDING' | 'PARTIAL' | 'DELIVERED';
   billingStatus?: 'NOT_INVOICED' | 'INVOICED';
   financialStatus?: 'UNPAID' | 'PARTIAL' | 'PAID';
@@ -127,6 +128,7 @@ export interface OrderInput {
   customerId: string;
   warehouseId?: string;
   quotationId?: string;
+  salesRepId?: string;
   expectedDeliveryDate?: string;
   notes?: string;
   shippingCost?: number;
@@ -291,6 +293,7 @@ export class OrderService {
     const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
     this.validateOrderDiscounts(items, input, actor);
+    const salesRepId = this.validateSalesRep(input.salesRepId);
     const id = `ord_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {
@@ -298,13 +301,13 @@ export class OrderService {
       const orderNumber = db.nextNumber('ORD');
 
       db.run(
-        `INSERT INTO orders (id, order_number, date, customer_id, warehouse_id, branch_id, quotation_id,
+        `INSERT INTO orders (id, order_number, date, customer_id, warehouse_id, branch_id, quotation_id, sales_rep_id,
           expected_delivery_date, subtotal, discount_amount, tax_amount, shipping_cost,
           total_amount, paid_amount, remaining_amount, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, ROUND(?*100), 'PENDING', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, ROUND(?*100), 'PENDING', ?, ?)`,
         [
           id, orderNumber, localDateString(), input.customerId, warehouse, branchId,
-          input.quotationId || null, input.expectedDeliveryDate || null,
+          input.quotationId || null, salesRepId, input.expectedDeliveryDate || null,
           totals.subtotal, totals.discountAmount, totals.taxAmount, totals.shippingCost,
           totals.totalAmount, totals.totalAmount, input.notes || null, actor.id,
         ]
@@ -356,18 +359,21 @@ export class OrderService {
     const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
     this.validateOrderDiscounts(items, input, actor);
+    const salesRepId = input.salesRepId !== undefined
+      ? this.validateSalesRep(input.salesRepId)
+      : (existing.salesRepId ?? null);
 
     return this.db.executeTransaction((db) => {
       this.releaseReservations(db, existing.warehouseId, existing.items || []);
       this.assertStockAndReserve(db, warehouse, items);
 
       db.run(
-        `UPDATE orders SET customer_id = ?, warehouse_id = ?, branch_id = ?, quotation_id = ?,
+        `UPDATE orders SET customer_id = ?, warehouse_id = ?, branch_id = ?, quotation_id = ?, sales_rep_id = ?,
           expected_delivery_date = ?, subtotal = ROUND(?*100), discount_amount = ROUND(?*100), tax_amount = ROUND(?*100),
           shipping_cost = ROUND(?*100), total_amount = ROUND(?*100), remaining_amount = ROUND(?*100), notes = ?,
           updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [
-          input.customerId, warehouse, branchId, input.quotationId || null, input.expectedDeliveryDate || null,
+          input.customerId, warehouse, branchId, input.quotationId || null, salesRepId, input.expectedDeliveryDate || null,
           totals.subtotal, totals.discountAmount, totals.taxAmount, totals.shippingCost,
           totals.totalAmount, totals.totalAmount, input.notes || null, id,
         ]
@@ -832,6 +838,17 @@ export class OrderService {
   }
 
   // ─── Internals ──────────────────────────────────────────────────────────────
+
+  /** Soft check: any active employee may be recorded as the order's sales rep. */
+  private validateSalesRep(salesRepId?: string): string | null {
+    if (!salesRepId) return null;
+    const rep = this.db.query<{ id: string }>(
+      `SELECT id FROM employees WHERE id = ? AND is_active = 1`,
+      [salesRepId]
+    )[0];
+    if (!rep) throw new Error('المندوب المحدد غير موجود أو غير نشط.');
+    return salesRepId;
+  }
 
   private resolveWarehouse(warehouseId?: string): string {
     if (warehouseId) {

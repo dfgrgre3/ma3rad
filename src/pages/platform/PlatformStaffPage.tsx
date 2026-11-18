@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatformPermission } from '../../hooks/platform/usePlatformPermission';
 import { PlatformStaffAuthService } from '../../services/domains/platform/PlatformStaffAuthService';
 import { AuthService } from '../../services/domains/auth/AuthService';
@@ -151,10 +153,16 @@ export const PlatformStaffPage: React.FC = () => {
 
   const mfaMissingIds = useMemo(() => new Set(mfaCompliance.missing.map((item) => item.id)), [mfaCompliance]);
 
-  const loadStaff = useCallback(() => {
+  const loadStaff = useCallback(async () => {
     setLoading(true);
     try {
-      setStaffList(platformAdminService.listPlatformStaff(search, roleFilter));
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const staff = await centralPlatformClient.listStaff();
+        setStaffList(staff as any);
+      } else {
+        setStaffList(platformAdminService.listPlatformStaff(search, roleFilter));
+      }
       setRoles(platformAdminService.listPlatformStaffRoles());
       setError(null);
     } catch (err) {
@@ -164,10 +172,20 @@ export const PlatformStaffPage: React.FC = () => {
     }
   }, [search, roleFilter]);
 
-  const loadSessions = useCallback(() => {
+  const loadSessions = useCallback(async () => {
     try {
-      setSessions(platformAdminService.listStaffSessions());
-      setDevices(platformAdminService.listTrustedDevices());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [sessions, devices] = await Promise.all([
+          centralPlatformClient.listStaffSessions(),
+          centralPlatformClient.listStaffDevices(),
+        ]);
+        setSessions(sessions as any);
+        setDevices(devices as any);
+      } else {
+        setSessions(platformAdminService.listStaffSessions());
+        setDevices(platformAdminService.listTrustedDevices());
+      }
       setCurrentDeviceTrusted(PlatformStaffAuthService.isCurrentDeviceTrusted());
     } catch {
       setSessions([]);
@@ -175,9 +193,15 @@ export const PlatformStaffPage: React.FC = () => {
     }
   }, []);
 
-  const loadInvites = useCallback(() => {
+  const loadInvites = useCallback(async () => {
     try {
-      setInvites(platformAdminService.listStaffInvites('all'));
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const invites = await centralPlatformClient.listStaffInvites();
+        setInvites(invites as any);
+      } else {
+        setInvites(platformAdminService.listStaffInvites('all'));
+      }
     } catch {
       setInvites([]);
     }

@@ -77,7 +77,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
   const canViewRestricted = can('hr.documents.restricted.view') || canManage;
   const canViewConfidential = can('hr.documents.confidential.view') || canManage;
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setRows(service.getDocuments({
@@ -87,7 +87,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
       }));
       setSummary(service.getSummary(employeeFilter || undefined));
       if (canManage && can('employees.view')) {
-        setEmployees(EmployeeService.getAll().map((employee) => ({ id: employee.id, name: employee.name })));
+        setEmployees((await EmployeeService.getAllAsync()).map((employee) => ({ id: employee.id, name: employee.name })));
       }
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل مستندات الموظفين.');

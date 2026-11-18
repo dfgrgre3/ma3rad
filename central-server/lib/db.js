@@ -490,6 +490,18 @@ async function createTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON platform_invoices(tenant_id, status);
 
+    CREATE TABLE IF NOT EXISTS platform_invoice_items (
+      id TEXT PRIMARY KEY,
+      invoice_id TEXT NOT NULL,
+      description TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      unit_price REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id) REFERENCES platform_invoices(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_invoice_items_invoice ON platform_invoice_items(invoice_id);
+
     CREATE TABLE IF NOT EXISTS platform_tenant_accounts (
       id TEXT PRIMARY KEY,
       tenant_id TEXT UNIQUE NOT NULL,
@@ -735,12 +747,32 @@ async function createTables() {
       requester_phone TEXT,
       assignee_id TEXT,
       assignee_name TEXT,
+      remote_access_requested INTEGER NOT NULL DEFAULT 0,
+      remote_access_approved INTEGER NOT NULL DEFAULT 0,
+      remote_access_requested_at TEXT,
+      remote_access_approved_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_message_at TEXT,
       FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_platform_support_tickets_tenant ON platform_support_tickets(tenant_id, status);
+
+    CREATE TABLE IF NOT EXISTS platform_remote_sessions (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      staff_id TEXT,
+      technician_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','ENDED','EXPIRED')),
+      started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      ended_at TEXT,
+      duration_minutes INTEGER,
+      summary TEXT,
+      FOREIGN KEY (ticket_id) REFERENCES platform_support_tickets(id) ON DELETE CASCADE,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_remote_sessions_ticket ON platform_remote_sessions(ticket_id);
 
     CREATE TABLE IF NOT EXISTS platform_support_messages (
       id TEXT PRIMARY KEY,
@@ -861,6 +893,384 @@ async function createTables() {
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_status ON platform_backups(status)');
+
+  await db.exec(`
+-- 
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_modules (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      description TEXT,
+      category TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_feature_flags (
+      id TEXT PRIMARY KEY,
+      key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      description TEXT,
+      is_enabled INTEGER NOT NULL DEFAULT 0,
+      rollout_percentage INTEGER NOT NULL DEFAULT 0,
+      target_tenants TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_staff_sessions (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      device_name TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_activity_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_staff_sessions_staff ON platform_staff_sessions(staff_id);
+
+    CREATE TABLE IF NOT EXISTS platform_staff_devices (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      device_name TEXT,
+      fingerprint TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      is_trusted INTEGER NOT NULL DEFAULT 0,
+      last_seen_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(staff_id, fingerprint)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_staff_devices_staff ON platform_staff_devices(staff_id);
+
+    CREATE TABLE IF NOT EXISTS platform_staff_invites (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      phone TEXT,
+      role TEXT NOT NULL DEFAULT 'SUPPORT_AGENT',
+      token_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      invited_by TEXT,
+      accepted_at TEXT,
+      revoked_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_staff_invites_email ON platform_staff_invites(email);
+-- 
+    CREATE TABLE IF NOT EXISTS platform_security_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'INFO',
+      actor_id TEXT,
+      actor_name TEXT,
+      tenant_id TEXT,
+      details TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_security_events_type ON platform_security_events(event_type, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_security_events_severity ON platform_security_events(severity, created_at);
+
+    CREATE TABLE IF NOT EXISTS platform_api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL,
+      prefix TEXT,
+      scopes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_used_at TEXT,
+      expires_at TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      revoked_at TEXT
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_analytics_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      actor_id TEXT,
+      tenant_id TEXT,
+      metadata TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_analytics_events_type ON platform_analytics_events(event_type, created_at);
+-- 
+    CREATE TABLE IF NOT EXISTS platform_emergency_events (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      severity TEXT NOT NULL DEFAULT 'MEDIUM',
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      affected_tenants TEXT,
+      actions_taken TEXT,
+      resolved_at TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_sync_events (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      payload TEXT,
+      error TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_sync_events_tenant ON platform_sync_events(tenant_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_sync_events_status ON platform_sync_events(status);
+-- 
+    CREATE TABLE IF NOT EXISTS platform_branding (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      logo_url TEXT,
+      primary_color TEXT,
+      secondary_color TEXT,
+      font_family TEXT,
+      custom_css TEXT,
+      login_bg_url TEXT,
+      invoice_template TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_customization (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      page_key TEXT NOT NULL,
+      element_key TEXT NOT NULL,
+      is_visible INTEGER NOT NULL DEFAULT 1,
+      custom_label TEXT,
+      custom_order INTEGER,
+      metadata TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_customization_tenant ON platform_customization(tenant_id, page_key);
+
+    CREATE TABLE IF NOT EXISTS platform_app_config (
+      id TEXT PRIMARY KEY,
+      config_key TEXT NOT NULL UNIQUE,
+      config_value TEXT NOT NULL,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_activity_settings (
+      id TEXT PRIMARY KEY,
+      activity_type TEXT NOT NULL,
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      settings TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_payment_providers (
+      id TEXT PRIMARY KEY,
+      provider_code TEXT NOT NULL UNIQUE,
+      provider_name TEXT NOT NULL,
+      is_enabled INTEGER NOT NULL DEFAULT 0,
+      config TEXT,
+      credentials_ref TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_sms_providers (
+      id TEXT PRIMARY KEY,
+      provider_code TEXT NOT NULL UNIQUE,
+      provider_name TEXT NOT NULL,
+      is_enabled INTEGER NOT NULL DEFAULT 0,
+      sender_id TEXT,
+      config TEXT,
+      credentials_ref TEXT,
+      daily_quota INTEGER NOT NULL DEFAULT 5000,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+-- 
+    CREATE TABLE IF NOT EXISTS platform_admin_actions (
+      id TEXT PRIMARY KEY,
+      action_type TEXT NOT NULL,
+      target_type TEXT,
+      target_id TEXT,
+      details TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      executed_by TEXT,
+      executed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_health_metrics (
+      id TEXT PRIMARY KEY,
+      metric_name TEXT NOT NULL,
+      metric_value REAL NOT NULL DEFAULT 0,
+      metric_unit TEXT,
+      status TEXT NOT NULL DEFAULT 'OK',
+      details TEXT,
+      recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_health_metrics_recorded ON platform_health_metrics(recorded_at);
+
+`);
+
+  await db.exec(`
+
+    -- ── Tenant Branding (versioned) ─────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS platform_tenant_branding (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      company_name TEXT,
+      logo_url TEXT,
+      logo_dark_url TEXT,
+      favicon_url TEXT,
+      primary_color TEXT,
+      secondary_color TEXT,
+      accent_color TEXT,
+      font_family TEXT,
+      invoice_template TEXT,
+      login_background_url TEXT,
+      login_welcome_title TEXT,
+      login_welcome_subtitle TEXT,
+      email_header_logo TEXT,
+      email_footer_text TEXT,
+      custom_subdomain TEXT,
+      allowed_customizations TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT,
+      UNIQUE(tenant_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_branding_tenant ON platform_tenant_branding(tenant_id, version DESC);
+
+    -- ── Tenant UI Customization (versioned) ────────────────────────────────
+    CREATE TABLE IF NOT EXISTS platform_ui_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      hidden_pages TEXT,
+      hidden_actions TEXT,
+      custom_labels TEXT,
+      form_field_rules TEXT,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_tenant_ui_customization (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      profile_id TEXT,
+      hidden_pages TEXT,
+      hidden_actions TEXT,
+      custom_labels TEXT,
+      form_field_rules TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT,
+      UNIQUE(tenant_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_ui_tenant ON platform_tenant_ui_customization(tenant_id, version DESC);
+
+    -- ── Tenant App Configuration (versioned + templates + rollouts) ────────
+    CREATE TABLE IF NOT EXISTS platform_config_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      config_payload TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_tenant_config (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      template_id TEXT,
+      config_payload TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT,
+      UNIQUE(tenant_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_config_tenant ON platform_tenant_config(tenant_id, version DESC);
+
+    CREATE TABLE IF NOT EXISTS platform_config_rollouts (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      target_tenants TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_config_acks (
+      id TEXT PRIMARY KEY,
+      rollout_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      device_id TEXT,
+      acked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      config_version INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_config_acks_rollout ON platform_config_acks(rollout_id, tenant_id);
+
+    -- ── Tenant Activity Settings (versioned) ───────────────────────────────
+    CREATE TABLE IF NOT EXISTS platform_tenant_activity (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      activity_id TEXT NOT NULL,
+      enabled_modules TEXT,
+      custom_terminology TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_by TEXT,
+      UNIQUE(tenant_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_activity_tenant ON platform_tenant_activity(tenant_id, version DESC);
+
+    -- ── Platform Staff (extended for admin control) ────────────────────────
+    CREATE TABLE IF NOT EXISTS platform_staff_extended (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      role TEXT NOT NULL DEFAULT 'SUPPORT_AGENT',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      permissions TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at TEXT
+    );
+
+    -- ── Analytics Aggregates (materialized views for performance) ──────────
+    CREATE TABLE IF NOT EXISTS platform_analytics_daily (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      metric_type TEXT NOT NULL,
+      metric_value REAL NOT NULL,
+      dimensions TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(date, metric_type, dimensions)
+    );
+`);
 
   console.log('Tables created successfully');
 }

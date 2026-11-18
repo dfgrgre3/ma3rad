@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 103 allowlisted endpoint pattern(s).
+ * 171 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -354,6 +354,37 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/billing/invoices/:id",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/invoices/:id/status",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/invoices/:id/void",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/payments",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/payments/:id",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/operations/jobs",
     "methods": [
       "GET",
@@ -494,6 +525,36 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/support/:id/remote-access/request",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/:id/remote-access/approve",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/:id/remote-access/start",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/remote-sessions/:sessionId/end",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/:id/remote-sessions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/monitoring/errors",
     "methods": [
       "GET"
@@ -569,10 +630,381 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/overview",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/billing/payments",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/settings",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/modules",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/modules/:id",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/feature-flags",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/feature-flags/:id",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/sessions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/sessions/:id",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/devices",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/devices/:id",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/invites",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/staff/invites/:id",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/overview",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/events",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/api-keys",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/api-keys/:id",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/events",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/summary",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/emergency/events",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/emergency/events/:id",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/sync/events",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/sync/status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/branding",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/customization",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/activity-settings",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/integrations/providers",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/actions",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/system-health",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/config/permission-limits",
     "methods": [
       "GET",
       "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/business-performance",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/customer-metrics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/license-metrics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/subscription-metrics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/analytics/operations-metrics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/branding/tenant/:tenantId",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/branding/platform",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/branding/tenant/:tenantId/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/branding/tenant/:tenantId/rollback/:version",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/customization/ui-profiles",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/customization/tenant/:tenantId",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/customization/tenant/:tenantId/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/customization/tenant/:tenantId/rollback/:version",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/templates",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/rollouts",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/rollouts/:id/start",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/tenant/:tenantId",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/tenant/:tenantId/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/tenant/:tenantId/rollback/:version",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-config/rollouts/:id/acks",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/activity/tenant/:tenantId",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/activity/tenant/:tenantId/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/activity/tenant/:tenantId/rollback/:version",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/staff",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/staff/:id",
+    "methods": [
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/staff-roles",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/tenant-users/:tenantId",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/tenant-users/:tenantId/:userId",
+    "methods": [
+      "PUT",
+      "DELETE"
     ]
   },
   {

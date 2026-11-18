@@ -144,7 +144,7 @@ test('branch access enforces assigned and explicit central scopes in service que
   `);
   assert.throws(
     () => inventory.transferStock('wh_scope_a', 'wh_scope_b', 'prod_scope_return', 1, 'unauthorized destination'),
-    /ليس لديك صلاحية الوصول/
+    /ليس لديك صلاحية الوصول|خارج نطاق صلاحياتك/
   );
   assert.equal(
     db.query<{ count: number }>(
@@ -233,7 +233,7 @@ test('branch access enforces assigned and explicit central scopes in service que
   procurement.settleClaim(manualClaim.id, 'REFUND', 5);
   assert.equal(
     db.query<{ balance: number }>('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_scope_a'])[0].balance,
-    cashBeforeClaimRefund + 5
+    cashBeforeClaimRefund + 500
   );
   assert.equal(
     db.query<{ branchId: string }>('SELECT branch_id AS branchId FROM supplier_claims WHERE id = ?', [manualClaim.id])[0]?.branchId,
@@ -537,7 +537,7 @@ test('inventory reconciliation and audit logs are limited to the active branch a
        pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
        min_selling_price_m2, min_stock_level, is_active)
     VALUES ('prod_recon_scope', 'RECON-SKU', 'RECON-BAR', 'Reconciliation Scope Product',
-       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1)
+       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 1000, 2000, 1500, 1000, 1, 1)
   `);
   db.run(`
     INSERT INTO products
@@ -545,7 +545,7 @@ test('inventory reconciliation and audit logs are limited to the active branch a
        pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
        min_selling_price_m2, min_stock_level, is_active)
     VALUES ('prod_recon_qty_scope', 'RECON-QTY-SKU', 'RECON-QTY-BAR', 'Quantity drift product',
-       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1)
+       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 1000, 2000, 1500, 1000, 1, 1)
   `);
   db.run(`
     INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
@@ -575,13 +575,13 @@ test('inventory reconciliation and audit logs are limited to the active branch a
       (id, entry_number, date, description, reference_type, reference_id,
        total_debit, total_credit, is_posted, created_by, branch_id, company_id)
      VALUES ('je_recon_scope_a', 'JE-RECON-SCOPE-A', '2026-01-01', 'Branch A inventory',
-       'TEST', 'recon_scope_a', 50, 50, 1, 'usr_recon_scope', 'br_recon_scope_a', 'cmp_main'),
+       'TEST', 'recon_scope_a', 5000, 5000, 1, 'usr_recon_scope', 'br_recon_scope_a', 'cmp_main'),
            ('je_recon_scope_b', 'JE-RECON-SCOPE-B', '2026-01-01', 'Branch B inventory',
        'TEST', 'recon_scope_b', 500000, 500000, 1, 'usr_recon_scope', 'br_recon_scope_b', 'cmp_main')
   `);
   db.run(`
     INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit)
-    VALUES ('jel_recon_scope_a', 'je_recon_scope_a', ?, 50, 0),
+    VALUES ('jel_recon_scope_a', 'je_recon_scope_a', ?, 5000, 0),
            ('jel_recon_scope_b', 'je_recon_scope_b', ?, 500000, 0)
   `, [accountId, accountId]);
 
@@ -590,16 +590,16 @@ test('inventory reconciliation and audit logs are limited to the active branch a
   assert.throws(() => inventory.reconcileInventoryWithGL('wh_recon_scope_b'), /ليس لديك صلاحية الوصول|الفرع النشط/);
   const result = inventory.reconcileInventoryWithGL();
   const expectedPhysical = db.query<{ total: number }>(`
-    SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS total
+    SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 AS total
     FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
     WHERE ws.warehouse_id = 'wh_recon_scope_a' AND p.is_active = 1
   `)[0].total;
   const expectedFifo = db.query<{ total: number }>(`
-    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS total
+    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) / 100.0 AS total
     FROM inventory_cost_layers WHERE warehouse_id = 'wh_recon_scope_a' AND quantity_remaining > 0
   `)[0].total;
   const expectedLedger = db.query<{ total: number }>(`
-    SELECT COALESCE(SUM(jel.debit - jel.credit), 0) AS total
+    SELECT COALESCE(SUM(jel.debit - jel.credit), 0) / 100.0 AS total
     FROM journal_entry_lines jel
     JOIN journal_entries je ON je.id = jel.entry_id
     WHERE je.is_posted = 1 AND je.branch_id = 'br_recon_scope_a' AND jel.account_id = ?

@@ -137,7 +137,7 @@ public createClaim(dto: {
         INSERT INTO supplier_claims (
           id, claim_number, date, supplier_id, branch_id, purchase_invoice_id, grn_id, purchase_order_id,
           claim_type, severity, claimed_amount, agreed_amount, status, resolution_type, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 0, 'OPEN', 'PENDING', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 0, 'OPEN', 'PENDING', ?, ?)
       `, [
         claimId, claimNumber, today, dto.supplierId, branchId, dto.purchaseInvoiceId || null,
         dto.grnId || null, dto.purchaseOrderId || null, dto.claimType, dto.severity || 'MEDIUM',

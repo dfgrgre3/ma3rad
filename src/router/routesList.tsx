@@ -176,6 +176,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'data-import', element: <P.DataImportPage /> },
   { path: 'settings', element: <P.SettingsHubPage /> },
   { path: 'settings/approvals', element: <P.ApprovalSettingsPage /> },
+  { path: 'settings/license-mode', element: <P.LicenseModeSettingsPage /> },
   { path: 'settings/app-configuration', element: <Navigate to="/settings?tab=appConfig" replace /> },
   { path: 'settings/configuration-studio', element: <Navigate to="/settings?tab=configStudio" replace /> },
   { path: 'users', element: <P.AdminPage initialTab="users" /> },

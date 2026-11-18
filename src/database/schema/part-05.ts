@@ -109,6 +109,20 @@ CREATE INDEX IF NOT EXISTS idx_commissions_emp ON commissions(employee_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_period ON commissions(period_month);
 CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
 
+-- Additional branches a sales rep serves beyond employees.branch_id (home branch).
+CREATE TABLE IF NOT EXISTS employee_branch_assignments (
+  employee_id TEXT NOT NULL,
+  branch_id TEXT NOT NULL,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (employee_id, branch_id),
+  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+  FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_eba_branch ON employee_branch_assignments(branch_id);
+CREATE INDEX IF NOT EXISTS idx_eba_employee ON employee_branch_assignments(employee_id);
+
 -- 21. SALES ORDERS
 -- An order is a commitment before the invoice: it reserves stock and can be
 -- fulfilled partially. Distinct from sales_invoices, which are the financial record.

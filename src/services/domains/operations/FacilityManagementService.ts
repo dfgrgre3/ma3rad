@@ -489,6 +489,64 @@ export class FacilityManagementService {
     this.db.run(`UPDATE facility_safety_records SET result = 'CLOSED', closed_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
   }
 
+  updateContract(input: { id: string; title?: string; vendorName?: string; startsAt?: string; endsAt?: string; nextPaymentDate?: string; paymentAmount?: number; paymentCycle?: string; expenseReference?: string; status?: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' }) {
+    const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('fl.branch_id', undefined, actor, true);
+    const existing = this.db.query<{ id: string; locationId: string }>(`
+      SELECT fc.id, fc.location_id AS locationId FROM facility_contracts fc JOIN facility_locations fl ON fl.id = fc.location_id
+      WHERE fc.id = ? AND ${scope.clause}
+    `, [input.id, ...scope.params]);
+    if (!existing.length) throw new Error('العقد غير متاح.');
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+    if (input.title !== undefined) { updates.push('title = ?'); params.push(input.title.trim()); }
+    if (input.vendorName !== undefined) { updates.push('vendor_name = ?'); params.push(input.vendorName.trim()); }
+    if (input.startsAt !== undefined) { updates.push('starts_at = ?'); params.push(input.startsAt || null); }
+    if (input.endsAt !== undefined) { updates.push('ends_at = ?'); params.push(input.endsAt || null); }
+    if (input.nextPaymentDate !== undefined) { updates.push('next_payment_date = ?'); params.push(input.nextPaymentDate || null); }
+    if (input.paymentAmount !== undefined) { updates.push('payment_amount = ROUND(?*100)'); params.push(Math.max(0, Number(input.paymentAmount))); }
+    if (input.paymentCycle !== undefined) { updates.push('payment_cycle = ?'); params.push(input.paymentCycle); }
+    if (input.status !== undefined) { updates.push('status = ?'); params.push(input.status); }
+    if (input.expenseReference !== undefined) { updates.push('expense_reference = ?'); params.push(input.expenseReference || null); }
+    if (!updates.length) throw new Error('لا توجد بيانات للتعديل.');
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(input.id);
+    this.db.run(`UPDATE facility_contracts SET ${updates.join(', ')} WHERE id = ?`, params);
+    this.db.run(`
+      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+      VALUES (?, ?, ?, ?, 'FACILITY_CONTRACT', ?, ?)
+    `, [`aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`, actor.id, actor.fullName, 'تعديل عقد تشغيلي', input.id,
+      JSON.stringify({ title: input.title, vendorName: input.vendorName, status: input.status })]);
+  }
+
+  updateSafetyRecord(input: { id: string; title?: string; checklistName?: string; result?: string; riskLevel?: string; observations?: string; correctiveAction?: string; dueDate?: string }) {
+    const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('fl.branch_id', undefined, actor, true);
+    const existing = this.db.query<{ id: string; result: string }>(`
+      SELECT sr.id, sr.result FROM facility_safety_records sr JOIN facility_locations fl ON fl.id = sr.location_id
+      WHERE sr.id = ? AND ${scope.clause}
+    `, [input.id, ...scope.params]);
+    if (!existing.length) throw new Error('سجل السلامة غير متاح.');
+    const updates: string[] = [];
+    const params: (string | null)[] = [];
+    if (input.title !== undefined) { updates.push('title = ?'); params.push(input.title.trim()); }
+    if (input.checklistName !== undefined) { updates.push('checklist_name = ?'); params.push(input.checklistName || null); }
+    if (input.result !== undefined) { updates.push('result = ?'); params.push(input.result); }
+    if (input.riskLevel !== undefined) { updates.push('risk_level = ?'); params.push(input.riskLevel || null); }
+    if (input.observations !== undefined) { updates.push('observations = ?'); params.push(input.observations || null); }
+    if (input.correctiveAction !== undefined) { updates.push('corrective_action = ?'); params.push(input.correctiveAction || null); }
+    if (input.dueDate !== undefined) { updates.push('due_date = ?'); params.push(input.dueDate || null); }
+    if (!updates.length) throw new Error('لا توجد بيانات للتعديل.');
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(input.id);
+    this.db.run(`UPDATE facility_safety_records SET ${updates.join(', ')} WHERE id = ?`, params);
+    this.db.run(`
+      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+      VALUES (?, ?, ?, ?, 'FACILITY_SAFETY', ?, ?)
+    `, [`aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`, actor.id, actor.fullName, 'تعديل سجل سلامة', input.id,
+      JSON.stringify({ title: input.title, result: input.result, riskLevel: input.riskLevel })]);
+  }
+
   /* ========== المواقع: تعديل وأرشفة ========== */
 
   updateLocation(input: { id: string; name?: string; code?: string; address?: string; managerUserId?: string; locationType?: LocationType; parentId?: string | null }) {

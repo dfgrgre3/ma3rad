@@ -197,6 +197,22 @@ const ROUTE_MANIFEST = [
     GET: ['platform.billing.view', 'platform.billing.manage'],
     POST: ['platform.billing.create', 'platform.billing.manage'],
   }),
+  route('/api/v1/admin/billing/invoices/:id', ['GET'], {
+    GET: ['platform.billing.view', 'platform.billing.manage'],
+  }),
+  route('/api/v1/admin/billing/invoices/:id/status', ['POST'], {
+    POST: ['platform.billing.update', 'platform.billing.manage'],
+  }),
+  route('/api/v1/admin/billing/invoices/:id/void', ['POST'], {
+    POST: ['platform.billing.delete', 'platform.billing.manage'],
+  }),
+  route('/api/v1/admin/billing/payments', ['GET', 'POST'], {
+    GET: ['platform.billing.view', 'platform.billing.manage'],
+    POST: ['platform.billing.create', 'platform.billing.approve', 'platform.billing.manage'],
+  }),
+  route('/api/v1/admin/billing/payments/:id', ['DELETE'], {
+    DELETE: ['platform.billing.delete', 'platform.billing.manage'],
+  }),
 
   // ── Operations ─────────────────────────────────────────────────────────────
   route('/api/v1/admin/operations/jobs', ['GET', 'POST'], {
@@ -283,6 +299,21 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/support/:id/messages', ['POST'], {
     POST: ['platform.support.update'],
   }),
+  route('/api/v1/admin/support/:id/remote-access/request', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
+  route('/api/v1/admin/support/:id/remote-access/approve', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
+  route('/api/v1/admin/support/:id/remote-access/start', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
+  route('/api/v1/admin/support/remote-sessions/:sessionId/end', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
+  route('/api/v1/admin/support/:id/remote-sessions', ['GET'], {
+    GET: ['platform.support.view'],
+  }),
 
   // ── Error monitoring ────────────────────────────────────────────────────────
   route('/api/v1/admin/monitoring/errors', ['GET'], {
@@ -330,9 +361,220 @@ const ROUTE_MANIFEST = [
     GET: ['platform.app-configuration.view'],
     PUT: ['platform.app-configuration.update', 'platform.settings.update'],
   }),
+
+  // ── Admin Extra (Dashboard, Billing, Settings, Product, Staff, Security, etc.) ──
+  route('/api/v1/admin/overview', ['GET'], {
+    GET: ['platform.dashboard.view', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/billing/payments', ['GET', 'POST'], {
+    GET: ['platform.billing.view', 'platform.billing.manage'],
+    POST: ['platform.billing.create', 'platform.billing.manage'],
+  }),
+  route('/api/v1/admin/settings', ['GET', 'PUT'], {
+    GET: ['platform.settings.view', 'platform.settings.manage'],
+    PUT: ['platform.settings.update', 'platform.settings.manage'],
+  }),
+  route('/api/v1/admin/modules', ['GET', 'POST'], {
+    GET: ['platform.product.view', 'platform.product.manage'],
+    POST: ['platform.product.create', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/modules/:id', ['PUT'], {
+    PUT: ['platform.product.update', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/feature-flags', ['GET', 'POST'], {
+    GET: ['platform.product.view', 'platform.product.manage'],
+    POST: ['platform.product.create', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/feature-flags/:id', ['PUT'], {
+    PUT: ['platform.product.update', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/staff/sessions', ['GET'], {
+    GET: ['platform.staff.view', 'platform.staff.manage_sessions'],
+  }),
+  route('/api/v1/admin/staff/sessions/:id', ['DELETE'], {
+    DELETE: ['platform.staff.manage_sessions'],
+  }),
+  route('/api/v1/admin/staff/devices', ['GET'], {
+    GET: ['platform.staff.view', 'platform.staff.manage_devices'],
+  }),
+  route('/api/v1/admin/staff/devices/:id', ['DELETE'], {
+    DELETE: ['platform.staff.manage_devices'],
+  }),
+  route('/api/v1/admin/staff/invites', ['GET', 'POST'], {
+    GET: ['platform.staff.view', 'platform.staff.manage_invites'],
+    POST: ['platform.staff.create', 'platform.staff.manage_invites'],
+  }),
+  route('/api/v1/admin/staff/invites/:id', ['DELETE'], {
+    DELETE: ['platform.staff.manage_invites'],
+  }),
+  route('/api/v1/admin/security/overview', ['GET'], {
+    GET: ['platform.security.view', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/security/events', ['GET'], {
+    GET: ['platform.security.view', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/security/api-keys', ['GET', 'POST'], {
+    GET: ['platform.security.view', 'platform.security.manage'],
+    POST: ['platform.security.create', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/security/api-keys/:id', ['DELETE'], {
+    DELETE: ['platform.security.delete', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/analytics/events', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/analytics/summary', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/emergency/events', ['GET', 'POST'], {
+    GET: ['platform.emergency.view', 'platform.emergency.manage'],
+    POST: ['platform.emergency.create', 'platform.emergency.manage'],
+  }),
+  route('/api/v1/admin/emergency/events/:id', ['PUT'], {
+    PUT: ['platform.emergency.update', 'platform.emergency.manage'],
+  }),
+  route('/api/v1/admin/sync/events', ['GET'], {
+    GET: ['platform.sync.view', 'platform.sync.manage'],
+  }),
+  route('/api/v1/admin/sync/status', ['GET'], {
+    GET: ['platform.sync.view', 'platform.sync.manage'],
+  }),
+  route('/api/v1/admin/branding', ['GET', 'PUT'], {
+    GET: ['platform.branding.view', 'platform.branding.manage'],
+    PUT: ['platform.branding.update', 'platform.branding.manage'],
+  }),
+  route('/api/v1/admin/customization', ['GET', 'PUT'], {
+    GET: ['platform.customization.view', 'platform.customization.manage'],
+    PUT: ['platform.customization.update', 'platform.customization.manage'],
+  }),
+  route('/api/v1/admin/app-config', ['GET', 'PUT'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+    PUT: ['platform.appconfig.update', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/activity-settings', ['GET', 'PUT'], {
+    GET: ['platform.activity.view', 'platform.activity.manage'],
+    PUT: ['platform.activity.update', 'platform.activity.manage'],
+  }),
+  route('/api/v1/admin/integrations/providers', ['GET', 'PUT'], {
+    GET: ['platform.integrations.view', 'platform.integrations.manage'],
+    PUT: ['platform.integrations.update', 'platform.integrations.manage'],
+  }),
+  route('/api/v1/admin/admin-control/actions', ['GET', 'POST'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage'],
+    POST: ['platform.admincontrol.create', 'platform.admincontrol.manage'],
+  }),
+  route('/api/v1/admin/system-health', ['GET', 'POST'], {
+    GET: ['platform.health.view', 'platform.health.manage'],
+    POST: ['platform.health.report', 'platform.health.manage'],
+  }),
   route('/api/v1/admin/config/permission-limits', ['GET', 'PUT'], {
     GET: ['platform.app-configuration.view'],
     PUT: ['platform.app-configuration.update', 'platform.settings.update'],
+  }),
+
+  // ── Complex Analytics Endpoints ─────────────────────────────────────────
+  route('/api/v1/admin/analytics/business-performance', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/analytics/customer-metrics', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/analytics/license-metrics', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/analytics/subscription-metrics', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+  route('/api/v1/admin/analytics/operations-metrics', ['GET'], {
+    GET: ['platform.analytics.view', 'platform.analytics.manage'],
+  }),
+
+  // ── Tenant Branding (versioned) ─────────────────────────────────────────
+  route('/api/v1/admin/branding/tenant/:tenantId', ['GET', 'PUT'], {
+    GET: ['platform.branding.view', 'platform.branding.manage'],
+    PUT: ['platform.branding.update', 'platform.branding.manage'],
+  }),
+  route('/api/v1/admin/branding/platform', ['GET'], {
+    GET: ['platform.branding.view', 'platform.branding.manage'],
+  }),
+  route('/api/v1/admin/branding/tenant/:tenantId/versions', ['GET'], {
+    GET: ['platform.branding.view', 'platform.branding.manage'],
+  }),
+  route('/api/v1/admin/branding/tenant/:tenantId/rollback/:version', ['POST'], {
+    POST: ['platform.branding.update', 'platform.branding.manage'],
+  }),
+
+  // ── Tenant UI Customization (versioned) ────────────────────────────────
+  route('/api/v1/admin/customization/ui-profiles', ['GET'], {
+    GET: ['platform.customization.view', 'platform.customization.manage'],
+  }),
+  route('/api/v1/admin/customization/tenant/:tenantId', ['GET', 'PUT'], {
+    GET: ['platform.customization.view', 'platform.customization.manage'],
+    PUT: ['platform.customization.update', 'platform.customization.manage'],
+  }),
+  route('/api/v1/admin/customization/tenant/:tenantId/versions', ['GET'], {
+    GET: ['platform.customization.view', 'platform.customization.manage'],
+  }),
+  route('/api/v1/admin/customization/tenant/:tenantId/rollback/:version', ['POST'], {
+    POST: ['platform.customization.update', 'platform.customization.manage'],
+  }),
+
+  // ── Tenant App Configuration (versioned + templates + rollouts) ────────
+  route('/api/v1/admin/app-config/templates', ['GET'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/rollouts', ['GET', 'POST'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+    POST: ['platform.appconfig.create', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/rollouts/:id/start', ['POST'], {
+    POST: ['platform.appconfig.update', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/tenant/:tenantId', ['GET', 'PUT'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+    PUT: ['platform.appconfig.update', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/tenant/:tenantId/versions', ['GET'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/tenant/:tenantId/rollback/:version', ['POST'], {
+    POST: ['platform.appconfig.update', 'platform.appconfig.manage'],
+  }),
+  route('/api/v1/admin/app-config/rollouts/:id/acks', ['GET'], {
+    GET: ['platform.appconfig.view', 'platform.appconfig.manage'],
+  }),
+
+  // ── Tenant Activity Settings (versioned) ───────────────────────────────
+  route('/api/v1/admin/activity/tenant/:tenantId', ['GET', 'PUT'], {
+    GET: ['platform.activity.view', 'platform.activity.manage'],
+    PUT: ['platform.activity.update', 'platform.activity.manage'],
+  }),
+  route('/api/v1/admin/activity/tenant/:tenantId/versions', ['GET'], {
+    GET: ['platform.activity.view', 'platform.activity.manage'],
+  }),
+  route('/api/v1/admin/activity/tenant/:tenantId/rollback/:version', ['POST'], {
+    POST: ['platform.activity.update', 'platform.activity.manage'],
+  }),
+
+  // ── Admin Control (Staff & Tenant Users) ────────────────────────────────
+  route('/api/v1/admin/admin-control/staff', ['GET', 'POST'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage'],
+    POST: ['platform.admincontrol.create', 'platform.admincontrol.manage'],
+  }),
+  route('/api/v1/admin/admin-control/staff/:id', ['PUT', 'DELETE'], {
+    PUT: ['platform.admincontrol.update', 'platform.admincontrol.manage'],
+    DELETE: ['platform.admincontrol.delete', 'platform.admincontrol.manage'],
+  }),
+  route('/api/v1/admin/admin-control/staff-roles', ['GET'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage'],
+  }),
+  route('/api/v1/admin/admin-control/tenant-users/:tenantId', ['GET', 'POST'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage'],
+    POST: ['platform.admincontrol.create', 'platform.admincontrol.manage'],
+  }),
+  route('/api/v1/admin/admin-control/tenant-users/:tenantId/:userId', ['PUT', 'DELETE'], {
+    PUT: ['platform.admincontrol.update', 'platform.admincontrol.manage'],
+    DELETE: ['platform.admincontrol.delete', 'platform.admincontrol.manage'],
   }),
 
   // ── Client-owned endpoints (device-authenticated, served by this server) ──
@@ -340,7 +582,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/licensing/validate', [], null, ['POST']),
   route('/api/v1/licensing/heartbeat', [], null, ['POST']),
   route('/api/v1/configuration/establishment', [], null, ['GET']),
-  route('/api/v1/configuration/current', [], null, ['GET']),
+  // Device-authenticated signed tenant configuration (X-Device-Id +
+  // X-Device-Credential); served by this server, no platform user required.
+  route('/api/v1/configuration/current', ['GET'], null),
   route('/api/v1/telemetry/errors', ['POST'], null),
   route('/api/v1/releases', ['GET'], null),
   // Device-authenticated application backup channel (X-Device-Id +

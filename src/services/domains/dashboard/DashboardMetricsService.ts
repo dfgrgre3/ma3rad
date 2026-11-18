@@ -135,7 +135,7 @@ export class DashboardMetricsService {
     let profit = 0;
     let profitData: { netProfit: number; dailyNetProfit: { date: string; profit: number }[] } = { netProfit: 0, dailyNetProfit: [] };
     try {
-      profitData = this.accountingService.getDashboardProfitData(fromStr, periodTo);
+      profitData = await this.accountingService.getDashboardProfitDataAsync(fromStr, periodTo);
       profit = profitData.netProfit;
     } catch (e) {
       this.addPartialError('profit', e as Error);
@@ -341,32 +341,32 @@ export class DashboardMetricsService {
     let recentActivities: RecentActivityItem[] = [];
 
     try {
-      metrics = this.accountingService.getDashboardMetrics();
+      metrics = await this.accountingService.getDashboardMetricsAsync();
     } catch (e) {
       this.addPartialError('metrics', e as Error);
       // Metrics will be null, UI should show "غير متاح" for valuation
     }
 
     try {
-      chartData = this.accountingService.getSalesTrendLast7Days();
+      chartData = await this.accountingService.getSalesTrendLast7DaysAsync();
     } catch (e) {
       this.addPartialError('chartData', e as Error);
     }
 
     try {
-      topProducts = this.accountingService.getTopSellingProducts(5);
+      topProducts = await this.accountingService.getTopSellingProductsAsync(5);
     } catch (e) {
       this.addPartialError('topProducts', e as Error);
     }
 
     try {
-      monthlyComparison = this.accountingService.getMonthlyComparison();
+      monthlyComparison = await this.accountingService.getMonthlyComparisonAsync();
     } catch (e) {
       this.addPartialError('monthlyComparison', e as Error);
     }
 
     try {
-      topCustomers = this.accountingService.getTopCustomers(5).map((customer) => ({
+      topCustomers = (await this.accountingService.getTopCustomersAsync(5)).map((customer) => ({
         name: customer.name,
         totalAmount: customer.totalPurchases,
         invoiceCount: customer.purchaseCount,
@@ -377,7 +377,7 @@ export class DashboardMetricsService {
 
     try {
       const categories = new Map<string, number>();
-      this.accountingService.getCategorySalesReport().forEach((category) => {
+      (await this.accountingService.getCategorySalesReportAsync()).forEach((category) => {
         categories.set(category.categoryName, (categories.get(category.categoryName) || 0) + category.totalRevenue);
       });
       categorySales = [...categories.entries()].map(([name, value]) => ({ name, value }));
@@ -386,13 +386,13 @@ export class DashboardMetricsService {
     }
 
     try {
-      gradeSales = this.accountingService.getSalesByGrade();
+      gradeSales = await this.accountingService.getSalesByGradeAsync();
     } catch (e) {
       this.addPartialError('gradeSales', e as Error);
     }
 
     try {
-      paymentDistribution = this.accountingService.getPaymentMethodDistribution().map((payment) => ({
+      paymentDistribution = (await this.accountingService.getPaymentMethodDistributionAsync()).map((payment) => ({
         method: this.translatePaymentMethod(payment.method),
         amount: payment.totalAmount,
         count: payment.count,
@@ -402,7 +402,7 @@ export class DashboardMetricsService {
     }
 
     try {
-      recentActivities = this.accountingService.getRecentActivities(6).map(a => ({
+      recentActivities = (await this.accountingService.getRecentActivitiesAsync(6)).map(a => ({
         type: a.type,
         description: a.description,
         amount: a.amount,

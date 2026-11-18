@@ -14,6 +14,8 @@ import {
   Building2,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import type {
   PlatformSyncLogEntry,
   PlatformSyncStatus,
@@ -36,16 +38,26 @@ export const PlatformSyncMonitorPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const logList = platformAdminService.listSyncStatus({
-        status: statusFilter as PlatformSyncStatus || undefined,
-        limit: 100,
-      });
-      const tenantList = platformAdminService.listTenants();
-      setLogs(logList);
-      setTenants(tenantList);
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [logList, tenantList] = await Promise.all([
+          centralPlatformClient.listSyncEvents({ status: statusFilter || undefined, limit: 100 }),
+          centralPlatformClient.listTenants(),
+        ]);
+        setLogs(logList as any);
+        setTenants(tenantList as any);
+      } else {
+        const logList = platformAdminService.listSyncStatus({
+          status: statusFilter as PlatformSyncStatus || undefined,
+          limit: 100,
+        });
+        const tenantList = platformAdminService.listTenants();
+        setLogs(logList);
+        setTenants(tenantList);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل سجلات المزامنة.');

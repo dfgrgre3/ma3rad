@@ -140,6 +140,7 @@ export { AppConfigurationView } from './lazyPages_part04';
 export { ConfigurationStudioView } from './lazyPages_part04';
 export { DataImportPage } from './lazyPages_part04';
 export { SettingsHubPage } from './lazyPages_part04';
+export { LicenseModeSettingsPage } from './lazyPages_part04';
 export { CentralActivationView } from './lazyPages_part04';
 export { UsersView } from './lazyPages_part04';
 export { BackupPage } from './lazyPages_part04';

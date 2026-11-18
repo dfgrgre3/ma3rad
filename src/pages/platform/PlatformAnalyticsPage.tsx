@@ -11,6 +11,9 @@ import {
   Filter,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import type {
   PlatformBusinessPerformance,
   PlatformCustomerMetrics,
@@ -44,23 +47,39 @@ export const PlatformAnalyticsPage: React.FC = () => {
   const [licenseMetrics, setLicenseMetrics] = useState<PlatformLicenseMetrics | null>(null);
   const [opsMetrics, setOpsMetrics] = useState<PlatformOperationsMetrics | null>(null);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
+    const centralState = getCentralDataSourceState();
     try {
-      const plns = platformAdminService.listPlans();
-      setPlans(plns);
-
-      const bp = platformAdminService.getBusinessPerformance(period, planId || undefined);
-      const cm = platformAdminService.getCustomerMetrics(period, planId || undefined);
-      const sm = platformAdminService.getSubscriptionMetrics(period, planId || undefined);
-      const lm = platformAdminService.getLicenseMetrics(period, planId || undefined);
-      const om = platformAdminService.getOperationsMetrics(period);
-
-      setBusinessPerf(bp);
-      setCustomerMetrics(cm);
-      setSubMetrics(sm);
-      setLicenseMetrics(lm);
-      setOpsMetrics(om);
+      if (centralState.active) {
+        const [plns, bp, cm, sm, lm, om] = await Promise.all([
+          centralPlatformClient.listPlans(),
+          centralPlatformClient.getBusinessPerformance(period),
+          centralPlatformClient.getCustomerMetrics(period),
+          centralPlatformClient.getSubscriptionMetrics(),
+          centralPlatformClient.getLicenseMetrics(),
+          centralPlatformClient.getOperationsMetrics(),
+        ]);
+        setPlans(plns);
+        setBusinessPerf(bp);
+        setCustomerMetrics(cm);
+        setSubMetrics(sm);
+        setLicenseMetrics(lm);
+        setOpsMetrics(om);
+      } else {
+        const plns = platformAdminService.listPlans();
+        setPlans(plns);
+        const bp = platformAdminService.getBusinessPerformance(period, planId || undefined);
+        const cm = platformAdminService.getCustomerMetrics(period, planId || undefined);
+        const sm = platformAdminService.getSubscriptionMetrics(period, planId || undefined);
+        const lm = platformAdminService.getLicenseMetrics(period, planId || undefined);
+        const om = platformAdminService.getOperationsMetrics(period);
+        setBusinessPerf(bp);
+        setCustomerMetrics(cm);
+        setSubMetrics(sm);
+        setLicenseMetrics(lm);
+        setOpsMetrics(om);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل التحليلات والتقارير.');
@@ -106,6 +125,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-4 text-right">
+      <CentralUnsupportedNotice feature="التحليلات والتقارير المتقدمة" />
       <PageHeader
         title="التقارير والتحليلات المركزية (Platform Analytics & BI)"
         description="تحليلات الإيرادات (MRR/ARR)، معدلات النمو، سلوك العملاء، التراخيص، ومؤشرات الأداء التشغيلي."

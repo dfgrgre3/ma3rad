@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { OrderService, Order, OrderStatus, OrderStats, OrderStatusEntry } from '../../../services/domains/sales/OrderService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
@@ -53,6 +54,7 @@ export const OrdersPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [salesReps, setSalesReps] = useState<ReturnType<typeof EmployeeService.getSalesReps>>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | OrderStatus>('ALL');
   const [dateFrom, setDateFrom] = useState('');
@@ -97,6 +99,10 @@ export const OrdersPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo]);
+  useEffect(() => {
+    const branchId = warehouses.find((w) => w.id === form.warehouseId)?.branchId;
+    setSalesReps(EmployeeService.getSalesReps(branchId));
+  }, [form.warehouseId, warehouses]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
   const pageItems = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -106,6 +112,7 @@ export const OrdersPage: React.FC = () => {
     setProducts(productService.getAllProducts());
     const whs = inventoryService.getAllWarehouses();
     setWarehouses(whs);
+    setSalesReps(EmployeeService.getSalesReps());
     return whs;
   };
 
@@ -127,6 +134,7 @@ export const OrdersPage: React.FC = () => {
       setForm({
         customerId: full.customerId,
         warehouseId: full.warehouseId,
+        salesRepId: full.salesRepId || '',
         deliveryDate: full.expectedDeliveryDate || '',
         notes: full.notes || '',
         shipping: String(full.shippingCost || ''),
@@ -202,6 +210,7 @@ export const OrdersPage: React.FC = () => {
       const payload = {
         customerId: form.customerId,
         warehouseId: form.warehouseId,
+        salesRepId: form.salesRepId,
         expectedDeliveryDate: form.deliveryDate || undefined,
         notes: form.notes || undefined,
         shippingCost: Number(form.shipping) || 0,
@@ -430,6 +439,7 @@ export const OrdersPage: React.FC = () => {
           customers={customers}
           products={products}
           warehouses={warehouses}
+          salesReps={salesReps}
           saving={saving}
           onClose={() => setFormOpen(false)}
           onSubmit={submitForm}

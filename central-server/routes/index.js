@@ -22,6 +22,7 @@ const monitoringRoutes = require('./monitoring');
 const telemetryRoutes = require('./telemetry');
 const { adminRouter: releasesAdminRoutes, clientRouter: releasesClientRoutes } = require('./releases');
 const { adminRouter: appBackupsAdminRoutes, clientRouter: appBackupsClientRoutes } = require('./appBackups');
+const adminExtraRoutes = require('./adminExtra');
 
 /**
  * Mounts every central API router under /api/v1.
@@ -49,6 +50,7 @@ function createApiRouter() {
   router.use('/admin/support', supportRoutes);
   router.use('/admin/monitoring', monitoringRoutes);
   router.use('/admin/releases', releasesAdminRoutes);
+  router.use('/', adminExtraRoutes);
   router.use('/telemetry', telemetryRoutes);
   router.use('/releases', releasesClientRoutes);
   router.use('/device/backups', appBackupsClientRoutes);

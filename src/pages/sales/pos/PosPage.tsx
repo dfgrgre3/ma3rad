@@ -47,6 +47,7 @@ import { PosCartPanel } from './components/PosCartPanel';
 import { PosCheckoutPanel } from './components/PosCheckoutPanel';
 import { gradeLabel as configuredGradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { ShoppingCart, X } from 'lucide-react';
 
 export const PosView: React.FC = () => {
@@ -75,6 +76,8 @@ export const PosView: React.FC = () => {
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [salesRepId, setSalesRepId] = useState<string>('');
+  const [salesReps, setSalesReps] = useState<ReturnType<typeof EmployeeService.getSalesReps>>([]);
 
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [discountMode, setDiscountMode] = useState<'percent' | 'amount'>('amount');
@@ -406,6 +409,11 @@ export const PosView: React.FC = () => {
     if (selectedWarehouseId) loadStock(selectedWarehouseId);
   }, [selectedWarehouseId, loadStock]);
 
+  useEffect(() => {
+    const branchId = warehouses.find((w) => w.id === selectedWarehouseId)?.branchId;
+    setSalesReps(EmployeeService.getSalesReps(branchId));
+  }, [selectedWarehouseId, warehouses]);
+
   // ── Cart operations ────────────────────────────────────────────────────────
   const clearCart = () => {
     if (cart.length === 0) return;
@@ -516,6 +524,7 @@ export const PosView: React.FC = () => {
     setSplitCredit,
     notes,
     setNotes,
+    salesRepId,
     remainingAmount,
     lineSubtotal,
     lineDiscountTotal,
@@ -1021,6 +1030,9 @@ export const PosView: React.FC = () => {
           operationalFields={invoiceOperationalFields}
           operationalFieldValues={invoiceOperationalValues}
           onOperationalFieldValuesChange={setInvoiceOperationalValues}
+          salesReps={salesReps}
+          salesRepId={salesRepId}
+          onSalesRepChange={setSalesRepId}
         />
       </div>
 

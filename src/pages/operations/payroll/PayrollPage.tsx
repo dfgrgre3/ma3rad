@@ -49,18 +49,23 @@ export const PayrollPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      const list = EmployeeService.getAll().filter((e) => e.status !== 'SUSPENDED');
-      setEmployees(list);
-      setTransactions(canViewPayroll ? EmployeeService.getTransactions().slice(0, 100) : []);
-      const loadedRun = canViewPayroll ? EmployeeService.getPayrollRun(period) : null;
-      setRun(loadedRun);
-      setReconciliation(loadedRun && loadedRun.status !== 'DRAFT' && loadedRun.status !== 'APPROVED'
-        ? EmployeeService.getPayrollPaymentReconciliation(loadedRun.id)
-        : null);
-      setError(null);
-    } catch (e: any) { setError(e?.message || 'تعذر تحميل بيانات الرواتب.'); }
-    finally { setLoading(false); }
+    void (async () => {
+      try {
+        const [employeeList, transactions, loadedRun] = await Promise.all([
+          EmployeeService.getAllAsync(),
+          canViewPayroll ? EmployeeService.getTransactionsAsync() : Promise.resolve([]),
+          canViewPayroll ? EmployeeService.getPayrollRunAsync(period) : Promise.resolve(null),
+        ]);
+        setEmployees(employeeList.filter((e) => e.status !== 'SUSPENDED'));
+        setTransactions(transactions.slice(0, 100));
+        setRun(loadedRun);
+        setReconciliation(loadedRun && loadedRun.status !== 'DRAFT' && loadedRun.status !== 'APPROVED'
+          ? EmployeeService.getPayrollPaymentReconciliation(loadedRun.id)
+          : null);
+        setError(null);
+      } catch (e: any) { setError(e?.message || 'تعذر تحميل بيانات الرواتب.'); }
+      finally { setLoading(false); }
+    })();
   }, [canViewPayroll, period]);
   useEffect(() => { load(); }, [load]);
 
@@ -121,11 +126,13 @@ export const PayrollPage: React.FC = () => {
 
   const payRun = () => {
     if (!run) return;
-    try {
-      setPayoutOptions(EmployeeService.getPayrollPayoutOptions());
-      setPayoutOpen(true);
-      setError(null);
-    } catch (err: any) { setError(err?.message || 'تعذر تحميل بيانات الصرف.'); }
+    void (async () => {
+      try {
+        setPayoutOptions(await EmployeeService.getPayrollPayoutOptionsAsync());
+        setPayoutOpen(true);
+        setError(null);
+      } catch (err: any) { setError(err?.message || 'تعذر تحميل بيانات الصرف.'); }
+    })();
   };
 
   const submitPayout = (payout: PayrollPayOptions) => {

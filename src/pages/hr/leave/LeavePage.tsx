@@ -92,7 +92,7 @@ export const LeavePage: React.FC = () => {
     reason: '',
   });
 
-  const load = () => {
+  const load = async () => {
     setLoading(true);
     try {
       setRows(service.getRequests({ status }));
@@ -107,7 +107,7 @@ export const LeavePage: React.FC = () => {
       ])) as Record<LeaveType, string>);
       setAnnualPolicyState(service.getAnnualAccrualPolicyState(annualPolicyDraft.employeeId || undefined));
       if ((canRequest || canApprove) && can('employees.view')) {
-        setEmployees(EmployeeService.getAll().map((employee) => ({ id: employee.id, name: employee.name })));
+        setEmployees((await EmployeeService.getAllAsync()).map((employee) => ({ id: employee.id, name: employee.name })));
       }
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل الإجازات.');

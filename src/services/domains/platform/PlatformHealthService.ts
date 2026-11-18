@@ -355,25 +355,52 @@ export class PlatformHealthService {
 
     const id = `cb_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
+    const plannedName = `platform-central_${now.replace(/[:.]/g, '-')}.sqlite.enc`;
 
-    // In production, this would trigger actual backup process
-    // For now, create a record
     this.db.run(
-      `INSERT INTO platform_central_backups (id, status, size_bytes, storage_path, started_at, created_at)
-       VALUES (?, 'IN_PROGRESS', 0, NULL, ?, ?)`,
-      [id, now, now]
+      `INSERT INTO platform_central_backups (id, filename, size_bytes, storage_location, status, integrity_check_passed, created_at)
+       VALUES (?, ?, 0, 'local', 'IN_PROGRESS', 0, ?)`,
+      [id, plannedName, now]
     );
 
     this.audit('بدء نسخة احتياطية مركزية', 'CENTRAL_BACKUP', id, {});
 
-    // Simulate completion (in real implementation, this would be async)
-    setTimeout(() => {
-      const size = Math.floor(Math.random() * 1000000000) + 100000000;
+    const markFailed = (message: string): never => {
       this.db.run(
-        `UPDATE platform_central_backups SET status = 'COMPLETED', size_bytes = ?, storage_path = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
-        [size, `/backups/${id}.sql.gz`, nowIso(), nowIso(), id]
+        `UPDATE platform_central_backups SET status = 'FAILED', verified_at = ? WHERE id = ?`,
+        [nowIso(), id]
       );
-    }, 5000);
+      this.audit('فشل نسخة احتياطية مركزية', 'CENTRAL_BACKUP', id, { error: message }, { status: 'FAILURE', errorMessage: message });
+      throw new Error(message);
+    };
+
+    let result: { ok: boolean; path?: string; bytes?: number; error?: string; strategy?: { actions: Array<{ type: string; target: string | null; status: string; description: string }>; recommendations: Array<{ type: string; action: string }> } } | undefined;
+    try {
+      const createBackup = typeof window !== 'undefined' ? window.ceramisys?.db?.backup : undefined;
+      if (!createBackup) {
+        throw new Error('إنشاء النسخة الاحتياطية يتطلب تشغيل تطبيق سطح المكتب.');
+      }
+      result = await createBackup('platform-central');
+    } catch (error) {
+      markFailed(error instanceof Error ? error.message : String(error));
+    }
+
+    if (!result?.ok || !result.path) {
+      markFailed(result?.error || 'فشل إنشاء النسخة الاحتياطية.');
+    }
+
+    const verifiedOffsite = (result!.strategy?.actions ?? []).some(
+      (action) => action.type === 'offsite' && action.status === 'complete'
+    );
+    const actualName = String(result!.path).split(/[\\/]/).pop() || plannedName;
+
+    this.db.run(
+      `UPDATE platform_central_backups
+       SET status = 'COMPLETED', filename = ?, size_bytes = ?, storage_location = ?, integrity_check_passed = ?, verified_at = ?
+       WHERE id = ?`,
+      [actualName, Number(result!.bytes) || 0, String(result!.path), verifiedOffsite ? 1 : 0, nowIso(), id]
+    );
+    this.audit('اكتمال نسخة احتياطية مركزية', 'CENTRAL_BACKUP', id, { path: result!.path, bytes: result!.bytes });
 
     const backup = this.getCentralBackup(id);
     if (!backup) throw new Error('فشل إنشاء النسخة الاحتياطية.')
@@ -502,13 +529,13 @@ export class PlatformHealthService {
   private mapBackup(row: any): PlatformCentralBackup {
     return {
       id: String(row.id),
-      filename: `backup_${row.id}.sql.gz`,
+      filename: String(row.filename ?? `backup_${row.id}`),
       sizeBytes: toNumber(row.size_bytes, 0),
-      storageLocation: row.storage_path ?? 'local',
+      storageLocation: String(row.storage_location ?? 'local'),
       status: row.status,
-      integrityCheckPassed: row.status === 'COMPLETED',
+      integrityCheckPassed: Boolean(row.integrity_check_passed),
       createdAt: String(row.created_at),
-      verifiedAt: row.completed_at ?? undefined,
+      verifiedAt: row.verified_at ?? undefined,
     };
   }
 

@@ -18,6 +18,9 @@ const deriveRecoveryKey = (password, salt, keyLength, options) => new Promise((r
   });
 });
 let sqliteInitializer;
+// Cached plaintext database key so the synchronous db:save-sync IPC
+// handler can encrypt snapshots without awaiting async fs/safeStorage calls.
+let cachedDatabaseKey = null;
 
 function createCodedError(message, code, cause) {
   return Object.assign(new TypeError(message), {
@@ -286,7 +289,11 @@ function registerDatabaseHandlers({
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
   const maxDatabaseSizeMessage = `حجم قاعدة البيانات يتجاوز الحد المناسب لهذا الجهاز (${Math.floor(MAX_DB_SIZE / (1024 * 1024))} ميجابايت).`;
-  const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, safeStorage, path });
+  const getKey = async () => {
+    const key = await readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, safeStorage, path });
+    cachedDatabaseKey = key;
+    return key;
+  };
   const offsiteBackupConfig = path.join(APP_DATA_DIR, 'offsite-backup.json');
 
   const getOffsiteBackupDir = async () => {
@@ -436,6 +443,95 @@ function registerDatabaseHandlers({
         code,
         retryable: true,
         error: message,
+      };
+    }
+  });
+
+  // Synchronous variant of readOrCreateDatabaseKey for the blocking
+  // db:save-sync channel used by financial transactions. Requires the
+  // synchronous safeStorage API (available on Windows/macOS); throws
+  // DATABASE_SYNC_UNAVAILABLE where only the async API exists so the
+  // renderer can degrade to the async persist path.
+  const getDatabaseKeySync = () => {
+    if (cachedDatabaseKey) return cachedDatabaseKey;
+    const hasSyncApi = typeof safeStorage.isEncryptionAvailable === 'function'
+      && typeof safeStorage.decryptString === 'function';
+    if (!hasSyncApi) {
+      throw createCodedError(
+        'OS secure storage does not expose synchronous APIs on this platform; durable synchronous save is unavailable.',
+        'DATABASE_SYNC_UNAVAILABLE'
+      );
+    }
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('تشفير قاعدة البيانات غير متاح في مخزن النظام الآمن على هذا الجهاز.');
+    }
+    const keyPath = path.join(APP_DATA_DIR, DB_KEY_FILE);
+    let encryptedKey;
+    try {
+      encryptedKey = fsSync.readFileSync(keyPath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw new Error(`تعذر فتح مفتاح تشفير قاعدة البيانات: ${error.message || error}`);
+      }
+      const key = randomBytes(32);
+      const encrypted = safeStorage.encryptString(key.toString('base64'));
+      const temporaryPath = `${keyPath}.tmp`;
+      fsSync.writeFileSync(temporaryPath, encrypted, { mode: 0o600 });
+      fsSync.renameSync(temporaryPath, keyPath);
+      cachedDatabaseKey = key;
+      return key;
+    }
+    const key = Buffer.from(safeStorage.decryptString(encryptedKey), 'base64');
+    if (key.length !== 32) throw new Error('Invalid database encryption key.');
+    cachedDatabaseKey = key;
+    return key;
+  };
+
+  ipcMain.on('db:save-sync', (event, bytes) => {
+    try {
+      validateIpcSender(event);
+      ensureDirs();
+      if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) {
+        event.returnValue = {
+          ok: false,
+          code: 'DATABASE_INVALID_PAYLOAD',
+          retryable: true,
+          error: 'Database save payload must be a byte array.',
+        };
+        return;
+      }
+      const data = Buffer.from(bytes);
+      if (data.length > MAX_DB_SIZE) {
+        event.returnValue = {
+          ok: false,
+          code: 'DATABASE_TOO_LARGE',
+          retryable: false,
+          error: maxDatabaseSizeMessage,
+        };
+        return;
+      }
+      if (!data.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+        event.returnValue = {
+          ok: false,
+          code: 'DATABASE_INVALID_SQLITE',
+          retryable: false,
+          error: 'Database save payload must contain a valid SQLite database.',
+        };
+        return;
+      }
+      const encrypted = encryptDatabaseBytes(data, getDatabaseKeySync());
+      const temporaryPath = `${DB_FILE}.tmp`;
+      fsSync.writeFileSync(temporaryPath, encrypted, { mode: 0o600 });
+      fsSync.renameSync(temporaryPath, DB_FILE);
+      event.returnValue = { ok: true, path: DB_FILE, bytes: encrypted.length };
+    } catch (error) {
+      event.returnValue = {
+        ok: false,
+        code: error && typeof error === 'object' && typeof error.code === 'string'
+          ? error.code
+          : 'DATABASE_SAVE_FAILED',
+        retryable: true,
+        error: describeError(error),
       };
     }
   });

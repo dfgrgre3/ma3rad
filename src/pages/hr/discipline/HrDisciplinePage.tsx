@@ -1,11 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, FileText, AlertTriangle, MessageSquare, Scale, Paperclip } from 'lucide-react';
 import { HrDisciplineService, HrViolation, HrWarning, HrPenalty, HrComplaint, HrAppeal, HrAttachment } from '../../../services/domains/hr/HrDisciplineService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'violations' | 'warnings' | 'penalties' | 'complaints' | 'appeals' | 'attachments';
 
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  violations: ['hr.discipline.manage'],
+  warnings: ['hr.discipline.manage'],
+  penalties: ['hr.discipline.manage'],
+  complaints: ['hr.discipline.manage'],
+  appeals: ['hr.discipline.manage'],
+  attachments: ['hr.discipline.manage'],
+};
+
 export const HrDisciplinePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('violations');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['violations', 'warnings', 'penalties', 'complaints', 'appeals', 'attachments'] as Tab[]).some(canTab);
   const [violations, setViolations] = useState<HrViolation[]>([]);
   const [warnings, setWarnings] = useState<HrWarning[]>([]);
   const [penalties, setPenalties] = useState<HrPenalty[]>([]);
@@ -37,7 +49,7 @@ export const HrDisciplinePage: React.FC = () => {
     finally { setLoading(false); }
   }, [filterEmployeeId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const createViolation = () => { try { HrDisciplineService.createViolation(violationForm); setViolationForm({ employeeId: '', violationType: '', description: '', occurredAt: new Date().toISOString().slice(0, 10), severity: 'MINOR' }); load(); } catch (e: any) { setError(e?.message); } };
   const issueWarning = () => { try { HrDisciplineService.issueWarning({ employeeId: warningForm.employeeId, violationId: warningForm.violationId || null, warningType: warningForm.warningType, issuedAt: warningForm.issuedAt, notes: warningForm.notes }); setWarningForm({ employeeId: '', violationId: '', warningType: 'WRITTEN', issuedAt: new Date().toISOString().slice(0, 10), notes: '' }); load(); } catch (e: any) { setError(e?.message); } };
@@ -54,6 +66,8 @@ export const HrDisciplinePage: React.FC = () => {
     { id: 'appeals', label: 'التظلمات', icon: <FileText className="h-4 w-4" /> },
     { id: 'attachments', label: 'المرفقات', icon: <Paperclip className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -73,15 +87,15 @@ export const HrDisciplinePage: React.FC = () => {
           <button onClick={load} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحديث</button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === t.id ? 'bg-rose-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-rose-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
         {loading ? <div className="py-16 flex justify-center"><ShieldAlert className="w-6 h-6 animate-spin text-rose-500" /></div> : (
           <>
-            {tab === 'violations' && (
+            {activeTab === 'violations' && canTab('violations') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المخالفات</h3>
@@ -106,7 +120,7 @@ export const HrDisciplinePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'warnings' && (
+            {activeTab === 'warnings' && canTab('warnings') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الإنذارات</h3>
@@ -129,7 +143,7 @@ export const HrDisciplinePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'penalties' && (
+            {activeTab === 'penalties' && canTab('penalties') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الجزاءات</h3>
@@ -159,7 +173,7 @@ export const HrDisciplinePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'complaints' && (
+            {activeTab === 'complaints' && canTab('complaints') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الشكاوى</h3>
@@ -183,7 +197,7 @@ export const HrDisciplinePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'appeals' && (
+            {activeTab === 'appeals' && canTab('appeals') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">التظلمات</h3>
@@ -210,7 +224,7 @@ export const HrDisciplinePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'attachments' && (
+            {activeTab === 'attachments' && canTab('attachments') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المرفقات</h3>

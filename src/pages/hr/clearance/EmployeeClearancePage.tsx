@@ -9,8 +9,14 @@ import {
 } from '../../../services/domains/hr/EmployeeClearanceService';
 import { EmployeeService, Employee } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'requests' | 'followup';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  requests: ['hr.clearance.manage'],
+  followup: ['hr.clearance.manage'],
+};
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -69,6 +75,8 @@ const StatCard: React.FC<{ label: string; value: string; icon: React.ReactNode; 
 
 export const EmployeeClearancePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('requests');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['requests', 'followup'] as Tab[]).some(canTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -87,13 +95,13 @@ export const EmployeeClearancePage: React.FC = () => {
     satisfactionScore: '3', wouldRecommend: '3', feedback: '', actionItems: '',
   });
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       setClearances(EmployeeClearanceService.getEmployeeClearances((statusFilter || undefined) as ClearanceStatus | undefined));
       setSummary(EmployeeClearanceService.getClearanceSummary());
-      setEmployees(EmployeeService.getAll({}));
+      setEmployees(await EmployeeService.getAllAsync({}));
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل بيانات إخلاء الطرف.');
     } finally {
@@ -101,7 +109,7 @@ export const EmployeeClearancePage: React.FC = () => {
     }
   }, [statusFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   useEffect(() => {
     try {
@@ -222,6 +230,8 @@ export const EmployeeClearancePage: React.FC = () => {
     { id: 'requests', label: 'طلبات إخلاء الطرف', icon: <UserMinus className="h-4 w-4" /> },
     { id: 'followup', label: 'المتابعة وقائمة التحقق', icon: <ClipboardCheck className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   const groupedItems = useMemo(() => {
     const groups = new Map<string, ClearanceChecklistItem[]>();
@@ -258,11 +268,11 @@ export const EmployeeClearancePage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${tab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
             >
               {item.icon} {item.label}
             </button>
@@ -280,7 +290,7 @@ export const EmployeeClearancePage: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
-        ) : tab === 'requests' ? (
+        ) : activeTab === 'requests' ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="border-b border-slate-100 px-4 py-3">

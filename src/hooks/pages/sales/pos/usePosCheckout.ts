@@ -60,6 +60,8 @@ interface UsePosCheckoutOptions {
   setSplitCredit: Dispatch<SetStateAction<number>>;
   notes: string;
   setNotes: Dispatch<SetStateAction<string>>;
+  /** Employee recorded as the invoice's sales representative (optional). */
+  salesRepId?: string;
   remainingAmount: number;
   lineSubtotal: number;
   lineDiscountTotal: number;
@@ -122,6 +124,7 @@ export const usePosCheckout = ({
   setSplitCredit,
   notes,
   setNotes,
+  salesRepId,
   remainingAmount,
   lineSubtotal,
   lineDiscountTotal,
@@ -382,6 +385,7 @@ export const usePosCheckout = ({
         customerId: selectedCustomer.id,
         warehouseId: selectedWarehouseId,
         shiftId: activeShift?.id,
+        salesRepId: salesRepId || undefined,
         items: cart.map((item) => ({
           productId: item.product.id,
           soldBy: item.soldBy,

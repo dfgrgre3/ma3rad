@@ -40,6 +40,8 @@ export const SettingsHubPage = lazy(() => import('../pages/settings/settings-hub
 
 export const ApprovalSettingsPage = lazy(() => import('../pages/settings/approvals/ApprovalSettingsPage').then(m => ({ default: m.ApprovalSettingsPage })));
 
+export const LicenseModeSettingsPage = lazy(() => import('../pages/settings/license-mode/LicenseModeSettingsPage').then(m => ({ default: m.LicenseModeSettingsPage })));
+
 export const CentralActivationView = lazy(() => import('../components/auth/CentralActivationView').then(m => ({ default: m.CentralActivationView })));
 
 export const UsersView = lazy(() => import('../components/admin/UsersView').then(m => ({ default: m.UsersView })));

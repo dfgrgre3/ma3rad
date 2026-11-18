@@ -256,6 +256,17 @@ export class AttendanceService {
     );
   }
 
+  static async getEmployeesAsync(): Promise<AttendanceEmployee[]> {
+    const actor = this.requireView();
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync<AttendanceEmployee>(
+      `SELECT e.id, e.branch_id AS branchId, e.name, e.role, e.phone, e.status
+       FROM employees e WHERE e.status != 'SUSPENDED' AND ${scope.clause}
+       ORDER BY e.name`,
+      scope.params
+    );
+  }
+
   private static assertPeriodEditable(branchId: string, date: string): void {
     const run = this.db.query<{ status: string }>(
       'SELECT status FROM payroll_runs WHERE branch_id = ? AND period = ?',
@@ -398,15 +409,48 @@ export class AttendanceService {
     }));
   }
 
+  static async getAttendanceByDateAsync(date: string): Promise<AttendanceEntry[]> {
+    const actor = this.requireView();
+    if (!isValidDate(date)) throw new Error('تاريخ الحضور غير صالح.');
+    const scope = this.employeeDataScope(actor);
+    return (await this.db.queryAsync<AttendanceEntry>(
+      `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode,
+              e.branch_id AS branchId, a.date, a.status, a.check_in_at AS checkInAt,
+              a.check_out_at AS checkOutAt, a.worked_minutes AS workedMinutes,
+              a.late_minutes AS lateMinutes, a.early_leave_minutes AS earlyLeaveMinutes,
+              a.overtime_minutes AS overtimeMinutes, a.break_minutes AS breakMinutes,
+              a.overtime_approved AS overtimeApproved, a.notes, a.source,
+              a.recorded_by AS recordedBy,
+              EXISTS (SELECT 1 FROM attendance_breaks b
+                      WHERE b.attendance_id = a.id AND b.ended_at IS NULL) AS activeBreak
+       FROM attendance a JOIN employees e ON e.id = a.employee_id
+       WHERE a.date = ? AND ${scope.clause} ORDER BY e.name`,
+      [date, ...scope.params]
+    )).map((row) => ({
+      ...row, overtimeApproved: Boolean(row.overtimeApproved), activeBreak: Boolean(row.activeBreak),
+    }));
+  }
+
   static getMonthlyReport(period: string): AttendanceReportRow[] {
     const actor = this.requireView();
     return this.buildMonthlyReport(period, actor);
+  }
+
+  static async getMonthlyReportAsync(period: string): Promise<AttendanceReportRow[]> {
+    const actor = this.requireView();
+    return this.buildMonthlyReportAsync(period, actor);
   }
 
   static getMonthlyReportForExport(period: string): AttendanceReportRow[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'employees.attendance.export');
     return this.buildMonthlyReport(period, actor);
+  }
+
+  static async getMonthlyReportForExportAsync(period: string): Promise<AttendanceReportRow[]> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.attendance.export');
+    return this.buildMonthlyReportAsync(period, actor);
   }
 
   private static buildMonthlyReport(
@@ -432,6 +476,31 @@ export class AttendanceService {
        ORDER BY a.date, e.name`,
       [period, ...scope.params]
     ).map((row) => ({ ...row, overtimeApproved: Boolean(row.overtimeApproved) }));
+  }
+
+  private static async buildMonthlyReportAsync(
+    period: string,
+    actor: ReturnType<typeof AuthService.requireAuth>,
+  ): Promise<AttendanceReportRow[]> {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
+    const scope = this.employeeDataScope(actor);
+    return (await this.db.queryAsync<AttendanceReportRow>(
+      `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode,
+              e.branch_id AS branchId, a.date, a.status, a.check_in_at AS checkInAt,
+              a.check_out_at AS checkOutAt, a.worked_minutes AS workedMinutes,
+              a.late_minutes AS lateMinutes, a.early_leave_minutes AS earlyLeaveMinutes,
+              a.overtime_minutes AS overtimeMinutes, a.break_minutes AS breakMinutes,
+              a.overtime_approved AS overtimeApproved, a.notes, a.source,
+              a.recorded_by AS recordedBy, s.name AS shiftName
+       FROM attendance a JOIN employees e ON e.id = a.employee_id
+       LEFT JOIN employee_shift_assignments sa
+         ON sa.employee_id = e.id AND sa.effective_from <= a.date
+         AND (sa.effective_to IS NULL OR sa.effective_to >= a.date)
+       LEFT JOIN attendance_shifts s ON s.id = sa.shift_id
+       WHERE substr(a.date, 1, 7) = ? AND ${scope.clause}
+       ORDER BY a.date, e.name`,
+      [period, ...scope.params]
+    )).map((row) => ({ ...row, overtimeApproved: Boolean(row.overtimeApproved) }));
   }
 
   static punchIn(employeeId: string): AttendanceEntry {
@@ -571,6 +640,23 @@ export class AttendanceService {
     );
   }
 
+  static async getBreaksByDateAsync(date: string): Promise<AttendanceBreakEntry[]> {
+    const actor = this.requireView();
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync<AttendanceBreakEntry>(
+      `SELECT b.id, b.attendance_id AS attendanceId, b.started_at AS startedAt,
+              b.ended_at AS endedAt,
+              CASE WHEN b.ended_at IS NULL THEN 0
+                   ELSE MAX(0, CAST((julianday(b.ended_at) - julianday(b.started_at)) * 1440 AS INTEGER))
+              END AS minutes
+       FROM attendance_breaks b JOIN attendance a ON a.id = b.attendance_id
+       JOIN employees e ON e.id = a.employee_id
+       WHERE a.date = ? AND ${scope.clause}
+       ORDER BY b.started_at`,
+      [date, ...scope.params]
+    );
+  }
+
   static saveManualRecord(data: {
     employeeId: string;
     date: string;
@@ -684,10 +770,48 @@ export class AttendanceService {
     );
   }
 
+  static async getCorrectionRequestsAsync(): Promise<AttendanceCorrection[]> {
+    const actor = this.requireView();
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync<AttendanceCorrection>(
+      `SELECT r.id, r.employee_id AS employeeId, e.name AS employeeName,
+              r.attendance_date AS attendanceDate, r.before_json AS beforeJson,
+              r.proposed_json AS proposedJson, u.full_name AS requestedByName,
+              r.requested_at AS requestedAt
+       FROM attendance_correction_requests r
+       JOIN employees e ON e.id = r.employee_id
+       JOIN users u ON u.id = r.requested_by
+       WHERE r.status = 'PENDING' AND ${scope.clause}
+       ORDER BY r.requested_at`,
+      scope.params
+    );
+  }
+
   static getCorrectionHistory(period: string): AttendanceCorrectionHistory[] {
     const actor = this.requireView();
     const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceCorrectionHistory>(
+      `SELECT r.id, r.employee_id AS employeeId, e.name AS employeeName,
+              r.attendance_date AS attendanceDate, r.before_json AS beforeJson,
+              r.proposed_json AS proposedJson, requester.full_name AS requestedByName,
+              r.requested_at AS requestedAt, r.status,
+              decider.full_name AS decidedByName, r.decided_at AS decidedAt,
+              r.decision_notes AS decisionNotes
+       FROM attendance_correction_requests r
+       JOIN employees e ON e.id = r.employee_id
+       JOIN users requester ON requester.id = r.requested_by
+       LEFT JOIN users decider ON decider.id = r.decided_by
+       WHERE r.status != 'PENDING' AND substr(r.attendance_date, 1, 7) = ?
+         AND ${scope.clause}
+       ORDER BY r.decided_at DESC LIMIT 200`,
+      [period, ...scope.params]
+    );
+  }
+
+  static async getCorrectionHistoryAsync(period: string): Promise<AttendanceCorrectionHistory[]> {
+    const actor = this.requireView();
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync<AttendanceCorrectionHistory>(
       `SELECT r.id, r.employee_id AS employeeId, e.name AS employeeName,
               r.attendance_date AS attendanceDate, r.before_json AS beforeJson,
               r.proposed_json AS proposedJson, requester.full_name AS requestedByName,
@@ -710,6 +834,22 @@ export class AttendanceService {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
     const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceAuditEntry>(
+      `SELECT l.id, e.name AS employeeName, l.attendance_date AS date,
+              l.action, l.before_json AS beforeJson, l.after_json AS afterJson,
+              u.full_name AS actorName, l.created_at AS createdAt
+       FROM attendance_audit_log l JOIN employees e ON e.id = l.employee_id
+       JOIN users u ON u.id = l.actor_id
+       WHERE substr(l.attendance_date, 1, 7) = ? AND ${scope.clause}
+       ORDER BY l.created_at DESC LIMIT 200`,
+      [period, ...scope.params]
+    );
+  }
+
+  static async getAuditHistoryAsync(period: string): Promise<AttendanceAuditEntry[]> {
+    const actor = this.requireView();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync<AttendanceAuditEntry>(
       `SELECT l.id, e.name AS employeeName, l.attendance_date AS date,
               l.action, l.before_json AS beforeJson, l.after_json AS afterJson,
               u.full_name AS actorName, l.created_at AS createdAt
@@ -839,6 +979,29 @@ export class AttendanceService {
     }));
   }
 
+  private static mapShiftRows(rows: ShiftRow[]): AttendanceShift[] {
+    return rows.map((row) => ({
+      id: row.id, branchId: row.branchId, name: row.name, startTime: row.startTime,
+      endTime: row.endTime, breakMinutes: Number(row.breakMinutes),
+      graceMinutes: Number(row.graceMinutes), overtimeAfterMinutes: Number(row.overtimeAfterMinutes),
+      workdays: JSON.parse(row.workdaysJson) as number[], isActive: Boolean(row.isActive),
+    }));
+  }
+
+  static async getShiftsAsync(): Promise<AttendanceShift[]> {
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('s.branch_id', undefined, actor);
+    const rows = await this.db.queryAsync<ShiftRow>(
+      `SELECT s.id, s.branch_id AS branchId, s.name, s.start_time AS startTime,
+              s.end_time AS endTime, s.break_minutes AS breakMinutes,
+              s.grace_minutes AS graceMinutes, s.overtime_after_minutes AS overtimeAfterMinutes,
+              s.workdays_json AS workdaysJson, s.is_active AS isActive
+       FROM attendance_shifts s WHERE ${scope.clause} ORDER BY s.name`,
+      scope.params
+    );
+    return this.mapShiftRows(rows);
+  }
+
   static saveShift(data: Omit<AttendanceShift, 'id' | 'branchId' | 'isActive'> & { id?: string }): AttendanceShift {
     const actor = this.requireManage();
     const branchId = this.branchAccess.getCurrentBranchId(actor);
@@ -928,6 +1091,23 @@ export class AttendanceService {
     );
   }
 
+  static async getAssignmentsAsync(): Promise<Array<{
+    id: string; employeeId: string; employeeName: string; shiftId: string;
+    shiftName: string; effectiveFrom: string; effectiveTo: string | null;
+  }>> {
+    const actor = this.requireView();
+    const scope = this.employeeDataScope(actor);
+    return this.db.queryAsync(
+      `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName,
+              a.shift_id AS shiftId, s.name AS shiftName,
+              a.effective_from AS effectiveFrom, a.effective_to AS effectiveTo
+       FROM employee_shift_assignments a JOIN employees e ON e.id = a.employee_id
+       JOIN attendance_shifts s ON s.id = a.shift_id
+       WHERE ${scope.clause} ORDER BY e.name, a.effective_from DESC`,
+      scope.params
+    );
+  }
+
   static addHoliday(date: string, name: string): void {
     const actor = this.requireManage();
     if (!isValidDate(date) || !name.trim()) throw new Error('تاريخ العطلة واسمها مطلوبان.');
@@ -956,6 +1136,16 @@ export class AttendanceService {
     const actor = this.requireView();
     const scope = this.branchAccess.sqlScope('h.branch_id', undefined, actor);
     return this.db.query(
+      `SELECT h.id, h.date, h.name FROM attendance_holidays h
+       WHERE substr(h.date, 1, 7) = ? AND ${scope.clause} ORDER BY h.date`,
+      [period, ...scope.params]
+    );
+  }
+
+  static async getHolidaysAsync(period: string): Promise<Array<{ id: string; date: string; name: string }>> {
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('h.branch_id', undefined, actor);
+    return this.db.queryAsync(
       `SELECT h.id, h.date, h.name FROM attendance_holidays h
        WHERE substr(h.date, 1, 7) = ? AND ${scope.clause} ORDER BY h.date`,
       [period, ...scope.params]

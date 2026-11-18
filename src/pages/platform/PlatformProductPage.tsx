@@ -19,6 +19,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformFeatureFlag,
@@ -136,13 +138,27 @@ export const PlatformProductPage: React.FC = () => {
 
   const [saving, setSaving] = React.useState(false);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setModules(platformAdminService.listModules());
-      setFeatures(platformAdminService.listFeatureFlags());
-      setReleases(platformAdminService.listReleases());
-      setTenants(platformAdminService.listTenants());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [releases, tenants, modules, features] = await Promise.all([
+          centralPlatformClient.listReleases(),
+          centralPlatformClient.listTenants(),
+          centralPlatformClient.listModules(),
+          centralPlatformClient.listFeatureFlags(),
+        ]);
+        setReleases(releases);
+        setTenants(tenants);
+        setModules(modules as any);
+        setFeatures(features as any);
+      } else {
+        setReleases(platformAdminService.listReleases());
+        setTenants(platformAdminService.listTenants());
+        setModules(platformAdminService.listModules());
+        setFeatures(platformAdminService.listFeatureFlags());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنتج.');

@@ -1,7 +1,7 @@
 import {
   Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Briefcase, Building2, Calendar, CalendarDays, Car,
   CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
-  Gift, GraduationCap, HardHat, Landmark, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
+  Gift, GraduationCap, HardHat, Landmark, Lock, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
   ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from '../types/config/navigation';
@@ -108,6 +108,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'الإعدادات', to: '/settings', icon: Settings, anyPerms: ['settings.view', 'settings.backup'] },
       { label: 'محرك التكوين الديناميكي', to: '/settings/app-configuration', icon: SlidersHorizontal, perm: 'settings.view' },
       { label: 'استوديو التكوين', to: '/settings/configuration-studio', icon: SlidersHorizontal, perm: 'settings.view' },
+      { label: 'وضع الترخيص', to: '/settings/license-mode', icon: Lock, anyPerms: ['settings.license_mode.view', 'settings.license_mode.manage', 'admin.license.manage', 'settings.view'] },
     ],
   },
 ];

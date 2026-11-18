@@ -39,13 +39,19 @@ export const ProfitLossPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      setScopeWarning(service.getBranchScopeWarning());
-      setPnl(service.getProfitAndLossReport(from, to));
-      setExpenses(service.getExpenseReport(from, to).byCategory as Array<{ category: string; total: number }>);
-      setError(null);
-    } catch (e: any) { setError(e?.message || 'تعذر تحميل قائمة الأرباح والخسائر.'); }
-    finally { setLoading(false); }
+    void (async () => {
+      try {
+        setScopeWarning(service.getBranchScopeWarning());
+        const [pnlReport, expenseReport] = await Promise.all([
+          service.getProfitAndLossReportAsync(from, to),
+          service.getExpenseReportAsync(from, to),
+        ]);
+        setPnl(pnlReport);
+        setExpenses(expenseReport.byCategory as Array<{ category: string; total: number }>);
+        setError(null);
+      } catch (e: any) { setError(e?.message || 'تعذر تحميل قائمة الأرباح والخسائر.'); }
+      finally { setLoading(false); }
+    })();
   }, [from, service, to]);
   useEffect(() => { load(); }, [load]);
 

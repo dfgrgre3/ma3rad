@@ -24,6 +24,9 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformStaff,
@@ -98,11 +101,21 @@ export const PlatformAdminControlPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Load staff
-  const loadStaff = useCallback(() => {
+  const loadStaff = useCallback(async () => {
     setStaffLoading(true);
+    const centralState = getCentralDataSourceState();
     try {
-      setStaffList(platformAdminService.listPlatformStaff(staffSearch, staffRoleFilter));
-      setStaffRoles(platformAdminService.listPlatformStaffRoles());
+      if (centralState.active) {
+        const [staff, roles] = await Promise.all([
+          centralPlatformClient.listAdminControlStaff({ search: staffSearch, role: staffRoleFilter }),
+          centralPlatformClient.listAdminControlStaffRoles(),
+        ]);
+        setStaffList(staff);
+        setStaffRoles(roles);
+      } else {
+        setStaffList(platformAdminService.listPlatformStaff(staffSearch, staffRoleFilter));
+        setStaffRoles(platformAdminService.listPlatformStaffRoles());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل موظفي المنصة.');
@@ -112,9 +125,12 @@ export const PlatformAdminControlPage: React.FC = () => {
   }, [staffSearch, staffRoleFilter]);
 
   // Load tenants
-  const loadTenants = useCallback(() => {
+  const loadTenants = useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     try {
-      const list = platformAdminService.listTenants();
+      const list = centralState.active
+        ? await centralPlatformClient.listTenants()
+        : platformAdminService.listTenants();
       setTenants(list);
       if (list.length > 0 && !selectedTenantId) {
         setSelectedTenantId(list[0].id);
@@ -125,11 +141,15 @@ export const PlatformAdminControlPage: React.FC = () => {
   }, [selectedTenantId]);
 
   // Load tenant users
-  const loadTenantUsers = useCallback((tenantId: string) => {
+  const loadTenantUsers = useCallback(async (tenantId: string) => {
     if (!tenantId) return;
     setTenantUsersLoading(true);
+    const centralState = getCentralDataSourceState();
     try {
-      setTenantUsers(platformAdminService.listTenantUsers(tenantId));
+      const users = centralState.active
+        ? await centralPlatformClient.listTenantUsers(tenantId)
+        : platformAdminService.listTenantUsers(tenantId);
+      setTenantUsers(users);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل مستخدمي العميل.');
     } finally {
@@ -179,7 +199,7 @@ export const PlatformAdminControlPage: React.FC = () => {
   const canManageTenantUsers = canPlatform('admin-control');
 
   // Save Staff
-  const handleSaveStaff = () => {
+  const handleSaveStaff = async () => {
     if (!canManageStaff) {
       alert('لا تملك صلاحية إدارة موظفي المنصة.');
       return;
@@ -192,15 +212,24 @@ export const PlatformAdminControlPage: React.FC = () => {
       alert('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
       return;
     }
+    const centralState = getCentralDataSourceState();
     try {
       const payload = { ...staffForm };
       if (editingStaff && !payload.password) {
         delete payload.password;
       }
-      if (editingStaff) {
-        platformAdminService.updatePlatformStaff(editingStaff.id, payload);
+      if (centralState.active) {
+        if (editingStaff) {
+          await centralPlatformClient.updateAdminControlStaff(editingStaff.id, payload);
+        } else {
+          await centralPlatformClient.createAdminControlStaff(payload);
+        }
       } else {
-        platformAdminService.createPlatformStaff(payload);
+        if (editingStaff) {
+          platformAdminService.updatePlatformStaff(editingStaff.id, payload);
+        } else {
+          platformAdminService.createPlatformStaff(payload);
+        }
       }
       setIsStaffModalOpen(false);
       loadStaff();
@@ -210,13 +239,18 @@ export const PlatformAdminControlPage: React.FC = () => {
   };
 
   // Toggle Staff Active
-  const handleToggleStaffActive = (staff: PlatformStaff) => {
+  const handleToggleStaffActive = async (staff: PlatformStaff) => {
     if (!canManageStaff) {
       alert('لا تملك صلاحية إدارة موظفي المنصة.');
       return;
     }
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.setPlatformStaffActive(staff.id, !staff.isActive);
+      if (centralState.active) {
+        await centralPlatformClient.updateAdminControlStaff(staff.id, { isActive: !staff.isActive });
+      } else {
+        platformAdminService.setPlatformStaffActive(staff.id, !staff.isActive);
+      }
       loadStaff();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر تغيير حالة الموظف.');
@@ -224,14 +258,19 @@ export const PlatformAdminControlPage: React.FC = () => {
   };
 
   // Delete Staff
-  const handleDeleteStaff = (staff: PlatformStaff) => {
+  const handleDeleteStaff = async (staff: PlatformStaff) => {
     if (!canDeleteStaff) {
       alert('لا تملك صلاحية حذف موظفي المنصة.');
       return;
     }
     if (!confirm(`هل أنت متأكد من حذف موظف المنصة (${staff.fullName})؟`)) return;
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.deletePlatformStaff(staff.id);
+      if (centralState.active) {
+        await centralPlatformClient.deleteAdminControlStaff(staff.id);
+      } else {
+        platformAdminService.deletePlatformStaff(staff.id);
+      }
       loadStaff();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر حذف الموظف.');
@@ -265,7 +304,7 @@ export const PlatformAdminControlPage: React.FC = () => {
   };
 
   // Save Tenant User
-  const handleSaveTenantUser = () => {
+  const handleSaveTenantUser = async () => {
     if (!selectedTenantId) return;
     if (!canManageTenantUsers) {
       alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
@@ -294,13 +333,18 @@ export const PlatformAdminControlPage: React.FC = () => {
   };
 
   // Toggle Tenant User Active
-  const handleToggleTenantUserActive = (user: PlatformTenantUser) => {
+  const handleToggleTenantUserActive = async (user: PlatformTenantUser) => {
     if (!canManageTenantUsers) {
       alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
       return;
     }
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.setTenantUserActive(user.id, user.status !== 'ACTIVE');
+      if (centralState.active && selectedTenantId) {
+        await centralPlatformClient.setTenantUserActive(selectedTenantId, user.id, user.status !== 'ACTIVE');
+      } else {
+        platformAdminService.setTenantUserActive(user.id, user.status !== 'ACTIVE');
+      }
       if (selectedTenantId) loadTenantUsers(selectedTenantId);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر تغيير حالة المستخدم.');
@@ -308,14 +352,19 @@ export const PlatformAdminControlPage: React.FC = () => {
   };
 
   // Delete Tenant User
-  const handleDeleteTenantUser = (user: PlatformTenantUser) => {
+  const handleDeleteTenantUser = async (user: PlatformTenantUser) => {
     if (!canManageTenantUsers) {
       alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
       return;
     }
     if (!confirm(`هل أنت متأكد من حذف مستخدم العميل (${user.fullName})؟`)) return;
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.deleteTenantUser(user.id);
+      if (centralState.active && selectedTenantId) {
+        await centralPlatformClient.deleteTenantUser(selectedTenantId, user.id);
+      } else {
+        platformAdminService.deleteTenantUser(user.id);
+      }
       if (selectedTenantId) loadTenantUsers(selectedTenantId);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر حذف المستخدم.');
@@ -324,6 +373,7 @@ export const PlatformAdminControlPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
+      <CentralUnsupportedNotice feature="التحكم الإداري (Admin Control)" />
       {/* Page Header */}
       <PageHeader
         title="مركز التحكم الإداري (RBAC & Staff Console)"

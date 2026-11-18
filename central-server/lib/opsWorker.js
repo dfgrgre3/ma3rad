@@ -64,6 +64,7 @@ const RESTORE_TABLES = [
   'platform_licenses',
   'platform_devices',
   'platform_invoices',
+  'platform_invoice_items',
   'platform_tenant_accounts',
   'platform_tenant_users',
   'platform_tenant_overrides',
@@ -123,11 +124,19 @@ async function exportTenantData(db, tenantId) {
         subscriptionIds
       );
     }
+    const invoiceIds = (dump.tables.platform_invoices || []).map((i) => i.id);
+    if (invoiceIds.length) {
+      dump.tables.platform_invoice_items = await db.all(
+        `SELECT * FROM platform_invoice_items WHERE invoice_id IN (${invoiceIds.map(() => '?').join(',')})`,
+        invoiceIds
+      );
+    }
     dump.tables.platform_audit_events = await db.all(
       'SELECT * FROM platform_audit_events WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 10000', [tenantId]);
   } else {
     for (const table of [...PLATFORM_TABLES, ...TENANT_SCOPED_TABLES,
       'platform_license_changes', 'platform_subscription_changes',
+      'platform_invoice_items',
       'platform_support_messages', 'platform_audit_events']) {
       dump.tables[table] = await db.all(`SELECT * FROM "${table}"`);
     }
@@ -180,6 +189,9 @@ async function deleteTenantRows(db, tenantId) {
   await db.run(
     `DELETE FROM platform_license_changes WHERE license_id IN
      (SELECT id FROM platform_licenses WHERE tenant_id = ?)`, [tenantId]);
+  await db.run(
+    `DELETE FROM platform_invoice_items WHERE invoice_id IN
+     (SELECT id FROM platform_invoices WHERE tenant_id = ?)`, [tenantId]);
   for (const table of [
     'platform_payments', 'platform_license_activations', 'platform_remote_config',
     'platform_tenant_branches', 'platform_tenant_overrides', 'platform_tenant_users',

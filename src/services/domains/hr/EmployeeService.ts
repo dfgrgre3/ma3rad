@@ -64,6 +64,33 @@ export interface Employee {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** Sales representative flag (employees.is_sales_rep). */
+  isSalesRep?: boolean;
+  /** Commission percentage applied to eligible sales. */
+  commissionPercentage?: number;
+  /** Monthly sales target in major currency units. */
+  monthlyTarget?: number;
+  /** Branches the employee serves beyond the home branch (employees.branch_id). */
+  additionalBranchIds?: string[];
+}
+
+export interface EmployeeBranchAssignment {
+  branchId: string;
+  branchName: string;
+}
+
+export interface SalesRepOption {
+  id: string;
+  code: string;
+  name: string;
+  homeBranchId: string | null;
+  /** Home branch + all additional assigned branches. */
+  branchIds: string[];
+  branchNames: string;
+  isSalesRep: boolean;
+  commissionPercentage: number;
+  /** Present when the caller passed a branch filter: whether the rep serves it. */
+  servesBranch?: boolean;
 }
 
 export interface PayrollTransaction {
@@ -443,8 +470,7 @@ export class EmployeeService {
 
   // ─── Employees ────────────────────────────────────────────────────────────────
 
-  static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
-    const actor = this.requireView();
+  private static buildEmployeeListQuery(actor: ReturnType<typeof AuthService.requireAuth>, opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): { sql: string; params: any[] } {
     const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
     const canSeePrivateProfile = PermissionService.can(actor, 'employees.profile.view');
     const salaryColumns = canSeeFinancials
@@ -497,12 +523,31 @@ export class EmployeeService {
                         e.manager_employee_id AS managerEmployeeId, m.name AS managerName,
                         e.terminated_at AS terminatedAt,
                         ${salaryColumns}, ${financialColumns}, e.status,
+                        COALESCE(e.is_sales_rep, 0) AS isSalesRep,
+                        e.commission_percentage AS commissionPercentage,
+                        e.monthly_target / 100.0 AS monthlyTarget,
+                        (SELECT GROUP_CONCAT(eba.branch_id) FROM employee_branch_assignments eba
+                          WHERE eba.employee_id = e.id) AS additionalBranchIdsRaw,
                         e.joined_date AS joinedDate, e.notes, e.created_at AS createdAt, e.updated_at AS updatedAt
                  FROM employees e
                  LEFT JOIN departments d ON d.id = e.department_id
                  LEFT JOIN employees m ON m.id = e.manager_employee_id
                  ${where} ORDER BY COALESCE(e.name, e.full_name) ASC`;
-    return this.db.query<Employee>(sql, params);
+    return { sql, params };
+  }
+
+  static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
+    const actor = this.requireView();
+    const { sql, params } = this.buildEmployeeListQuery(actor, opts);
+    return this.db.query<Employee & { additionalBranchIdsRaw?: string | null }>(sql, params)
+      .map((row) => this.hydrateEmployee(row));
+  }
+
+  static async getAllAsync(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Promise<Employee[]> {
+    const actor = this.requireView();
+    const { sql, params } = this.buildEmployeeListQuery(actor, opts);
+    const rows = await this.db.queryAsync<Employee & { additionalBranchIdsRaw?: string | null }>(sql, params);
+    return rows.map((row) => this.hydrateEmployee(row));
   }
 
   static getById(id: string): Employee | null {
@@ -510,7 +555,12 @@ export class EmployeeService {
     return this.getScopedById(id, actor);
   }
 
-  private static getScopedById(id: string, actor: ReturnType<typeof AuthService.requireAuth>): Employee | null {
+  static async getByIdAsync(id: string): Promise<Employee | null> {
+    const actor = this.requireView();
+    return this.getScopedByIdAsync(id, actor);
+  }
+
+  private static buildEmployeeByIdQuery(id: string, actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
@@ -532,21 +582,144 @@ export class EmployeeService {
     const financialColumns = canSeeFinancials
       ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount / 100.0 AS taxExemptionAmount, e.tax_dependents AS taxDependents'
       : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS walletProvider, NULL AS walletNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber, 0 AS taxExempt, 0 AS taxExemptionAmount, 0 AS taxDependents";
-    const rows = this.db.query<Employee>(
-      `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
+    const sql = `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
               COALESCE(e.name, e.full_name) AS name, ${privateProfileColumns},
               e.location, e.role, e.phone, e.email, e.department_id AS departmentId,
               d.name AS departmentName, e.manager_employee_id AS managerEmployeeId,
               m.name AS managerName, e.terminated_at AS terminatedAt,
               ${salaryColumns}, ${financialColumns}, e.status,
+              COALESCE(e.is_sales_rep, 0) AS isSalesRep,
+              e.commission_percentage AS commissionPercentage,
+              e.monthly_target / 100.0 AS monthlyTarget,
+              (SELECT GROUP_CONCAT(eba.branch_id) FROM employee_branch_assignments eba
+                WHERE eba.employee_id = e.id) AS additionalBranchIdsRaw,
               e.joined_date AS joinedDate, e.notes, e.created_at AS createdAt, e.updated_at AS updatedAt
        FROM employees e
        LEFT JOIN departments d ON d.id = e.department_id
        LEFT JOIN employees m ON m.id = e.manager_employee_id
-       WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause} AND ${departmentScope.clause}`,
-      [id, ...scope.params, ...companyScope.params, ...departmentScope.params]
+       WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause} AND ${departmentScope.clause}`;
+    return { sql, params: [id, ...scope.params, ...companyScope.params, ...departmentScope.params] };
+  }
+
+  private static hydrateEmployee(row: Employee & { additionalBranchIdsRaw?: string | null }): Employee {
+    const { additionalBranchIdsRaw, ...rest } = row;
+    return {
+      ...rest,
+      isSalesRep: Boolean(Number((rest as any).isSalesRep ?? 0)),
+      additionalBranchIds: additionalBranchIdsRaw
+        ? String(additionalBranchIdsRaw).split(',').map((id) => id.trim()).filter(Boolean)
+        : [],
+    };
+  }
+
+  private static getScopedById(id: string, actor: ReturnType<typeof AuthService.requireAuth>): Employee | null {
+    const { sql, params } = this.buildEmployeeByIdQuery(id, actor);
+    const rows = this.db.query<Employee & { additionalBranchIdsRaw?: string | null }>(sql, params);
+    return rows[0] ? this.hydrateEmployee(rows[0]) : null;
+  }
+
+  private static async getScopedByIdAsync(id: string, actor: ReturnType<typeof AuthService.requireAuth>): Promise<Employee | null> {
+    const { sql, params } = this.buildEmployeeByIdQuery(id, actor);
+    const rows = await this.db.queryAsync<Employee & { additionalBranchIdsRaw?: string | null }>(sql, params);
+    return rows[0] ? this.hydrateEmployee(rows[0]) : null;
+  }
+
+  /**
+   * Validates and normalizes additional branch ids for an employee: deduped,
+   * active branches inside the actor's authorized scope, excluding the home branch.
+   */
+  private static normalizeAdditionalBranchIds(
+    ids: string[] | undefined,
+    homeBranchId: string | null | undefined,
+    actor: ReturnType<typeof AuthService.requireAuth>
+  ): string[] {
+    if (!ids?.length) return [];
+    const unique = [...new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))]
+      .filter((branchId) => branchId !== homeBranchId);
+    for (const branchId of unique) {
+      const branch = this.db.query<{ isActive: number }>(
+        'SELECT is_active AS isActive FROM branches WHERE id = ?',
+        [branchId]
+      )[0];
+      if (!branch || Number(branch.isActive) !== 1) {
+        throw new Error('أحد الفروع الإضافية المحددة غير موجود أو غير نشط.');
+      }
+      this.branchAccess.requireBranchAuthorization(branchId, actor);
+    }
+    return unique;
+  }
+
+  private static syncBranchAssignments(
+    db: DatabaseManager,
+    employeeId: string,
+    branchIds: string[],
+    actorId: string
+  ): void {
+    db.run('DELETE FROM employee_branch_assignments WHERE employee_id = ?', [employeeId]);
+    for (const branchId of branchIds) {
+      db.run(
+        'INSERT OR IGNORE INTO employee_branch_assignments (employee_id, branch_id, created_by) VALUES (?, ?, ?)',
+        [employeeId, branchId, actorId]
+      );
+    }
+  }
+
+  /** Additional branches assigned to an employee (excludes the home branch). */
+  static getBranchAssignments(employeeId: string): EmployeeBranchAssignment[] {
+    AuthService.requireAuth();
+    return this.db.query<EmployeeBranchAssignment>(
+      `SELECT eba.branch_id AS branchId, b.name AS branchName
+       FROM employee_branch_assignments eba
+       JOIN branches b ON b.id = eba.branch_id
+       WHERE eba.employee_id = ?
+       ORDER BY b.name ASC`,
+      [employeeId]
     );
-    return rows[0] ?? null;
+  }
+
+  /**
+   * Sales-rep picker source: every active employee in the actor's company scope,
+   * with home + assigned branch coverage. When `branchId` is given, each option
+   * carries `servesBranch` so callers can badge or sort reps covering that branch.
+   * This is intentionally not restricted by employees.view — quotation/order
+   * creators need the picker without HR permissions.
+   */
+  static getSalesReps(branchId?: string): SalesRepOption[] {
+    const actor = AuthService.requireAuth();
+    const companyScope = this.branchAccess.companyScope('e.company_id', actor);
+    const rows = this.db.query<any>(
+      `SELECT e.id, e.code, COALESCE(e.name, e.full_name) AS name, e.branch_id AS homeBranchId,
+              COALESCE(e.is_sales_rep, 0) AS isSalesRep,
+              e.commission_percentage AS commissionPercentage,
+              (SELECT GROUP_CONCAT(a.branch_id) FROM employee_branch_assignments a
+                WHERE a.employee_id = e.id) AS extraBranchIds
+       FROM employees e
+       WHERE e.is_active = 1 AND ${companyScope.clause}
+       ORDER BY COALESCE(e.is_sales_rep, 0) DESC, name ASC`,
+      companyScope.params
+    );
+    const branchNames = new Map(
+      this.db.query<{ id: string; name: string }>(
+        'SELECT id, name FROM branches WHERE is_active = 1'
+      ).map((branch) => [branch.id, branch.name])
+    );
+    return rows.map((row) => {
+      const extraIds: string[] = row.extraBranchIds
+        ? String(row.extraBranchIds).split(',').map((id: string) => id.trim()).filter(Boolean)
+        : [];
+      const ids = [row.homeBranchId, ...extraIds].filter(Boolean) as string[];
+      return {
+        id: String(row.id),
+        code: String(row.code || ''),
+        name: String(row.name || ''),
+        homeBranchId: row.homeBranchId ?? null,
+        branchIds: ids,
+        branchNames: ids.map((id) => branchNames.get(id) || id).join('، '),
+        isSalesRep: Boolean(Number(row.isSalesRep)),
+        commissionPercentage: Number(row.commissionPercentage) || 0,
+        servesBranch: branchId ? ids.includes(branchId) : undefined,
+      };
+    });
   }
 
   static create(data: Omit<Employee, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
@@ -566,6 +739,7 @@ export class EmployeeService {
     const branchId = data.branchId || this.branchAccess.getCurrentBranchId(actor);
     this.branchAccess.requireBranchAccess(branchId, actor);
     this.validateEmployeeOrganization(data, branchId, undefined, actor);
+    const additionalBranchIds = this.normalizeAdditionalBranchIds(data.additionalBranchIds, branchId, actor);
     const id = `emp_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('EMP');
@@ -580,8 +754,9 @@ export class EmployeeService {
            employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes, company_id,
            national_id, phone2, address, birth_date, gender, emergency_contact_name, emergency_contact_phone,
            department_id, manager_employee_id, probation_start_date, probation_end_date, bank_account_number,
-           bank_name, wallet_provider, wallet_number, salary_payment_method, social_insurance_number, tax_file_number, tax_exempt, tax_exemption_amount, tax_dependents, education, previous_experience
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
+           bank_name, wallet_provider, wallet_number, salary_payment_method, social_insurance_number, tax_file_number, tax_exempt, tax_exemption_amount, tax_dependents, education, previous_experience,
+           is_sales_rep, commission_percentage, monthly_target
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ROUND(?*100))`,
         [id, code, data.name.trim(), data.name.trim(), this.normalizePhone(data.phone), data.email?.trim() || null, data.role.trim(), data.role.trim(),
          data.location?.trim() || '', branchId, data.employmentType || 'FULL_TIME', joinedDate, joinedDate, data.baseSalary,
          data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes?.trim() || null,
@@ -595,8 +770,11 @@ export class EmployeeService {
          data.salaryPaymentMethod || 'CASH', data.socialInsuranceNumber?.trim() || null,
          data.taxFileNumber?.trim() || null, data.taxExempt ? 1 : 0,
          Math.max(0, Number(data.taxExemptionAmount) || 0), Math.max(0, Math.round(Number(data.taxDependents) || 0)),
-         data.education?.trim() || null, data.previousExperience?.trim() || null]
+         data.education?.trim() || null, data.previousExperience?.trim() || null,
+         data.isSalesRep ? 1 : 0, Math.max(0, Number(data.commissionPercentage) || 0),
+         Math.max(0, Math.round(Number(data.monthlyTarget) || 0))]
       );
+      this.syncBranchAssignments(db, id, additionalBranchIds, actor.id);
       db.run(
         `INSERT INTO employee_status_history
          (id, employee_id, previous_status, next_status, effective_date, reason, actor_id)
@@ -633,6 +811,10 @@ export class EmployeeService {
       [id]
     )[0];
     this.validateEmployeeOrganization(data, data.branchId || existing.branchId || '', id, actor);
+    const effectiveBranchId = data.branchId || existing.branchId || '';
+    const additionalBranchIds = data.additionalBranchIds !== undefined
+      ? this.normalizeAdditionalBranchIds(data.additionalBranchIds, effectiveBranchId, actor)
+      : undefined;
     const nextStatus = data.status ?? existing.status;
     this.db.executeTransaction((db) => {
     db.run(
@@ -697,6 +879,29 @@ export class EmployeeService {
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [...profileUpdates.map(([key, , normalize]) => normalize(data[key])), id]
       );
+    }
+    const repUpdates: string[] = [];
+    const repParams: any[] = [];
+    if (data.isSalesRep !== undefined) {
+      repUpdates.push('is_sales_rep = ?');
+      repParams.push(data.isSalesRep ? 1 : 0);
+    }
+    if (data.commissionPercentage !== undefined) {
+      repUpdates.push('commission_percentage = ?');
+      repParams.push(Math.max(0, Number(data.commissionPercentage) || 0));
+    }
+    if (data.monthlyTarget !== undefined) {
+      repUpdates.push('monthly_target = ROUND(?*100)');
+      repParams.push(Math.max(0, Number(data.monthlyTarget) || 0));
+    }
+    if (repUpdates.length) {
+      db.run(
+        `UPDATE employees SET ${repUpdates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [...repParams, id]
+      );
+    }
+    if (additionalBranchIds !== undefined) {
+      this.syncBranchAssignments(db, id, additionalBranchIds, actor.id);
     }
     if (stored && nextStatus !== stored.status) {
       db.run(
@@ -872,29 +1077,41 @@ export class EmployeeService {
 
   // ─── Payroll Transactions ─────────────────────────────────────────────────────
 
-  static getTransactions(employeeId?: string): PayrollTransaction[] {
-    const actor = this.requirePayrollView();
+  private static buildTransactionsQuery(employeeId: string | undefined, actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     if (employeeId) {
-      this.requireEmployeeBranch(employeeId, actor);
-      return this.db.query<PayrollTransaction>(
-        `SELECT pt.*, e.name AS employee_name
+      return {
+        sql: `SELECT pt.*, e.name AS employee_name
          FROM payroll_transactions pt
          LEFT JOIN employees e ON e.id = pt.employee_id
          WHERE pt.employee_id = ? AND ${scope.clause} AND ${departmentScope.clause}
          ORDER BY pt.date DESC, pt.created_at DESC`,
-        [employeeId, ...scope.params, ...departmentScope.params]
-      );
+        params: [employeeId, ...scope.params, ...departmentScope.params],
+      };
     }
-    return this.db.query<PayrollTransaction>(
-      `SELECT pt.*, e.name AS employee_name
+    return {
+      sql: `SELECT pt.*, e.name AS employee_name
        FROM payroll_transactions pt
        LEFT JOIN employees e ON e.id = pt.employee_id
        WHERE ${scope.clause} AND ${departmentScope.clause}
        ORDER BY pt.date DESC, pt.created_at DESC`,
-      [...scope.params, ...departmentScope.params]
-    );
+      params: [...scope.params, ...departmentScope.params],
+    };
+  }
+
+  static getTransactions(employeeId?: string): PayrollTransaction[] {
+    const actor = this.requirePayrollView();
+    if (employeeId) this.requireEmployeeBranch(employeeId, actor);
+    const { sql, params } = this.buildTransactionsQuery(employeeId, actor);
+    return this.db.query<PayrollTransaction>(sql, params);
+  }
+
+  static async getTransactionsAsync(employeeId?: string): Promise<PayrollTransaction[]> {
+    const actor = this.requirePayrollView();
+    if (employeeId) this.requireEmployeeBranch(employeeId, actor);
+    const { sql, params } = this.buildTransactionsQuery(employeeId, actor);
+    return this.db.queryAsync<PayrollTransaction>(sql, params);
   }
 
   private static ensureSalaryAccrual(
@@ -1317,51 +1534,139 @@ export class EmployeeService {
     return { created, skipped };
   }
 
+  private static buildPayrollRunQuery(where: string, params: any[]): { sql: string; params: any[] } {
+    return {
+      sql: `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
+              pr.created_at AS createdAt, pr.approved_at AS approvedAt,
+              pr.paid_at AS paidAt, pr.closed_at AS closedAt
+       FROM payroll_runs pr
+       WHERE ${where}`,
+      params,
+    };
+  }
+
+  private static mapPayrollRunRows(rows: any[]): PayrollRun[] {
+    return rows.map((run) => this.readPayrollRun(run));
+  }
+
   static getPayrollRun(period: string): PayrollRun | null {
     const actor = this.requirePayrollView();
     this.departmentAccess.requireAllDepartmentAccess(actor);
     if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
     const branchId = this.branchAccess.getCurrentBranchId(actor);
-    const run = this.db.query<any>(
-      `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
-              pr.created_at AS createdAt, pr.approved_at AS approvedAt,
-              pr.paid_at AS paidAt, pr.closed_at AS closedAt
-       FROM payroll_runs pr
-       WHERE pr.period = ? AND pr.branch_id = ?`,
-      [period, branchId]
-    )[0];
+    const { sql, params } = this.buildPayrollRunQuery('pr.period = ? AND pr.branch_id = ?', [period, branchId]);
+    const run = this.db.query<any>(sql, params)[0];
     return run ? this.readPayrollRun(run) : null;
+  }
+
+  static async getPayrollRunAsync(period: string): Promise<PayrollRun | null> {
+    const actor = this.requirePayrollView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
+    if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
+    const { sql, params } = this.buildPayrollRunQuery('pr.period = ? AND pr.branch_id = ?', [period, branchId]);
+    const run = (await this.db.queryAsync<any>(sql, params))[0];
+    return run ? this.readPayrollRunAsync(run) : null;
   }
 
   static getPayrollRunById(id: string): PayrollRun {
     const actor = this.requirePayrollView();
     this.departmentAccess.requireAllDepartmentAccess(actor);
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
-    const run = this.db.query<any>(
-      `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
-              pr.created_at AS createdAt, pr.approved_at AS approvedAt,
-              pr.paid_at AS paidAt, pr.closed_at AS closedAt
-       FROM payroll_runs pr
-       WHERE pr.id = ? AND ${scope.clause}`,
-      [id, ...scope.params]
-    )[0];
+    const { sql, params } = this.buildPayrollRunQuery(`pr.id = ? AND ${scope.clause}`, [id, ...scope.params]);
+    const run = this.db.query<any>(sql, params)[0];
     if (!run) throw new Error('دورة الرواتب غير موجودة ضمن نطاق فروعك.');
     return this.readPayrollRun(run);
+  }
+
+  static async getPayrollRunByIdAsync(id: string): Promise<PayrollRun> {
+    const actor = this.requirePayrollView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
+    const { sql, params } = this.buildPayrollRunQuery(`pr.id = ? AND ${scope.clause}`, [id, ...scope.params]);
+    const run = (await this.db.queryAsync<any>(sql, params))[0];
+    if (!run) throw new Error('دورة الرواتب غير موجودة ضمن نطاق فروعك.');
+    return this.readPayrollRunAsync(run);
   }
 
   static getAllPayrollRuns(): PayrollRun[] {
     const actor = this.requirePayrollView();
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
-    const rows = this.db.query<any>(
-      `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
-              pr.created_at AS createdAt, pr.approved_at AS approvedAt,
-              pr.paid_at AS paidAt, pr.closed_at AS closedAt
-       FROM payroll_runs pr
-       WHERE ${scope.clause}
-       ORDER BY pr.period DESC`,
-      [...scope.params]
+    const { sql, params } = this.buildPayrollRunQuery(scope.clause, [...scope.params]);
+    const rows = this.db.query<any>(`${sql} ORDER BY pr.period DESC`, params);
+    return this.mapPayrollRunRows(rows);
+  }
+
+  static async getAllPayrollRunsAsync(): Promise<PayrollRun[]> {
+    const actor = this.requirePayrollView();
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
+    const { sql, params } = this.buildPayrollRunQuery(scope.clause, [...scope.params]);
+    const rows = await this.db.queryAsync<any>(`${sql} ORDER BY pr.period DESC`, params);
+    if (rows.length === 0) return [];
+    // Batch-fetch items for all runs in one worker query (avoids N+1 round-trips).
+    const placeholders = rows.map(() => '?').join(',');
+    const itemRows = await this.db.queryAsync<any>(
+      `SELECT payroll_run_id AS runId, id, employee_id AS employeeId, branch_id AS branchId, employee_name AS employeeName,
+              salary_type AS salaryType, base_salary / 100.0 AS baseSalary, expected_workdays AS expectedWorkdays,
+              absent_days AS absentDays, unpaid_leave_days AS unpaidLeaveDays,
+              late_minutes AS lateMinutes, overtime_minutes AS overtimeMinutes,
+              base_amount / 100.0 AS baseAmount, overtime_amount / 100.0 AS overtimeAmount,
+              bonus_amount / 100.0 AS bonusAmount, commission_amount / 100.0 AS commissionAmount,
+              allowance_amount / 100.0 AS allowanceAmount, loan_deduction_amount / 100.0 AS loanDeductionAmount,
+              advance_amount / 100.0 AS advanceAmount, manual_deduction_amount / 100.0 AS manualDeductionAmount,
+              attendance_deduction_amount / 100.0 AS attendanceDeductionAmount, tax_amount / 100.0 AS taxAmount,
+              social_insurance_base / 100.0 AS socialInsuranceBase,
+              social_insurance_employee_share / 100.0 AS socialInsuranceEmployeeShare,
+              social_insurance_employer_share / 100.0 AS socialInsuranceEmployerShare,
+              social_insurance_total / 100.0 AS socialInsuranceTotal,
+              gross_amount / 100.0 AS grossAmount, net_amount / 100.0 AS netAmount, warning_json AS warningJson,
+              detail_json AS detailJson, payout_transaction_id AS payoutTransactionId,
+              payment_method AS paymentMethod, payment_reference AS paymentReference,
+              payment_proof AS paymentProof, paid_amount / 100.0 AS paidAmount, payout_status AS payoutStatus
+       FROM payroll_run_items WHERE payroll_run_id IN (${placeholders}) ORDER BY employee_name`,
+      rows.map((r) => r.id)
     );
-    return rows.map((run) => this.readPayrollRun(run));
+    const itemsByRun = new Map<string, PayrollRunItem[]>();
+    for (const row of itemRows) {
+      const { runId, ...item } = row;
+      const list = itemsByRun.get(runId) || [];
+      list.push({ ...item, warnings: JSON.parse(item.warningJson), details: JSON.parse(item.detailJson) } as PayrollRunItem);
+      itemsByRun.set(runId, list);
+    }
+    return rows.map((run) => ({ ...run, items: itemsByRun.get(run.id) || [] }));
+  }
+
+  private static async readPayrollRunItemsAsync(runId: string): Promise<PayrollRunItem[]> {
+    const rows = await this.db.queryAsync<any>(
+      `SELECT id, employee_id AS employeeId, branch_id AS branchId, employee_name AS employeeName,
+              salary_type AS salaryType, base_salary / 100.0 AS baseSalary, expected_workdays AS expectedWorkdays,
+              absent_days AS absentDays, unpaid_leave_days AS unpaidLeaveDays,
+              late_minutes AS lateMinutes, overtime_minutes AS overtimeMinutes,
+              base_amount / 100.0 AS baseAmount, overtime_amount / 100.0 AS overtimeAmount,
+              bonus_amount / 100.0 AS bonusAmount, commission_amount / 100.0 AS commissionAmount,
+              allowance_amount / 100.0 AS allowanceAmount, loan_deduction_amount / 100.0 AS loanDeductionAmount,
+              advance_amount / 100.0 AS advanceAmount, manual_deduction_amount / 100.0 AS manualDeductionAmount,
+              attendance_deduction_amount / 100.0 AS attendanceDeductionAmount, tax_amount / 100.0 AS taxAmount,
+              social_insurance_base / 100.0 AS socialInsuranceBase,
+              social_insurance_employee_share / 100.0 AS socialInsuranceEmployeeShare,
+              social_insurance_employer_share / 100.0 AS socialInsuranceEmployerShare,
+              social_insurance_total / 100.0 AS socialInsuranceTotal,
+              gross_amount / 100.0 AS grossAmount, net_amount / 100.0 AS netAmount, warning_json AS warningJson,
+              detail_json AS detailJson, payout_transaction_id AS payoutTransactionId,
+              payment_method AS paymentMethod, payment_reference AS paymentReference,
+              payment_proof AS paymentProof, paid_amount / 100.0 AS paidAmount, payout_status AS payoutStatus
+       FROM payroll_run_items WHERE payroll_run_id = ? ORDER BY employee_name`,
+      [runId]
+    );
+    return rows.map((row): PayrollRunItem => ({
+      ...row,
+      warnings: JSON.parse(row.warningJson),
+      details: JSON.parse(row.detailJson),
+    }));
+  }
+
+  private static async readPayrollRunAsync(run: any): Promise<PayrollRun> {
+    return { ...run, items: await this.readPayrollRunItemsAsync(run.id) };
   }
 
   private static readPayrollRun(run: any): PayrollRun {
@@ -2159,6 +2464,35 @@ export class EmployeeService {
     return { bankAccounts, registers };
   }
 
+  static async getPayrollPayoutOptionsAsync(): Promise<{
+    bankAccounts: Array<{ id: string; accountName: string; bankName: string; accountNumber: string; currentBalance: number }>;
+    registers: Array<{ id: string; name: string; currentBalance: number }>;
+  }> {
+    const actor = this.requirePayrollApproval();
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
+    this.branchAccess.requireBranchAccess(branchId, actor);
+    const [bankRows, registerRows] = await Promise.all([
+      this.db.queryAsync<any>(
+        `SELECT id, account_name AS accountName, bank_name AS bankName,
+                account_number AS accountNumber, COALESCE(current_balance, 0) / 100.0 AS currentBalance
+         FROM bank_accounts
+         WHERE is_active = 1 AND (branch_id = ? OR branch_id IS NULL)
+         ORDER BY branch_id IS NULL, account_name`,
+        [branchId]
+      ),
+      this.db.queryAsync<any>(
+        `SELECT id, name, COALESCE(current_balance, 0) / 100.0 AS currentBalance
+         FROM cash_registers WHERE branch_id = ? AND is_active = 1
+         ORDER BY is_default DESC, name`,
+        [branchId]
+      ),
+    ]);
+    return {
+      bankAccounts: bankRows.map((row) => ({ ...row, currentBalance: Number(row.currentBalance) || 0 })),
+      registers: registerRows.map((row) => ({ ...row, currentBalance: Number(row.currentBalance) || 0 })),
+    };
+  }
+
   static closePayrollRun(id: string): PayrollRun {
     const actor = this.requirePayrollApproval();
     this.departmentAccess.requireAllDepartmentAccess(actor);
@@ -2182,8 +2516,14 @@ export class EmployeeService {
   static getPayrollPayables(): EmployeePayrollPayable[] {
     const actor = this.requireFinancialView();
     this.departmentAccess.requireAllDepartmentAccess(actor);
+    const { sql, params } = this.buildPayrollPayablesSpec(actor);
+    return this.db.query<EmployeePayrollPayable>(sql, params);
+  }
+
+  private static buildPayrollPayablesSpec(actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
-    return this.db.query<EmployeePayrollPayable>(`
+    return {
+      sql: `
       WITH payroll_lines AS (
         SELECT
           CASE
@@ -2214,7 +2554,16 @@ export class EmployeeService {
       GROUP BY p.employee_id, emp.name
       HAVING ABS(SUM(p.balance)) > 0.009
       ORDER BY employeeName
-    `, scope.params);
+    `,
+      params: [...scope.params],
+    };
+  }
+
+  static async getPayrollPayablesAsync(): Promise<EmployeePayrollPayable[]> {
+    const actor = this.requireFinancialView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
+    const { sql, params } = this.buildPayrollPayablesSpec(actor);
+    return this.db.queryAsync<EmployeePayrollPayable>(sql, params);
   }
 
   static deleteTransaction(id: string): void {
@@ -2279,6 +2628,46 @@ export class EmployeeService {
     return { baseSalary: monthlySalary, advances, bonuses, deductions, payouts, netDue };
   }
 
+  static async getEmployeeFinancialsAsync(employeeId: string, period = localDateString().slice(0, 7)): Promise<EmployeeFinancials> {
+    const actor = this.requireFinancialView();
+    if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
+    const emp = await this.getScopedByIdAsync(employeeId, actor);
+    if (!emp) throw new Error('الموظف غير موجود ضمن نطاق فروعك.');
+
+    const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const [rows, workingDaysRow] = await Promise.all([
+      this.db.queryAsync<{ type: PayrollTxType; total: number }>(
+        `SELECT pt.type, SUM(pt.amount) / 100.0 AS total
+         FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+         WHERE pt.employee_id = ? AND substr(pt.date, 1, 7) = ? AND ${scope.clause}
+           AND ${departmentScope.clause} GROUP BY pt.type`,
+        [employeeId, period, ...scope.params, ...departmentScope.params]
+      ),
+      this.db.queryAsync<{ workingDays: number }>(
+        `SELECT COALESCE(c.working_days_per_month, 26) AS workingDays
+         FROM employees e
+         LEFT JOIN branches b ON b.id = e.branch_id
+         LEFT JOIN companies c ON c.id = b.company_id
+         WHERE e.id = ?`,
+        [employeeId]
+      ),
+    ]);
+
+    const map: Record<string, number> = {};
+    for (const r of rows) map[r.type] = r.total ?? 0;
+
+    const advances = map['ADVANCE'] ?? 0;
+    const bonuses = map['BONUS'] ?? 0;
+    const deductions = map['DEDUCTION'] ?? 0;
+    const payouts = map['SALARY_PAYOUT'] ?? 0;
+    const workingDays = Number(workingDaysRow[0]?.workingDays) || 26;
+    const monthlySalary = emp.salaryType === 'DAILY' ? emp.baseSalary * workingDays : emp.baseSalary;
+    const netDue = monthlySalary + bonuses - advances - deductions - payouts;
+
+    return { baseSalary: monthlySalary, advances, bonuses, deductions, payouts, netDue };
+  }
+
   // ─── Attendance ────────────────────────────────────────────────────────────────
 
   static getAllAttendance(): Attendance[] {
@@ -2295,11 +2684,40 @@ export class EmployeeService {
     `, [...scope.params, ...departmentScope.params]);
   }
 
+  static async getAllAttendanceAsync(): Promise<Attendance[]> {
+    const actor = this.requireAttendanceView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    return this.db.queryAsync<Attendance>(`
+      SELECT a.id, a.employee_id AS employeeId, a.date, a.status,
+             COALESCE(a.late_minutes, 0) AS lateMinutes,
+             COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
+             a.notes, a.recorded_by AS recordedBy, a.created_at AS createdAt
+      FROM attendance a JOIN employees e ON e.id = a.employee_id
+      WHERE ${scope.clause} AND ${departmentScope.clause} ORDER BY a.date DESC
+    `, [...scope.params, ...departmentScope.params]);
+  }
+
   static getAttendanceByDate(date: string): Attendance[] {
     const actor = this.requireAttendanceView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     return this.db.query<Attendance>(
+      `SELECT a.id, a.employee_id AS employeeId, a.date, a.status,
+              COALESCE(a.late_minutes, 0) AS lateMinutes,
+              COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
+              a.notes, a.recorded_by AS recordedBy, a.created_at AS createdAt
+       FROM attendance a JOIN employees e ON e.id = a.employee_id
+       WHERE a.date = ? AND ${scope.clause} AND ${departmentScope.clause} ORDER BY a.created_at`,
+      [date, ...scope.params, ...departmentScope.params]
+    );
+  }
+
+  static async getAttendanceByDateAsync(date: string): Promise<Attendance[]> {
+    const actor = this.requireAttendanceView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    return this.db.queryAsync<Attendance>(
       `SELECT a.id, a.employee_id AS employeeId, a.date, a.status,
               COALESCE(a.late_minutes, 0) AS lateMinutes,
               COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
@@ -2334,10 +2752,33 @@ export class EmployeeService {
     );
   }
 
+  static async getLocationCountsAsync(): Promise<{ location: string; count: number }[]> {
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    return this.db.queryAsync<{ location: string; count: number }>(
+      `SELECT e.location, COUNT(*) AS count FROM employees e
+       WHERE ${scope.clause} GROUP BY e.location ORDER BY count DESC`,
+      scope.params
+    );
+  }
+
   static getTotalWagesBill(): number {
     const actor = this.requireFinancialView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const rows = this.db.query<{ salaryType: string; baseSalary: number }>(
+      `SELECT e.salary_type AS salaryType, e.base_salary / 100.0 AS baseSalary FROM employees e
+       WHERE e.status = 'ACTIVE' AND ${scope.clause}`,
+      scope.params
+    );
+    return rows.reduce((sum, e) => {
+      return sum + (e.salaryType === 'DAILY' ? e.baseSalary * 26 : e.baseSalary);
+    }, 0);
+  }
+
+  static async getTotalWagesBillAsync(): Promise<number> {
+    const actor = this.requireFinancialView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const rows = await this.db.queryAsync<{ salaryType: string; baseSalary: number }>(
       `SELECT e.salary_type AS salaryType, e.base_salary / 100.0 AS baseSalary FROM employees e
        WHERE e.status = 'ACTIVE' AND ${scope.clause}`,
       scope.params

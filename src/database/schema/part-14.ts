@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 CREATE INDEX IF NOT EXISTS idx_approvals_status ON approval_requests(status);
 CREATE INDEX IF NOT EXISTS idx_approvals_type ON approval_requests(request_type);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_approvals_reference_request_type
+CREATE INDEX IF NOT EXISTS idx_approvals_reference_request_type
   ON approval_requests(reference_type, reference_id, request_type)
   WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL;
 

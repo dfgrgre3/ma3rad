@@ -487,9 +487,51 @@ export class PlatformStaffService {
       throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
     }
 
-    // This would be called from client with device fingerprint
-    // For now, just a placeholder
-    this.audit('إضافة جهاز موثوق', 'TRUSTED_DEVICE', null, { deviceName });
+    const staff = this.getPlatformStaff(user.id);
+    if (!staff) throw new Error('حساب الموظف غير موجود.');
+
+    let fingerprint: string;
+    try {
+      fingerprint = this.getDeviceFingerprint();
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'تعذر الحصول على بصمة الجهاز.');
+    }
+
+    const existing = this.db.query<any>(
+      'SELECT id FROM platform_trusted_devices WHERE staff_id = ? AND fingerprint = ?',
+      [staff.id, fingerprint]
+    )[0];
+    if (existing) {
+      throw new Error('هذا الجهاز موثق بالفعل لهذا الموظف.');
+    }
+
+    const id = `td_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    const now = nowIso();
+
+    this.db.run(
+      `INSERT INTO platform_trusted_devices (id, staff_id, device_name, fingerprint, last_seen_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, staff.id, deviceName || null, fingerprint, now, now]
+    );
+
+    this.audit('إضافة جهاز موثوق', 'TRUSTED_DEVICE', id, { staffId: staff.id, deviceName, fingerprint });
+  }
+
+  private getDeviceFingerprint(): string {
+    if (typeof window !== 'undefined' && (window as any).ceramisys?.license?.getHwid) {
+      const hwid = (window as any).ceramisys.license.getHwid();
+      if (hwid && typeof hwid === 'string' && hwid.trim()) return hwid.trim();
+    }
+    try {
+      let id = localStorage.getItem('central_device_id');
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('central_device_id', id);
+      }
+      return id;
+    } catch {
+      return 'dev_' + Math.random().toString(36).slice(2, 10);
+    }
   }
 
   // ─── MFA Management ───────────────────────────────────────────────────────────

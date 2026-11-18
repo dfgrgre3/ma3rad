@@ -8,6 +8,12 @@ import type {
   PlatformLicense,
   PlatformDevice,
   PlatformSubscription,
+  PlatformInvoice,
+  PlatformInvoiceInput,
+  PlatformInvoiceStatus,
+  PlatformPayment,
+  PlatformPaymentInput,
+  PlatformPaymentMethod,
 } from './platformTypes';
 
 export type CentralRequest = {
@@ -182,6 +188,53 @@ export function mapCentralDevice(row: any): PlatformDevice {
     notes: row.notes ?? null,
     createdAt: String(row.created_at ?? row.createdAt ?? ''),
     updatedAt: String(row.updated_at ?? row.updatedAt ?? ''),
+  };
+}
+
+/** Map a central `platform_invoices` row to the UI type (amounts are major units). */
+export function mapCentralInvoice(row: any): PlatformInvoice {
+  return {
+    id: String(row.id),
+    number: String(row.number ?? row.id ?? ''),
+    tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+    tenantName: row.tenantName ?? row.tenant_name ?? undefined,
+    subscriptionId: row.subscriptionId ?? row.subscription_id ?? null,
+    issueDate: String(row.issueDate ?? row.issue_date ?? ''),
+    dueDate: row.dueDate ?? row.due_date ?? null,
+    status: String(row.status ?? 'DRAFT') as PlatformInvoiceStatus,
+    currency: String(row.currency ?? 'EGP'),
+    subtotal: toNumber(row.subtotal, 0),
+    discount: toNumber(row.discount, 0),
+    tax: toNumber(row.tax, 0),
+    total: toNumber(row.total, 0),
+    paidAmount: toNumber(row.paidAmount ?? row.paid_amount, 0),
+    notes: row.notes ?? null,
+    createdAt: String(row.createdAt ?? row.created_at ?? ''),
+    items: Array.isArray(row.items)
+      ? row.items.map((item: any) => ({
+          id: item.id ? String(item.id) : undefined,
+          description: String(item.description ?? ''),
+          quantity: toNumber(item.quantity, 0),
+          unitPrice: toNumber(item.unitPrice ?? item.unit_price, 0),
+          total: item.total === undefined ? undefined : toNumber(item.total, 0),
+        }))
+      : undefined,
+  };
+}
+
+/** Map a central `platform_payments` row to the UI type (amounts are major units). */
+export function mapCentralPayment(row: any): PlatformPayment {
+  return {
+    id: String(row.id),
+    invoiceId: row.invoiceId ?? row.invoice_id ?? null,
+    invoiceNumber: row.invoiceNumber ?? row.invoice_number ?? null,
+    tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+    tenantName: row.tenantName ?? row.tenant_name ?? undefined,
+    amount: toNumber(row.amount, 0),
+    method: String(row.method ?? 'CASH') as PlatformPaymentMethod,
+    reference: row.reference ?? null,
+    paidAt: String(row.paidAt ?? row.paid_at ?? ''),
+    notes: row.notes ?? null,
   };
 }
 
@@ -380,10 +433,8 @@ export class PlatformAdminApiClient {
 
   // Roles & permission catalog
   async listRoles(): Promise<PlatformRoleSummary[]> {
-    const envelope = await this.requestEnvelope<PlatformRoleSummary[]>({
-      path: '/api/v1/admin/roles',
-      method: 'GET',
-    });
+    const envelope = await this.requestEnvelope<PlatformRoleSummary[]>({ path: '/api/v1/admin/roles',
+      method: 'GET' });
     if (envelope.success === false) {
       throw new CentralApiError({ status: 0, envelope });
     }
@@ -407,10 +458,8 @@ export class PlatformAdminApiClient {
     permissions: unknown[];
     roles: Array<PlatformRoleSummary & { permissions: string[] }>;
   }> {
-    const envelope = await this.requestEnvelope<any>({
-      path: '/api/v1/admin/permissions/catalog',
-      method: 'GET',
-    });
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/permissions/catalog',
+      method: 'GET' });
     if (envelope.success === false) {
       throw new CentralApiError({ status: 0, envelope });
     }
@@ -629,10 +678,8 @@ export class PlatformAdminApiClient {
   }
 
   async listNotificationTemplates(): Promise<any[]> {
-    const envelope = await this.requestEnvelope<any[]>({
-      path: '/api/v1/admin/notifications/templates',
-      method: 'GET',
-    });
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/notifications/templates',
+      method: 'GET' });
     if (envelope.success === false) {
       throw new CentralApiError({ status: 0, envelope });
     }
@@ -1183,10 +1230,8 @@ export class PlatformAdminApiClient {
 
   /** Cross-tenant clone detection; requires full tenant scope server-side. */
   async detectCloneDevices(): Promise<{ devices: PlatformDevice[]; licenses: PlatformLicense[]; alerts: string[] }> {
-    const envelope = await this.requestEnvelope<{ devices: any[]; licenses: any[]; alerts: string[] }>({
-      path: '/api/v1/admin/devices/detect-clones',
-      method: 'POST',
-    });
+    const envelope = await this.requestEnvelope<{ devices: any[]; licenses: any[]; alerts: string[] }>({ path: '/api/v1/admin/devices/detect-clones',
+      method: 'POST' });
     if (envelope.success === false) {
       throw new CentralApiError({ status: 0, envelope });
     }
@@ -1196,6 +1241,670 @@ export class PlatformAdminApiClient {
       licenses: (Array.isArray(data.licenses) ? data.licenses : []).map(mapCentralLicense),
       alerts: Array.isArray(data.alerts) ? data.alerts.map(String) : [],
     };
+  }
+
+  // ── Billing: invoices & payments ──────────────────────────────────────────
+
+  async listInvoices(filters: { search?: string; status?: string; tenantId?: string } = {}): Promise<PlatformInvoice[]> {
+    const params: Record<string, string> = {};
+    if (filters.search) params.search = filters.search;
+    if (filters.status) params.status = filters.status;
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({
+      path: `/api/v1/admin/billing/invoices${qs ? `?${qs}` : ''}`,
+      method: 'GET',
+    });
+    return (Array.isArray(rows) ? rows : []).map(mapCentralInvoice);
+  }
+
+  async getInvoice(id: string): Promise<PlatformInvoice | null> {
+    const row = await this.request<any>({
+      path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}`,
+      method: 'GET',
+    });
+    return row ? mapCentralInvoice(row) : null;
+  }
+
+  async createInvoice(input: PlatformInvoiceInput, number?: string): Promise<PlatformInvoice> {
+    const payload = {
+      tenantId: input.tenantId,
+      number: number || `INV-${Date.now()}`,
+      subscriptionId: input.subscriptionId ?? null,
+      issueDate: input.issueDate,
+      dueDate: input.dueDate,
+      status: input.status ?? 'DRAFT',
+      discount: input.discount ?? 0,
+      tax: input.tax ?? 0,
+      notes: input.notes ?? null,
+      items: input.items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    };
+    const row = await this.request<any>({
+      path: '/api/v1/admin/billing/invoices',
+      method: 'POST',
+      body: payload,
+    });
+    return mapCentralInvoice(row);
+  }
+
+  async setInvoiceStatus(id: string, status: PlatformInvoiceStatus): Promise<PlatformInvoice> {
+    const row = await this.request<any>({
+      path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}/status`,
+      method: 'POST',
+      body: { status },
+    });
+    return mapCentralInvoice(row);
+  }
+
+  async voidInvoice(id: string): Promise<PlatformInvoice> {
+    const row = await this.request<any>({
+      path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}/void`,
+      method: 'POST',
+      body: {},
+    });
+    return mapCentralInvoice(row);
+  }
+
+  async listPayments(filters: { tenantId?: string; invoiceId?: string; limit?: number } = {}): Promise<PlatformPayment[]> {
+    const params: Record<string, string> = {};
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.invoiceId) params.invoiceId = filters.invoiceId;
+    if (filters.limit) params.limit = String(filters.limit);
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({
+      path: `/api/v1/admin/billing/payments${qs ? `?${qs}` : ''}`,
+      method: 'GET',
+    });
+    return (Array.isArray(rows) ? rows : []).map(mapCentralPayment);
+  }
+
+  async addPayment(input: PlatformPaymentInput): Promise<PlatformPayment> {
+    const row = await this.request<any>({
+      path: '/api/v1/admin/billing/payments',
+      method: 'POST',
+      body: {
+        tenantId: input.tenantId,
+        invoiceId: input.invoiceId ?? null,
+        amount: input.amount,
+        method: input.method ?? 'CASH',
+        reference: input.reference ?? null,
+        notes: input.notes ?? null,
+        paidAt: input.paidAt ?? null,
+      },
+    });
+    return mapCentralPayment(row);
+  }
+
+  async voidPayment(id: string): Promise<void> {
+    await this.request<any>({
+      path: `/api/v1/admin/billing/payments/${encodeURIComponent(id)}`,
+      method: 'DELETE',
+    });
+  }
+
+  // ── Dashboard Overview ──────────────────────────────────────────────────
+  async getOverview(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/overview', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async createPayment(input: { tenantId: string; invoiceId?: string; amount: number; method?: string; reference?: string; notes?: string }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/billing/payments', method: 'POST', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Platform Settings ───────────────────────────────────────────────────
+  async getSettings(): Promise<Record<string, string>> {
+    const envelope = await this.requestEnvelope<Record<string, string>>({ path: '/api/v1/admin/settings', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data || {};
+  }
+
+  async updateSettings(settings: Record<string, string>): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/settings', method: 'PUT', body: settings });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Platform Policies (stored in platform_settings) ─────────────────────
+  async getPlatformPolicies(): Promise<{ terms: string; privacy: string; retention: any; updatedAt: string }> {
+    const settings = await this.getSettings();
+    let retention: any = {};
+    try {
+      retention = settings['policy.retention'] ? JSON.parse(settings['policy.retention']) : {};
+    } catch { /* keep defaults */ }
+    return {
+      terms: settings['policy.terms'] || '',
+      privacy: settings['policy.privacy'] || '',
+      retention,
+      updatedAt: settings['policy.updated_at'] || '',
+    };
+  }
+
+  async savePlatformPolicies(input: { terms?: string; privacy?: string; retention?: any }): Promise<any> {
+    const updates: Record<string, string> = {};
+    const now = new Date().toISOString();
+    if (input.terms !== undefined) updates['policy.terms'] = input.terms;
+    if (input.privacy !== undefined) updates['policy.privacy'] = input.privacy;
+    if (input.retention !== undefined) {
+      const current = await this.getPlatformPolicies();
+      updates['policy.retention'] = JSON.stringify({ ...current.retention, ...input.retention });
+    }
+    updates['policy.updated_at'] = now;
+    return this.updateSettings(updates);
+  }
+
+  // ── Product Modules & Feature Flags ─────────────────────────────────────
+  async listModules(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/modules', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createModule(input: { code: string; name: string; description?: string; category?: string; isActive?: boolean; sortOrder?: number }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/modules', method: 'POST', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async updateModule(id: string, input: { name?: string; description?: string; category?: string; isActive?: boolean; sortOrder?: number }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/modules/${encodeURIComponent(id)}`, method: 'PUT', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listFeatureFlags(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/feature-flags', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createFeatureFlag(input: { key: string; name: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/feature-flags', method: 'POST', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async updateFeatureFlag(id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/feature-flags/${encodeURIComponent(id)}`, method: 'PUT', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Staff Sessions, Devices & Invites ───────────────────────────────────
+  async listStaffSessions(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/staff/sessions', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async revokeStaffSession(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/staff/sessions/${encodeURIComponent(id)}`, method: 'DELETE' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listStaffDevices(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/staff/devices', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async revokeStaffDevice(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/staff/devices/${encodeURIComponent(id)}`, method: 'DELETE' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listStaffInvites(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/staff/invites', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createStaffInvite(input: { email: string; fullName: string; phone?: string; role?: string; expiresInDays?: number }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/staff/invites', method: 'POST', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async revokeStaffInvite(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/staff/invites/${encodeURIComponent(id)}`, method: 'DELETE' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Security Center ─────────────────────────────────────────────────────
+  async getSecurityOverview(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/security/overview', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listSecurityEvents(filters: { severity?: string; eventType?: string; limit?: number } = {}): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters.severity) params.set('severity', filters.severity);
+    if (filters.eventType) params.set('eventType', filters.eventType);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const query = params.toString();
+    const envelope = await this.requestEnvelope<any[]>({ path: `/api/v1/admin/security/events${query ? `?${query}` : ''}`, method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  // ── Sync Monitor ────────────────────────────────────────────────────────
+  async listSyncEvents(filters: { tenantId?: string; status?: string; limit?: number } = {}): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters.tenantId) params.set('tenantId', filters.tenantId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const query = params.toString();
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/sync/events${query ? `?${query}` : ''}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async getSyncStatus(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/sync/status', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listApiKeys(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/security/api-keys', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createApiKey(input: { name: string; scopes?: string[]; expiresInDays?: number }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/security/api-keys', method: 'POST', body: input });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async revokeApiKey(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/security/api-keys/${encodeURIComponent(id)}`,
+      method: 'DELETE',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+  // ── Complex Analytics ───────────────────────────────────────────────────
+  async getBusinessPerformance(period: string = '30d'): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/analytics/business-performance?period=${period}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async getCustomerMetrics(period: string = '30d'): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/analytics/customer-metrics?period=${period}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async getLicenseMetrics(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/analytics/license-metrics', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async getSubscriptionMetrics(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/analytics/subscription-metrics', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async getOperationsMetrics(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/analytics/operations-metrics', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Tenant Branding ─────────────────────────────────────────────────────
+  async getPlatformBranding(): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/branding/platform', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async getTenantBranding(tenantId: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/branding/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async saveTenantBranding(tenantId: string, input: Record<string, any>): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/branding/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listTenantBrandingVersions(tenantId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/branding/tenant/${encodeURIComponent(tenantId)}/versions`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async rollbackTenantBranding(tenantId: string, version: number): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/branding/tenant/${encodeURIComponent(tenantId)}/rollback/${version}`,
+      method: 'POST',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Tenant UI Customization ─────────────────────────────────────────────
+  async listUiProfiles(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/customization/ui-profiles', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async getTenantUiCustomization(tenantId: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/customization/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async saveTenantUiCustomization(tenantId: string, input: Record<string, any>): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/customization/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listTenantUiVersions(tenantId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/customization/tenant/${encodeURIComponent(tenantId)}/versions`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async rollbackTenantUi(tenantId: string, version: number): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/customization/tenant/${encodeURIComponent(tenantId)}/rollback/${version}`,
+      method: 'POST',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Tenant App Configuration ────────────────────────────────────────────
+  async listConfigTemplates(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/app-config/templates', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async listConfigRollouts(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/app-config/rollouts', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createConfigRollout(input: { templateId: string; targetTenants?: string[] }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: '/api/v1/admin/app-config/rollouts',
+      method: 'POST',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async startConfigRollout(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/app-config/rollouts/${encodeURIComponent(id)}/start`,
+      method: 'POST',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listConfigAcks(rolloutId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/app-config/rollouts/${encodeURIComponent(rolloutId)}/acks`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async getTenantConfig(tenantId: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/app-config/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async saveTenantConfig(tenantId: string, input: { templateId?: string; configPayload?: any }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/app-config/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listTenantConfigVersions(tenantId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/app-config/tenant/${encodeURIComponent(tenantId)}/versions`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async rollbackTenantConfig(tenantId: string, version: number): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/app-config/tenant/${encodeURIComponent(tenantId)}/rollback/${version}`,
+      method: 'POST',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Tenant Activity Settings ────────────────────────────────────────────
+  async getTenantActivity(tenantId: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/activity/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async saveTenantActivity(tenantId: string, input: { activityId: string; enabledModules?: any; customTerminology?: any }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/activity/tenant/${encodeURIComponent(tenantId)}`,
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listTenantActivityVersions(tenantId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/activity/tenant/${encodeURIComponent(tenantId)}/versions`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async rollbackTenantActivity(tenantId: string, version: number): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/activity/tenant/${encodeURIComponent(tenantId)}/rollback/${version}`,
+      method: 'POST',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Admin Control ───────────────────────────────────────────────────────
+  async listAdminControlStaff(filters: { search?: string; role?: string } = {}): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters.search) params.set('search', filters.search);
+    if (filters.role) params.set('role', filters.role);
+    const query = params.toString();
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/admin-control/staff${query ? `?${query}` : ''}`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async listAdminControlStaffRoles(): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({ path: '/api/v1/admin/admin-control/staff-roles', method: 'GET' });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
+  }
+
+  async createAdminControlStaff(input: { fullName: string; email: string; phone?: string; role?: string; permissions?: any }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: '/api/v1/admin/admin-control/staff',
+      method: 'POST',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async updateAdminControlStaff(id: string, input: Record<string, any>): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/admin-control/staff/${encodeURIComponent(id)}`,
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async deleteAdminControlStaff(id: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/admin-control/staff/${encodeURIComponent(id)}`,
+      method: 'DELETE',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Integration Providers ───────────────────────────────────────────────
+  async listIntegrationProviders(): Promise<{ payments: any[]; sms: any[] }> {
+    const envelope = await this.requestEnvelope<{ payments: any[]; sms: any[] }>({
+      path: '/api/v1/admin/integrations/providers',
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data || { payments: [], sms: [] };
+  }
+
+  async updateIntegrationProvider(input: {
+    type: 'payment' | 'sms';
+    providerCode: string;
+    providerName?: string;
+    isEnabled?: boolean;
+    config?: any;
+    senderId?: string;
+    dailyQuota?: number;
+  }): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: '/api/v1/admin/integrations/providers',
+      method: 'PUT',
+      body: input,
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  // ── Support Remote Access ────────────────────────────────────────────────
+  async requestRemoteAccess(ticketId: string, requested: boolean, durationMinutes: number = 60): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/support/${encodeURIComponent(ticketId)}/remote-access/request`,
+      method: 'POST',
+      body: { requested, durationMinutes },
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async approveRemoteAccess(ticketId: string, approved: boolean): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/support/${encodeURIComponent(ticketId)}/remote-access/approve`,
+      method: 'POST',
+      body: { approved },
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async startRemoteSession(ticketId: string, technicianName: string, durationMinutes: number = 60): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/support/${encodeURIComponent(ticketId)}/remote-access/start`,
+      method: 'POST',
+      body: { technicianName, durationMinutes },
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async endRemoteSession(sessionId: string, summary?: string): Promise<any> {
+    const envelope = await this.requestEnvelope<any>({
+      path: `/api/v1/admin/support/remote-sessions/${encodeURIComponent(sessionId)}/end`,
+      method: 'POST',
+      body: { summary },
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return envelope.data;
+  }
+
+  async listRemoteSessions(ticketId: string): Promise<any[]> {
+    const envelope = await this.requestEnvelope<any[]>({
+      path: `/api/v1/admin/support/${encodeURIComponent(ticketId)}/remote-sessions`,
+      method: 'GET',
+    });
+    if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+    return Array.isArray(envelope.data) ? envelope.data : [];
   }
 }
 

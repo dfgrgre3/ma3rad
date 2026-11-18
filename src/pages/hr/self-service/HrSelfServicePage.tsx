@@ -8,8 +8,21 @@ import {
   MyDiscipline, MyDocument, MyEnrollment, MyPerformance, MyBenefits, MySelfServiceRequest,
   SELF_SERVICE_REQUEST_TYPES,
 } from '../../../services/domains/hr/EmployeeSelfServiceService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'overview' | 'payroll' | 'attendance' | 'leaves' | 'discipline' | 'training' | 'performance' | 'benefits' | 'requests';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  overview: ['hr.selfservice.view'],
+  payroll: ['hr.selfservice.view', 'hr.payroll.view', 'employees.payroll.view'],
+  attendance: ['hr.selfservice.view', 'employees.attendance.view'],
+  leaves: ['hr.selfservice.view', 'hr.leave.view', 'hr.leave.request'],
+  discipline: ['hr.selfservice.view'],
+  training: ['hr.selfservice.view'],
+  performance: ['hr.selfservice.view'],
+  benefits: ['hr.selfservice.view'],
+  requests: ['hr.selfservice.view', 'hr.selfservice.request'],
+};
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -29,6 +42,8 @@ const label = (status: string) => {
 
 export const HrSelfServicePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('overview');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['overview', 'payroll', 'attendance', 'leaves', 'discipline', 'training', 'performance', 'benefits', 'requests'] as Tab[]).some(canTab);
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [payslips, setPayslips] = useState<MyPayslip[]>([]);
   const [attendance, setAttendance] = useState<MyAttendanceRecord[]>([]);
@@ -84,7 +99,7 @@ export const HrSelfServicePage: React.FC = () => {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const run = (fn: () => void) => {
     try { fn(); load(); } catch (e: any) { setError(e?.message || 'حدث خطأ.'); }
@@ -101,6 +116,8 @@ export const HrSelfServicePage: React.FC = () => {
     { id: 'benefits', label: 'مزاياي وقروضي', icon: <Gift className="h-4 w-4" /> },
     { id: 'requests', label: 'طلباتي', icon: <Inbox className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -117,15 +134,15 @@ export const HrSelfServicePage: React.FC = () => {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === t.id ? 'bg-sky-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-sky-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
         {loading ? <div className="py-16 flex justify-center"><UserRound className="w-6 h-6 animate-spin text-sky-500" /></div> : (
           <>
-            {tab === 'overview' && profile && (
+            {activeTab === 'overview' && canTab('overview') && profile && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2 lg:col-span-2">
                   <h3 className="text-sm font-black mb-3">بياناتي الشخصية</h3>
@@ -154,7 +171,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'payroll' && (
+            {activeTab === 'payroll' && canTab('payroll') && (
               <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                 <h3 className="text-sm font-black mb-3">كشوف رواتبي</h3>
                 {payslips.length === 0 && <p className="text-xs text-slate-400">لا توجد دورات رواتب معتمدة بعد.</p>}
@@ -190,7 +207,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'attendance' && (
+            {activeTab === 'attendance' && canTab('attendance') && (
               <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                 <h3 className="text-sm font-black mb-3">حضور وانصرافي</h3>
                 {attendance.length === 0 && <p className="text-xs text-slate-400">لا يوجد سجل حضور.</p>}
@@ -205,7 +222,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'leaves' && (
+            {activeTab === 'leaves' && canTab('leaves') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                   <h3 className="text-sm font-black mb-3">طلبات إجازتي</h3>
@@ -233,7 +250,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'discipline' && discipline && (
+            {activeTab === 'discipline' && canTab('discipline') && discipline && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                   <h3 className="text-sm font-black mb-3">سجلي الانضباطي</h3>
@@ -295,7 +312,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'training' && (
+            {activeTab === 'training' && canTab('training') && (
               <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                 <h3 className="text-sm font-black mb-3">تدريبي</h3>
                 {training.length === 0 && <p className="text-xs text-slate-400">لا توجد دورات تدريبية.</p>}
@@ -308,7 +325,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'performance' && performance && (
+            {activeTab === 'performance' && canTab('performance') && performance && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                   <h3 className="text-sm font-black mb-3">تقييماتي</h3>
@@ -336,7 +353,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'benefits' && benefits && (
+            {activeTab === 'benefits' && canTab('benefits') && benefits && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                   <h3 className="text-sm font-black mb-2">بدلاتي</h3>
@@ -372,7 +389,7 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'requests' && (
+            {activeTab === 'requests' && canTab('requests') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
                   <h3 className="text-sm font-black mb-3">طلباتي</h3>

@@ -20,38 +20,41 @@ export const EmployeeTabs: React.FC<EmployeeTabsProps> = ({
       <button
         onClick={() => onTabChange('directory')}
         className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'directory' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
- }`}
+}`}
       >
         <HardHat className="w-4 h-4" />
         دليل العمال وتوزيعهم
       </button>
-      <button
-        onClick={() => onTabChange('finance')}
-        disabled={!canManageEmployees}
-        className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
- }`}
-      >
-        <Landmark className="w-4 h-4" />
-        حسابات الأجور والرواتب
-      </button>
-      <button
-        onClick={() => onTabChange('attendance')}
-        disabled={!canViewAttendance}
-        className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'attendance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
- } ${!canViewAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        <UserCheck className="w-4 h-4" />
-        سجل الحضور اليومي
-      </button>
-      <button
-        onClick={() => onTabChange('analytics')}
-        disabled={!canManageEmployees}
-        className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
- }`}
-      >
-        <BarChart3 className="w-4 h-4" />
-        تقارير المراقبة والتحليلات
-      </button>
+      {canManageEmployees && (
+        <button
+          onClick={() => onTabChange('finance')}
+          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
+}`}
+        >
+          <Landmark className="w-4 h-4" />
+          حسابات الأجور والرواتب
+        </button>
+      )}
+      {canViewAttendance && (
+        <button
+          onClick={() => onTabChange('attendance')}
+          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'attendance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
+}`}
+        >
+          <UserCheck className="w-4 h-4" />
+          سجل الحضور اليومي
+        </button>
+      )}
+      {canManageEmployees && (
+        <button
+          onClick={() => onTabChange('analytics')}
+          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
+}`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          تقارير المراقبة والتحليلات
+        </button>
+      )}
     </div>
   );
 };

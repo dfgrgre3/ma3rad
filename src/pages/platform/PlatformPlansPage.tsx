@@ -1,6 +1,8 @@
 import React from 'react';
 import { Layers3, Plus, Pencil, CheckCircle2, XCircle, Star } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformBillingCycle,
@@ -20,6 +22,7 @@ import {
   formatMoney,
   inputClass,
 } from './components/PlatformUI';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 
 const CYCLES: Array<{ value: PlatformBillingCycle; label: string }> = [
   { value: 'MONTHLY', label: 'شهري' },
@@ -65,10 +68,15 @@ export const PlatformPlansPage: React.FC = () => {
   const [featuresText, setFeaturesText] = React.useState('');
   const [saving, setSaving] = React.useState(false);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setPlans(platformAdminService.listPlans());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        setPlans(await centralPlatformClient.listPlans());
+      } else {
+        setPlans(platformAdminService.listPlans());
+      }
       setModules(platformAdminService.listModules());
       setError(null);
     } catch (err) {
@@ -167,6 +175,7 @@ export const PlatformPlansPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <CentralUnsupportedNotice feature="إدارة وحدات ومنتج المنصة" />
       <PageHeader
         title="خطط الاشتراك"
         description="أنشئ خطط التسعير وحدود الاستخدام والوحدات المتضمنة."

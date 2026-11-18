@@ -35,8 +35,8 @@ interface HrStats {
   salaryDue: number;
 }
 
-function buildHrStats(): HrStats {
-  const employees = EmployeeService.getAll();
+async function buildHrStats(): Promise<HrStats> {
+  const employees = await EmployeeService.getAllAsync();
   const active = employees.filter(e => e.status === 'ACTIVE');
   const today = localDateString();
 
@@ -246,10 +246,10 @@ export const HrDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      setStats(buildHrStats());
+      setStats(await buildHrStats());
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل إحصاءات الموارد البشرية.');

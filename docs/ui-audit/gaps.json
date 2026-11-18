@@ -1,15 +1,23 @@
 {
-  "generatedAt": "2026-11-06T23:15:33.845Z",
+  "generatedAt": "2026-11-18T06:26:02.715Z",
   "tool": "scripts/ui-audit/gaps.mjs",
   "schemaVersion": 1,
   "totals": {
-    "gaps": 3,
+    "gaps": 7,
     "byKind": {
-      "button-without-handler": 3
+      "button-without-handler": 7
     },
-    "files": 3
+    "files": 5
   },
   "topFiles": [
+    {
+      "file": "src/pages/admin/admin/AppearanceCustomizationTab.tsx",
+      "count": 2
+    },
+    {
+      "file": "src/pages/platform/PlatformBrandingSettingsPage.tsx",
+      "count": 2
+    },
     {
       "file": "src/components/auth/PermissionGate.tsx",
       "count": 1
@@ -41,6 +49,30 @@
       "file": "src/components/ui/CentralLimitGuard.tsx",
       "line": 14,
       "snippet": "<button>"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/pages/admin/admin/AppearanceCustomizationTab.tsx",
+      "line": 1064,
+      "snippet": "<button type=\"button\" className=\"rounded-md px-2.5 py-1.5 text-xs font-bold\" style={{ backgroundColor: builder.primary, color: builderTextOnPrimary }}>"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/pages/admin/admin/AppearanceCustomizationTab.tsx",
+      "line": 1233,
+      "snippet": "<button type=\"button\" className=\"win-btn win-btn--primary\">"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/pages/platform/PlatformBrandingSettingsPage.tsx",
+      "line": 736,
+      "snippet": "<button type=\"button\" className=\"w-full py-2.5 rounded font-semibold text-white shadow transition-transform active:scale-95 text-xs\" style={{ backgroundColor: primaryColor }} >"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/pages/platform/PlatformBrandingSettingsPage.tsx",
+      "line": 848,
+      "snippet": "<button type=\"button\" className=\"w-full py-2 rounded text-white font-semibold text-xs shadow\" style={{ backgroundColor: primaryColor }} >"
     }
   ]
 }

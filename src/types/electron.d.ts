@@ -39,6 +39,11 @@ declare global {
       db?: {
         load?: () => Promise<Uint8Array | null>;
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string }>;
+        // Synchronous durable save used by financial transactions: blocks the
+        // renderer until the encrypted file write completes in the main
+        // process. Returns DATABASE_SYNC_UNAVAILABLE when the OS secure
+        // storage only exposes async APIs on this platform.
+        saveSync?: (bytes: Uint8Array) => { ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string };
         decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
         exportRecoveryKey?: (password: string) => Promise<Uint8Array>;
         decryptBackupWithRecoveryKey?: (

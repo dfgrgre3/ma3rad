@@ -648,7 +648,7 @@ const PAGES: PageSpec[] = [
     actions: ['view', 'execute', 'import', 'import_excel', 'import_csv', 'preview', 'validate', 'rollback', 'export', 'print'] },
   { key: 'dynamic_data', label: 'أنواع البيانات الديناميكية', module: 'SETTINGS', route: '/data-import/types', legacyView: 'settings.dynamic_data.view',
     actions: [...CONFIG, 'manage'] },
-  { key: 'license_mode', label: 'وضع الترخيص', module: 'SETTINGS', route: '/settings', legacyView: 'settings.license_mode.view',
+  { key: 'license_mode', label: 'وضع الترخيص', module: 'SETTINGS', route: '/settings/license-mode', legacyView: 'settings.license_mode.view',
     actions: [...CONFIG, 'manage', 'activate', 'deactivate'] },
   { key: 'backup', label: 'النسخ الاحتياطي', module: 'SETTINGS', route: '/backup', legacyView: 'settings.backup',
     actions: ['view', 'backup', 'restore', 'restore_backup', 'download', 'upload', 'delete', 'schedule', 'verify', 'print'] },

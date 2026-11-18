@@ -11,11 +11,13 @@ export interface PurchasesTabsBarProps {
   onExportSuppliers: () => void;
   onExportPayments: () => void;
   plain: NumberFormatter;
+  canViewPayments?: boolean;
 }
 
 export const PurchasesTabsBar: React.FC<PurchasesTabsBarProps> = ({
   tab, tabCounts, onTabChange,
   onExportInvoices, onExportItems, onExportSuppliers, onExportPayments, plain,
+  canViewPayments = true,
 }) => (
   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700 sm:px-4" role="tablist" aria-label="أقسام مشتريات اليوم">
     <div className="flex flex-wrap items-center gap-1">
@@ -24,7 +26,7 @@ export const PurchasesTabsBar: React.FC<PurchasesTabsBarProps> = ({
         { key: 'items', label: 'الأصناف', icon: Package },
         { key: 'suppliers', label: 'الموردون', icon: Truck },
         { key: 'payments', label: 'سداد الموردين', icon: Wallet },
-      ] as { key: TabKey; label: string; icon: React.ElementType }[]).map((entry) => {
+      ] as { key: TabKey; label: string; icon: React.ElementType }[]).filter((entry) => entry.key !== 'payments' || canViewPayments).map((entry) => {
         const TabIcon = entry.icon;
         const active = tab === entry.key;
         return (

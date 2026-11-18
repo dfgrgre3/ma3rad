@@ -105,6 +105,7 @@ export interface Quotation {
   convertedInvoiceNumber?: string | null;
   notes?: string | null;
   salesRepId?: string | null;
+  salesRepName?: string | null;
   projectId?: string | null;
   followUpDate?: string | null;
   followUpNotes?: string | null;
@@ -176,6 +177,7 @@ export class QuotationService {
       `SELECT q.*, c.name AS customer_name, c.phone AS customer_phone,
               si.invoice_number AS converted_invoice_number,
               o.order_number AS converted_order_number,
+              COALESCE(se.name, se.full_name) AS sales_rep_name,
               ((SELECT COUNT(*) FROM quotation_items qi WHERE qi.quotation_id = q.id) +
                (SELECT COUNT(*) FROM quotation_service_items qsi WHERE qsi.quotation_id = q.id)) AS items_count,
               (SELECT COALESCE(SUM(qi.quantity_m2), 0) FROM quotation_items qi WHERE qi.quotation_id = q.id) AS total_m2
@@ -183,6 +185,7 @@ export class QuotationService {
        JOIN customers c ON c.id = q.customer_id
        LEFT JOIN sales_invoices si ON si.id = q.converted_invoice_id
        LEFT JOIN orders o ON o.id = q.converted_order_id
+       LEFT JOIN employees se ON se.id = q.sales_rep_id
        ${where}
        ORDER BY q.date DESC, q.created_at DESC`,
       [...scope.params, ...params]
@@ -200,11 +203,13 @@ export class QuotationService {
     const rows = this.db.query<Quotation>(
       `SELECT q.*, c.name AS customer_name, c.phone AS customer_phone,
               si.invoice_number AS converted_invoice_number,
-              o.order_number AS converted_order_number
+              o.order_number AS converted_order_number,
+              COALESCE(se.name, se.full_name) AS sales_rep_name
        FROM quotations q
        JOIN customers c ON c.id = q.customer_id
        LEFT JOIN sales_invoices si ON si.id = q.converted_invoice_id
        LEFT JOIN orders o ON o.id = q.converted_order_id
+       LEFT JOIN employees se ON se.id = q.sales_rep_id
        WHERE q.id = ? AND ${scope.clause}`,
       [id, ...scope.params]
     ).map((row) => unscaleMoneyRow(row, QUOTATION_MONEY_FIELDS));
@@ -294,9 +299,20 @@ export class QuotationService {
     };
   }
 
+  /** Soft check: any active employee may be recorded as the quotation's sales rep. */
+  private validateSalesRep(repId: string | null | undefined): void {
+    if (!repId) return;
+    const rep = this.db.query<{ id: string }>(
+      `SELECT id FROM employees WHERE id = ? AND is_active = 1`,
+      [repId]
+    )[0];
+    if (!rep) throw new Error('المندوب المحدد غير موجود أو غير نشط.');
+  }
+
   public createQuotation(input: QuotationInput): Quotation {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'quotations.create');
+    this.validateSalesRep(input.salesRepId);
 
     const prepared = this.prepareItems(input.items || [], actor);
     const preparedServices = this.prepareServiceItems(input.serviceItems || []);
@@ -366,6 +382,7 @@ export class QuotationService {
   public updateQuotation(id: string, input: QuotationInput): Quotation {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'quotations.update');
+    this.validateSalesRep(input.salesRepId);
     const existing = this.getQuotation(id);
     if (!existing) throw new Error('عرض السعر غير موجود.');
     if (!['PENDING', 'EXPIRED'].includes(existing.status)) {
@@ -495,6 +512,7 @@ export class QuotationService {
       discountAmount: existing.discountAmount,
       taxAmount: existing.taxAmount,
       notes: existing.notes || undefined,
+      salesRepId: existing.salesRepId || undefined,
       items: (existing.items || []).map((i) => ({
         productId: i.productId,
         quantityM2: i.quantityM2,
@@ -544,6 +562,7 @@ export class QuotationService {
       customerId: fresh.customerId,
       warehouseId,
       quotationId: fresh.id,
+      salesRepId: fresh.salesRepId || undefined,
       expectedDeliveryDate: options.expectedDeliveryDate,
       notes: options.notes || `طلب مبيعات من عرض السعر ${quotation.quotationNumber}`,
       discountAmount: fresh.discountAmount,
@@ -656,6 +675,7 @@ export class QuotationService {
         customerId: fresh.customerId,
         warehouseId,
         quotationId: fresh.id,
+        salesRepId: fresh.salesRepId || undefined,
         items: fresh.items!.map((item) => ({
           productId: item.productId,
           quotationItemId: item.id,

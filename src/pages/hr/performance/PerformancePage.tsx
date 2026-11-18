@@ -1,12 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Target, ListChecks, Award, ClipboardList, TrendingUp, Gift } from 'lucide-react';
 import { PerformanceService, PerformanceCycle, PerformanceKpi, PerformanceGoal, PerformanceEvaluation, PerformancePip, PerformanceReward } from '../../../services/domains/hr/PerformanceService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'cycles' | 'kpis' | 'goals' | 'evaluations' | 'pips' | 'rewards';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  cycles: ['hr.performance.manage'],
+  kpis: ['hr.performance.manage'],
+  goals: ['hr.performance.manage'],
+  evaluations: ['hr.performance.manage'],
+  pips: ['hr.performance.manage'],
+  rewards: ['hr.performance.manage'],
+};
 
 
 export const PerformancePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('cycles');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['cycles', 'kpis', 'goals', 'evaluations', 'pips', 'rewards'] as Tab[]).some(canTab);
   const [cycles, setCycles] = useState<PerformanceCycle[]>([]);
   const [kpis, setKpis] = useState<PerformanceKpi[]>([]);
   const [goals, setGoals] = useState<PerformanceGoal[]>([]);
@@ -40,7 +52,7 @@ export const PerformancePage: React.FC = () => {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const createCycle = () => {
     try { PerformanceService.createCycle(cycleForm); setCycleForm({ name: '', periodType: 'MONTHLY', startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10), status: 'DRAFT' }); load(); }
@@ -103,6 +115,8 @@ export const PerformancePage: React.FC = () => {
     { id: 'pips', label: 'خطط التحسين PIP', icon: <Award className="h-4 w-4" /> },
     { id: 'rewards', label: 'المكافآت', icon: <Gift className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -118,15 +132,15 @@ export const PerformancePage: React.FC = () => {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === t.id ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
         {loading ? <div className="py-16 flex justify-center"><Target className="w-6 h-6 animate-spin text-indigo-500" /></div> : (
           <>
-            {tab === 'cycles' && (
+            {activeTab === 'cycles' && canTab('cycles') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">دورات التقييم</h3>
@@ -158,7 +172,7 @@ export const PerformancePage: React.FC = () => {
               </div>
             </div>
 
-            {tab === 'kpis' && (
+            {activeTab === 'kpis' && canTab('kpis') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المؤشرات</h3>
@@ -180,7 +194,7 @@ export const PerformancePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'goals' && (
+            {activeTab === 'goals' && canTab('goals') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الأهداف</h3>
@@ -202,7 +216,7 @@ export const PerformancePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'evaluations' && (
+            {activeTab === 'evaluations' && canTab('evaluations') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">التقييمات</h3>
@@ -237,7 +251,7 @@ export const PerformancePage: React.FC = () => {
               </div>
             </div>
 
-            {tab === 'pips' && (
+            {activeTab === 'pips' && canTab('pips') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">خطط التحسين</h3>
@@ -259,7 +273,7 @@ export const PerformancePage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'rewards' && (
+            {activeTab === 'rewards' && canTab('rewards') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المكافآت</h3>

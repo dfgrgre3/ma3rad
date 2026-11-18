@@ -18,6 +18,9 @@ import {
   Monitor,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformBrandingConfig,
@@ -67,9 +70,12 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   const [versions, setVersions] = useState<PlatformBrandingVersion[]>([]);
 
   // Load Tenants
-  const loadTenants = useCallback(() => {
+  const loadTenants = useCallback(async () => {
+    const centralState = getCentralDataSourceState();
     try {
-      const list = platformAdminService.listTenants();
+      const list = centralState.active
+        ? await centralPlatformClient.listTenants()
+        : platformAdminService.listTenants();
       setTenants(list);
     } catch {
       setTenants([]);
@@ -77,12 +83,24 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   }, []);
 
   // Load Branding Data
-  const loadBranding = useCallback((tenantId: string) => {
+  const loadBranding = useCallback(async (tenantId: string) => {
     setLoading(true);
+    const centralState = getCentralDataSourceState();
     try {
-      const data = tenantId
-        ? platformAdminService.getTenantBranding(tenantId)
-        : platformAdminService.getPlatformBranding();
+      let data: any;
+      let vList: any[] = [];
+
+      if (centralState.active) {
+        data = tenantId
+          ? await centralPlatformClient.getTenantBranding(tenantId)
+          : await centralPlatformClient.getPlatformBranding();
+        vList = tenantId ? await centralPlatformClient.listTenantBrandingVersions(tenantId) : [];
+      } else {
+        data = tenantId
+          ? platformAdminService.getTenantBranding(tenantId)
+          : platformAdminService.getPlatformBranding();
+        vList = platformAdminService.listTenantBrandingVersions(tenantId || null);
+      }
 
       setCompanyName(data.companyName || '');
       setLogoUrl(data.logoUrl || '');
@@ -100,14 +118,13 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
       setEmailFooterText(data.emailFooterText || '');
       setCustomSubdomain(data.customSubdomain || '');
 
-      setCanChangeLogo(data.allowedCustomizations.canChangeLogo);
-      setCanChangeColors(data.allowedCustomizations.canChangeColors);
-      setCanChangeInvoiceTemplate(data.allowedCustomizations.canChangeInvoiceTemplate);
-      setCanChangeLogin(data.allowedCustomizations.canChangeLogin);
+      const allowed = data.allowedCustomizations || {};
+      setCanChangeLogo(allowed.canChangeLogo ?? true);
+      setCanChangeColors(allowed.canChangeColors ?? true);
+      setCanChangeInvoiceTemplate(allowed.canChangeInvoiceTemplate ?? true);
+      setCanChangeLogin(allowed.canChangeLogin ?? false);
 
       setCurrentVersion(data.version);
-
-      const vList = platformAdminService.listTenantBrandingVersions(tenantId || null);
       setVersions(vList);
     } catch (e) {
       console.error('Failed to load branding:', e);
@@ -125,14 +142,14 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   }, [selectedTenantId, loadBranding]);
 
   // Handle Save
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
     setSaving(true);
     setSavedSuccess(false);
+    const centralState = getCentralDataSourceState();
     try {
-      const updated = platformAdminService.saveTenantBranding({
-        tenantId: selectedTenantId || null,
+      const brandingInput = {
         companyName,
         logoUrl,
         logoDarkUrl,
@@ -154,11 +171,28 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
           canChangeInvoiceTemplate,
           canChangeLogin,
         },
-        changeSummary: selectedTenantId
-          ? `تحديث هوية العميل (${tenants.find((t) => t.id === selectedTenantId)?.name || selectedTenantId})`
-          : 'تحديث الهوية المركزية للمنصة',
-      });
-      setCurrentVersion(updated.version);
+      };
+
+      let updated: any;
+      if (centralState.active) {
+        if (selectedTenantId) {
+          updated = await centralPlatformClient.saveTenantBranding(selectedTenantId, brandingInput);
+        } else {
+          // For platform-level branding, use updateBranding (settings endpoint)
+          await centralPlatformClient.updateSettings({ branding: JSON.stringify(brandingInput) });
+          updated = { version: currentVersion + 1 };
+        }
+      } else {
+        updated = platformAdminService.saveTenantBranding({
+          tenantId: selectedTenantId || null,
+          ...brandingInput,
+          changeSummary: selectedTenantId
+            ? `تحديث هوية العميل (${tenants.find((t) => t.id === selectedTenantId)?.name || selectedTenantId})`
+            : 'تحديث الهوية المركزية للمنصة',
+        });
+      }
+
+      setCurrentVersion(updated.version || currentVersion + 1);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
       loadBranding(selectedTenantId);
@@ -170,11 +204,16 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   };
 
   // Handle Rollback
-  const handleRollback = (ver: number) => {
+  const handleRollback = async (ver: number) => {
     if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع إعدادات الهوية للإصدار #${ver}؟`)) return;
+    const centralState = getCentralDataSourceState();
     try {
-      platformAdminService.rollbackTenantBranding(selectedTenantId || null, ver);
+      if (centralState.active && selectedTenantId) {
+        await centralPlatformClient.rollbackTenantBranding(selectedTenantId, ver);
+      } else if (!centralState.active) {
+        platformAdminService.rollbackTenantBranding(selectedTenantId || null, ver);
+      }
       loadBranding(selectedTenantId);
       alert(`تم استرجاع الإصدار #${ver} بنجاح.`);
     } catch (err) {

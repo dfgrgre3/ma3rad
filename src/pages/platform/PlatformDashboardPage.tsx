@@ -24,6 +24,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import type { PlatformOverview } from '../../services/domains/platform/platformTypes';
 import {
   EmptyState,
@@ -142,9 +144,15 @@ export const PlatformDashboardPage: React.FC = () => {
   const [overview, setOverview] = React.useState<PlatformOverview | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     try {
-      setOverview(platformAdminService.getOverview());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const data = await centralPlatformClient.getOverview();
+        setOverview(data as any);
+      } else {
+        setOverview(platformAdminService.getOverview());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');

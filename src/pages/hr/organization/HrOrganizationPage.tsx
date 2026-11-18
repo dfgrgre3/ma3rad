@@ -2,13 +2,28 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, GitBranch, Briefcase, Wallet, MoveRight, Activity, RefreshCw } from 'lucide-react';
 import { EmployeeOrganizationService, EmployeeDepartment, EmployeeJobTitle, EmployeeJobGrade, EmployeeCostCenter, EmployeeTransfer, EmployeeLifecycleEvent, DepartmentNode } from '../../../services/domains/hr/EmployeeOrganizationService';
 import { fmt } from '../../operations/payroll/payrollDisplay';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'structure' | 'departments' | 'titles' | 'costCenters' | 'transfers' | 'lifecycle' | 'onboarding' | 'custody' | 'probation';
+
+const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  structure: ['hr.organization.view', 'ui.employees.employees.manage', 'employees.payroll.manage'],
+  departments: ['hr.organization.view', 'ui.employees.employees.manage', 'employees.payroll.manage'],
+  titles: ['hr.organization.view', 'ui.employees.employees.manage', 'employees.payroll.manage'],
+  costCenters: ['hr.organization.view', 'ui.employees.employees.manage', 'employees.payroll.manage'],
+  transfers: ['employees.payroll.manage', 'employees.manage', 'ui.employees.employees.manage', 'hr.organization.view'],
+  lifecycle: ['employees.payroll.manage', 'employees.manage', 'ui.employees.employees.manage', 'hr.organization.view'],
+  onboarding: ['employees.payroll.manage', 'employees.manage', 'ui.employees.employees.manage', 'hr.organization.view'],
+  custody: ['employees.payroll.manage', 'employees.manage', 'ui.employees.employees.manage', 'hr.organization.view'],
+  probation: ['employees.payroll.manage', 'employees.manage', 'ui.employees.employees.manage', 'hr.organization.view'],
+};
 
 const service = new EmployeeOrganizationService();
 
 export const HrOrganizationPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('structure');
+  const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
+  const anyTabAllowed = (['structure', 'departments', 'titles', 'costCenters', 'transfers', 'lifecycle', 'onboarding', 'custody', 'probation'] as Tab[]).some(canTab);
   const [departments, setDepartments] = useState<EmployeeDepartment[]>([]);
   const [jobTitles, setJobTitles] = useState<EmployeeJobTitle[]>([]);
   const [jobGrades, setJobGrades] = useState<EmployeeJobGrade[]>([]);
@@ -52,7 +67,7 @@ export const HrOrganizationPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (anyTabAllowed) load(); }, [load, anyTabAllowed]);
 
   const createDepartment = () => {
     try {
@@ -222,6 +237,8 @@ export const HrOrganizationPage: React.FC = () => {
     { id: 'custody', label: 'العهد', icon: <Wallet className="h-4 w-4" /> },
     { id: 'probation', label: 'تقييم الاختبار', icon: <Activity className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -241,8 +258,8 @@ export const HrOrganizationPage: React.FC = () => {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
-          {tabs.map((item) => (
-            <button key={item.id} onClick={() => setTab(item.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((item) => (
+            <button key={item.id} onClick={() => setTab(item.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {item.icon} {item.label}
             </button>
           ))}
@@ -250,7 +267,7 @@ export const HrOrganizationPage: React.FC = () => {
 
         {loading ? <div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-teal-500" /></div> : (
           <>
-            {tab === 'structure' && (
+            {activeTab === 'structure' && canTab('structure') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4">
                   <h3 className="text-sm font-black mb-3">الهيكل التنظيمي</h3>
@@ -271,7 +288,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'departments' && (
+            {activeTab === 'departments' && canTab('departments') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">الأقسام</h3>
@@ -297,7 +314,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'titles' && (
+            {activeTab === 'titles' && canTab('titles') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">المسميات الوظيفية</h3>
@@ -328,7 +345,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'costCenters' && (
+            {activeTab === 'costCenters' && canTab('costCenters') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">مراكز التكلفة</h3>
@@ -348,7 +365,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'transfers' && (
+            {activeTab === 'transfers' && canTab('transfers') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">الانتقالات</h3>
@@ -375,7 +392,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'lifecycle' && (
+            {activeTab === 'lifecycle' && canTab('lifecycle') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">أحداث دورة الحياة</h3>
@@ -405,7 +422,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             
             )}
-{tab === 'onboarding' && (
+{activeTab === 'onboarding' && canTab('onboarding') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">التأهيل (Onboarding)</h3>
@@ -432,7 +449,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'custody' && (
+            {activeTab === 'custody' && canTab('custody') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">العهد</h3>
@@ -460,7 +477,7 @@ export const HrOrganizationPage: React.FC = () => {
               </div>
             )}
 
-            {tab === 'probation' && (
+            {activeTab === 'probation' && canTab('probation') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">تقييم فترة الاختبار</h3>

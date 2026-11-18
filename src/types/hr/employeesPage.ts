@@ -41,6 +41,10 @@ export interface Employee {
   previousExperience?: string | null;
   status: 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
   joinedDate: string;
+  isSalesRep?: boolean;
+  commissionPercentage?: number;
+  monthlyTarget?: number;
+  additionalBranchIds?: string[];
 }
 
 export interface FinancialTransaction {
@@ -101,6 +105,10 @@ export interface EmployeeFormState {
   status: Employee['status'];
   joinedDate: string;
   notes: string;
+  isSalesRep: boolean;
+  commissionPercentage: number;
+  monthlyTarget: number;
+  additionalBranchIds: string[];
 }
 
 export interface TransactionFormState {

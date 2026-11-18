@@ -302,4 +302,110 @@ router.delete(
   }
 );
 
+
+// ── Remote Access ──────────────────────────────────────────────────────────
+router.post(
+  '/:id/remote-access/request',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const ticket = await getTicketOr404(db, req.params.id);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      const { requested, durationMinutes = 60 } = req.body || {};
+      const now = nowIso();
+      await db.run(
+        `UPDATE platform_support_tickets SET remote_access_requested = ?, remote_access_requested_at = ?, updated_at = ? WHERE id = ?`,
+        [requested ? 1 : 0, now, now, ticket.id]
+      );
+      const updated = await db.get('SELECT * FROM platform_support_tickets WHERE id = ?', [ticket.id]);
+      res.json({ data: updated, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/:id/remote-access/approve',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const ticket = await getTicketOr404(db, req.params.id);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      const { approved } = req.body || {};
+      const now = nowIso();
+      await db.run(
+        `UPDATE platform_support_tickets SET remote_access_approved = ?, remote_access_approved_at = ?, updated_at = ? WHERE id = ?`,
+        [approved ? 1 : 0, now, now, ticket.id]
+      );
+      const updated = await db.get('SELECT * FROM platform_support_tickets WHERE id = ?', [ticket.id]);
+      res.json({ data: updated, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/:id/remote-access/start',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const ticket = await getTicketOr404(db, req.params.id);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!ticket.remote_access_approved) {
+        return res.status(400).json({ error: 'Remote access must be approved first' });
+      }
+      const { technicianName, durationMinutes = 60 } = req.body || {};
+      const sessionId = `rs_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+      const now = nowIso();
+      await db.run(
+        `INSERT INTO platform_remote_sessions (id, ticket_id, tenant_id, staff_id, technician_name, status, started_at, duration_minutes)
+         VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`,
+        [sessionId, ticket.id, ticket.tenant_id, req.platformUser?.id || null, technicianName || 'Unknown', now, durationMinutes]
+      );
+      const session = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
+      res.status(201).json({ data: session, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/remote-sessions/:sessionId/end',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { sessionId } = req.params;
+      const { summary } = req.body || {};
+      const now = nowIso();
+      await db.run(
+        `UPDATE platform_remote_sessions SET status = 'ENDED', ended_at = ?, summary = ? WHERE id = ?`,
+        [now, summary || null, sessionId]
+      );
+      const session = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
+      res.json({ data: session, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.get(
+  '/:id/remote-sessions',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.view']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const sessions = await db.all(
+        'SELECT * FROM platform_remote_sessions WHERE ticket_id = ? ORDER BY started_at DESC',
+        [req.params.id]
+      );
+      res.json({ data: sessions, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
 module.exports = router;

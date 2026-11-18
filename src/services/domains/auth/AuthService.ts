@@ -9,6 +9,7 @@ import { BranchAccessService } from './BranchAccessService';
 import { twoFactorAuth } from './twoFactorAuth';
 import { getConfiguredPasswordPolicy } from './passwordPolicy';
 import { PlatformStaffAuthService } from '../platform/PlatformStaffAuthService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 
 /** Raised when the password was correct but a second factor is required. */
 export class TwoFactorRequiredError extends Error {
@@ -961,7 +962,8 @@ export class AuthService {
   public createUser(
     user: { username: string; password: string; fullName: string; role: UserRole; phone?: string; pinCode?: string; pinCiphertext?: string },
     performedBy = 'usr_admin',
-    actor?: User | null
+    actor?: User | null,
+    options?: { approvalId?: string }
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'ui.users.users.create');
@@ -987,6 +989,16 @@ export class AuthService {
       throw new Error('اسم المستخدم مسجل مسبقاً.');
     }
 
+    // Approval must never carry the password, PIN hash or PIN ciphertext.
+    const { gate, approvalId } = this.prepareOperationApproval(
+      'users.create',
+      `إنشاء مستخدم ${user.username}`,
+      `الدور: ${user.role}`,
+      { username: user.username },
+      `create:user:${user.username}`,
+      options,
+    );
+
     const id = `usr_${uuidv4().substring(0, 8)}`;
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(user.password, salt);
@@ -997,6 +1009,7 @@ export class AuthService {
         INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, pin_ciphertext, is_active, branch_id, branch_scope)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 'ASSIGNED')
       `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash, user.pinCiphertext || null, branchId]);
+      if (approvalId) gate.consume(approvalId, 'USER', id, db);
       db.run(
         'INSERT INTO users_branches (user_id, branch_id) VALUES (?, ?)',
         [id, branchId]
@@ -1088,7 +1101,8 @@ export class AuthService {
   public updateUser(
     id: string,
     patch: Partial<Pick<User, 'fullName' | 'role' | 'phone' | 'isActive'>> & { pinCode?: string; pinCiphertext?: string },
-    actor?: User | null
+    actor?: User | null,
+    options?: { approvalId?: string }
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'ui.users.users.update');
@@ -1107,6 +1121,18 @@ export class AuthService {
     if (patch.role === 'SUPER_ADMIN' && existing.role !== 'SUPER_ADMIN') {
       throw new Error('لا يمكن ترقية أي مستخدم إلى دور مالك المنصة (SUPER_ADMIN) من إدارة المستخدمين.');
     }
+    // Secrets are deliberately excluded from the approval payload and match key.
+    const changedFields = Object.keys(patch)
+      .filter((key) => key !== 'pinCode' && key !== 'pinCiphertext' && (patch as Record<string, unknown>)[key] !== undefined)
+      .sort();
+    const { gate, approvalId } = this.prepareOperationApproval(
+      'users.update',
+      `تعديل مستخدم ${existing.username}`,
+      `الحقول المعدّلة: ${changedFields.join(', ') || 'بدون تغييرات'}`,
+      { userId: id, fields: changedFields },
+      `update:user:${id}:${changedFields.join(',')}`,
+      options,
+    );
     const pinHash = patch.pinCode === undefined
       ? record.pinHash
       : patch.pinCode === ''
@@ -1121,20 +1147,23 @@ export class AuthService {
       this.assertUniqueActivePin(patch.pinCode, id);
     }
 
-    this.db.run(
-      `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, pin_ciphertext = ?, is_active = ?, updated_at = ?
-       WHERE id = ?`,
-      [
-        patch.fullName ?? existing.fullName,
-        patch.role ?? existing.role,
-        patch.phone ?? existing.phone ?? null,
-        pinHash,
-        pinCiphertext,
-        (patch.isActive ?? existing.isActive) ? 1 : 0,
-        new Date().toISOString(),
-        id,
-      ]
-    );
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, pin_ciphertext = ?, is_active = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          patch.fullName ?? existing.fullName,
+          patch.role ?? existing.role,
+          patch.phone ?? existing.phone ?? null,
+          pinHash,
+          pinCiphertext,
+          (patch.isActive ?? existing.isActive) ? 1 : 0,
+          new Date().toISOString(),
+          id,
+        ]
+      );
+      if (approvalId) gate.consume(approvalId, 'USER', id, db);
+    });
     this.audit(subject, 'تعديل بيانات مستخدم', 'USERS', id, existing, patch);
     PermissionService.invalidate(existing);
     return this.getUserRecordById(id)!.user;
@@ -1350,7 +1379,7 @@ export class AuthService {
     };
   }
 
-  public deleteUser(id: string, actor?: User | null): void {
+  public deleteUser(id: string, actor?: User | null, options?: { approvalId?: string }): void {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'ui.users.users.delete');
     if (id === subject.id) throw new Error('لا يمكنك حذف حسابك الحالي.');
@@ -1359,7 +1388,16 @@ export class AuthService {
     if (existing.id === 'usr_admin' || existing.username === 'admin') {
       throw new Error('لا يمكن حذف حساب المدير الأساسي.');
     }
-    this.db.executeTransaction(() => {
+    const { gate, approvalId } = this.prepareOperationApproval(
+      'users.delete',
+      `حذف مستخدم ${existing.username}`,
+      `معرف المستخدم: ${id}`,
+      { userId: id },
+      `delete:user:${id}`,
+      options,
+    );
+    this.db.executeTransaction((db) => {
+      if (approvalId) gate.consume(approvalId, 'USER', id, db);
       this.db.run('DELETE FROM user_permissions WHERE user_id = ?', [id]);
       this.db.run('DELETE FROM users WHERE id = ?', [id]);
     });
@@ -1386,6 +1424,34 @@ export class AuthService {
 
   private requireActor(_actor?: User | null): User {
     return AuthService.requireAuth();
+  }
+
+  /** Evaluate an approval policy and return the gate with an approved id when one exists. */
+  private prepareOperationApproval(
+    operationCode: string,
+    title: string,
+    description: string,
+    matchDetails: Record<string, unknown>,
+    dedupeKey: string,
+    options?: { approvalId?: string }
+  ): { gate: OperationApprovalGate; approvalId: string | null } {
+    const gate = new OperationApprovalGate(this.db);
+    const { required } = gate.evaluate(operationCode);
+    if (!required) return { gate, approvalId: null };
+    const approvalId = options?.approvalId
+      ?? gate.findApproved(operationCode, 'OTHER', matchDetails);
+    if (options?.approvalId) gate.assertApproved(options.approvalId, operationCode, matchDetails);
+    if (!approvalId) {
+      const requestId = gate.requestApproval({
+        operationCode,
+        requestType: 'OTHER',
+        title,
+        description,
+        details: { ...matchDetails, dedupeKey },
+      });
+      gate.throwRequested(requestId);
+    }
+    return { gate, approvalId };
   }
 
   public generateUniqueLoginPin(): string {

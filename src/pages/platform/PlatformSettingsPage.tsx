@@ -17,6 +17,8 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformSettingsMap } from '../../services/domains/platform/platformTypes';
@@ -58,10 +60,16 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setSettings(platformAdminService.getSettings());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const data = await centralPlatformClient.getSettings();
+        setSettings(data as any);
+      } else {
+        setSettings(platformAdminService.getSettings());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل إعدادات المنصة.');

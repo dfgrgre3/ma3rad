@@ -5,6 +5,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { InventoryTransferTrackingService } from './InventoryTransferTrackingService';
 import { InventoryServicePart07 } from './InventoryServicePart07';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
@@ -71,7 +72,7 @@ public createTransferRequest(input: {
     toWarehouseId: string;
     items: Array<{ productId: string; quantityM2: number; notes?: string }>;
     notes?: string;
-  }): string {
+  }, options: { approvalId?: string } = {}): string {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer', undefined, {
@@ -93,6 +94,39 @@ public createTransferRequest(input: {
     }
     if (!input.items || input.items.length === 0) {
       throw new Error('يجب إضافة صنف واحد على الأقل للتحويل.');
+    }
+
+    // ── Approval gate: نقل المخزون قد يتطلب موافقة حسب سياسة العملية ──
+    const gate = new OperationApprovalGate(this.db);
+    const transferMatchDetails = {
+      fromWarehouseId: input.fromWarehouseId,
+      toWarehouseId: input.toWarehouseId,
+      totalQuantity: Math.round(input.items.reduce((sum, item) => sum + (Number(item.quantityM2) || 0), 0) * 1000) / 1000,
+    };
+    const { policy: transferPolicy, required: transferApprovalRequired } = gate.evaluate('inventory.transfer.create');
+    let transferApprovalId: string | null = null;
+    if (transferApprovalRequired) {
+      transferApprovalId = options.approvalId
+        ?? gate.findApproved('inventory.transfer.create', 'OTHER', transferMatchDetails);
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'inventory.transfer.create', transferMatchDetails);
+      }
+      if (!transferApprovalId) {
+        const approvalId = gate.requestApproval({
+          operationCode: 'inventory.transfer.create',
+          requestType: 'OTHER',
+          title: 'نقل مخزون بين المستودعات',
+          description: `${transferMatchDetails.totalQuantity} وحدة من ${input.fromWarehouseId} إلى ${input.toWarehouseId}`,
+          branchId: null,
+          details: {
+            ...transferMatchDetails,
+            itemsCount: input.items.length,
+            dedupeKey: `transfer:${input.fromWarehouseId}:${input.toWarehouseId}:${transferMatchDetails.totalQuantity}`,
+            policy: transferPolicy,
+          },
+        });
+        gate.throwRequested(approvalId);
+      }
     }
 
     return this.db.executeFinancialTransaction((txDb) => {
@@ -169,6 +203,10 @@ public createTransferRequest(input: {
       }
 
       new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'CREATE');
+
+      if (transferApprovalId) {
+        gate.consume(transferApprovalId, 'STOCK_TRANSFER', transferId, txDb);
+      }
 
       return transferId;
     });

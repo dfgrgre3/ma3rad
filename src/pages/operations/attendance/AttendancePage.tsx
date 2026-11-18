@@ -116,24 +116,37 @@ export const AttendancePage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      const currentEmployees = AttendanceService.getEmployees();
-      setEmployees(currentEmployees);
-      setRecords(AttendanceService.getAttendanceByDate(date));
-      setBreaks(AttendanceService.getBreaksByDate(date));
-      setReport(AttendanceService.getMonthlyReport(period));
-      setShifts(AttendanceService.getShifts());
-      setAssignments(AttendanceService.getAssignments());
-      setHolidays(AttendanceService.getHolidays(period));
-      setRequests(AttendanceService.getCorrectionRequests());
-      setCorrectionHistory(AttendanceService.getCorrectionHistory(period));
-      setAuditHistory(AttendanceService.getAuditHistory(period));
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'تعذر تحميل بيانات الحضور.');
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      try {
+        const [currentEmployees, recordsData, breaksData, reportData, shiftsData, assignmentsData, holidaysData, requestsData, correctionHistoryData, auditHistoryData] = await Promise.all([
+          AttendanceService.getEmployeesAsync(),
+          AttendanceService.getAttendanceByDateAsync(date),
+          AttendanceService.getBreaksByDateAsync(date),
+          AttendanceService.getMonthlyReportAsync(period),
+          AttendanceService.getShiftsAsync(),
+          AttendanceService.getAssignmentsAsync(),
+          AttendanceService.getHolidaysAsync(period),
+          AttendanceService.getCorrectionRequestsAsync(),
+          AttendanceService.getCorrectionHistoryAsync(period),
+          AttendanceService.getAuditHistoryAsync(period),
+        ]);
+        setEmployees(currentEmployees);
+        setRecords(recordsData);
+        setBreaks(breaksData);
+        setReport(reportData);
+        setShifts(shiftsData);
+        setAssignments(assignmentsData);
+        setHolidays(holidaysData);
+        setRequests(requestsData);
+        setCorrectionHistory(correctionHistoryData);
+        setAuditHistory(auditHistoryData);
+        setError(null);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'تعذر تحميل بيانات الحضور.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [date, period]);
   useEffect(() => { load(); }, [load]);
 

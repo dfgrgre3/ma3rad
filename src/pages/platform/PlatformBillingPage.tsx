@@ -14,6 +14,8 @@ import {
   platformAdminService,
   PLATFORM_INVOICE_STATUS_LABELS,
 } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformInvoice,
@@ -93,11 +95,21 @@ export const PlatformBillingPage: React.FC = () => {
     notes: '',
   });
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setInvoices(platformAdminService.listInvoices(search, status));
-      setPayments(platformAdminService.listPayments());
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [invoiceRows, paymentRows] = await Promise.all([
+          centralPlatformClient.listInvoices({ search, status }),
+          centralPlatformClient.listPayments(),
+        ]);
+        setInvoices(invoiceRows);
+        setPayments(paymentRows);
+      } else {
+        setInvoices(platformAdminService.listInvoices(search, status));
+        setPayments(platformAdminService.listPayments());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المبيعات.');
@@ -106,15 +118,31 @@ export const PlatformBillingPage: React.FC = () => {
     }
   }, [search, status]);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => { void load(); }, [load]);
 
   React.useEffect(() => {
-    try {
-      setTenants(platformAdminService.listTenants());
-      setPlans(platformAdminService.listPlans(false));
-    } catch {
-      /* handled by the list error */
-    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const centralState = getCentralDataSourceState();
+        if (centralState.active) {
+          const [tenantRows, planRows] = await Promise.all([
+            centralPlatformClient.listTenants(),
+            centralPlatformClient.listPlans(),
+          ]);
+          if (!cancelled) {
+            setTenants(tenantRows);
+            setPlans(planRows);
+          }
+          return;
+        }
+        setTenants(platformAdminService.listTenants());
+        setPlans(platformAdminService.listPlans(false));
+      } catch {
+        /* handled by the list error */
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const subtotal = invoiceForm.items.reduce(
@@ -157,7 +185,7 @@ export const PlatformBillingPage: React.FC = () => {
     setInvoiceForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }));
   };
 
-  const saveInvoice = () => {
+  const saveInvoice = async () => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!invoiceForm.tenantId) {
       toast.error('اختر العميل أولاً');
@@ -170,14 +198,18 @@ export const PlatformBillingPage: React.FC = () => {
     }
     setSavingInvoice(true);
     try {
-      const invoice = platformAdminService.createInvoice({
+      const payload = {
         ...invoiceForm,
         dueDate: invoiceForm.dueDate || undefined,
         items,
-      });
+      };
+      const centralState = getCentralDataSourceState();
+      const invoice = centralState.active
+        ? await centralPlatformClient.createInvoice(payload)
+        : platformAdminService.createInvoice(payload);
       toast.success('تم إنشاء الفاتورة', invoice.number);
       setInvoiceOpen(false);
-      load();
+      void load();
     } catch (err) {
       toast.error('تعذر إنشاء الفاتورة', err instanceof Error ? err.message : undefined);
     } finally {
@@ -185,33 +217,45 @@ export const PlatformBillingPage: React.FC = () => {
     }
   };
 
-  const sendInvoice = (invoice: PlatformInvoice) => {
+  const sendInvoice = async (invoice: PlatformInvoice) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     try {
-      platformAdminService.setInvoiceStatus(invoice.id, 'SENT');
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.setInvoiceStatus(invoice.id, 'SENT');
+      } else {
+        platformAdminService.setInvoiceStatus(invoice.id, 'SENT');
+      }
       toast.success('تم إرسال الفاتورة', invoice.number);
-      load();
+      void load();
     } catch (err) {
       toast.error('تعذر تحديث الفاتورة', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const voidInvoice = (invoice: PlatformInvoice) => {
+  const voidInvoice = async (invoice: PlatformInvoice) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm(`إلغاء الفاتورة ${invoice.number}؟ لن يمكن التراجع.`)) return;
     try {
-      platformAdminService.voidInvoice(invoice.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.voidInvoice(invoice.id);
+      } else {
+        platformAdminService.voidInvoice(invoice.id);
+      }
       toast.success('تم إلغاء الفاتورة');
       setDetail(null);
-      load();
+      void load();
     } catch (err) {
       toast.error('تعذر إلغاء الفاتورة', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const openDetail = (invoice: PlatformInvoice) => {
+  const openDetail = async (invoice: PlatformInvoice) => {
     try {
-      setDetail(platformAdminService.getInvoice(invoice.id));
+      if (getCentralDataSourceState().active) {
+        setDetail(await centralPlatformClient.getInvoice(invoice.id));
+      } else {
+        setDetail(platformAdminService.getInvoice(invoice.id));
+      }
     } catch (err) {
       toast.error('تعذر تحميل الفاتورة', err instanceof Error ? err.message : undefined);
     }
@@ -230,7 +274,7 @@ export const PlatformBillingPage: React.FC = () => {
     setPayOpen(true);
   };
 
-  const savePayment = () => {
+  const savePayment = async () => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!payForm.tenantId) {
       toast.error('اختر العميل أولاً');
@@ -241,7 +285,7 @@ export const PlatformBillingPage: React.FC = () => {
       return;
     }
     try {
-      platformAdminService.addPayment({
+      const payload = {
         tenantId: payForm.tenantId,
         invoiceId: payForm.invoiceId || null,
         amount: payForm.amount,
@@ -249,23 +293,32 @@ export const PlatformBillingPage: React.FC = () => {
         reference: payForm.reference,
         paidAt: payForm.paidAt,
         notes: payForm.notes,
-      });
+      };
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.addPayment(payload);
+      } else {
+        platformAdminService.addPayment(payload);
+      }
       toast.success('تم تسجيل الدفعة');
       setPayOpen(false);
       setDetail(null);
-      load();
+      void load();
     } catch (err) {
       toast.error('تعذر تسجيل الدفعة', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const voidPayment = (payment: PlatformPayment) => {
+  const voidPayment = async (payment: PlatformPayment) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm('إلغاء هذه الدفعة؟ سيُعاد احتساب الفاتورة المرتبطة.')) return;
     try {
-      platformAdminService.voidPayment(payment.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.voidPayment(payment.id);
+      } else {
+        platformAdminService.voidPayment(payment.id);
+      }
       toast.success('تم إلغاء الدفعة');
-      load();
+      void load();
     } catch (err) {
       toast.error('تعذر إلغاء الدفعة', err instanceof Error ? err.message : undefined);
     }

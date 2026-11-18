@@ -3,13 +3,23 @@ import { Gift, HeartPulse, Landmark, CalendarCheck, PiggyBank } from 'lucide-rea
 import {
   HrBenefitsService, HrAllowance, HrBenefit, HrLoan, HrLoanInstallment, HrLeaveSettlement,
 } from '../../../services/domains/hr/HrBenefitsService';
+import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
 type Tab = 'allowances' | 'benefits' | 'loans' | 'installments' | 'settlements';
+
+const BENEFITS_TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
+  allowances: ['hr.benefits.manage'],
+  benefits: ['hr.benefits.manage'],
+  loans: ['hr.benefits.manage'],
+  installments: ['hr.benefits.manage'],
+  settlements: ['hr.benefits.manage'],
+};
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export const HrBenefitsPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('allowances');
+  const canTab = useTabPermissions<Tab>(BENEFITS_TAB_PERMISSIONS);
   const [allowances, setAllowances] = useState<HrAllowance[]>([]);
   const [benefits, setBenefits] = useState<HrBenefit[]>([]);
   const [loans, setLoans] = useState<HrLoan[]>([]);
@@ -26,6 +36,11 @@ export const HrBenefitsPage: React.FC = () => {
   const [selectedLoanId, setSelectedLoanId] = useState('');
 
   const load = useCallback(() => {
+    // منع جلب البيانات كلياً عندما لا يملك المستخدم أي تبويبة مسموحة.
+    if (!(['allowances', 'benefits', 'loans', 'installments', 'settlements'] as Tab[]).some(canTab)) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -36,7 +51,7 @@ export const HrBenefitsPage: React.FC = () => {
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل البيانات.'); }
     finally { setLoading(false); }
-  }, [filterEmployeeId]);
+  }, [filterEmployeeId, canTab]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -51,6 +66,8 @@ export const HrBenefitsPage: React.FC = () => {
     { id: 'installments', label: 'أقساط القروض', icon: <PiggyBank className="h-4 w-4" /> },
     { id: 'settlements', label: 'تسويات الإجازات', icon: <CalendarCheck className="h-4 w-4" /> },
   ];
+  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   const loadInstallments = () => {
     if (!selectedLoanId) return;
@@ -75,15 +92,15 @@ export const HrBenefitsPage: React.FC = () => {
           <button onClick={load} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحديث</button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === t.id ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
         {loading ? <div className="py-16 flex justify-center"><Gift className="w-6 h-6 animate-spin text-emerald-500" /></div> : (
           <>
-            {tab === 'allowances' && (
+            {activeTab === 'allowances' && canTab('allowances') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">البدلات</h3>
@@ -111,7 +128,7 @@ export const HrBenefitsPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'benefits' && (
+            {activeTab === 'benefits' && canTab('benefits') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المزايا والتأمينات</h3>
@@ -141,7 +158,7 @@ export const HrBenefitsPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'loans' && (
+            {activeTab === 'loans' && canTab('loans') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">القروض</h3>
@@ -165,7 +182,7 @@ export const HrBenefitsPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tab === 'installments' && (
+            {activeTab === 'installments' && canTab('installments') && (
               <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                 <h3 className="text-sm font-black">أقساط القروض</h3>
                 <div className="flex items-center gap-2">
@@ -180,7 +197,7 @@ export const HrBenefitsPage: React.FC = () => {
                 ))}
               </div>
             )}
-            {tab === 'settlements' && (
+            {activeTab === 'settlements' && canTab('settlements') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">تسويات الإجازات</h3>

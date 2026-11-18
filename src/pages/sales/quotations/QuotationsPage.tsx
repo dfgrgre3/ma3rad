@@ -6,6 +6,7 @@ import {
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
 import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
@@ -63,6 +64,7 @@ export const QuotationsPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [salesReps, setSalesReps] = useState<ReturnType<typeof EmployeeService.getSalesReps>>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | QuotationStatus>('ALL');
   const [dateFrom, setDateFrom] = useState('');
@@ -124,6 +126,10 @@ export const QuotationsPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
+  useEffect(() => {
+    const branchId = warehouses.find((w) => w.id === form.warehouseId)?.branchId;
+    setSalesReps(EmployeeService.getSalesReps(branchId));
+  }, [form.warehouseId, warehouses]);
 
   const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));
   const pageItems = quotations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -133,6 +139,7 @@ export const QuotationsPage: React.FC = () => {
     setProducts(productService.getAllProducts());
     const whs = inventoryService.getAllWarehouses();
     setWarehouses(whs);
+    setSalesReps(EmployeeService.getSalesReps());
     return whs;
   };
 
@@ -156,6 +163,7 @@ export const QuotationsPage: React.FC = () => {
       setForm({
         customerId: full.customerId,
         warehouseId: full.warehouseId || '',
+        salesRepId: full.salesRepId || '',
         validDays: String(days),
         discount: String(full.discountAmount || ''),
         tax: String(full.taxAmount || ''),
@@ -230,6 +238,7 @@ export const QuotationsPage: React.FC = () => {
       const payload = {
         customerId: form.customerId,
         warehouseId: form.warehouseId || undefined,
+        salesRepId: form.salesRepId || undefined,
         validDays: Number(form.validDays) || 15,
         discountAmount: Number(form.discount) || 0,
         taxAmount: Number(form.tax) || 0,
@@ -588,6 +597,7 @@ export const QuotationsPage: React.FC = () => {
         customers={customers}
         products={products}
         warehouses={warehouses}
+        salesReps={salesReps}
         setLine={setLine}
         pickProduct={pickProduct}
         changeLineUnit={changeLineUnit}

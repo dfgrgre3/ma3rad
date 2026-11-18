@@ -35,6 +35,14 @@ function sha256File(filePath) {
   });
 }
 
+/**
+ * @typedef {Object} ApiFetchOptions
+ * @property {string} [method]
+ * @property {Record<string, string>} [headers]
+ * @property {any} [body] Raw request body (string or a readable stream for binary uploads).
+ * @property {number} [timeoutMs]
+ */
+
 function createAppBackupClient({ getOrigin, getCredential, getDeviceId }) {
   async function authHeaders(extra = {}) {
     const [origin, deviceId, credential] = await Promise.all([getOrigin(), getDeviceId(), getCredential()]);
@@ -49,7 +57,12 @@ function createAppBackupClient({ getOrigin, getCredential, getDeviceId }) {
     };
   }
 
-  async function apiFetch(pathname, { method = 'GET', headers = {}, body, timeoutMs = JSON_TIMEOUT_MS } = {}) {
+  /**
+   * @param {string} pathname
+   * @param {ApiFetchOptions} [options]
+   */
+  async function apiFetch(pathname, options = {}) {
+    const { method = 'GET', headers = {}, body, timeoutMs = JSON_TIMEOUT_MS } = options;
     const origin = await getOrigin();
     if (!origin) throw new Error('Central API is not configured for this application build.');
     const controller = new AbortController();

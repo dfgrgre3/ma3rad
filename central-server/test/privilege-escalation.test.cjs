@@ -178,7 +178,7 @@ test('LIMITED-scope staff only see and touch their tenants', async () => {
   const invoices = await api(server.base, '/api/v1/admin/billing/invoices', { token: scopedToken });
   assert.equal(invoices.status, 200);
   assert.ok(
-    invoices.body.data.every((invoice) => invoice.tenant_id === tenantA.id),
+    invoices.body.data.every((invoice) => invoice.tenantId === tenantA.id),
     'invoice list must not leak out-of-scope invoices',
   );
 

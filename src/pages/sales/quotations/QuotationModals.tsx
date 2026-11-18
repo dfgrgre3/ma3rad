@@ -32,6 +32,7 @@ export type ServiceLine = { productId?: string; description: string; unit: strin
 export interface FormState {
   customerId: string;
   warehouseId: string;
+  salesRepId: string;
   validDays: string;
   discount: string;
   tax: string;
@@ -41,7 +42,7 @@ export interface FormState {
 }
 
 export const emptyForm = (): FormState => ({
-  customerId: '', warehouseId: '', validDays: '15', discount: '', tax: '', notes: '',
+  customerId: '', warehouseId: '', salesRepId: '', validDays: '15', discount: '', tax: '', notes: '',
   lines: [{ productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }],
   serviceLines: [],
 });
@@ -67,6 +68,14 @@ const Info: React.FC<{ label: string; value: string; sub?: string }> = ({ label,
   </div>
 );
 
+export interface SalesRepOption {
+  id: string;
+  name: string;
+  isSalesRep?: boolean;
+  branchNames?: string;
+  servesBranch?: boolean;
+}
+
 interface QuotationModalsProps {
   canCreate: boolean;
   canUpdate: boolean;
@@ -82,6 +91,7 @@ interface QuotationModalsProps {
   customers: Customer[];
   products: Product[];
   warehouses: Warehouse[];
+  salesReps: SalesRepOption[];
   setLine: (idx: number, patch: Partial<Line>) => void;
   pickProduct: (idx: number, productId: string) => void;
   changeLineUnit: (idx: number, unit: string) => void;
@@ -148,6 +158,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
   customers,
   products,
   warehouses,
+  salesReps,
   setLine,
   pickProduct,
   changeLineUnit,
@@ -208,7 +219,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
     </div>
     <form onSubmit={submitForm} className="space-y-3 text-xs">
       <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية لعرض السعر" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div>
           <label className="font-bold text-slate-700 block mb-1">العميل *</label>
           <select required value={form.customerId} onChange={(e) => setForm((p) => ({ ...p, customerId: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
@@ -226,6 +237,17 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
         <div>
           <label className="font-bold text-slate-700 block mb-1">صلاحية العرض (أيام)</label>
           <input type="number" min={1} max={365} value={form.validDays} onChange={(e) => setForm((p) => ({ ...p, validDays: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">المندوب</label>
+          <select value={form.salesRepId} onChange={(e) => setForm((p) => ({ ...p, salesRepId: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+            <option value="">— بدون —</option>
+            {salesReps.map((rep) => (
+              <option key={rep.id} value={rep.id}>
+                {rep.name}{rep.isSalesRep ? ' · مندوب' : ''}{rep.servesBranch === false ? ` — خارج نطاق الفرع: ${rep.branchNames || ''}` : ''}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -358,6 +380,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       <Info label="العميل" value={detail.customerName || '—'} sub={detail.customerPhone || ''} />
       <Info label="المخزن المرجعي" value={warehouses.find((w) => w.id === detail.warehouseId)?.name || '—'} sub={detail.convertedInvoiceNumber ? `الفاتورة: ${detail.convertedInvoiceNumber}` : 'لم تُفوتر بعد'} />
       <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${(detail.items?.length || 0) + (detail.serviceItems?.length || 0)} بند`} />
+      <Info label="المندوب" value={detail.salesRepName || '—'} sub={detail.salesRepId ? 'مسؤول المتابعة' : ''} />
     </div>
     <div className="mb-4 space-y-2">
       <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />

@@ -79,6 +79,9 @@ export interface PosCheckoutPanelProps {
   operationalFields: OperationalFieldDefinition[];
   operationalFieldValues: Record<string, string>;
   onOperationalFieldValuesChange: (values: Record<string, string>) => void;
+  salesReps?: Array<{ id: string; name: string; isSalesRep?: boolean; branchNames?: string; servesBranch?: boolean }>;
+  salesRepId?: string;
+  onSalesRepChange?: (id: string) => void;
 }
 
 export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
@@ -144,6 +147,9 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   operationalFields,
   operationalFieldValues,
   onOperationalFieldValuesChange,
+  salesReps,
+  salesRepId,
+  onSalesRepChange,
 }) => (
   <div className="flex min-h-0 flex-[1.25_1_0%] max-h-[58%] flex-col overflow-hidden border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 max-[900px]:max-h-[68%]">
     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
@@ -419,6 +425,25 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
         </div>
       )}
     </section>
+
+    {/* Sales rep */}
+    {salesReps && salesReps.length > 0 && onSalesRepChange && (
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold text-slate-500">المندوب</span>
+        <select
+          value={salesRepId || ''}
+          onChange={(e) => onSalesRepChange(e.target.value)}
+          className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        >
+          <option value="">— بدون —</option>
+          {salesReps.map((rep) => (
+            <option key={rep.id} value={rep.id}>
+              {rep.name}{rep.isSalesRep ? ' · مندوب' : ''}{rep.servesBranch === false ? ` — خارج نطاق الفرع: ${rep.branchNames || ''}` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+    )}
 
     {/* Notes */}
     <label htmlFor="pos-notes" className="sr-only">ملاحظات الفاتورة</label>

@@ -25,6 +25,8 @@ export interface ProductQueryOptions {
   status?: 'all' | 'active' | 'inactive';
   productIds?: string[];
   customFieldFilters?: Record<string, string>;
+  /** تصفية حسب قيم الخصائص الديناميكية (attributes) — attributeId → value. */
+  attributeFilters?: Record<string, string>;
 }
 
 export interface ProductStats {
@@ -157,6 +159,14 @@ export class ProductService {
           AND opfv.field_id = ? AND opfv.value = ?
       )`);
       params.push(fieldId, value);
+    }
+    for (const [attributeId, value] of Object.entries(options.attributeFilters || {})) {
+      if (!attributeId || !value) continue;
+      filters.push(`EXISTS (
+        SELECT 1 FROM product_attribute_values pav
+        WHERE pav.product_id = p.id AND pav.attribute_id = ? AND pav.value = ?
+      )`);
+      params.push(attributeId, value);
     }
     if (options.stockStatus === 'out') filters.push(`COALESCE(st.qty, 0) <= 0`);
     else if (options.stockStatus === 'low') filters.push(`COALESCE(st.qty, 0) > 0 AND COALESCE(st.qty, 0) <= p.min_stock_level`);
@@ -375,7 +385,12 @@ export class ProductService {
     return candidate;
   }
 
-  public createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, initialStock?: { warehouseId: string; quantityM2: number; unitCost: number }, performedBy = 'usr_admin'): Product {
+  public createProduct(
+    product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>,
+    initialStock?: { warehouseId: string; quantityM2: number; unitCost: number },
+    performedBy = 'usr_admin',
+    options: { approvalId?: string } = {}
+  ): Product {
     PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     CentralUsageLimitService.assertWithin('maxProducts');
     if (initialStock && initialStock.quantityM2 > 0 && !ModuleRegistryService.isInventoryTracked()) {
@@ -403,6 +418,34 @@ export class ProductService {
     if (product.brandId) {
       const brand = this.db.query('SELECT id FROM brands WHERE id = ?', [product.brandId]);
       if (brand.length === 0) throw new Error('الماركة المحددة غير موجودة.');
+    }
+
+    // ── Approval gate: إضافة منتج قد تتطلب موافقة حسب سياسة العملية ──
+    const gate = new OperationApprovalGate(this.db);
+    const createMatchDetails = { productSku: product.sku, productBarcode: product.barcode };
+    const { policy: createPolicy, required: createApprovalRequired } = gate.evaluate('products.create');
+    let createApprovalId: string | null = null;
+    if (createApprovalRequired) {
+      createApprovalId = options.approvalId
+        ?? gate.findApproved('products.create', 'OTHER', createMatchDetails);
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'products.create', createMatchDetails);
+      }
+      if (!createApprovalId) {
+        const approvalId = gate.requestApproval({
+          operationCode: 'products.create',
+          requestType: 'OTHER',
+          title: `إضافة منتج ${product.name}`,
+          description: `الكود: ${product.sku} — الباركود: ${product.barcode}`,
+          details: {
+            ...createMatchDetails,
+            productName: product.name ?? null,
+            dedupeKey: `create:product:${product.sku}`,
+            policy: createPolicy,
+          },
+        });
+        gate.throwRequested(approvalId);
+      }
     }
 
     return this.db.executeTransaction((sqliteDb) => {
@@ -465,6 +508,10 @@ export class ProductService {
         VALUES (?, ?, 'المدير', 'إضافة صنف جديد', 'PRODUCTS', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(product)]);
 
+      if (createApprovalId) {
+        gate.consume(createApprovalId, 'PRODUCT', id, sqliteDb);
+      }
+
       return this.getProductById(id)!;
     });
   }
@@ -479,8 +526,41 @@ export class ProductService {
     const existing = this.getProductById(id);
     if (!existing) throw new Error('المنتج غير موجود.');
 
-    // ── Approval gate: تغيير أسعار المنتج يتطلب موافقة عند تجاوز الحد ──
+    // ── Approval gate: تعديل بيانات المنتج وفق سياسة العملية ──
+    // حقول الأسعار تُدار بواسطة بوابة products.price.update أدناه، فلا نطالب
+    // باعتمادين مختلفين لنفس العملية.
     const priceFields = ['costPrice', 'sellingPriceM2', 'sellingPriceBox', 'wholesalePriceM2', 'minSellingPriceM2'] as const;
+    const touchesPriceFields = priceFields.some(
+      (field) => updates[field] !== undefined && updates[field] !== null
+    );
+    const gate = new OperationApprovalGate(this.db);
+    const updateMatchDetails = { productId: id };
+    const { policy: updatePolicy, required: updateApprovalRequired } = gate.evaluate('products.update');
+    let updateApprovalId: string | null = null;
+    if (updateApprovalRequired && !touchesPriceFields) {
+      updateApprovalId = options.approvalId
+        ?? gate.findApproved('products.update', 'OTHER', updateMatchDetails);
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'products.update', updateMatchDetails);
+      }
+      if (!updateApprovalId) {
+        const approvalId = gate.requestApproval({
+          operationCode: 'products.update',
+          requestType: 'OTHER',
+          title: `تعديل المنتج ${existing.name ?? id}`,
+          description: `الحقول: ${Object.keys(updates).join('، ')}`,
+          details: {
+            ...updateMatchDetails,
+            productName: existing.name ?? null,
+            dedupeKey: `update:product:${id}`,
+            policy: updatePolicy,
+          },
+        });
+        gate.throwRequested(approvalId);
+      }
+    }
+
+    // ── Approval gate: تغيير أسعار المنتج يتطلب موافقة عند تجاوز الحد ──
     const priceChanges: Record<string, { from: number; to: number }> = {};
     let maxPriceDelta = 0;
     for (const field of priceFields) {
@@ -495,7 +575,6 @@ export class ProductService {
         maxPriceDelta = Math.max(maxPriceDelta, delta);
       }
     }
-    const gate = new OperationApprovalGate(this.db);
     let priceApprovalRequired = false;
     let resolvedApprovalId: string | null = null;
     let pricePolicy: unknown = null;
@@ -593,6 +672,9 @@ export class ProductService {
         VALUES (?, ?, 'المدير', 'تعديل بيانات صنف', 'PRODUCTS', ?, ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
+      if (updateApprovalId) {
+        gate.consume(updateApprovalId, 'PRODUCT', id, sqliteDb);
+      }
       if (resolvedApprovalId) {
         gate.consume(resolvedApprovalId, 'PRICE_CHANGE', id, sqliteDb);
       }

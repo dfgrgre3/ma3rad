@@ -503,12 +503,11 @@ export class AccountingService {
     return this.mapSalesTrendRows(await this.db.queryAsync<any>(sql, params), dates);
   }
 
-  public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
-    this.requireView('dashboard.view');
-    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  private buildTopSellingProductsSpec(limit: number): { sql: string; params: any[] } {
     const scope = this.branchScope('si.branch_id');
-    return this.db.query<any>(`
-      SELECT 
+    return {
+      sql: `
+      SELECT
         p.name,
         p.product_type AS productType,
         p.base_unit AS baseUnit,
@@ -522,15 +521,24 @@ export class AccountingService {
       GROUP BY p.id
       ORDER BY quantityM2 DESC, totalRevenue DESC
       LIMIT ?
-    `, [...scope.params, limit]);
+    `,
+      params: [...scope.params, limit],
+    };
   }
 
-  public getPurchaseReport(dateFrom?: string, dateTo?: string): {
-    totalPurchases: number;
-    totalPaid: number;
-    totalRemaining: number;
-    invoices: any[];
-  } {
+  public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
+    this.requireDashboardSalesView();
+    const { sql, params } = this.buildTopSellingProductsSpec(limit);
+    return this.db.query<any>(sql, params);
+  }
+
+  public async getTopSellingProductsAsync(limit = 5): Promise<{ name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[]> {
+    this.requireDashboardSalesView();
+    const { sql, params } = this.buildTopSellingProductsSpec(limit);
+    return this.db.queryAsync<any>(sql, params);
+  }
+
+  private buildPurchaseReportSpec(dateFrom?: string, dateTo?: string): { invoicesSql: string; totalsSql: string; params: any[] } {
     this.requireView('ui.finance.overview.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
@@ -547,24 +555,29 @@ export class AccountingService {
       params.push(dateTo);
     }
 
-    const invoices = this.db.query<any>(`
+    return {
+      invoicesSql: `
       SELECT pi.*, s.name as supplierName, w.name as warehouseName
       FROM purchase_invoices pi
       LEFT JOIN suppliers s ON pi.supplier_id = s.id
       LEFT JOIN warehouses w ON pi.warehouse_id = w.id
       ${whereClause}
       ORDER BY pi.date DESC
-    `, params);
-
-    const totals = this.db.query<any>(`
-      SELECT 
+    `,
+      totalsSql: `
+      SELECT
         SUM(total_amount) as totalPurchases,
         SUM(paid_amount) as totalPaid,
         SUM(remaining_amount) as totalRemaining
       FROM purchase_invoices pi
       ${whereClause}
-    `, params)[0] || {};
+    `,
+      params,
+    };
+  }
 
+  private mapPurchaseReport(invoices: any[], totals: any): { totalPurchases: number; totalPaid: number; totalRemaining: number; invoices: any[] } {
+    totals = totals || {};
     return {
       totalPurchases: Number((totals.totalPurchases || 0).toFixed(2)),
       totalPaid: Number((totals.totalPaid || 0).toFixed(2)),
@@ -573,11 +586,34 @@ export class AccountingService {
     };
   }
 
-  public getExpenseReport(dateFrom?: string, dateTo?: string): {
-    totalExpenses: number;
-    byCategory: { category: string; total: number }[];
-    expenses: any[];
+  public getPurchaseReport(dateFrom?: string, dateTo?: string): {
+    totalPurchases: number;
+    totalPaid: number;
+    totalRemaining: number;
+    invoices: any[];
   } {
+    const { invoicesSql, totalsSql, params } = this.buildPurchaseReportSpec(dateFrom, dateTo);
+    return this.mapPurchaseReport(
+      this.db.query<any>(invoicesSql, params),
+      this.db.query<any>(totalsSql, params)[0],
+    );
+  }
+
+  public async getPurchaseReportAsync(dateFrom?: string, dateTo?: string): Promise<{
+    totalPurchases: number;
+    totalPaid: number;
+    totalRemaining: number;
+    invoices: any[];
+  }> {
+    const { invoicesSql, totalsSql, params } = this.buildPurchaseReportSpec(dateFrom, dateTo);
+    const [invoices, totalsRows] = await Promise.all([
+      this.db.queryAsync<any>(invoicesSql, params),
+      this.db.queryAsync<any>(totalsSql, params),
+    ]);
+    return this.mapPurchaseReport(invoices, totalsRows[0]);
+  }
+
+  private buildExpenseReportSpec(dateFrom?: string, dateTo?: string): { whereClause: string; params: any[] } {
     this.requireView('ui.finance.overview.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
@@ -593,16 +629,32 @@ export class AccountingService {
       whereClause += ' AND e.date <= ?';
       params.push(dateTo);
     }
+    return { whereClause, params };
+  }
 
-    const expenses = this.db.query<any>(`
+  private mapExpenseReport(expenseRows: any[], byCategory: any[], totalResult: any): { totalExpenses: number; byCategory: { category: string; total: number }[]; expenses: any[] } {
+    const expenses = expenseRows.map((row) => ({ ...row, amount: Number(row.amount) / 100 }));
+    totalResult = totalResult || {};
+    return {
+      totalExpenses: Number((totalResult.totalExpenses || 0).toFixed(2)),
+      byCategory,
+      expenses
+    };
+  }
+
+  public getExpenseReport(dateFrom?: string, dateTo?: string): {
+    totalExpenses: number;
+    byCategory: { category: string; total: number }[];
+    expenses: any[];
+  } {
+    const { whereClause, params } = this.buildExpenseReportSpec(dateFrom, dateTo);
+    const expenseRows = this.db.query<any>(`
       SELECT e.*, u.full_name as performedByName
       FROM expenses e
       LEFT JOIN users u ON e.performed_by = u.id
       ${whereClause}
       ORDER BY e.date DESC
-    `, params)
-      .map((row) => ({ ...row, amount: Number(row.amount) / 100 }));
-
+    `, params);
     const byCategory = this.db.query<any>(`
       SELECT e.category, SUM(e.amount) / 100.0 as total
       FROM expenses e
@@ -610,17 +662,115 @@ export class AccountingService {
       GROUP BY e.category
       ORDER BY total DESC
     `, params);
-
     const totalResult = this.db.query<any>(`
       SELECT SUM(amount) / 100.0 as totalExpenses
       FROM expenses e
       ${whereClause}
-    `, params)[0] || {};
+    `, params)[0];
+    return this.mapExpenseReport(expenseRows, byCategory, totalResult);
+  }
+
+  public async getExpenseReportAsync(dateFrom?: string, dateTo?: string): Promise<{
+    totalExpenses: number;
+    byCategory: { category: string; total: number }[];
+    expenses: any[];
+  }> {
+    const { whereClause, params } = this.buildExpenseReportSpec(dateFrom, dateTo);
+    const [expenseRows, byCategory, totalRows] = await Promise.all([
+      this.db.queryAsync<any>(`
+        SELECT e.*, u.full_name as performedByName
+        FROM expenses e
+        LEFT JOIN users u ON e.performed_by = u.id
+        ${whereClause}
+        ORDER BY e.date DESC
+      `, params),
+      this.db.queryAsync<any>(`
+        SELECT e.category, SUM(e.amount) / 100.0 as total
+        FROM expenses e
+        ${whereClause}
+        GROUP BY e.category
+        ORDER BY total DESC
+      `, params),
+      this.db.queryAsync<any>(`
+        SELECT SUM(amount) / 100.0 as totalExpenses
+        FROM expenses e
+        ${whereClause}
+      `, params),
+    ]);
+    return this.mapExpenseReport(expenseRows, byCategory, totalRows[0]);
+  }
+
+  private requireProfitAndLossView(dateFrom?: string, dateTo?: string): void {
+    this.requireView('ui.finance.overview.view');
+    if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
+      throw new Error('Invalid profit and loss date range.');
+    }
+  }
+
+  private buildProfitAndLossSpecs(dateFrom?: string, dateTo?: string): {
+    balancesSql: string; balancesParams: string[];
+    sourceExpensesSql: string; sourceExpensesParams: string[];
+  } {
+    const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
+    const params: string[] = [];
+    const scope = this.ledgerScope();
+    conditions.push(scope.clause);
+    params.push(...scope.params);
+    if (dateFrom) { conditions.push('e.date >= ?'); params.push(dateFrom); }
+    if (dateTo) { conditions.push('e.date <= ?'); params.push(dateTo); }
+    const sourceExpenseScope = this.branchScope('ex.branch_id');
+    const sourceExpenseConditions = [sourceExpenseScope.clause];
+    const sourceExpenseParams: string[] = [...sourceExpenseScope.params];
+    if (dateFrom) { sourceExpenseConditions.push('ex.date >= ?'); sourceExpenseParams.push(dateFrom); }
+    if (dateTo) { sourceExpenseConditions.push('ex.date <= ?'); sourceExpenseParams.push(dateTo); }
+    return {
+      balancesSql: `
+      SELECT a.code, a.type,
+             ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN (l.credit - l.debit) / 100.0 ELSE (l.debit - l.credit) / 100.0 END), 2) AS amount
+      FROM journal_entries e
+      JOIN journal_entry_lines l ON l.entry_id = e.id
+      JOIN chart_of_accounts a ON a.id = l.account_id
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY a.code, a.type
+    `,
+      balancesParams: params,
+      sourceExpensesSql: `
+      SELECT COALESCE(SUM(ex.amount), 0) / 100.0 AS total
+      FROM expenses ex
+      WHERE ${sourceExpenseConditions.join(' AND ')}
+    `,
+      sourceExpensesParams: sourceExpenseParams,
+    };
+  }
+
+  private computeProfitAndLoss(balances: { code: string; type: string; amount: number }[], sourceExpensesValue: number): {
+    revenue: number;
+    merchandiseRevenue: number;
+    shippingRevenue: number;
+    otherRevenue: number;
+    costOfGoodsSold: number;
+    grossProfit: number;
+    expenses: number;
+    sourceExpenses: number;
+    expenseReconciliationDifference: number;
+    netProfit: number;
+    margin: number;
+  } {
+    const merchandiseRevenue = Number(balances.filter((row) => row.code === '4101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const shippingRevenue = Number(balances.filter((row) => row.code === '4102').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const otherRevenue = Number(balances.filter((row) => row.type === 'REVENUE' && !['4101', '4102'].includes(row.code)).reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const revenue = Number((merchandiseRevenue + shippingRevenue + otherRevenue).toFixed(2));
+    const costOfGoodsSold = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code === '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const grossProfit = Number((merchandiseRevenue - costOfGoodsSold).toFixed(2));
+    const expenses = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code !== '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const roundedSourceExpenses = Number(sourceExpensesValue.toFixed(2));
+    const expenseReconciliationDifference = Number((roundedSourceExpenses - expenses).toFixed(2));
+    const netProfit = Number((grossProfit + shippingRevenue + otherRevenue - expenses).toFixed(2));
+    const margin = revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : 0;
 
     return {
-      totalExpenses: Number((totalResult.totalExpenses || 0).toFixed(2)),
-      byCategory,
-      expenses
+      revenue, merchandiseRevenue, shippingRevenue, otherRevenue, costOfGoodsSold, grossProfit, expenses,
+      sourceExpenses: roundedSourceExpenses, expenseReconciliationDifference, netProfit, margin,
     };
   }
 
@@ -637,52 +787,33 @@ export class AccountingService {
     netProfit: number;
     margin: number;
   } {
-    this.requireView('ui.finance.overview.view');
-    if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
-      throw new Error('Invalid profit and loss date range.');
-    }
-    const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
-    const params: string[] = [];
-    const scope = this.ledgerScope();
-    conditions.push(scope.clause);
-    params.push(...scope.params);
-    if (dateFrom) { conditions.push('e.date >= ?'); params.push(dateFrom); }
-    if (dateTo) { conditions.push('e.date <= ?'); params.push(dateTo); }
-    const balances = this.db.query<{ code: string; type: string; amount: number }>(`
-      SELECT a.code, a.type,
-             ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN (l.credit - l.debit) / 100.0 ELSE (l.debit - l.credit) / 100.0 END), 2) AS amount
-      FROM journal_entries e
-      JOIN journal_entry_lines l ON l.entry_id = e.id
-      JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE ${conditions.join(' AND ')}
-      GROUP BY a.code, a.type
-    `, params);
-    const merchandiseRevenue = Number(balances.filter((row) => row.code === '4101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
-    const shippingRevenue = Number(balances.filter((row) => row.code === '4102').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
-    const otherRevenue = Number(balances.filter((row) => row.type === 'REVENUE' && !['4101', '4102'].includes(row.code)).reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
-    const revenue = Number((merchandiseRevenue + shippingRevenue + otherRevenue).toFixed(2));
-    const costOfGoodsSold = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code === '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
-    const grossProfit = Number((merchandiseRevenue - costOfGoodsSold).toFixed(2));
-    const expenses = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code !== '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
-    const sourceExpenseScope = this.branchScope('ex.branch_id');
-    const sourceExpenseConditions = [sourceExpenseScope.clause];
-    const sourceExpenseParams: string[] = [...sourceExpenseScope.params];
-    if (dateFrom) { sourceExpenseConditions.push('ex.date >= ?'); sourceExpenseParams.push(dateFrom); }
-    if (dateTo) { sourceExpenseConditions.push('ex.date <= ?'); sourceExpenseParams.push(dateTo); }
-    const sourceExpenses = Number(this.db.query<{ total: number }>(`
-      SELECT COALESCE(SUM(ex.amount), 0) / 100.0 AS total
-      FROM expenses ex
-      WHERE ${sourceExpenseConditions.join(' AND ')}
-    `, sourceExpenseParams)[0]?.total || 0);
-    const roundedSourceExpenses = Number(sourceExpenses.toFixed(2));
-    const expenseReconciliationDifference = Number((roundedSourceExpenses - expenses).toFixed(2));
-    const netProfit = Number((grossProfit + shippingRevenue + otherRevenue - expenses).toFixed(2));
-    const margin = revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : 0;
+    this.requireProfitAndLossView(dateFrom, dateTo);
+    const { balancesSql, balancesParams, sourceExpensesSql, sourceExpensesParams } = this.buildProfitAndLossSpecs(dateFrom, dateTo);
+    const balances = this.db.query<{ code: string; type: string; amount: number }>(balancesSql, balancesParams);
+    const sourceExpenses = Number(this.db.query<{ total: number }>(sourceExpensesSql, sourceExpensesParams)[0]?.total || 0);
+    return this.computeProfitAndLoss(balances, sourceExpenses);
+  }
 
-    return {
-      revenue, merchandiseRevenue, shippingRevenue, otherRevenue, costOfGoodsSold, grossProfit, expenses,
-      sourceExpenses: roundedSourceExpenses, expenseReconciliationDifference, netProfit, margin,
-    };
+  public async getProfitAndLossReportAsync(dateFrom?: string, dateTo?: string): Promise<{
+    revenue: number;
+    merchandiseRevenue: number;
+    shippingRevenue: number;
+    otherRevenue: number;
+    costOfGoodsSold: number;
+    grossProfit: number;
+    expenses: number;
+    sourceExpenses: number;
+    expenseReconciliationDifference: number;
+    netProfit: number;
+    margin: number;
+  }> {
+    this.requireProfitAndLossView(dateFrom, dateTo);
+    const { balancesSql, balancesParams, sourceExpensesSql, sourceExpensesParams } = this.buildProfitAndLossSpecs(dateFrom, dateTo);
+    const [balances, sourceExpenseRows] = await Promise.all([
+      this.db.queryAsync<{ code: string; type: string; amount: number }>(balancesSql, balancesParams),
+      this.db.queryAsync<{ total: number }>(sourceExpensesSql, sourceExpensesParams),
+    ]);
+    return this.computeProfitAndLoss(balances, Number(sourceExpenseRows[0]?.total || 0));
   }
 
   private requireProfitView(dateFrom: string, dateTo: string): void {
@@ -772,9 +903,12 @@ export class AccountingService {
     return this.computeDashboardProfitData(balances);
   }
 
-  public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
-    this.requireView('dashboard.view');
+  private requireSalesReportView(permission: string): void {
+    this.requireView(permission);
     PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  }
+
+  private buildSalesReportWhere(dateFrom?: string, dateTo?: string): { whereClause: string; params: any[] } {
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
     const scope = this.branchScope('si.branch_id');
@@ -789,9 +923,19 @@ export class AccountingService {
       whereClause += ' AND si.date <= ?';
       params.push(dateTo);
     }
+    return { whereClause, params };
+  }
 
-    return this.db.query<any>(`
-      SELECT 
+  private maskReportProfit<T extends { profit: number }>(rows: T[]): T[] {
+    const canSee = financialFieldVisibility().profit;
+    return rows.map((row) => ({ ...row, profit: canSee ? Number(row.profit || 0) : 0 }));
+  }
+
+  private buildCategorySalesSpec(dateFrom?: string, dateTo?: string): { sql: string; params: any[] } {
+    const { whereClause, params } = this.buildSalesReportWhere(dateFrom, dateTo);
+    return {
+      sql: `
+      SELECT
         c.name as categoryName,
         CASE
           WHEN p.product_type = 'GENERAL' AND p.base_unit = 'CUSTOM' THEN COALESCE(NULLIF(TRIM(p.custom_unit), ''), 'وحدة')
@@ -817,31 +961,28 @@ export class AccountingService {
       ${whereClause}
       GROUP BY c.id, c.name, p.product_type, p.base_unit, p.custom_unit
       ORDER BY totalRevenue DESC
-    `, params).map((row: any) => ({
-      ...row,
-      profit: financialFieldVisibility().profit ? Number(row.profit || 0) : 0,
-    }));
+    `,
+      params,
+    };
   }
 
-  public getBrandSalesReport(dateFrom?: string, dateTo?: string): { brandName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
-    this.requireView('reports.view');
-    let whereClause = 'WHERE si.invoice_status != \'VOID\'';
-    const params: any[] = [];
-    const scope = this.branchScope('si.branch_id');
-    whereClause += ` AND ${scope.clause}`;
-    params.push(...scope.params);
+  public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
+    this.requireSalesReportView('dashboard.view');
+    const { sql, params } = this.buildCategorySalesSpec(dateFrom, dateTo);
+    return this.maskReportProfit(this.db.query<any>(sql, params));
+  }
 
-    if (dateFrom) {
-      whereClause += ' AND si.date >= ?';
-      params.push(dateFrom);
-    }
-    if (dateTo) {
-      whereClause += ' AND si.date <= ?';
-      params.push(dateTo);
-    }
+  public async getCategorySalesReportAsync(dateFrom?: string, dateTo?: string): Promise<{ categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[]> {
+    this.requireSalesReportView('dashboard.view');
+    const { sql, params } = this.buildCategorySalesSpec(dateFrom, dateTo);
+    return this.maskReportProfit(await this.db.queryAsync<any>(sql, params));
+  }
 
-    return this.db.query<any>(`
-      SELECT 
+  private buildBrandSalesSpec(dateFrom?: string, dateTo?: string): { sql: string; params: any[] } {
+    const { whereClause, params } = this.buildSalesReportWhere(dateFrom, dateTo);
+    return {
+      sql: `
+      SELECT
         b.name as brandName,
         CASE
           WHEN p.product_type = 'GENERAL' AND p.base_unit = 'CUSTOM' THEN COALESCE(NULLIF(TRIM(p.custom_unit), ''), 'وحدة')
@@ -867,24 +1008,32 @@ export class AccountingService {
       ${whereClause}
       GROUP BY b.id, b.name, p.product_type, p.base_unit, p.custom_unit
       ORDER BY totalRevenue DESC
-    `, params).map((row: any) => ({
-      ...row,
-      profit: financialFieldVisibility().profit ? Number(row.profit || 0) : 0,
-    }));
+    `,
+      params,
+    };
   }
 
-  public getInventoryValuationReport(): {
-    totalCostValue: number;
-    totalSaleValue: number;
-    byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
-  } {
+  public getBrandSalesReport(dateFrom?: string, dateTo?: string): { brandName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
+    this.requireView('reports.view');
+    const { sql, params } = this.buildBrandSalesSpec(dateFrom, dateTo);
+    return this.maskReportProfit(this.db.query<any>(sql, params));
+  }
+
+  public async getBrandSalesReportAsync(dateFrom?: string, dateTo?: string): Promise<{ brandName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[]> {
+    this.requireView('reports.view');
+    const { sql, params } = this.buildBrandSalesSpec(dateFrom, dateTo);
+    return this.maskReportProfit(await this.db.queryAsync<any>(sql, params));
+  }
+
+  private buildInventoryValuationSpecs(): { byWarehouseSql: string; totalsSql: string; params: any[] } {
     this.requireView('ui.finance.overview.view');
     const scope = this.branchScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
     );
-    const byWarehouse = this.db.query<any>(`
-      SELECT 
+    return {
+      byWarehouseSql: `
+      SELECT
         w.name as warehouseName,
         SUM(ws.quantity_m2 * p.cost_price) / 100.0 as costValue,
         SUM(ws.quantity_m2 * p.selling_price_m2) / 100.0 as saleValue,
@@ -895,18 +1044,26 @@ export class AccountingService {
       WHERE p.is_active = 1 AND ws.quantity_m2 > 0 AND ${scope.clause}
       GROUP BY w.id, w.name
       ORDER BY costValue DESC
-    `, scope.params);
-
-    const totals = this.db.query<any>(`
-      SELECT 
+    `,
+      totalsSql: `
+      SELECT
         SUM(ws.quantity_m2 * p.cost_price) / 100.0 as totalCost,
         SUM(ws.quantity_m2 * p.selling_price_m2) / 100.0 as totalSale
       FROM warehouse_stock ws
       JOIN warehouses w ON ws.warehouse_id = w.id
       JOIN products p ON ws.product_id = p.id
       WHERE p.is_active = 1 AND ws.quantity_m2 > 0 AND ${scope.clause}
-    `, scope.params)[0] || {};
+    `,
+      params: [...scope.params],
+    };
+  }
 
+  private mapInventoryValuation(byWarehouse: any[], totals: any): {
+    totalCostValue: number;
+    totalSaleValue: number;
+    byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
+  } {
+    totals = totals || {};
     return {
       totalCostValue: Number((totals.totalCost || 0).toFixed(2)),
       totalSaleValue: Number((totals.totalSale || 0).toFixed(2)),
@@ -914,10 +1071,38 @@ export class AccountingService {
     };
   }
 
+  public getInventoryValuationReport(): {
+    totalCostValue: number;
+    totalSaleValue: number;
+    byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
+  } {
+    const { byWarehouseSql, totalsSql, params } = this.buildInventoryValuationSpecs();
+    return this.mapInventoryValuation(
+      this.db.query<any>(byWarehouseSql, params),
+      this.db.query<any>(totalsSql, params)[0],
+    );
+  }
+
+  public async getInventoryValuationReportAsync(): Promise<{
+    totalCostValue: number;
+    totalSaleValue: number;
+    byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
+  }> {
+    const { byWarehouseSql, totalsSql, params } = this.buildInventoryValuationSpecs();
+    const [byWarehouse, totalsRows] = await Promise.all([
+      this.db.queryAsync<any>(byWarehouseSql, params),
+      this.db.queryAsync<any>(totalsSql, params),
+    ]);
+    return this.mapInventoryValuation(byWarehouse, totalsRows[0]);
+  }
+
   // New methods for enhanced dashboard analytics
-  public getMonthlyComparison(): MonthlyComparison {
+  private requireMonthlyComparisonView(): void {
     this.requireView('dashboard.view');
     PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  }
+
+  private buildMonthlyComparisonSpec(): { sql: string; params: any[] } {
     const now = new Date();
     const today = localDateString();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -928,7 +1113,8 @@ export class AccountingService {
     const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${String(Math.min(now.getDate(), prevMonthLastDay)).padStart(2, '0')}`;
     const scope = this.branchScope('si.branch_id');
 
-    const summaries = this.db.query<any>(`
+    return {
+      sql: `
       WITH sales AS (
         SELECT
           SUM(CASE WHEN si.date BETWEEN ? AND ? THEN si.subtotal - si.discount_amount ELSE 0 END) / 100.0 AS currentRevenue,
@@ -972,16 +1158,21 @@ export class AccountingService {
         returned_cost.currentCost AS currentReturnedCost,
         returned_cost.previousCost AS previousReturnedCost
       FROM sales CROSS JOIN returns CROSS JOIN returned_cost
-    `, [
-      currentMonthStart, today, currentMonthStart, today, currentMonthStart, today,
-      prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd,
-      currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
-      currentMonthStart, today, prevMonthStart, prevMonthEnd,
-      currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
-      currentMonthStart, today, prevMonthStart, prevMonthEnd,
-      currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
-    ])[0] || {};
+    `,
+      params: [
+        currentMonthStart, today, currentMonthStart, today, currentMonthStart, today,
+        prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd,
+        currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
+        currentMonthStart, today, prevMonthStart, prevMonthEnd,
+        currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
+        currentMonthStart, today, prevMonthStart, prevMonthEnd,
+        currentMonthStart, today, prevMonthStart, prevMonthEnd, ...scope.params,
+      ],
+    };
+  }
 
+  private mapMonthlyComparison(summaries: any): MonthlyComparison {
+    summaries = summaries || {};
     const current = {
       sales: Number(summaries.currentSalesRevenue || 0) - Number(summaries.currentReturnedRevenue || 0),
       profit: Number(summaries.currentProfit || 0) - Number(summaries.currentReturnedRevenue || 0) + Number(summaries.currentReturnedCost || 0),
@@ -1016,6 +1207,18 @@ export class AccountingService {
         : null,
       currentMonthInvoices: currentMonth.invoices,
     };
+  }
+
+  public getMonthlyComparison(): MonthlyComparison {
+    this.requireMonthlyComparisonView();
+    const { sql, params } = this.buildMonthlyComparisonSpec();
+    return this.mapMonthlyComparison(this.db.query<any>(sql, params)[0]);
+  }
+
+  public async getMonthlyComparisonAsync(): Promise<MonthlyComparison> {
+    this.requireMonthlyComparisonView();
+    const { sql, params } = this.buildMonthlyComparisonSpec();
+    return this.mapMonthlyComparison((await this.db.queryAsync<any>(sql, params))[0]);
   }
 
   public getDailyComparison(): MonthlyComparison {
@@ -1181,13 +1384,17 @@ export class AccountingService {
   public getNetSales(dateFrom?: string, dateTo?: string) { return this.getNetSalesAnalysis(dateFrom, dateTo); }
   public getNetSalesAfterReturns(dateFrom?: string, dateTo?: string) { return this.getNetSalesAnalysis(dateFrom, dateTo); }
 
-  public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
+  private requireDashboardCustomersSalesView(): void {
     this.requireView('dashboard.view');
     PermissionService.require(AuthService.requireAuth(), 'customers.view', '/customers');
     PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  }
+
+  private buildTopCustomersSpec(limit: number): { sql: string; params: any[] } {
     const scope = this.branchScope('si.branch_id');
-    return this.db.query<any>(`
-      SELECT 
+    return {
+      sql: `
+      SELECT
         c.name,
         SUM(si.total_amount) / 100.0 as totalPurchases,
         COUNT(DISTINCT si.id) as purchaseCount
@@ -1197,16 +1404,34 @@ export class AccountingService {
       HAVING totalPurchases > 0
       ORDER BY totalPurchases DESC
       LIMIT ?
-    `, [...scope.params, limit]);
+    `,
+      params: [...scope.params, limit],
+    };
   }
 
-  public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
+  public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
+    this.requireDashboardCustomersSalesView();
+    const { sql, params } = this.buildTopCustomersSpec(limit);
+    return this.db.query<any>(sql, params);
+  }
+
+  public async getTopCustomersAsync(limit = 5): Promise<{ name: string; totalPurchases: number; purchaseCount: number }[]> {
+    this.requireDashboardCustomersSalesView();
+    const { sql, params } = this.buildTopCustomersSpec(limit);
+    return this.db.queryAsync<any>(sql, params);
+  }
+
+  private requireDashboardFinanceSalesView(): void {
     this.requireView('dashboard.view');
     PermissionService.require(AuthService.requireAuth(), 'finance.view', '/finance');
     PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  }
+
+  private buildPaymentMethodSpec(): { sql: string; params: any[] } {
     const scope = this.branchScope('si.branch_id');
-    return this.db.query<any>(`
-      SELECT 
+    return {
+      sql: `
+      SELECT
         payment_type as method,
         COUNT(*) as count,
         SUM(total_amount) / 100.0 as totalAmount
@@ -1214,15 +1439,28 @@ export class AccountingService {
       WHERE invoice_status != 'VOID' AND date >= date('now', '-30 days') AND ${scope.clause}
       GROUP BY payment_type
       ORDER BY totalAmount DESC
-    `, scope.params);
+    `,
+      params: [...scope.params],
+    };
   }
 
-  public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
-    this.requireView('dashboard.view');
-    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
+  public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
+    this.requireDashboardFinanceSalesView();
+    const { sql, params } = this.buildPaymentMethodSpec();
+    return this.db.query<any>(sql, params);
+  }
+
+  public async getPaymentMethodDistributionAsync(): Promise<{ method: string; count: number; totalAmount: number }[]> {
+    this.requireDashboardFinanceSalesView();
+    const { sql, params } = this.buildPaymentMethodSpec();
+    return this.db.queryAsync<any>(sql, params);
+  }
+
+  private buildSalesByGradeSpec(): { sql: string; params: any[] } {
     const scope = this.branchScope('si.branch_id');
-    return this.db.query<any>(`
-      SELECT 
+    return {
+      sql: `
+      SELECT
         p.grade,
         SUM(sii.quantity_m2) as quantityM2,
         SUM(sii.total_price) / 100.0 as totalRevenue
@@ -1232,26 +1470,43 @@ export class AccountingService {
       WHERE si.invoice_status != 'VOID' AND si.date >= date('now', '-30 days') AND ${scope.clause}
       GROUP BY p.grade
       ORDER BY totalRevenue DESC
-    `, scope.params);
+    `,
+      params: [...scope.params],
+    };
   }
 
-  public getRecentActivities(limit = 10): RecentDashboardActivity[] {
+  public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
+    this.requireDashboardSalesView();
+    const { sql, params } = this.buildSalesByGradeSpec();
+    return this.db.query<any>(sql, params);
+  }
+
+  public async getSalesByGradeAsync(): Promise<{ grade: string; quantityM2: number; totalRevenue: number }[]> {
+    this.requireDashboardSalesView();
+    const { sql, params } = this.buildSalesByGradeSpec();
+    return this.db.queryAsync<any>(sql, params);
+  }
+
+  private requireRecentActivitiesView(): void {
     this.requireView('dashboard.view');
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.view', '/sales');
     PermissionService.require(actor, 'purchases.view', '/purchases');
     PermissionService.require(actor, 'inventory.view', '/inventory');
+  }
+
+  private buildRecentActivitySpecs(): { sales: { sql: string; params: any[] }; purchases: { sql: string; params: any[] }; stocks: { sql: string; params: any[] } } {
     const salesScope = this.branchScope('si.branch_id');
     const purchaseScope = this.branchScope('pi.branch_id');
     const stockScope = this.branchScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
     );
-    const activities: DashboardActivityRow[] = [];
-
-    // Recent sales
-    const sales = this.db.query<DashboardActivityRow>(`
-      SELECT 'SALE' as type, 
+    return {
+      // Recent sales
+      sales: {
+        sql: `
+      SELECT 'SALE' as type,
         'فاتورة مبيعات #' || si.invoice_number as description,
         si.total_amount / 100.0 as amount,
         si.date
@@ -1259,10 +1514,12 @@ export class AccountingService {
       WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
       ORDER BY si.date DESC
       LIMIT 3
-    `, salesScope.params);
-
-    // Recent purchases
-    const purchases = this.db.query<DashboardActivityRow>(`
+    `,
+        params: [...salesScope.params],
+      },
+      // Recent purchases
+      purchases: {
+        sql: `
       SELECT 'PURCHASE' as type,
         'فاتورة توريد #' || pi.invoice_number as description,
         pi.total_amount / 100.0 as amount,
@@ -1271,10 +1528,12 @@ export class AccountingService {
       WHERE ${purchaseScope.clause}
       ORDER BY pi.date DESC
       LIMIT 3
-    `, purchaseScope.params);
-
-    // Recent stock movements
-    const stocks = this.db.query<DashboardActivityRow>(`
+    `,
+        params: [...purchaseScope.params],
+      },
+      // Recent stock movements
+      stocks: {
+        sql: `
       SELECT 'STOCK' as type,
         'حركة مخزون #' || t.transaction_number as description,
         NULL as amount,
@@ -1284,9 +1543,14 @@ export class AccountingService {
       WHERE ${stockScope.clause}
       ORDER BY t.created_at DESC
       LIMIT 2
-    `, stockScope.params);
+    `,
+        params: [...stockScope.params],
+      },
+    };
+  }
 
-    activities.push(...sales, ...purchases, ...stocks);
+  private mapRecentActivities(sales: DashboardActivityRow[], purchases: DashboardActivityRow[], stocks: DashboardActivityRow[], limit: number): RecentDashboardActivity[] {
+    const activities: DashboardActivityRow[] = [...sales, ...purchases, ...stocks];
     activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const activityTypes: Record<string, RecentDashboardActivity['type']> = {
@@ -1301,5 +1565,27 @@ export class AccountingService {
       amount: a.amount == null ? undefined : Number(Number(a.amount).toFixed(2)),
       timestamp: a.date,
     }));
+  }
+
+  public getRecentActivities(limit = 10): RecentDashboardActivity[] {
+    this.requireRecentActivitiesView();
+    const specs = this.buildRecentActivitySpecs();
+    return this.mapRecentActivities(
+      this.db.query<DashboardActivityRow>(specs.sales.sql, specs.sales.params),
+      this.db.query<DashboardActivityRow>(specs.purchases.sql, specs.purchases.params),
+      this.db.query<DashboardActivityRow>(specs.stocks.sql, specs.stocks.params),
+      limit,
+    );
+  }
+
+  public async getRecentActivitiesAsync(limit = 10): Promise<RecentDashboardActivity[]> {
+    this.requireRecentActivitiesView();
+    const specs = this.buildRecentActivitySpecs();
+    const [sales, purchases, stocks] = await Promise.all([
+      this.db.queryAsync<DashboardActivityRow>(specs.sales.sql, specs.sales.params),
+      this.db.queryAsync<DashboardActivityRow>(specs.purchases.sql, specs.purchases.params),
+      this.db.queryAsync<DashboardActivityRow>(specs.stocks.sql, specs.stocks.params),
+    ]);
+    return this.mapRecentActivities(sales, purchases, stocks, limit);
   }
 }

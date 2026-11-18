@@ -43,8 +43,18 @@ export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
                   <MapPin className="w-3.5 h-3.5 shrink-0" />
                   {emp.location}
                 </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>
-                  {st.label}
+                <span className="flex items-center gap-1.5">
+                  {emp.isSalesRep && (
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-orange-500/10 text-orange-600 border-orange-500/25"
+                      title={emp.additionalBranchIds?.length ? `يخدم ${emp.additionalBranchIds.length + 1} فروع` : 'مندوب مبيعات'}
+                    >
+                      مندوب{emp.additionalBranchIds?.length ? ` · ${emp.additionalBranchIds.length + 1} فروع` : ''}
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>
+                    {st.label}
+                  </span>
                 </span>
               </div>
               <OperationalFieldsSummary fields={operationalFields} values={operationalValuesByRecord[emp.id] || {}} />

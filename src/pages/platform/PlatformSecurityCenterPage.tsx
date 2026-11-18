@@ -28,6 +28,8 @@ import {
   Copy,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformCentralSecurityOverview,
@@ -98,15 +100,24 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   // Load Security Overview
   const canManageSecurity = canPlatform('security-center');
 
-  const loadSecurity = useCallback(() => {
+  const loadSecurity = useCallback(async () => {
     setLoading(true);
     try {
-      const overview = platformAdminService.getPlatformSecurityOverview();
-      const keys = platformAdminService.listApiKeys();
-      const tenantList = platformAdminService.listTenants();
-      setData(overview);
-      setApiKeys(keys);
-      setTenants(tenantList);
+      const centralState = getCentralDataSourceState();
+      if (centralState.active) {
+        const [overview, keys, tenantList] = await Promise.all([
+          centralPlatformClient.getSecurityOverview(),
+          centralPlatformClient.listApiKeys(),
+          centralPlatformClient.listTenants(),
+        ]);
+        setData(overview as any);
+        setApiKeys(keys as any);
+        setTenants(tenantList as any);
+      } else {
+        setData(platformAdminService.getPlatformSecurityOverview());
+        setApiKeys(platformAdminService.listApiKeys());
+        setTenants(platformAdminService.listTenants());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل مركز الأمان.');
