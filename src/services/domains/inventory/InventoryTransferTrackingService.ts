@@ -245,7 +245,7 @@ export class InventoryTransferTrackingService {
   }): void {
     const batches = db.query<BatchRow>(`
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
-        COALESCE(grade, '') AS grade, COALESCE(cost_price, 0) AS costPrice,
+        COALESCE(grade, '') AS grade, COALESCE(cost_price, 0) / 100.0 AS costPrice,
         COALESCE(quantity_remaining_m2, 0) AS remainingM2,
         production_date AS productionDate, received_date AS receivedDate,
         supplier_id AS supplierId, created_at AS createdAt
@@ -285,7 +285,7 @@ export class InventoryTransferTrackingService {
         INSERT INTO stock_transfer_batch_allocations (
           id, transfer_item_id, source_batch_id, transit_batch_id, batch_number,
           tone_shade, caliber, grade, quantity_m2, unit_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100))
       `, [
         `trfba_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
         input.transferItemId,
@@ -325,7 +325,7 @@ export class InventoryTransferTrackingService {
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
         COALESCE(grade, '') AS grade,
         quantity_m2 AS quantityM2, received_m2 AS receivedM2, lost_m2 AS lostM2,
-        reverted_m2 AS revertedM2, unit_cost AS unitCost,
+        reverted_m2 AS revertedM2, unit_cost / 100.0 AS unitCost,
         transit_batch_id AS transitBatchId, source_batch_id AS sourceBatchId,
         created_at AS createdAt
       FROM stock_transfer_batch_allocations
@@ -403,7 +403,7 @@ export class InventoryTransferTrackingService {
       SELECT id, batch_number AS batchNumber, tone_shade AS toneShade, caliber,
         COALESCE(grade, '') AS grade,
         quantity_m2 AS quantityM2, received_m2 AS receivedM2, lost_m2 AS lostM2,
-        reverted_m2 AS revertedM2, unit_cost AS unitCost,
+        reverted_m2 AS revertedM2, unit_cost / 100.0 AS unitCost,
         transit_batch_id AS transitBatchId, source_batch_id AS sourceBatchId,
         created_at AS createdAt
       FROM stock_transfer_batch_allocations
@@ -502,7 +502,7 @@ export class InventoryTransferTrackingService {
         id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
         production_date, received_date, supplier_id, cost_price,
         quantity_m2, quantity_remaining_m2, notes, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
     `, [
       id,
       input.productId,

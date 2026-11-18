@@ -77,16 +77,19 @@ export const PurchasesView: React.FC = () => {
     notes: '',
   });
   const loadData = useCallback(() => {
-    try {
-      const purs = purchaseService.getAllPurchases(search);
-      setOperationalFields(fieldService.getDefinitions('purchase_invoices'));
-      const fieldValues = fieldService.getRecordValuesForRecords('purchase_invoices', purs.map((purchase) => purchase.id));
-      setValuesByPurchase(fieldValues);
-      const sups = supplierService.getAllSuppliers();
-      const prods = productService.getAllProducts();
-      const whs = inventoryService.getAllWarehouses();
-      const grnList = procurementService.getAllGoodsReceipts('', 'ALL');
-      const poList = poService.getAllOrders('', 'ALL').filter(p => ['SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED'].includes(p.status));
+    (async () => {
+      try {
+        const [purs, sups, prods, whs] = await Promise.all([
+          purchaseService.getAllPurchasesAsync(search),
+          supplierService.getAllSuppliersAsync(),
+          productService.getAllProductsAsync(),
+          inventoryService.getAllWarehousesAsync(),
+        ]);
+        setOperationalFields(fieldService.getDefinitions('purchase_invoices'));
+        const fieldValues = fieldService.getRecordValuesForRecords('purchase_invoices', purs.map((purchase) => purchase.id));
+        setValuesByPurchase(fieldValues);
+        const grnList = procurementService.getAllGoodsReceipts('', 'ALL');
+        const poList = poService.getAllOrders('', 'ALL').filter(p => ['SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED'].includes(p.status));
 
       setPurchases(purs.filter((purchase) => matchesOperationalFieldFilters(purchase.id, fieldValues, fieldFilters)));
       setSuppliers(sups);
@@ -103,9 +106,10 @@ export const PurchasesView: React.FC = () => {
           items: [{ productId: prods[0]?.id || '', quantityM2: prods[0]?.productType === 'GENERAL' ? 1 : 100, boxesCount: prods[0]?.productType === 'GENERAL' ? (prods[0]?.baseUnit === 'BOX' ? 1 : 0) : Number((100 / (prods[0]?.metersPerBox || 1.44)).toFixed(2)), unitCost: prods[0]?.costPrice || 150 }],
         }));
       }
-    } catch (e) {
-      console.error(e);
-    }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, [search, dto, fieldFilters, fieldService, inventoryService, poService, procurementService, productService, purchaseService, supplierService]);
 
   useEffect(() => {
@@ -118,9 +122,10 @@ export const PurchasesView: React.FC = () => {
       setExpandedDetails(null);
       return;
     }
-    const det = purchaseService.getPurchaseById(id);
-    setExpandedDetails(det);
-    setExpandedId(id);
+    purchaseService.getPurchaseByIdAsync(id).then((det) => {
+      setExpandedDetails(det);
+      setExpandedId(id);
+    });
   };
 
   const handleSelectGrn = (grnId: string) => {

@@ -4,7 +4,7 @@ import type { CartItem, PosUnit } from '../../../../types/pos';
 
 export interface PosCartPanelProps {
   selectedCustomer: Customer | null;
-  customerService: Pick<CustomerService, 'getCustomersPage'>;
+  customerService: Pick<CustomerService, 'getCustomersPageAsync'>;
   customerSearch: string;
   filteredCustomers: Customer[];
   hasMoreCustomers?: boolean;

@@ -28,7 +28,7 @@ export class HrBenefitsService {
   static createAllowance(input: { employeeId: string; allowanceType: string; amount: number; frequency?: string; effectiveFrom: string; effectiveTo?: string | null }): HrAllowance {
     const actor = this.requireManage();
     const id = `alw_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO hr_allowances (id, employee_id, allowance_type, amount, frequency, effective_from, effective_to) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO hr_allowances (id, employee_id, allowance_type, amount, frequency, effective_from, effective_to) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?)`,
       [id, input.employeeId, input.allowanceType.trim(), Math.max(0, Number(input.amount) || 0), input.frequency || 'MONTHLY', input.effectiveFrom, input.effectiveTo || null]);
     this.audit(actor, 'إضافة بدل', id, input);
     try { new NotificationService().createNotification('SYSTEM', 'إضافة بدل', `تم إضافة بدل ${input.allowanceType} بقيمة ${input.amount} للموظف ${input.employeeId}`, undefined, 'HR_ALLOWANCE', id); } catch { /* ignore */ }
@@ -49,7 +49,7 @@ export class HrBenefitsService {
   static getAllowanceTotal(employeeId: string, period: string): number {
     const periodEnd = `${period}-31`;
     const rows = this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(amount), 0) AS amount FROM hr_allowances
+      SELECT COALESCE(SUM(amount), 0) / 100.0 AS amount FROM hr_allowances
       WHERE employee_id = ? AND is_active = 1 AND effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)
         AND frequency = 'MONTHLY'
     `, [employeeId, periodEnd, `${period}-01`]);
@@ -60,7 +60,7 @@ export class HrBenefitsService {
   static createBenefit(input: { employeeId: string; benefitType: string; provider?: string; policyNumber?: string; startDate: string; endDate?: string | null; amount?: number }): HrBenefit {
     const actor = this.requireManage();
     const id = `ben_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO hr_benefits (id, employee_id, benefit_type, provider, policy_number, start_date, end_date, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO hr_benefits (id, employee_id, benefit_type, provider, policy_number, start_date, end_date, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100))`,
       [id, input.employeeId, input.benefitType.trim(), input.provider?.trim() || null, input.policyNumber?.trim() || null, input.startDate, input.endDate || null, Math.max(0, Number(input.amount) || 0)]);
     this.audit(actor, 'إضافة ميزة/تأمين', id, input);
     try { new NotificationService().createNotification('SYSTEM', 'إضافة ميزة/تأمين', `تم إضافة ${input.benefitType} للموظف ${input.employeeId}`, undefined, 'HR_BENEFIT', id); } catch { /* ignore */ }
@@ -83,7 +83,7 @@ export class HrBenefitsService {
     const actor = this.requireManage();
     const id = `lon_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     const principal = Math.max(0, Number(input.principal) || 0);
-    this.db.run(`INSERT INTO hr_loans (id, employee_id, principal, installment_amount, start_date, remaining_balance, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO hr_loans (id, employee_id, principal, installment_amount, start_date, remaining_balance, notes) VALUES (?, ?, ROUND(?*100), ROUND(?*100), ?, ROUND(?*100), ?)`,
       [id, input.employeeId, principal, Math.max(0, Number(input.installmentAmount) || 0), input.startDate, principal, input.notes?.trim() || null]);
     // generate installments monthly until the principal is covered
     const installment = Math.max(0, Number(input.installmentAmount) || 0);
@@ -95,7 +95,7 @@ export class HrBenefitsService {
         const due = new Date(Date.UTC(startYear, startMonth - 1 + guard, startDay || 1));
         const dueDate = `${due.getUTCFullYear()}-${String(due.getUTCMonth() + 1).padStart(2, '0')}-${String(due.getUTCDate()).padStart(2, '0')}`;
         const amt = Math.min(installment, remaining);
-        this.db.run(`INSERT INTO hr_loan_installments (id, loan_id, due_date, amount) VALUES (?, ?, ?, ?)`,
+        this.db.run(`INSERT INTO hr_loan_installments (id, loan_id, due_date, amount) VALUES (?, ?, ?, ROUND(?*100))`,
           [`ins_${uuidv4().replace(/-/g, '').slice(0, 16)}`, id, dueDate, amt]);
         remaining = Math.max(0, remaining - amt);
         guard += 1;
@@ -141,7 +141,7 @@ export class HrBenefitsService {
   static getDueInstallments(employeeId: string, period: string): number {
     const periodEnd = `${period}-31`;
     const rows = this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(i.amount), 0) AS amount
+      SELECT COALESCE(SUM(i.amount), 0) / 100.0 AS amount
       FROM hr_loan_installments i
       JOIN hr_loans l ON l.id = i.loan_id
       WHERE l.employee_id = ? AND i.status = 'PENDING' AND i.due_date <= ?
@@ -175,7 +175,7 @@ export class HrBenefitsService {
   static createLeaveSettlement(input: { employeeId: string; leaveDays: number; amount: number; settlementDate: string; notes?: string }): HrLeaveSettlement {
     const actor = this.requireManage();
     const id = `lvs_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO hr_leave_settlements (id, employee_id, leave_days, amount, settlement_date, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO hr_leave_settlements (id, employee_id, leave_days, amount, settlement_date, notes) VALUES (?, ?, ?, ROUND(?*100), ?, ?)`,
       [id, input.employeeId, Math.max(0, Number(input.leaveDays) || 0), Math.max(0, Number(input.amount) || 0), input.settlementDate, input.notes?.trim() || null]);
     this.audit(actor, 'تسوية إجازات غير مستخدمة', id, input);
     return this.getLeaveSettlements(input.employeeId).find((s) => s.id === id)!;
@@ -193,7 +193,7 @@ export class HrBenefitsService {
   static approveLeaveSettlement(id: string): void {
     const actor = this.requireManage();
     const settlement = this.db.query<{ employeeId: string; amount: number; settlementDate: string; status: string }>(
-      `SELECT employee_id AS employeeId, amount, settlement_date AS settlementDate, status
+      `SELECT employee_id AS employeeId, amount / 100.0 AS amount, settlement_date AS settlementDate, status
        FROM hr_leave_settlements WHERE id = ?`, [id]
     )[0];
     if (!settlement) throw new Error('تسوية الإجازات غير موجودة.');

@@ -4,7 +4,7 @@ import {
   Activity, AlertTriangle, ArrowLeftRight, Barcode, BookmarkPlus, Building2, ClipboardList, Layers,
   PackageSearch, Scale, ShieldAlert, Warehouse, Wrench,
 } from 'lucide-react';
-import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -39,23 +39,6 @@ const TABS: WorkspaceHubTab[] = [
   { id: 'reconciliation', label: 'المطابقة', path: '/inventory/reconciliation', icon: Scale },
 ];
 
-const REQUIRED_PERMISSION: Record<string, string> = {
-  overview: 'inventory.view',
-  'warehouse-stock': 'inventory.view',
-  'showroom-stock': 'inventory.view',
-  alerts: 'inventory.view',
-  ledger: 'inventory.view',
-  transfers: 'inventory.transfer',
-  counts: 'inventory.count',
-  valuation: 'inventory.view',
-  adjustments: 'inventory.view',
-  'stock-reservations': 'inventory.view',
-  'reorder-planning': 'inventory.view',
-  locations: 'inventory.view',
-  'damage-quarantine': 'inventory.adjust',
-  reconciliation: 'inventory.view',
-};
-
 const PAGE_BY_TAB = {
   overview: InventoryView,
   'warehouse-stock': () => <LocationStockPage mode="warehouse" />,
@@ -75,12 +58,20 @@ const PAGE_BY_TAB = {
 
 export const InventoryHubPage: React.FC = () => {
   const { pathname } = useLocation();
-  const can = usePermission();
-  const tabs = TABS.filter((tab) => can(REQUIRED_PERMISSION[tab.id]));
-  const activeTab = tabs.find((tab) => tab.path === pathname)?.id ?? tabs[0]?.id;
+  const canAccess = useRouteAccess();
+  // Tabs follow the exact same route rules as the MainLayout guard — no
+  // per-tab permission map that can drift from ROUTE_PERMISSIONS.
+  const tabs = TABS.filter((tab) => canAccess(tab.path));
+  const matchedTab = TABS.find((tab) => tab.path === pathname);
+  const matchedAllowed = matchedTab ? tabs.some((tab) => tab.id === matchedTab.id) : false;
+  const activeTab = matchedTab ? (matchedAllowed ? matchedTab.id : null) : tabs[0]?.id ?? null;
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
-  if (!tabs.length || !ActivePage) {
+  if (matchedTab && !matchedAllowed) {
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من مركز المخزون.</div>;
+  }
+
+  if (!activeTab || !ActivePage) {
     return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى مركز المخزون.</div>;
   }
 

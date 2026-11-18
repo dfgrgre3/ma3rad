@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 49 allowlisted endpoint pattern(s).
+ * 103 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -83,7 +83,8 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/roles/:code/permissions",
     "methods": [
-      "GET"
+      "GET",
+      "PUT"
     ]
   },
   {
@@ -102,13 +103,151 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/tenants/:id",
     "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/status",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/archive",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/profile",
+    "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/account",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/account/reset-password",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/account/status",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/users",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/users/:userId",
+    "methods": [
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/users/:userId/status",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/users/:userId/resend-invite",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/overrides",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/overrides/:overrideId",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/payments",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/remote",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/remote/config",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/remote/sync",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/branches",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/branches/:branchId",
+    "methods": [
+      "PUT",
+      "DELETE"
     ]
   },
   {
     "pattern": "/api/v1/admin/plans",
     "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/renew",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/cancel",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/change-plan",
+    "methods": [
+      "POST"
     ]
   },
   {
@@ -131,6 +270,12 @@ const ROUTE_DEFINITIONS = [
   },
   {
     "pattern": "/api/v1/admin/licenses/:id/suspend",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/licenses/:id/reactivate",
     "methods": [
       "POST"
     ]
@@ -211,6 +356,31 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/operations/jobs",
     "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/jobs/:id/cancel",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/jobs/:id/retry",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/usage",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/usage/:tenantId",
+    "methods": [
       "GET"
     ]
   },
@@ -250,7 +420,139 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/backups",
     "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/backups/restores",
+    "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/backups/:id",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/backups/:id/download",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/backups/:id/restore",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-backups",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-backups/:id",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-backups/:id/restore",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/app-backups/:id/restore/cancel",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/:id",
+    "methods": [
+      "GET",
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/support/:id/messages",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors/summary",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors/:id/acknowledge",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors/:id/resolve",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors/:id/ignore",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/errors/:id/reopen",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/releases",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/releases/:id",
+    "methods": [
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/releases/:id/publish",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/releases/:id/rollback",
+    "methods": [
+      "POST"
     ]
   },
   {
@@ -261,6 +563,13 @@ const ROUTE_DEFINITIONS = [
   },
   {
     "pattern": "/api/v1/admin/config/feature-permissions",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/config/permission-limits",
     "methods": [
       "GET",
       "PUT"
@@ -306,6 +615,36 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/releases",
     "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/backups",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/backups/pending-restore",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/backups/upload",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/backups/:id/download",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/backups/:id/restore-result",
+    "methods": [
+      "POST"
     ]
   }
 ];

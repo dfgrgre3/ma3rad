@@ -82,6 +82,8 @@ import { MIGRATION_PART_80 } from './part80';
 import { MIGRATION_PART_81 } from './part81';
 import { MIGRATION_PART_82 } from './part82';
 import { MIGRATION_PART_83 } from './part83';
+import { MIGRATION_PART_84 } from './part84';
+import { MIGRATION_PART_85 } from './part85';
 import { MIGRATION_PART_100 } from './part100';
 import { MIGRATION_PART_101 } from './part101';
 import { MIGRATION_PART_102 } from './part102';
@@ -109,6 +111,22 @@ import { MIGRATION_PART_124 } from './part124';
 import { MIGRATION_PART_125 } from './part125';
 import { MIGRATION_PART_126 } from './part126';
 import { MIGRATION_PART_127 } from './part127';
+import { MIGRATION_PART_128 } from './part128';
+import { MIGRATION_PART_129 } from './part129';
+import { MIGRATION_PART_130 } from './part130';
+import { MIGRATION_PART_131 } from './part131';
+import { MIGRATION_PART_132 } from './part132';
+import { MIGRATION_PART_133 } from './part133';
+import { MIGRATION_PART_134 } from './part134';
+import { MIGRATION_PART_135 } from './part135';
+import { MIGRATION_PART_136 } from './part136';
+import { MIGRATION_PART_137 } from './part137';
+import { MIGRATION_PART_138 } from './part138';
+import { MIGRATION_PART_139 } from './part139';
+import { MIGRATION_PART_140 } from './part140';
+import { MIGRATION_PART_141 } from './part141';
+import { MIGRATION_PART_142 } from './part142';
+import { MIGRATION_PART_143 } from './part143';
 import { MIGRATION_PART_114 } from './part114';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
@@ -180,6 +198,8 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_81,
   MIGRATION_PART_82,
   MIGRATION_PART_83,
+  MIGRATION_PART_84,
+  MIGRATION_PART_85,
   MIGRATION_PART_100,
   ...MIGRATION_PART_101,
   ...MIGRATION_PART_102,
@@ -2846,7 +2866,7 @@ export const MIGRATIONS: Migration[] = [
           party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
           party_id TEXT NOT NULL,
           account_code TEXT NOT NULL CHECK(account_code IN ('1103', '2101')),
-          amount REAL NOT NULL,
+          amount INTEGER NOT NULL,
           effective_date TEXT NOT NULL,
           reference_type TEXT NOT NULL,
           reference_id TEXT NOT NULL,
@@ -2863,7 +2883,7 @@ export const MIGRATIONS: Migration[] = [
           party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
           party_id TEXT NOT NULL,
           control_account_code TEXT NOT NULL CHECK(control_account_code IN ('1103', '2101')),
-          balance REAL NOT NULL,
+          balance INTEGER NOT NULL,
           effective_date TEXT NOT NULL,
           captured_at TEXT NOT NULL,
           FOREIGN KEY(period_id) REFERENCES fiscal_periods(id) ON DELETE RESTRICT
@@ -3507,6 +3527,22 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_125,
   MIGRATION_PART_126,
   MIGRATION_PART_127,
+  MIGRATION_PART_128,
+  MIGRATION_PART_129,
+  MIGRATION_PART_130,
+  MIGRATION_PART_131,
+  MIGRATION_PART_132,
+  MIGRATION_PART_133,
+  MIGRATION_PART_134,
+  MIGRATION_PART_135,
+  MIGRATION_PART_136,
+  MIGRATION_PART_137,
+  MIGRATION_PART_138,
+  MIGRATION_PART_139,
+  MIGRATION_PART_140,
+  MIGRATION_PART_141,
+  MIGRATION_PART_142,
+  MIGRATION_PART_143,
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
@@ -3537,6 +3573,8 @@ export interface MigrationReport {
   applied: string[];
   skipped: string[];
   failed: Array<{ id: string; error: string }>;
+  /** True when the stored bundle fingerprint matched and no DDL/migration ran. */
+  schemaReplayed: boolean;
 }
 
 function appliedIds(db: Database): Set<string> {
@@ -3621,6 +3659,92 @@ function createSchemaIndexes(db: Database): void {
   }
 }
 
+const SCHEMA_BUNDLE_SETTINGS_KEY = '__schema_bundle_v1';
+
+/**
+ * Fingerprint of everything runMigrations can change: the declarative schema
+ * text plus the ordered migration catalog. When it matches the marker stored
+ * in system_settings, the database already reflects the current bundle and
+ * the (large) idempotent schema replay can be skipped entirely on boot.
+ */
+let cachedSchemaFingerprint: string | null = null;
+
+function schemaBundleFingerprint(): string {
+  if (cachedSchemaFingerprint !== null) return cachedSchemaFingerprint;
+  const ids = MIGRATIONS.map((migration) => migration.id).join(',');
+  let hash = 0x811c9dc5;
+  const input = `${SCHEMA_SQL.length}:${ids}:${SCHEMA_SQL}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  cachedSchemaFingerprint = `${MIGRATIONS.length}:${SCHEMA_SQL.length}:${hash.toString(16)}`;
+  return cachedSchemaFingerprint;
+}
+
+/**
+ * The bundle marker alone is not sufficient: schema_migrations rows could be
+ * lost independently (partial restore, manual repair), in which case pending
+ * migrations must re-apply even though the code bundle is unchanged.
+ */
+function schemaMigrationsComplete(db: Database): boolean {
+  try {
+    const applied = appliedIds(db);
+    return MIGRATIONS.every((migration) => applied.has(migration.id));
+  } catch {
+    return false;
+  }
+}
+
+/** Cheap steady-state check: marker matches AND every migration is recorded. */
+export function isSchemaBundleCurrent(db: Database): boolean {
+  return readSchemaBundleMarker(db) === schemaBundleFingerprint()
+    && schemaMigrationsComplete(db);
+}
+
+function readSchemaBundleMarker(db: Database): string | null {
+  try {
+    const row = db.exec(
+      'SELECT value FROM system_settings WHERE key = ?',
+      [SCHEMA_BUNDLE_SETTINGS_KEY],
+    )[0]?.values?.[0]?.[0];
+    return row == null ? null : String(row);
+  } catch {
+    // system_settings does not exist yet on a fresh database.
+    return null;
+  }
+}
+
+function writeSchemaBundleMarker(db: Database, fingerprint: string): void {
+  try {
+    db.run(
+      'INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)',
+      [SCHEMA_BUNDLE_SETTINGS_KEY, fingerprint],
+    );
+  } catch {
+    // Marker is a boot-time optimization only; never fail migrations over it.
+  }
+}
+
+/**
+ * sqlite_stat1 persists inside the database file, so ANALYZE only needs to run
+ * once per database lifetime. The query planner on a ~550-table schema benefits
+ * measurably from fresh statistics; skipping it when stat tables already exist
+ * keeps steady-state boots cheap.
+ */
+function ensureSqliteStats(db: Database): void {
+  try {
+    const exists = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1'",
+    )[0]?.values?.length;
+    if (!exists) {
+      db.exec('ANALYZE');
+    }
+  } catch {
+    // Statistics are advisory; a failure must not block startup.
+  }
+}
+
 /**
  * Brings any database — brand new or years old — up to the current schema.
  * Call on every startup, before any service issues a query.
@@ -3629,11 +3753,22 @@ function createSchemaIndexes(db: Database): void {
  * schema and data invariants, so stop immediately and retry on the next launch.
  */
 export function runMigrations(db: Database): MigrationReport {
-  const report: MigrationReport = { applied: [], skipped: [], failed: [] };
+  const report: MigrationReport = { applied: [], skipped: [], failed: [], schemaReplayed: false };
 
   // PRAGMA foreign_keys is connection-scoped and SQLite ignores changes made
   // inside a transaction, so configure it before executing schema/migrations.
   setForeignKeysEnabled(db, 'SQLite foreign key enforcement could not be enabled.');
+
+  // 0. Steady-state fast path: when the stored bundle fingerprint matches, the
+  //    schema tables, indexes and every migration already reflect this exact
+  //    SCHEMA_SQL + migration catalog, so replaying thousands of idempotent
+  //    DDL statements on every boot is pure overhead.
+  if (isSchemaBundleCurrent(db)) {
+    report.schemaReplayed = true;
+    report.skipped.push(...MIGRATIONS.map((migration) => migration.id));
+    ensureSqliteStats(db);
+    return report;
+  }
 
   // 1. Create missing tables before migrations. Indexes are deferred because a
   //    legacy table may not have the columns referenced by a newer index yet.
@@ -3648,6 +3783,8 @@ export function runMigrations(db: Database): MigrationReport {
   //    exist on both fresh and upgraded databases.
   if (report.failed.length === 0) {
     createSchemaIndexes(db);
+    writeSchemaBundleMarker(db, schemaBundleFingerprint());
+    ensureSqliteStats(db);
   }
 
   if (report.applied.length > 0) {

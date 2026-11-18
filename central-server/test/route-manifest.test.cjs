@@ -49,6 +49,14 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/admin/auth/mfa/setup',
     '/api/v1/admin/auth/mfa/verify',
     '/api/v1/admin/auth/mfa/disable',
+    // Device-authenticated client endpoints (no platform staff session).
+    '/api/v1/telemetry/errors',
+    '/api/v1/releases',
+    '/api/v1/device/backups',
+    '/api/v1/device/backups/pending-restore',
+    '/api/v1/device/backups/upload',
+    '/api/v1/device/backups/:id/download',
+    '/api/v1/device/backups/:id/restore-result',
   ]);
 
   for (const entry of ROUTE_MANIFEST) {

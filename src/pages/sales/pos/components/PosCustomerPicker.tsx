@@ -24,7 +24,7 @@ export interface CustomerPosSummary {
 
 export interface PosCustomerPickerProps {
   selectedCustomer: Customer | null;
-  customerService: Pick<CustomerService, 'getCustomersPage'>;
+  customerService: Pick<CustomerService, 'getCustomersPageAsync'>;
   customerSearch: string;
   filteredCustomers: Customer[];
   hasMoreCustomers?: boolean;

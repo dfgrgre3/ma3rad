@@ -61,23 +61,25 @@ export const PurchaseOrdersPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      const currentRows = service.getAllOrders(search, statusFilter);
-      setFields(fieldService.getDefinitions('purchase_orders'));
-      const fieldValues = fieldService.getRecordValuesForRecords('purchase_orders', currentRows.map((row) => row.id));
-      setValuesByOrder(fieldValues);
-      setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
-    }
-    catch (e: any) { toast.error(e?.message || 'تعذر تحميل أوامر الشراء.'); }
-    finally { setLoading(false); }
+    (async () => {
+      try {
+        const currentRows = await service.getAllOrdersAsync(search, statusFilter);
+        setFields(fieldService.getDefinitions('purchase_orders'));
+        const fieldValues = fieldService.getRecordValuesForRecords('purchase_orders', currentRows.map((row) => row.id));
+        setValuesByOrder(fieldValues);
+        setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
+      }
+      catch (e: any) { toast.error(e?.message || 'تعذر تحميل أوامر الشراء.'); }
+      finally { setLoading(false); }
+    })();
   }, [service, fieldService, search, statusFilter, setLoading, setFields, setValuesByOrder, setRows, fieldFilters, toast]);
 
   useEffect(() => { load();   }, [statusFilter, fieldFilters, load]);
 
   const openDetails = (row: PurchaseOrderRow) => {
     if (expanded === row.id) { setExpanded(null); setDetails(null); return; }
-    try { setDetails(service.getOrderById(row.id)); setExpanded(row.id); }
-    catch (e: any) { toast.error(e?.message); }
+    service.getOrderByIdAsync(row.id).then((det) => { setDetails(det); setExpanded(row.id); })
+      .catch((e: any) => toast.error(e?.message));
   };
 
   const openModal = () => {

@@ -4,7 +4,7 @@ import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { ProcurementServicePart03 } from './ProcurementServicePart03';
 
 export abstract class ProcurementServicePart04 extends ProcurementServicePart03 {
-public getAllGoodsReceipts(search = '', status = 'ALL'): GoodsReceiptRow[] {
+  private buildGoodsReceiptsQuery(search: string, status: string): { sql: string; params: any[] } {
     let sql = `
       SELECT g.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName,
         po.order_number AS orderNumber,
@@ -27,10 +27,12 @@ public getAllGoodsReceipts(search = '', status = 'ALL'): GoodsReceiptRow[] {
       params.push(term, term, term, term);
     }
     sql += ` ORDER BY g.created_at DESC`;
-    const rows = this.db.query<GoodsReceiptRow>(sql, params);
-    if (rows.length === 0) return rows;
+    return { sql, params };
+  }
 
-    const itemRows = this.db.query<any>(`
+  private buildReceiptsBreakdownQuery(grnIds: string[]): { sql: string; params: any[] } {
+    return {
+      sql: `
       SELECT gi.grn_id AS grnId, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
         SUM(gi.received_quantity_m2) AS totalReceived,
         SUM(gi.accepted_quantity_m2) AS totalAccepted,
@@ -38,9 +40,14 @@ public getAllGoodsReceipts(search = '', status = 'ALL'): GoodsReceiptRow[] {
         SUM(gi.shortage_quantity_m2) AS totalShortage
       FROM goods_receipt_note_items gi
       LEFT JOIN products p ON p.id = gi.product_id
-      WHERE gi.grn_id IN (${rows.map(() => '?').join(',')})
-      GROUP BY gi.grn_id, p.product_type, p.base_unit, p.custom_unit
-    `, rows.map((row) => row.id));
+      WHERE gi.grn_id IN (${grnIds.map(() => '?').join(',')})
+      GROUP BY gi.grn_id, p.product_type, p.base_unit, p.custom_unit`,
+      params: grnIds,
+    };
+  }
+
+  private mapReceiptsWithBreakdown(rows: GoodsReceiptRow[], itemRows: any[]): GoodsReceiptRow[] {
+    if (rows.length === 0) return rows;
     const breakdownByReceipt = new Map<string, any[]>();
     for (const item of itemRows) {
       const breakdown = breakdownByReceipt.get(item.grnId) || [];
@@ -53,8 +60,27 @@ public getAllGoodsReceipts(search = '', status = 'ALL'): GoodsReceiptRow[] {
     return rows.map((row) => ({ ...row, quantityBreakdown: breakdownByReceipt.get(row.id) || [] }));
   }
 
-public getGoodsReceiptById(id: string): (GoodsReceiptRow & { items: GoodsReceiptItem[] }) | null {
-    const row = this.db.query<GoodsReceiptRow>(`
+public getAllGoodsReceipts(search = '', status = 'ALL'): GoodsReceiptRow[] {
+    const { sql, params } = this.buildGoodsReceiptsQuery(search, status);
+    const rows = this.db.query<GoodsReceiptRow>(sql, params);
+    if (rows.length === 0) return rows;
+    const { sql: breakdownSql, params: breakdownParams } = this.buildReceiptsBreakdownQuery(rows.map((row) => row.id));
+    const itemRows = this.db.query<any>(breakdownSql, breakdownParams);
+    return this.mapReceiptsWithBreakdown(rows, itemRows);
+  }
+
+  public async getAllGoodsReceiptsAsync(search = '', status = 'ALL'): Promise<GoodsReceiptRow[]> {
+    const { sql, params } = this.buildGoodsReceiptsQuery(search, status);
+    const rows = await this.db.queryAsync<GoodsReceiptRow>(sql, params);
+    if (rows.length === 0) return rows;
+    const { sql: breakdownSql, params: breakdownParams } = this.buildReceiptsBreakdownQuery(rows.map((row) => row.id));
+    const itemRows = await this.db.queryAsync<any>(breakdownSql, breakdownParams);
+    return this.mapReceiptsWithBreakdown(rows, itemRows);
+  }
+
+  private buildGoodsReceiptByIdQueries(id: string): { rowSql: string; rowParams: any[]; itemsSql: string; itemsParams: any[] } {
+    return {
+      rowSql: `
       SELECT g.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName,
         po.order_number AS orderNumber
       FROM goods_receipt_notes g
@@ -63,17 +89,35 @@ public getGoodsReceiptById(id: string): (GoodsReceiptRow & { items: GoodsReceipt
       LEFT JOIN purchase_orders po ON po.id = g.purchase_order_id
       LEFT JOIN users u ON u.id = g.created_by
       WHERE g.id = ?
-    `, [id])[0];
-    if (!row) return null;
-
-    const items = this.db.query<GoodsReceiptItem>(`
+    `,
+      rowParams: [id],
+      itemsSql: `
       SELECT gi.*, p.sku AS productSku,
              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
       FROM goods_receipt_note_items gi
       LEFT JOIN products p ON p.id = gi.product_id
       WHERE gi.grn_id = ?
-    `, [id]);
+    `,
+      itemsParams: [id],
+    };
+  }
 
+public getGoodsReceiptById(id: string): (GoodsReceiptRow & { items: GoodsReceiptItem[] }) | null {
+    const { rowSql, rowParams, itemsSql, itemsParams } = this.buildGoodsReceiptByIdQueries(id);
+    const row = this.db.query<GoodsReceiptRow>(rowSql, rowParams)[0];
+    if (!row) return null;
+    const items = this.db.query<GoodsReceiptItem>(itemsSql, itemsParams);
+    return { ...row, items };
+  }
+
+  public async getGoodsReceiptByIdAsync(id: string): Promise<(GoodsReceiptRow & { items: GoodsReceiptItem[] }) | null> {
+    const { rowSql, rowParams, itemsSql, itemsParams } = this.buildGoodsReceiptByIdQueries(id);
+    const [rows, items] = await Promise.all([
+      this.db.queryAsync<GoodsReceiptRow>(rowSql, rowParams),
+      this.db.queryAsync<GoodsReceiptItem>(itemsSql, itemsParams),
+    ]);
+    const row = rows[0];
+    if (!row) return null;
     return { ...row, items };
   }
 
@@ -132,7 +176,7 @@ public perform3WayMatching(params: {
     if (!purchaseOrderId) return items;
 
     const poItems = this.db.query<any>(
-      `SELECT product_id, unit_cost, quantity_m2 FROM purchase_order_items WHERE purchase_order_id = ?`,
+      `SELECT product_id, unit_cost / 100.0 AS unit_cost, quantity_m2 FROM purchase_order_items WHERE purchase_order_id = ?`,
       [purchaseOrderId],
     );
     for (const item of poItems) {

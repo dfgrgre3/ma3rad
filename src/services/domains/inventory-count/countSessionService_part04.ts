@@ -64,7 +64,7 @@ export function postCountVariance(
       id, transaction_number, type, product_id, warehouse_id,
       quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
       notes, performed_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'STOCK_COUNT', ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'STOCK_COUNT', ?, ?, ?, CURRENT_TIMESTAMP)
   `, [
     txId, txNum, txType, item.productId, warehouseId,
     diffM2, boxesCount, unitCost, value, activeSession.id,

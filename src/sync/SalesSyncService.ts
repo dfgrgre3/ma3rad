@@ -2,6 +2,14 @@
 import type { SyncEvent, SyncOperation } from '../types/sync/index.ts';
 import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 
+const SALES_INVOICE_MONEY_COLS = new Set([
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'extra_fees',
+  'total_amount', 'paid_amount', 'remaining_amount', 'total_cost', 'gross_profit', 'returned_amount',
+]);
+const SALES_RETURN_MONEY_COLS = new Set([
+  'total_amount', 'return_tax_amount', 'refunded_amount', 'remaining_to_balance',
+]);
+
 export class SalesSyncService {
   private db = DatabaseManager.getInstance();
   private engine: SyncEngine;
@@ -132,17 +140,19 @@ export class SalesSyncService {
       const cols = Object.keys(payload);
       const placeholders = cols.map(() => '?').join(',');
       const assignments = cols.map((c) => `${c} = excluded.${c}`).join(',');
+      const values = cols.map((c) => SALES_INVOICE_MONEY_COLS.has(c) && payload[c] != null
+        ? Math.round(Number(payload[c]) * 100) : payload[c]);
 
       if (existing) {
         tx.run(
           `INSERT INTO sales_invoices (${cols.join(',')}) VALUES (${placeholders})
            ON CONFLICT(id) DO UPDATE SET ${assignments}, updated_at = CURRENT_TIMESTAMP`,
-          cols.map((c) => payload[c])
+          values
         );
       } else {
         tx.run(
           `INSERT INTO sales_invoices (${cols.join(',')}) VALUES (${placeholders})`,
-          cols.map((c) => payload[c])
+          values
         );
       }
 
@@ -172,17 +182,19 @@ export class SalesSyncService {
       const cols = Object.keys(payload);
       const placeholders = cols.map(() => '?').join(',');
       const assignments = cols.map((c) => `${c} = excluded.${c}`).join(',');
+      const values = cols.map((c) => SALES_RETURN_MONEY_COLS.has(c) && payload[c] != null
+        ? Math.round(Number(payload[c]) * 100) : payload[c]);
 
       if (existing) {
         tx.run(
           `INSERT INTO sales_returns (${cols.join(',')}) VALUES (${placeholders})
            ON CONFLICT(id) DO UPDATE SET ${assignments}, updated_at = CURRENT_TIMESTAMP`,
-          cols.map((c) => payload[c])
+          values
         );
       } else {
         tx.run(
           `INSERT INTO sales_returns (${cols.join(',')}) VALUES (${placeholders})`,
-          cols.map((c) => payload[c])
+          values
         );
       }
 

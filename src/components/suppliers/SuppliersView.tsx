@@ -86,9 +86,9 @@ export const SuppliersView: React.FC = () => {
   const canApproveFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.approve');
   const canImport = PermissionService.can(currentUser, 'ui.settings.hub.view');
 
-  const loadSuppliers = useCallback(() => {
+  const loadSuppliers = useCallback(async () => {
     try {
-      const data = supplierService.getAllSuppliers(search, showInactive);
+      const data = await supplierService.getAllSuppliersAsync(search, showInactive);
       setSuppliers(data);
       setOperationalFields(operationalFieldService.getDefinitions('suppliers'));
       setSupplierFieldValues(operationalFieldService.getRecordValuesForExport(
@@ -108,14 +108,18 @@ export const SuppliersView: React.FC = () => {
 
   useEffect(() => {
     if (!selectedSupplier) return;
-    try {
-      const current = supplierService.getSupplierById(selectedSupplier.id);
-      if (!current) return;
-      setSelectedSupplier(current);
-      setStatement(canViewFinancials ? supplierService.getSupplierStatement(current.id, statementFrom, statementTo) : null);
-    } catch (e) {
-      console.error(e);
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const current = await supplierService.getSupplierByIdAsync(selectedSupplier.id);
+        if (!current || cancelled) return;
+        setSelectedSupplier(current);
+        setStatement(canViewFinancials ? supplierService.getSupplierStatement(current.id, statementFrom, statementTo) : null);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [selectedSupplier, statementFrom, statementTo, canViewFinancials, supplierService]);
 
   const handleOpenStatement = (sup: Supplier) => {

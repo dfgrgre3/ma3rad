@@ -45,6 +45,14 @@ pnpm-debug.log*
 test-domain.js
 apply_invoice_pagination.py
 
+# Windows reserved device names (e.g. accidentally created via `> nul` in Git Bash)
+nul
+con
+aux
+prn
+com[1-9]
+lpt[1-9]
+
 # Temporary files
 lint-results.json
 appearance-temp.tsx
@@ -95,4 +103,5 @@ Microsoft/
 docs/ui-audit/manifest.json
 docs/ui-audit/smoke-report.json
 e2e-data/ceramisys-e2e-d0qghf/DevToolsActivePort
-.env.example
+.env.example/
+.env.example/*

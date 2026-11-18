@@ -9,6 +9,8 @@ import {
   Info,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatformPermission } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformRoleMatrix, PlatformStaffRole } from '../../services/domains/platform/platformTypes';
 import { PLATFORM_ROLE_DEFINITIONS } from '../../services/domains/platform/PlatformAuthorizationService';
@@ -28,6 +30,36 @@ const ROLE_ORDER: PlatformStaffRole[] = [
 
 const ACTION_ORDER = ['view', 'create', 'update', 'delete', 'approve', 'export'] as const;
 
+const CENTRAL_ACTION_LABELS: Record<string, string> = {
+  view: 'عرض',
+  create: 'إنشاء',
+  update: 'تعديل',
+  delete: 'حذف',
+  approve: 'اعتماد',
+  export: 'تصدير',
+};
+
+/** Build the local matrix shape from the central permission catalog endpoint. */
+async function loadCentralMatrix(): Promise<PlatformRoleMatrix> {
+  const catalog = await centralPlatformClient.getPermissionCatalog();
+  const sections = ((catalog.sections as any[]) || []).map((section) => ({
+    module: String(section.module),
+    title: String(section.title ?? section.module),
+    standardActions: Array.isArray(section.standardActions) ? section.standardActions.map(String) : [],
+    permissions: (Array.isArray(section.permissions) ? section.permissions : []).map((permission: any) => ({
+      code: String(permission.code),
+      action: String(permission.action ?? ''),
+      name: String(permission.name ?? permission.code),
+      special: Boolean(permission.special),
+    })),
+  }));
+  const matrix: Record<string, string[]> = {};
+  for (const role of (catalog.roles as any[]) || []) {
+    matrix[String(role.code)] = Array.isArray(role.permissions) ? role.permissions.map(String) : [];
+  }
+  return { matrix, sections, standardActionLabels: CENTRAL_ACTION_LABELS, fetchedAt: new Date().toISOString() };
+}
+
 /**
  * مصفوفة الأدوار والصلاحيات — النموذج الكامل:
  *  - مصفوفة أساسية: الأقسام × الأفعال الستة (عرض/إنشاء/تعديل/حذف/اعتماد/تصدير).
@@ -44,10 +76,14 @@ export const PlatformRolesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = platformAdminService.getRolePermissionMatrix();
+      const central = getCentralDataSourceState();
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      const data = central.active ? await loadCentralMatrix() : platformAdminService.getRolePermissionMatrix();
       setMatrix(data);
       setDraft(Object.fromEntries(Object.entries(data.matrix).map(([role, codes]) => [role, [...codes]])));
       setDirtyRoles(new Set());
@@ -59,7 +95,7 @@ export const PlatformRolesPage: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const actionLabel = useCallback((action: string) => matrix?.standardActionLabels[action] ?? action, [matrix]);
@@ -109,11 +145,22 @@ export const PlatformRolesPage: React.FC = () => {
     if (!canManage || dirtyRoles.size === 0) return;
     setSaving(true);
     try {
-      for (const role of dirtyRoles) {
-        platformAdminService.setRolePermissions(role, draft[role] ?? []);
+      const central = getCentralDataSourceState();
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      if (central.active) {
+        for (const role of dirtyRoles) {
+          if (role === 'SUPER_ADMIN') continue;
+          await centralPlatformClient.updateRolePermissions(role, draft[role] ?? []);
+        }
+      } else {
+        for (const role of dirtyRoles) {
+          platformAdminService.setRolePermissions(role, draft[role] ?? []);
+        }
       }
       toast.success(`تم حفظ مصفوفة الصلاحيات لـ ${dirtyRoles.size} دور/أدوار. تُطبق التغييرات فوراً على جميع الموظفين بذلك الدور.`);
-      load();
+      void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر حفظ المصفوفة.');
     } finally {
@@ -193,7 +240,7 @@ export const PlatformRolesPage: React.FC = () => {
         actions={(
           <div className="flex items-center gap-2">
             {dirtyRoles.size > 0 && (
-              <Button size="sm" variant="ghost" onClick={load} leadingIcon={<RotateCcw className="h-4 w-4" />}>
+              <Button size="sm" variant="ghost" onClick={() => void load()} leadingIcon={<RotateCcw className="h-4 w-4" />}>
                 تجاهل ({dirtyRoles.size})
               </Button>
             )}

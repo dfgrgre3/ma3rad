@@ -6,6 +6,11 @@ import { localDateString } from '../../../utils/shared/date';
 import { assertLedgerDateOpenForPosting, paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../../database/repositories/ledger';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { inclusiveReturnTaxSql, returnTaxSql } from './financials';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const FA_MONEY_FIELDS = ['purchase_cost', 'salvage_value', 'accumulated_depreciation'] as const;
+const FA_DISPOSAL_MONEY_FIELDS = ['sale_proceeds', 'expenses', 'accumulated_depreciation', 'book_value', 'gain_loss'] as const;
+const FA_DEPR_MONEY_FIELDS = ['amount'] as const;
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -353,7 +358,7 @@ export class FinanceExtrasService {
     )[0];
     if (!visible) throw new Error('القيد المحاسبي غير موجود ضمن نطاق صلاحيتك.');
     return this.db.query<JournalLine>(
-      `SELECT l.*, a.code AS account_code, a.name AS account_name
+      `SELECT l.id, l.entry_id, l.account_id, l.debit / 100.0 AS debit, l.credit / 100.0 AS credit, l.description, l.cost_center_id, a.code AS account_code, a.name AS account_name
        FROM journal_entry_lines l
        LEFT JOIN chart_of_accounts a ON a.id = l.account_id
        WHERE l.entry_id = ?
@@ -426,7 +431,7 @@ export class FinanceExtrasService {
     const lines = this.getJournalLines(id);
     this.db.executeFinancialTransaction((db) => {
       for (const line of lines) {
-        db.run('UPDATE chart_of_accounts SET balance = ROUND(balance - ?, 2) WHERE id = ?', [line.debit - line.credit, line.accountId]);
+        db.run('UPDATE chart_of_accounts SET balance = balance - ROUND(? * 100) WHERE id = ?', [line.debit - line.credit, line.accountId]);
       }
       db.run('DELETE FROM journal_entry_lines WHERE entry_id = ?', [id]);
       db.run('DELETE FROM journal_entries WHERE id = ?', [id]);
@@ -497,10 +502,10 @@ export class FinanceExtrasService {
          GROUP BY a.id
        )
        SELECT code, name, type,
-              ROUND(MAX(debit_total - credit_total, 0), 2) AS debit,
-              ROUND(MAX(credit_total - debit_total, 0), 2) AS credit
+              ROUND(MAX(0, (debit_total - credit_total) / 100.0), 2) AS debit,
+              ROUND(MAX(0, (credit_total - debit_total) / 100.0), 2) AS credit
        FROM scoped
-       WHERE ROUND(debit_total - credit_total, 2) != 0
+       WHERE ROUND((debit_total - credit_total) / 100.0, 2) != 0
        ORDER BY code`, params
     );
   }
@@ -531,20 +536,20 @@ export class FinanceExtrasService {
       'pr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
     );
     const sales = this.db.query<any>(
-      `SELECT COALESCE(SUM(tax_amount), 0) AS tax, COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
+      `SELECT COALESCE(SUM(tax_amount), 0) / 100.0 AS tax, COALESCE(SUM(total_amount), 0) / 100.0 AS total, COUNT(*) AS count
        FROM sales_invoices si
        WHERE si.invoice_status != 'VOID' AND si.date >= ? AND si.date <= ? AND ${salesScope.clause}`,
       [dateFrom, dateTo, ...salesScope.params]
     )[0] || {};
     const purchases = this.db.query<any>(
-      `SELECT COALESCE(SUM(tax_amount), 0) AS tax, COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
+      `SELECT COALESCE(SUM(tax_amount), 0) / 100.0 AS tax, COALESCE(SUM(total_amount), 0) / 100.0 AS total, COUNT(*) AS count
        FROM purchase_invoices pi
        WHERE pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}`,
       [dateFrom, dateTo, ...purchaseScope.params]
     )[0] || {};
     const salesReturns = this.db.query<any>(
-      `SELECT COALESCE(SUM(sr.total_amount), 0) AS net,
-              COALESCE(SUM(${salesReturnTax}), 0) AS tax
+      `SELECT COALESCE(SUM(sr.total_amount), 0) / 100.0 AS net,
+              COALESCE(SUM(${salesReturnTax}), 0) / 100.0 AS tax
        FROM sales_returns sr
        JOIN sales_invoices original ON original.id = sr.original_invoice_id
        WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
@@ -552,8 +557,8 @@ export class FinanceExtrasService {
       [dateFrom, dateTo, ...returnSalesScope.params]
     )[0] || {};
     const purchaseReturns = this.db.query<any>(
-      `SELECT COALESCE(SUM(pr.total_amount), 0) AS total,
-              COALESCE(SUM(${purchaseReturnTax}), 0) AS tax
+      `SELECT COALESCE(SUM(pr.total_amount), 0) / 100.0 AS total,
+              COALESCE(SUM(${purchaseReturnTax}), 0) / 100.0 AS tax
        FROM purchase_returns pr
        JOIN purchase_invoices original ON original.id = pr.original_purchase_id
        WHERE pr.date >= ? AND pr.date <= ? AND ${returnPurchaseScope.clause}`,
@@ -588,24 +593,24 @@ export class FinanceExtrasService {
     );
     return this.db.query<{ month: string; outputTax: number; inputTax: number }>(
       `SELECT month, SUM(output_tax) AS outputTax, SUM(input_tax) AS inputTax FROM (
-         SELECT substr(si.date, 1, 7) AS month, si.tax_amount AS output_tax, 0 AS input_tax
+         SELECT substr(si.date, 1, 7) AS month, si.tax_amount / 100.0 AS output_tax, 0 AS input_tax
          FROM sales_invoices si
          WHERE si.invoice_status != 'VOID' AND si.date >= ? AND si.date <= ? AND ${salesScope.clause}
          UNION ALL
          SELECT substr(sr.date, 1, 7) AS month,
-                -(${salesReturnTax}) AS output_tax,
+                -(${salesReturnTax}) / 100.0 AS output_tax,
                 0 AS input_tax
          FROM sales_returns sr
          JOIN sales_invoices original ON original.id = sr.original_invoice_id
          WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
            AND ${returnSalesScope.clause}
          UNION ALL
-         SELECT substr(pi.date, 1, 7) AS month, 0 AS output_tax, pi.tax_amount AS input_tax
+         SELECT substr(pi.date, 1, 7) AS month, 0 AS output_tax, pi.tax_amount / 100.0 AS input_tax
          FROM purchase_invoices pi
          WHERE pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}
          UNION ALL
          SELECT substr(pr.date, 1, 7) AS month, 0 AS output_tax,
-                -(${purchaseReturnTax}) AS input_tax
+                -(${purchaseReturnTax}) / 100.0 AS input_tax
          FROM purchase_returns pr
          JOIN purchase_invoices original ON original.id = pr.original_purchase_id
          WHERE pr.date >= ? AND pr.date <= ? AND ${returnPurchaseScope.clause}
@@ -623,7 +628,7 @@ export class FinanceExtrasService {
 
   getCheques(): Cheque[] {
     this.requireView();
-    return this.db.query<Cheque>('SELECT * FROM cheques ORDER BY due_date ASC, created_at DESC');
+    return this.db.query<Cheque>('SELECT * FROM cheques ORDER BY due_date ASC, created_at DESC').map((row) => unscaleMoneyRow(row, ['amount', 'bounce_fee']));
   }
 
   saveCheque(input: Partial<Cheque> & { chequeNumber: string; partyName: string; amount: number; dueDate: string }): void {
@@ -647,13 +652,13 @@ export class FinanceExtrasService {
     if (input.id) {
       this.db.run(
         `UPDATE cheques SET cheque_number = ?, type = ?, party_type = ?, party_id = ?, party_name = ?, bank_name = ?,
-           amount = ?, due_date = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+           amount = ROUND(?*100), due_date = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [...values, input.id]
       );
     } else {
       this.db.run(
         `INSERT INTO cheques (id, cheque_number, type, party_type, party_id, party_name, bank_name, amount, due_date, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?)`,
         [`chq_${uuidv4().substring(0, 8)}`, ...values, actor.id]
       );
     }
@@ -674,12 +679,13 @@ export class FinanceExtrasService {
   getFixedAssets(): FixedAsset[] {
     const actor = this.requireView();
     const allowed = this.branchAccess.getAccessibleBranchIds(actor);
-    if (allowed === null) return this.db.query<FixedAsset>('SELECT * FROM fixed_assets ORDER BY code ASC');
+    if (allowed === null) return this.db.query<FixedAsset>('SELECT * FROM fixed_assets ORDER BY code ASC')
+      .map((r) => unscaleMoneyRow(r, FA_MONEY_FIELDS));
     if (!allowed.length) return [];
     return this.db.query<FixedAsset>(
       `SELECT * FROM fixed_assets WHERE branch_id IN (${allowed.map(() => '?').join(',')}) ORDER BY code ASC`,
       allowed
-    );
+    ).map((r) => unscaleMoneyRow(r, FA_MONEY_FIELDS));
   }
 
   private requireAssetAccess(asset: FixedAsset, actor = AuthService.requireAuth()): void {
@@ -733,7 +739,7 @@ export class FinanceExtrasService {
     ];
     if (input.id) {
       const posted = this.db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [input.id])[0];
-      const existing = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id=?', [input.id])[0];
+      const existing = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id=?', [input.id])[0], FA_MONEY_FIELDS);
       if (!existing) throw new Error('Fixed asset not found.');
       this.requireAssetAccess(existing, actor);
       if (existing.status === 'DISPOSED') throw new Error('لا يمكن تعديل أصل مستبعد.');
@@ -749,7 +755,7 @@ export class FinanceExtrasService {
         throw new Error('The acquisition date and cost cannot be edited after posting. Dispose and re-enter the asset to correct it.');
       }
       this.db.run(
-        `UPDATE fixed_assets SET name = ?, category = ?, purchase_date = ?, purchase_cost = ?, salvage_value = ?,
+        `UPDATE fixed_assets SET name = ?, category = ?, purchase_date = ?, purchase_cost = ROUND(?*100), salvage_value = ROUND(?*100),
            useful_life_years = ?, status = ?, location = ?, notes = ?, depreciation_method = ?, declining_rate = ?,
            expected_units = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [...values, input.id]
@@ -771,14 +777,14 @@ export class FinanceExtrasService {
           `INSERT INTO fixed_assets (id, code, name, category, purchase_date, purchase_cost, salvage_value,
              useful_life_years, status, location, notes, depreciation_method, declining_rate, expected_units,
              branch_id, department_id, responsible_user_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [id, `FA-${String(next).padStart(4, '0')}`, ...values, branchId, input.departmentId || null, input.responsibleUserId || null]
         );
         const cashAccount = paymentType === 'CREDIT' ? '2201' : paymentAccountCode(paymentType);
         if (paymentType === 'CASH') {
           const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
           if (!register) throw new Error('The selected cash register is unavailable.');
-          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [Number(input.purchaseCost), registerId]);
+          db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id=?', [Number(input.purchaseCost), registerId]);
         }
         postLedgerEntry(db.getDatabase(), {
           date: input.purchaseDate,
@@ -805,11 +811,11 @@ export class FinanceExtrasService {
   }> {
     this.requireView();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(throughPeriod)) throw new Error('فترة الإهلاك غير صحيحة.');
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset);
     const depreciationRows = this.db.query<{ period: string; amount: number; usageQuantity: number | null }>(
-      'SELECT period, amount, usage_quantity FROM fixed_asset_depreciation_periods WHERE asset_id = ? ORDER BY period',
+      'SELECT period, amount / 100.0 AS amount, usage_quantity FROM fixed_asset_depreciation_periods WHERE asset_id = ? ORDER BY period',
       [assetId]
     );
     const posted = new Map(depreciationRows.map((row) => [row.period, row]));
@@ -867,7 +873,7 @@ export class FinanceExtrasService {
 
   requestFixedAssetDepreciation(id: string, period: string, usageQuantity?: number): string {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [id])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [id])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (asset.status !== 'ACTIVE') throw new Error('لا يمكن إهلاك أصل غير نشط.');
@@ -908,7 +914,7 @@ export class FinanceExtrasService {
       db.run(
         `INSERT INTO fixed_asset_depreciation_requests
          (id, asset_id, period, posting_date, amount, usage_quantity, requested_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?)`,
         [requestId, id, period, postingDate, round2(amount),
           asset.depreciationMethod === 'UNITS_OF_PRODUCTION' ? usageQuantity ?? null : null, actor.id]
       );
@@ -927,7 +933,7 @@ export class FinanceExtrasService {
 
   getFixedAssetDepreciationRequests(assetId: string): FixedAssetDepreciationRequest[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetDepreciationRequest>(
@@ -937,19 +943,19 @@ export class FinanceExtrasService {
        LEFT JOIN users approver ON approver.id = r.approved_by
        WHERE r.asset_id = ? ORDER BY r.created_at DESC, r.id DESC`,
       [assetId]
-    );
+    ).map((row) => unscaleMoneyRow(row, FA_DEPR_MONEY_FIELDS));
   }
 
   approveFixedAssetDepreciationRequest(requestId: string): FixedAssetDepreciationPeriod {
     const actor = this.requireManage();
-    const request = this.db.query<FixedAssetDepreciationRequest>(
+    const request = unscaleMoneyRow(this.db.query<FixedAssetDepreciationRequest>(
       'SELECT * FROM fixed_asset_depreciation_requests WHERE id = ?',
       [requestId]
-    )[0];
+    )[0], FA_DEPR_MONEY_FIELDS);
     if (!request) throw new Error('طلب الإهلاك غير موجود.');
     if (request.status !== 'PENDING') throw new Error('تمت معالجة طلب الإهلاك بالفعل.');
     if (request.requestedBy === actor.id) throw new Error('يجب أن يكون معتمد الإهلاك مستخدمًا مختلفًا عن مقدم الطلب.');
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [request.assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [request.assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (asset.status !== 'ACTIVE') throw new Error('لا يمكن إهلاك أصل غير نشط.');
@@ -993,11 +999,11 @@ export class FinanceExtrasService {
       db.run(
         `INSERT INTO fixed_asset_depreciation_periods
          (id, asset_id, period, posting_date, amount, usage_quantity, status, journal_entry_id, posted_by)
-         VALUES (?, ?, ?, ?, ?, ?, 'POSTED', ?, ?)`,
+         VALUES (?, ?, ?, ?, ROUND(?*100), ?, 'POSTED', ?, ?)`,
         [periodId, asset.id, request.period, request.postingDate, amount, request.usageQuantity, entryId, actor.id]
       );
       db.run(
-        'UPDATE fixed_assets SET accumulated_depreciation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        'UPDATE fixed_assets SET accumulated_depreciation = ROUND(?*100), status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [Math.min(depreciable, nextAccumulated), nextAccumulated >= depreciable - 0.009 ? 'FULLY_DEPRECIATED' : 'ACTIVE', asset.id]
       );
       db.run(
@@ -1026,7 +1032,7 @@ export class FinanceExtrasService {
 
   getFixedAssetTransfers(assetId: string): FixedAssetTransfer[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetTransfer>(
@@ -1039,7 +1045,7 @@ export class FinanceExtrasService {
 
   getFixedAssetTimeline(assetId: string): FixedAssetTimelineEvent[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetTimelineEvent>(
@@ -1066,7 +1072,7 @@ export class FinanceExtrasService {
          UNION ALL
          SELECT m.maintenance_date, 'MAINTENANCE',
                 CASE m.cost_treatment WHEN 'CAPITALIZED' THEN 'تحسين رأسمالي' ELSE 'صيانة تشغيلية' END,
-                m.cost, u.full_name, COALESCE(m.journal_entry_id, m.id),
+                m.cost / 100.0, u.full_name, COALESCE(m.journal_entry_id, m.id),
                 m.maintenance_type || ' — ' || m.description ||
                   CASE WHEN m.vendor IS NOT NULL AND TRIM(m.vendor) <> '' THEN ' | المورد: ' || m.vendor ELSE '' END,
                 m.created_at
@@ -1074,16 +1080,16 @@ export class FinanceExtrasService {
          JOIN users u ON u.id = m.actor_id
          WHERE m.asset_id = ?
          UNION ALL
-         SELECT d.posting_date, 'DEPRECIATION', 'إهلاك مرحّل', d.amount, u.full_name,
+         SELECT d.posting_date, 'DEPRECIATION', 'إهلاك مرحّل', d.amount / 100.0, u.full_name,
                 d.journal_entry_id, 'الفترة ' || d.period || ' — الحالة: ' || d.status, d.created_at
          FROM fixed_asset_depreciation_periods d
          JOIN users u ON u.id = d.posted_by
          WHERE d.asset_id = ?
          UNION ALL
-         SELECT d.disposal_date, 'DISPOSAL', 'استبعاد معتمد', d.sale_proceeds, u.full_name,
+         SELECT d.disposal_date, 'DISPOSAL', 'استبعاد معتمد', d.sale_proceeds / 100.0, u.full_name,
                 d.journal_entry_id,
-                d.reason || ' | القيمة الدفترية: ' || d.book_value ||
-                  ' | مصروفات: ' || d.expenses || ' | ربح/خسارة: ' || d.gain_loss,
+                d.reason || ' | القيمة الدفترية: ' || d.book_value / 100.0 ||
+                  ' | مصروفات: ' || d.expenses / 100.0 || ' | ربح/خسارة: ' || d.gain_loss / 100.0,
                 d.created_at
          FROM fixed_asset_disposals d
          JOIN users u ON u.id = d.approved_by
@@ -1099,7 +1105,7 @@ export class FinanceExtrasService {
     responsibleUserId?: string; notes?: string;
   }): void {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (asset.status === 'DISPOSED') throw new Error('لا يمكن نقل أصل مستبعد.');
@@ -1156,7 +1162,7 @@ export class FinanceExtrasService {
 
   getFixedAssetMaintenance(assetId: string): FixedAssetMaintenance[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetMaintenance>(
@@ -1164,7 +1170,7 @@ export class FinanceExtrasService {
        FROM fixed_asset_maintenance m JOIN users u ON u.id = m.actor_id
        WHERE m.asset_id = ? ORDER BY m.maintenance_date DESC, m.created_at DESC`,
       [assetId]
-    );
+    ).map((row) => unscaleMoneyRow(row, ['cost']));
   }
 
   recordFixedAssetMaintenance(input: {
@@ -1172,7 +1178,7 @@ export class FinanceExtrasService {
     treatment: 'OPERATIONAL' | 'CAPITALIZED'; vendor?: string; nextDate?: string;
   }): string {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (asset.status === 'DISPOSED') throw new Error('لا يمكن تسجيل صيانة لأصل مستبعد.');
@@ -1210,12 +1216,12 @@ export class FinanceExtrasService {
       db.run(
         `INSERT INTO fixed_asset_maintenance
          (id, asset_id, maintenance_date, maintenance_type, description, cost, cost_treatment, vendor, next_maintenance_date, journal_entry_id, actor_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?)`,
         [id, asset.id, input.date, input.type.trim(), input.description.trim(), round2(input.cost), input.treatment,
           input.vendor?.trim() || null, input.nextDate || null, journalEntryId, actor.id]
       );
       if (input.treatment === 'CAPITALIZED') {
-        db.run('UPDATE fixed_assets SET purchase_cost = ROUND(purchase_cost + ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        db.run('UPDATE fixed_assets SET purchase_cost = purchase_cost + ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
           [round2(input.cost), asset.id]);
       }
       db.run(
@@ -1229,26 +1235,26 @@ export class FinanceExtrasService {
 
   getFixedAssetDisposal(assetId: string): FixedAssetDisposal | null {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
-    return this.db.query<FixedAssetDisposal>('SELECT * FROM fixed_asset_disposals WHERE asset_id = ?', [assetId])[0] || null;
+    return unscaleMoneyRow(this.db.query<FixedAssetDisposal>('SELECT * FROM fixed_asset_disposals WHERE asset_id = ?', [assetId])[0], FA_DISPOSAL_MONEY_FIELDS) || null;
   }
 
   getFixedAssetSettlementSources(assetId: string): FixedAssetSettlementSource[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (!asset.branchId) return [];
     return [
       ...this.db.query<{ id: string; name: string; currentBalance: number }>(
-        `SELECT id, name, current_balance AS currentBalance FROM cash_registers
+        `SELECT id, name, current_balance / 100.0 AS currentBalance FROM cash_registers
          WHERE is_active = 1 AND branch_id = ? ORDER BY is_default DESC, name`,
         [asset.branchId]
       ).map((row) => ({ ...row, type: 'CASH_REGISTER' as const, currentBalance: Number(row.currentBalance) })),
       ...this.db.query<{ id: string; name: string; currentBalance: number }>(
-        `SELECT ba.id, ba.account_name AS name, ba.current_balance AS currentBalance
+        `SELECT ba.id, ba.account_name AS name, ba.current_balance / 100.0 AS currentBalance
          FROM bank_accounts ba
          JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id
          WHERE ba.is_active = 1 AND ba.branch_id = ? AND ba.currency = 'EGP'
@@ -1261,7 +1267,7 @@ export class FinanceExtrasService {
 
   getFixedAssetAttachments(assetId: string): FixedAssetAttachment[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetAttachment>(
@@ -1277,7 +1283,7 @@ export class FinanceExtrasService {
     mimeType?: string | null; fileSize: number; checksum?: string | null; storageName: string;
   }): FixedAssetAttachment {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     const documentTypes = ['INVOICE', 'WARRANTY', 'PURCHASE_CONTRACT', 'OWNERSHIP', 'OTHER'];
@@ -1314,7 +1320,7 @@ export class FinanceExtrasService {
     settlementType: 'CASH_REGISTER' | 'BANK_ACCOUNT'; settlementId: string;
   }): FixedAssetDisposal {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [input.assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     if (asset.status === 'DISPOSED') throw new Error('الأصل مستبعد بالفعل.');
@@ -1351,7 +1357,7 @@ export class FinanceExtrasService {
       let currentBalance = 0;
       if (input.settlementType === 'CASH_REGISTER') {
         const register = db.query<{ currentBalance: number; branchId: string | null }>(
-          'SELECT current_balance AS currentBalance, branch_id AS branchId FROM cash_registers WHERE id = ? AND is_active = 1',
+          'SELECT current_balance / 100.0 AS currentBalance, branch_id AS branchId FROM cash_registers WHERE id = ? AND is_active = 1',
           [input.settlementId]
         )[0];
         if (!register || !register.branchId || register.branchId !== asset.branchId) {
@@ -1361,7 +1367,7 @@ export class FinanceExtrasService {
         currentBalance = Number(register.currentBalance);
       } else {
         const bank = db.query<{ currentBalance: number; branchId: string | null; accountCode: string }>(
-          `SELECT ba.current_balance AS currentBalance, ba.branch_id AS branchId, coa.code AS accountCode
+          `SELECT ba.current_balance / 100.0 AS currentBalance, ba.branch_id AS branchId, coa.code AS accountCode
            FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id
            WHERE ba.id = ? AND ba.is_active = 1 AND ba.currency = 'EGP'
              AND coa.is_active = 1 AND coa.type = 'ASSET'`,
@@ -1388,17 +1394,17 @@ export class FinanceExtrasService {
       db.run(
         `INSERT INTO fixed_asset_disposals
          (id, asset_id, disposal_date, reason, sale_proceeds, expenses, buyer, accumulated_depreciation, book_value, gain_loss, journal_entry_id, approved_by, settlement_type, settlement_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)`,
         [disposalId, asset.id, input.date, input.reason.trim(), round2(proceeds), round2(expenses),
           input.buyer?.trim() || null, depreciation, bookValue, gainLoss, journalEntryId, actor.id,
           input.settlementType, input.settlementId]
       );
       db.run("UPDATE fixed_assets SET status = 'DISPOSED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [asset.id]);
       if (input.settlementType === 'CASH_REGISTER') {
-        db.run('UPDATE cash_registers SET current_balance = ROUND(current_balance + ? - ?, 2) WHERE id = ?',
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) - ROUND(?*100) WHERE id = ?',
           [round2(proceeds), round2(expenses), input.settlementId]);
       } else {
-        db.run('UPDATE bank_accounts SET current_balance = ROUND(current_balance + ? - ?, 2), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        db.run('UPDATE bank_accounts SET current_balance = current_balance + ROUND(?*100) - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
           [round2(proceeds), round2(expenses), input.settlementId]);
       }
       db.run(
@@ -1420,13 +1426,13 @@ export class FinanceExtrasService {
 
   getFixedAssetDepreciationPeriods(assetId: string): FixedAssetDepreciationPeriod[] {
     const actor = this.requireView();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [assetId])[0], FA_MONEY_FIELDS);
     if (!asset) throw new Error('الأصل غير موجود.');
     this.requireAssetAccess(asset, actor);
     return this.db.query<FixedAssetDepreciationPeriod>(
       'SELECT * FROM fixed_asset_depreciation_periods WHERE asset_id = ? ORDER BY period DESC',
       [assetId]
-    );
+    ).map((row) => unscaleMoneyRow(row, FA_DEPR_MONEY_FIELDS));
   }
 
   getFixedAssetCountCampaigns(): FixedAssetCountCampaign[] {
@@ -1607,7 +1613,7 @@ export class FinanceExtrasService {
     if (campaign.status !== 'OPEN') throw new Error('حملة الجرد مغلقة.');
     const code = input.code.trim();
     if (!code) throw new Error('كود الأصل مطلوب.');
-    const found = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE code = ?', [code])[0];
+    const found = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE code = ?', [code])[0], FA_MONEY_FIELDS);
     const snapshot = found && found.branchId === campaign.branchId && (campaign.location === null || found.location === campaign.location)
       ? this.db.query('SELECT asset_id FROM fixed_asset_count_snapshots WHERE campaign_id = ? AND asset_id = ?', [campaign.id, found.id])[0]
       : null;
@@ -1665,7 +1671,7 @@ export class FinanceExtrasService {
 
   deleteFixedAsset(id: string): void {
     const actor = this.requireManage();
-    const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id=?', [id])[0];
+    const asset = unscaleMoneyRow(this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id=?', [id])[0], FA_MONEY_FIELDS);
     if (!asset) return;
     this.requireAssetAccess(asset, actor);
     const historyCount = this.db.query<{ count: number }>(
@@ -1691,7 +1697,7 @@ export class FinanceExtrasService {
           date: localDateString(), description: `Reverse fixed asset acquisition ${asset.code}`,
           referenceType: 'ASSET_ACQUISITION_VOID', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
         });
-        if (cashLine) db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [asset.purchaseCost, 'cr_main']);
+        if (cashLine) db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id=?', [asset.purchaseCost, 'cr_main']);
       }
       db.run('DELETE FROM fixed_assets WHERE id=?', [id]);
     });

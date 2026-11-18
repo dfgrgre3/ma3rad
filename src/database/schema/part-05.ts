@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS employees (
   employment_type TEXT DEFAULT 'FULL_TIME' CHECK(employment_type IN ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY')),
   hired_at TEXT NOT NULL,
   terminated_at TEXT,
+  status TEXT DEFAULT 'ACTIVE',
   base_salary REAL DEFAULT 0,
   is_sales_rep INTEGER DEFAULT 0,
   commission_percentage REAL DEFAULT 0,

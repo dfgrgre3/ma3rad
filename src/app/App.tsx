@@ -17,14 +17,17 @@ import { APP_VERSION } from '../config/appVersion';
 import { DatabasePersistenceStatus } from '../components/shared/DatabasePersistenceStatus';
 import { AppRouter } from '../router';
 import { LoginPage } from '../pages/auth/login/LoginPage';
-import { PlatformStaffInviteAcceptPage } from '../pages/platform/PlatformStaffInviteAcceptPage';
-import { PlatformOwnerSetupPage } from '../pages/platform/PlatformOwnerSetupPage';
-import { SetupWizard } from '../components/setup/SetupWizard';
+// Rare pre-auth platform flows are lazy-loaded so the platform service graph
+// stays out of the entry chunk for regular users.
+const PlatformStaffInviteAcceptPage = React.lazy(() => import('../pages/platform/PlatformStaffInviteAcceptPage').then(m => ({ default: m.PlatformStaffInviteAcceptPage })));
+const PlatformOwnerSetupPage = React.lazy(() => import('../pages/platform/PlatformOwnerSetupPage').then(m => ({ default: m.PlatformOwnerSetupPage })));
+const SetupWizard = React.lazy(() => import('../components/setup/SetupWizard').then(m => ({ default: m.SetupWizard })));
 import { ForcePasswordChangeModal } from '../components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from '../contexts/ThemeProvider';
 import { ToastProvider } from '../components/ui/Toast';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { UpdateNotification } from '../components/shared/UpdateNotification';
+import { CentralRestoreNotification } from '../components/shared/CentralRestoreNotification';
 import { useAppStartup } from '../hooks/domains/auth/useAppStartup';
 import { useAppSession } from '../hooks/domains/auth/useAppSession';
 import { securityService, auditLogger, performanceMonitor, localCache, systemHealth, CentralTelemetryService } from '../services';
@@ -218,46 +221,59 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (!currentUser) return;
-    try {
-      const db = DatabaseManager.getInstance();
-      const tables = new Set(db.query<{ name: string }>(
-        `SELECT name FROM sqlite_master WHERE type = 'table'`
-      ).map(({ name }) => name));
-      const businessTables = [
-        'products', 'customers', 'suppliers', 'sales_invoices', 'purchase_invoices',
-        'purchase_orders', 'purchase_requests', 'sales_returns', 'purchase_returns',
-        'sales_orders', 'quotations', 'goods_receipts', 'inventory_transactions',
-        'stock_movements', 'inventory_adjustments', 'inventory_transfers', 'stock_counts',
-        'customer_payments', 'supplier_payments', 'cash_transactions', 'expenses',
-        'projects', 'employees', 'employee_contracts', 'employee_leave_requests',
-        'deliveries', 'documents', 'contracts', 'leads', 'manufacturing_orders',
-        'journal_entries',
-      ];
-      const hasBusinessData = businessTables.some((table) =>
-        tables.has(table) && db.query(`SELECT 1 FROM "${table}" LIMIT 1`).length > 0
-      ) || (tables.has('users')
-        && db.query(`SELECT 1 FROM users WHERE lower(username) <> 'admin' LIMIT 1`).length > 0)
-        || ['companies', 'branches', 'warehouses'].some((table) =>
-          tables.has(table) && db.query(`SELECT 1 FROM "${table}" LIMIT 1 OFFSET 1`).length > 0
+    let cancelled = false;
+    const evaluateSetupState = async () => {
+      try {
+        const db = DatabaseManager.getInstance();
+        const tableRows = await db.queryAsync<{ name: string }>(
+          `SELECT name FROM sqlite_master WHERE type = 'table'`
         );
-      const legacySettings = db.query<{ key: string; value: string }>(
-        `SELECT key, value FROM system_settings
-         WHERE key IN ('showroomName', 'businessType', 'businessProfileConfig', 'enabledModules')`
-      );
-      const hasLegacyConfiguration = legacySettings.some(({ key, value }) =>
-        (key === 'showroomName' && value.trim().length > 0)
-        || (key !== 'showroomName' && value.trim().length > 0 && value.trim() !== '{}')
-      );
-      setShowSetup(BYPASS_FIRST_RUN_SETUP ? false : shouldShowFirstRunSetup({
-        completed: SettingsService.getValue('setup_completed') === '1',
-        hasBusinessData,
-        hasLegacyConfiguration,
-      }));
-    } catch {
-      // Fail closed: never open a mutating first-run wizard when setup state
-      // cannot be determined safely.
-      setShowSetup(false);
-    }
+        const tables = new Set(tableRows.map(({ name }) => name));
+        const businessTables = [
+          'products', 'customers', 'suppliers', 'sales_invoices', 'purchase_invoices',
+          'purchase_orders', 'purchase_requests', 'sales_returns', 'purchase_returns',
+          'sales_orders', 'quotations', 'goods_receipts', 'inventory_transactions',
+          'stock_movements', 'inventory_adjustments', 'inventory_transfers', 'stock_counts',
+          'customer_payments', 'supplier_payments', 'cash_transactions', 'expenses',
+          'projects', 'employees', 'employee_contracts', 'employee_leave_requests',
+          'deliveries', 'documents', 'contracts', 'leads', 'manufacturing_orders',
+          'journal_entries',
+        ];
+        const hasBusinessData = (await Promise.all(businessTables.map(async (table) =>
+          tables.has(table)
+            ? (await db.queryAsync(`SELECT 1 FROM "${table}" LIMIT 1`)).length > 0
+            : false
+        ))).some(Boolean)
+          || (tables.has('users')
+            && (await db.queryAsync(`SELECT 1 FROM users WHERE lower(username) <> 'admin' LIMIT 1`)).length > 0)
+          || (await Promise.all(['companies', 'branches', 'warehouses'].map(async (table) =>
+            tables.has(table)
+              ? (await db.queryAsync(`SELECT 1 FROM "${table}" LIMIT 1 OFFSET 1`)).length > 0
+              : false
+          ))).some(Boolean);
+        const legacySettings = await db.queryAsync<{ key: string; value: string }>(
+          `SELECT key, value FROM system_settings
+           WHERE key IN ('showroomName', 'businessType', 'businessProfileConfig', 'enabledModules')`
+        );
+        if (cancelled) return;
+        const hasLegacyConfiguration = legacySettings.some(({ key, value }) =>
+          (key === 'showroomName' && value.trim().length > 0)
+          || (key !== 'showroomName' && value.trim().length > 0 && value.trim() !== '{}')
+        );
+        setShowSetup(BYPASS_FIRST_RUN_SETUP ? false : shouldShowFirstRunSetup({
+          completed: SettingsService.getValue('setup_completed') === '1',
+          hasBusinessData,
+          hasLegacyConfiguration,
+        }));
+      } catch {
+        if (cancelled) return;
+        // Fail closed: never open a mutating first-run wizard when setup state
+        // cannot be determined safely.
+        setShowSetup(false);
+      }
+    };
+    void evaluateSetupState();
+    return () => { cancelled = true; };
   }, [currentUser?.id, currentUser]);
 
   // Pre-auth platform staff invitation: /#/accept-staff-invite/<token>
@@ -360,15 +376,15 @@ export const App: React.FC = () => {
   if (!currentUser) {
     if (ownerSetupRequested) {
       return (
-        <>
+        <React.Suspense fallback={null}>
           <PlatformOwnerSetupPage onSuccess={setCurrentUser} />
           <UpdateNotification />
-        </>
+        </React.Suspense>
       );
     }
     if (staffInviteToken) {
       return (
-        <>
+        <React.Suspense fallback={null}>
           <PlatformStaffInviteAcceptPage
             token={staffInviteToken}
             onSuccess={(user) => {
@@ -377,7 +393,7 @@ export const App: React.FC = () => {
             }}
           />
           <UpdateNotification />
-        </>
+        </React.Suspense>
       );
     }
     return (
@@ -402,13 +418,16 @@ export const App: React.FC = () => {
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
           <UpdateNotification />
+          <CentralRestoreNotification />
           {showSetup ? (
+            <React.Suspense fallback={null}>
             <SetupWizard
               onComplete={(configuredAdmin) => {
                 setShowSetup(false);
                 setCurrentUser((current) => configuredAdmin ?? (current ? { ...current, mustChangePassword: false } : current));
               }}
             />
+            </React.Suspense>
           ) : (
             <HashRouter>
               <AppRouter

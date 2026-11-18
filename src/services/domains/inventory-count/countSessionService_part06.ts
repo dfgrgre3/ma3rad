@@ -35,7 +35,7 @@ export function approveCountSession(activeSession: CountSession): boolean {
       UPDATE stock_counts
       SET status = 'POSTED', approval_status = 'APPROVED', approved_by = ?, approved_at = CURRENT_TIMESTAMP,
           posted_at = CURRENT_TIMESTAMP, posted_by = ?,
-          items_with_variance = ?, total_variance_value = ?
+          items_with_variance = ?, total_variance_value = ROUND(?*100)
       WHERE id = ?
     `, [actor.id, actor.id, varianceCount, totalVarianceVal, activeSession.id]);
   });

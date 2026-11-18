@@ -8,6 +8,11 @@ import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const SUPPLIER_MONEY_FIELDS = ['current_balance','total_purchases'] as const;
+const SUPPLIER_PAYMENT_MONEY_FIELDS = ['amount'] as const;
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
@@ -19,9 +24,23 @@ export class SupplierService {
     return this.fetchSuppliers(search, includeInactive);
   }
 
+  public async getAllSuppliersAsync(search?: string, includeInactive = false): Promise<Supplier[]> {
+    this.requireSuppliersDirectory();
+    return this.fetchSuppliersAsync(search, includeInactive);
+  }
+
   public getSupplierById(id: string): Supplier | null {
     this.requireSuppliersView();
     return this.readSupplier(id);
+  }
+
+  public async getSupplierByIdAsync(id: string): Promise<Supplier | null> {
+    this.requireSuppliersView();
+    const scope = this.branchAccess.companyScope('company_id');
+    const rows = await this.db.queryAsync<Supplier>(
+      `SELECT * FROM suppliers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params],
+    );
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], SUPPLIER_MONEY_FIELDS) : null;
   }
 
   private requireSuppliersView(): void {
@@ -39,10 +58,10 @@ export class SupplierService {
   private readSupplier(id: string): Supplier | null {
     const scope = this.branchAccess.companyScope('company_id');
     const rows = this.db.query<Supplier>(`SELECT * FROM suppliers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params]);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], SUPPLIER_MONEY_FIELDS) : null;
   }
 
-  private fetchSuppliers(search?: string, includeInactive = false): Supplier[] {
+  private buildSuppliersQuery(search?: string, includeInactive = false): { sql: string; params: any[] } {
     const scope = this.branchAccess.companyScope('company_id');
     let sql = `SELECT * FROM suppliers`;
     const params: any[] = [];
@@ -59,7 +78,19 @@ export class SupplierService {
 
     sql += ` WHERE ${conditions.join(' AND ')}`;
     sql += ` ORDER BY name ASC`;
-    return this.db.query<Supplier>(sql, params);
+    return { sql, params };
+  }
+
+  private fetchSuppliers(search?: string, includeInactive = false): Supplier[] {
+    const { sql, params } = this.buildSuppliersQuery(search, includeInactive);
+    return this.db.query<Supplier>(sql, params)
+      .map((row) => unscaleMoneyRow(row, SUPPLIER_MONEY_FIELDS));
+  }
+
+  private async fetchSuppliersAsync(search?: string, includeInactive = false): Promise<Supplier[]> {
+    const { sql, params } = this.buildSuppliersQuery(search, includeInactive);
+    const rows = await this.db.queryAsync<Supplier>(sql, params);
+    return rows.map((row) => unscaleMoneyRow(row, SUPPLIER_MONEY_FIELDS));
   }
 
   public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }): Supplier {
@@ -80,7 +111,7 @@ export class SupplierService {
         INSERT INTO suppliers (
           id, code, name, company_name, phone, email, tax_number, commercial_record,
           address, current_balance, total_purchases, payment_terms_days, notes, company_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 0, ?, ?, ?)
       `, [
         id, code, supplier.name, supplier.companyName || null, supplier.phone,
         supplier.email || null, supplier.taxNumber || null, supplier.commercialRecord || null,
@@ -160,18 +191,45 @@ export class SupplierService {
     notes = '',
     idempotencyKey?: string,
     paymentDate?: string,
-    invoiceId?: string
+    invoiceId?: string,
+    options: { approvalId?: string } = {}
   ): SupplierPayment {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.suppliers.suppliers.payment');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
 
+    // ── Approval gate: دفعة المورد حسب الحد المالي في سياسة الموافقات ──
+    const gate = new OperationApprovalGate(this.db);
+    const { policy: paymentPolicy, required: approvalRequired } = gate.evaluate('purchases.supplier.payment', amount);
+    const paymentMatchDetails = { supplierId, amount, invoiceId: invoiceId ?? null };
+    let resolvedApprovalId: string | null = null;
+    if (approvalRequired) {
+      resolvedApprovalId = options.approvalId
+        ?? gate.findApproved('purchases.supplier.payment', 'SUPPLIER_PAYMENT', paymentMatchDetails);
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'purchases.supplier.payment', paymentMatchDetails);
+      }
+      if (!resolvedApprovalId) {
+        const supName = this.readSupplier(supplierId)?.name ?? supplierId;
+        const approvalId = gate.requestApproval({
+          operationCode: 'purchases.supplier.payment',
+          requestType: 'SUPPLIER_PAYMENT',
+          title: `دفعة مورد ${supName} — ${amount} ج`,
+          description: notes || undefined,
+          branchId,
+          requestedValue: amount,
+          details: { ...paymentMatchDetails, paymentType, registerId, notes, dedupeKey: `suppay:${supplierId}:${amount}:${invoiceId ?? ''}`, policy: paymentPolicy },
+        });
+        gate.throwRequested(approvalId);
+      }
+    }
+
     const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
     if (invoiceId) {
       const invoice = this.db.query<{ supplierId: string; remainingAmount: number; branchId: string | null }>(`
-        SELECT pi.supplier_id AS supplierId, pi.remaining_amount AS remainingAmount,
+        SELECT pi.supplier_id AS supplierId, pi.remaining_amount / 100.0 AS remainingAmount,
           COALESCE(pi.branch_id, w.branch_id) AS branchId
         FROM purchase_invoices pi JOIN warehouses w ON w.id = pi.warehouse_id
         WHERE pi.id = ?
@@ -193,7 +251,8 @@ export class SupplierService {
 
     return this.db.executeFinancialTransaction((sqliteDb) => {
       if (idempotencyKey) {
-        const prior = sqliteDb.query<any>(`SELECT * FROM supplier_payments WHERE idempotency_key = ?`, [idempotencyKey])[0];
+        const prior = sqliteDb.query<any>(`SELECT * FROM supplier_payments WHERE idempotency_key = ?`, [idempotencyKey])
+          .map((row) => unscaleMoneyRow(row, SUPPLIER_PAYMENT_MONEY_FIELDS))[0];
         if (prior) {
           if (prior.supplierId !== supplierId || Number(prior.amount) !== amount ||
             prior.paymentType !== paymentType || (prior.registerId || 'cr_main') !== registerId ||
@@ -203,42 +262,49 @@ export class SupplierService {
           return prior as SupplierPayment;
         }
       }
+      // بُعدا المبلغ والنطاق داخل المعاملة — استهلاك اعتماد المبلغ ذرّي
+      // مع قيد السداد (فوق بوابة OperationApprovalGate القائمة).
+      PermissionService.require(actor, 'ui.suppliers.suppliers.payment', undefined, {
+        branchId,
+        amount,
+        operation: 'ui.suppliers.suppliers.payment',
+      });
       const receiptNumber = sqliteDb.nextNumber('PAY');
       // 1. Insert Payment Receipt
       sqliteDb.run(`
         INSERT INTO supplier_payments (
           id, receipt_number, supplier_id, amount, idempotency_key, payment_type, date, register_id, branch_id, notes, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)
       `, [paymentId, receiptNumber, supplierId, amount, idempotencyKey || null, paymentType, today, registerId, branchId, notes, actor.id]);
 
       let unapplied = amount;
       const invoices = sqliteDb.query<any>(`
-        SELECT id,paid_amount,remaining_amount FROM purchase_invoices
-        WHERE supplier_id=? AND branch_id=? AND remaining_amount>0.009
+        SELECT id,paid_amount / 100.0 AS paid_amount,remaining_amount / 100.0 AS remaining_amount FROM purchase_invoices
+        WHERE supplier_id=? AND branch_id=? AND remaining_amount>1
         ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, date, created_at, id
       `, [supplierId, branchId, invoiceId || '']);
       for (const invoice of invoices) {
         if (unapplied <= 0.009) break;
         const allocated = Math.round(Math.min(unapplied, Number(invoice.remainingAmount)) * 100) / 100;
         if (allocated <= 0) continue;
-        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
           [`spa_${uuidv4().substring(0, 8)}`, paymentId, invoice.id, allocated]);
         const paid = Math.round((Number(invoice.paidAmount) + allocated) * 100) / 100;
         const remaining = Math.max(0, Math.round((Number(invoice.remainingAmount) - allocated) * 100) / 100);
-        sqliteDb.run(`UPDATE purchase_invoices SET paid_amount=?,remaining_amount=?,payment_status=? WHERE id=?`,
+        sqliteDb.run(`UPDATE purchase_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=? WHERE id=?`,
           [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
         unapplied = Math.round((unapplied - allocated) * 100) / 100;
       }
 
       // 2. Reduce supplier balance
       sqliteDb.run(`
-        UPDATE suppliers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE suppliers SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?
       `, [amount, supplierId]);
 
       // 3. Deduct from Cash register if cash
       if (paymentType === 'CASH') {
         sqliteDb.run(`
-          UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
+          UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?
         `, [amount, registerId]);
       }
       postLedgerEntry(sqliteDb.getDatabase(), {
@@ -265,6 +331,10 @@ export class SupplierService {
         paymentId,
         JSON.stringify({ supplierId, receiptNumber, amount, paymentType, registerId }),
       ]);
+
+      if (resolvedApprovalId) {
+        gate.consume(resolvedApprovalId, 'SUPPLIER_PAYMENT', paymentId, sqliteDb);
+      }
 
       return {
         id: paymentId,
@@ -300,22 +370,22 @@ export class SupplierService {
     const claimScope = this.branchAccess.supplierClaimBranchScope('supplier_claims');
 
     const purchases = this.db.query<any>(`
-      SELECT pi.id, pi.date, pi.invoice_number as docNumber, pi.total_amount as credit,
-        pi.paid_amount, pi.created_at
+      SELECT pi.id, pi.date, pi.invoice_number as docNumber, pi.total_amount / 100.0 as credit,
+        pi.paid_amount / 100.0 AS paid_amount, pi.created_at
       FROM purchase_invoices pi
       WHERE pi.supplier_id = ? AND (? = '' OR pi.date >= ?) AND (? = '' OR pi.date <= ?)
         AND ${invoiceScope.clause}
     `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...invoiceScope.params]);
 
     const payments = this.db.query<any>(`
-      SELECT sp.id, sp.date, sp.receipt_number as docNumber, sp.amount as debit, sp.created_at, sp.notes
+      SELECT sp.id, sp.date, sp.receipt_number as docNumber, sp.amount / 100.0 as debit, sp.created_at, sp.notes
       FROM supplier_payments sp
       WHERE sp.supplier_id = ? AND (? = '' OR sp.date >= ?) AND (? = '' OR sp.date <= ?)
         AND ${paymentScope.clause}
     `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...paymentScope.params]);
 
     const returns = this.db.query<any>(`
-      SELECT pr.id, pr.date, pr.return_number as docNumber, pr.total_amount as debit, pr.created_at, pr.reason
+      SELECT pr.id, pr.date, pr.return_number as docNumber, pr.total_amount / 100.0 as debit, pr.created_at, pr.reason
       FROM purchase_returns pr
       LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
       LEFT JOIN warehouses w ON w.id = pr.warehouse_id
@@ -324,7 +394,7 @@ export class SupplierService {
     `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...returnScope.params]);
 
     const claims = this.db.query<any>(`
-      SELECT id, date, claim_number as docNumber, agreed_amount as debit, created_at, notes
+      SELECT id, date, claim_number as docNumber, agreed_amount / 100.0 as debit, created_at, notes
       FROM supplier_claims
       WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE'
         AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
@@ -333,13 +403,13 @@ export class SupplierService {
 
     const totals = this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
       SELECT
-        COALESCE((SELECT SUM(pi.total_amount) FROM purchase_invoices pi WHERE pi.supplier_id = ? AND ${invoiceScope.clause}), 0) AS purchases,
-        COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id = ? AND ${paymentScope.clause}), 0) AS payments,
+        COALESCE((SELECT SUM(pi.total_amount) / 100.0 FROM purchase_invoices pi WHERE pi.supplier_id = ? AND ${invoiceScope.clause}), 0) AS purchases,
+        COALESCE((SELECT SUM(sp.amount) / 100.0 FROM supplier_payments sp WHERE sp.supplier_id = ? AND ${paymentScope.clause}), 0) AS payments,
         COALESCE((SELECT SUM(pr.total_amount) FROM purchase_returns pr
           LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
           LEFT JOIN warehouses w ON w.id = pr.warehouse_id
-          WHERE pr.supplier_id = ? AND ${returnScope.clause}), 0) AS returns,
-        COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND ${claimScope.clause}), 0) AS claims
+          WHERE pr.supplier_id = ? AND ${returnScope.clause}), 0) / 100.0 AS returns,
+        COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND ${claimScope.clause}), 0) / 100.0 AS claims
     `, [
       supplierId, ...invoiceScope.params,
       supplierId, ...paymentScope.params,
@@ -350,13 +420,13 @@ export class SupplierService {
     const beforeRange = fromDate
       ? this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
         SELECT
-          COALESCE((SELECT SUM(pi.total_amount) FROM purchase_invoices pi WHERE pi.supplier_id = ? AND pi.date < ? AND ${invoiceScope.clause}), 0) AS purchases,
-          COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id = ? AND sp.date < ? AND ${paymentScope.clause}), 0) AS payments,
+          COALESCE((SELECT SUM(pi.total_amount) / 100.0 FROM purchase_invoices pi WHERE pi.supplier_id = ? AND pi.date < ? AND ${invoiceScope.clause}), 0) AS purchases,
+          COALESCE((SELECT SUM(sp.amount) / 100.0 FROM supplier_payments sp WHERE sp.supplier_id = ? AND sp.date < ? AND ${paymentScope.clause}), 0) AS payments,
           COALESCE((SELECT SUM(pr.total_amount) FROM purchase_returns pr
             LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
             LEFT JOIN warehouses w ON w.id = pr.warehouse_id
-            WHERE pr.supplier_id = ? AND pr.date < ? AND ${returnScope.clause}), 0) AS returns,
-          COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND date < ? AND ${claimScope.clause}), 0) AS claims
+            WHERE pr.supplier_id = ? AND pr.date < ? AND ${returnScope.clause}), 0) / 100.0 AS returns,
+          COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND date < ? AND ${claimScope.clause}), 0) / 100.0 AS claims
       `, [
         supplierId, fromDate, ...invoiceScope.params,
         supplierId, fromDate, ...paymentScope.params,
@@ -445,8 +515,8 @@ export class SupplierService {
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
     );
     const invoices = this.db.query<any>(`
-      SELECT pi.id, pi.invoice_number, pi.supplier_invoice_number, pi.date, pi.total_amount,
-             pi.paid_amount, pi.remaining_amount, pi.payment_status
+      SELECT pi.id, pi.invoice_number, pi.supplier_invoice_number, pi.date, pi.total_amount / 100.0,
+             pi.paid_amount / 100.0 AS paid_amount, pi.remaining_amount / 100.0 AS remaining_amount, pi.payment_status
       FROM purchase_invoices pi
       WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
       ORDER BY pi.date DESC, pi.created_at DESC
@@ -454,7 +524,7 @@ export class SupplierService {
 
     return invoices.map(inv => {
       const allocations = this.db.query<any>(`
-        SELECT a.id, a.amount, sp.receipt_number AS receiptNumber, sp.date AS paymentDate, sp.payment_type AS paymentType
+        SELECT a.id, a.amount / 100.0 AS amount, sp.receipt_number AS receiptNumber, sp.date AS paymentDate, sp.payment_type AS paymentType
         FROM supplier_payment_allocations a
         JOIN supplier_payments sp ON sp.id = a.payment_id
         WHERE a.purchase_invoice_id = ?
@@ -475,7 +545,7 @@ export class SupplierService {
       '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',
     );
     const payments = this.db.query<any>(`
-      SELECT sp.id, sp.receipt_number, sp.date, sp.amount, sp.payment_type, sp.notes
+      SELECT sp.id, sp.receipt_number, sp.date, sp.amount / 100.0 AS amount, sp.payment_type, sp.notes
       FROM supplier_payments sp
       WHERE sp.supplier_id = ? AND ${paymentScope.clause}
       ORDER BY sp.date DESC, sp.created_at DESC
@@ -483,8 +553,8 @@ export class SupplierService {
 
     return payments.map(pay => {
       const allocations = this.db.query<any>(`
-        SELECT a.id, a.purchase_invoice_id AS purchaseInvoiceId, a.amount,
-          pi.invoice_number AS invoiceNumber, pi.date AS invoiceDate, pi.total_amount AS invoiceTotal
+        SELECT a.id, a.purchase_invoice_id AS purchaseInvoiceId, a.amount / 100.0 AS amount,
+          pi.invoice_number AS invoiceNumber, pi.date AS invoiceDate, pi.total_amount / 100.0 AS invoiceTotal
         FROM supplier_payment_allocations a
         JOIN purchase_invoices pi ON pi.id = a.purchase_invoice_id
         WHERE a.payment_id = ?
@@ -531,10 +601,10 @@ export class SupplierService {
       if (!payment.effectiveBranchId) throw new Error('سند الصرف غير مرتبط بفرع.');
       this.branchAccess.requireBranchAccess(payment.effectiveBranchId, actor);
 
-      const paymentCents = Math.round(Number(payment.amount) * 100);
+      const paymentCents = Math.round(Number(payment.amount));
       const requestedCents = [...requested.values()].reduce((sum, amount) => sum + amount, 0);
       if (!Number.isFinite(paymentCents) || paymentCents <= 0 || requestedCents > paymentCents) {
-        throw new Error(`مجموع التوزيعات (${(requestedCents / 100).toFixed(2)} ج) يتجاوز قيمة السند (${payment.amount} ج).`);
+        throw new Error(`مجموع التوزيعات (${(requestedCents / 100).toFixed(2)} ج) يتجاوز قيمة السند (${(paymentCents/100).toFixed(2)} ج).`);
       }
 
       const oldAllocations = db.query<any>(`
@@ -545,7 +615,7 @@ export class SupplierService {
       const priorByInvoice = new Map<string, number>();
       for (const old of oldAllocations) {
         const invoiceId = String(old.purchaseInvoiceId);
-        const amountCents = Math.round(Number(old.amount) * 100);
+        const amountCents = Math.round(Number(old.amount));
         if (!invoiceId || !Number.isFinite(amountCents) || amountCents < 0) {
           throw new Error('تخصيص سابق غير صالح على سند الصرف.');
         }
@@ -555,8 +625,8 @@ export class SupplierService {
       const invoiceStates = new Map<string, { paidCents: number; totalCents: number }>();
       for (const invoiceId of new Set([...priorByInvoice.keys(), ...requested.keys()])) {
         const invoice = db.query<any>(`
-          SELECT pi.id, pi.supplier_id AS supplierId, pi.paid_amount AS paidAmount,
-            pi.total_amount AS totalAmount, COALESCE(pi.branch_id, w.branch_id) AS effectiveBranchId
+          SELECT pi.id, pi.supplier_id AS supplierId, pi.paid_amount / 100.0 AS paidAmount,
+            pi.total_amount / 100.0 AS totalAmount, COALESCE(pi.branch_id, w.branch_id) AS effectiveBranchId
           FROM purchase_invoices pi
           LEFT JOIN warehouses w ON w.id = pi.warehouse_id
           WHERE pi.id = ?
@@ -591,7 +661,7 @@ export class SupplierService {
         const remainingAmount = remainingCents / 100;
         db.run(`
           UPDATE purchase_invoices
-          SET paid_amount = ?, remaining_amount = ?,
+          SET paid_amount = ROUND(?*100), remaining_amount = ROUND(?*100),
               payment_status = CASE WHEN ? <= 1 THEN 'PAID' ELSE 'PARTIAL' END
           WHERE id = ?
         `, [paidAmount, remainingAmount, remainingCents, invoiceId]);
@@ -600,7 +670,7 @@ export class SupplierService {
       for (const [invoiceId, amountCents] of requested) {
         db.run(`
           INSERT INTO supplier_payment_allocations (id, payment_id, purchase_invoice_id, amount)
-          VALUES (?, ?, ?, ?)
+          VALUES (?, ?, ?, ROUND(?*100))
         `, [`spa_${uuidv4().substring(0, 8)}`, paymentId, invoiceId, amountCents / 100]);
       }
     });

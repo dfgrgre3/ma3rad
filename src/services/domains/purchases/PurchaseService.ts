@@ -14,6 +14,17 @@ import { SettingsService } from '../config/SettingsService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 import { isServiceProduct } from '../../../utils/products/productUnits';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const PURCHASE_INVOICE_MONEY_FIELDS = [
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'total_amount',
+  'paid_amount', 'remaining_amount', 'landed_freight', 'landed_loading',
+  'landed_customs_taxes', 'landed_insurance', 'landed_other',
+  'price_variance_amount', 'qty_variance_amount',
+] as const;
+const PURCHASE_ITEM_MONEY_FIELDS = [
+  'unit_cost', 'total_cost', 'landed_cost_share', 'effective_unit_cost', 'ordered_unit_cost',
+] as const;
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -59,9 +70,19 @@ export class PurchaseService {
     return this.fetchPurchases(search);
   }
 
+  public async getAllPurchasesAsync(search?: string): Promise<PurchaseInvoice[]> {
+    this.requirePurchasesView();
+    return this.fetchPurchasesAsync(search);
+  }
+
   public getPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
     this.requirePurchasesView();
     return this.readPurchaseById(id);
+  }
+
+  public async getPurchaseByIdAsync(id: string): Promise<(PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null> {
+    this.requirePurchasesView();
+    return this.readPurchaseByIdAsync(id);
   }
 
   private requirePurchasesView(): void {
@@ -69,7 +90,7 @@ export class PurchaseService {
     PermissionService.require(actor, 'ui.purchases.invoices.view');
   }
 
-  private fetchPurchases(search?: string): PurchaseInvoice[] {
+  private buildPurchasesQuery(search?: string): { sql: string; params: any[] } {
     AuthService.requireAuth();
     const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
     const companyScope = this.branchAccess.companyScope('pi.company_id');
@@ -90,27 +111,36 @@ export class PurchaseService {
     }
 
     sql += ` ORDER BY pi.created_at DESC`;
-    return this.db.query<PurchaseInvoice>(sql, params);
+    return { sql, params };
   }
 
-  /** Internal read used by mutations; public reads additionally require `purchases.view`. */
-  private readPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+  private fetchPurchases(search?: string): PurchaseInvoice[] {
+    const { sql, params } = this.buildPurchasesQuery(search);
+    return this.db.query<PurchaseInvoice>(sql, params)
+      .map((row) => unscaleMoneyRow(row, PURCHASE_INVOICE_MONEY_FIELDS));
+  }
+
+  private async fetchPurchasesAsync(search?: string): Promise<PurchaseInvoice[]> {
+    const { sql, params } = this.buildPurchasesQuery(search);
+    const rows = await this.db.queryAsync<PurchaseInvoice>(sql, params);
+    return rows.map((row) => unscaleMoneyRow(row, PURCHASE_INVOICE_MONEY_FIELDS));
+  }
+
+  private buildPurchaseByIdQueries(id: string): { invoiceSql: string; invoiceParams: any[]; itemsSql: string; itemsParams: any[] } {
     AuthService.requireAuth();
     const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
     const companyScope = this.branchAccess.companyScope('pi.company_id');
-    const rows = this.db.query<PurchaseInvoice>(`
+    return {
+      invoiceSql: `
       SELECT pi.*, s.name as supplierName, s.phone as supplierPhone, w.name as warehouseName, u.full_name as createdByName
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
       JOIN warehouses w ON pi.warehouse_id = w.id
       LEFT JOIN users u ON pi.created_by = u.id
       WHERE pi.id = ? AND ${scope.clause} AND ${companyScope.clause}
-    `, [id, ...scope.params, ...companyScope.params]);
-
-    if (rows.length === 0) return null;
-    const inv = rows[0];
-
-    const items = this.db.query<PurchaseInvoiceItem>(`
+    `,
+      invoiceParams: [id, ...scope.params, ...companyScope.params],
+      itemsSql: `
       SELECT pii.*, pii.quantity_m2 AS quantityM2, pii.unit_cost AS unitCost,
              pii.landed_cost_share AS landedCostShare, pii.total_cost AS totalCost,
              pii.effective_unit_cost AS effectiveUnitCost, p.name AS productName,
@@ -118,12 +148,33 @@ export class PurchaseService {
       FROM purchase_invoice_items pii
       LEFT JOIN products p ON p.id = pii.product_id
       WHERE pii.purchase_id = ?
-    `, [id]);
-
-    return {
-      ...inv,
-      items
+    `,
+      itemsParams: [id],
     };
+  }
+
+  private mapPurchaseById(invoiceRows: PurchaseInvoice[], itemsRows: PurchaseInvoiceItem[]): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+    if (invoiceRows.length === 0) return null;
+    const inv = unscaleMoneyRow(invoiceRows[0], PURCHASE_INVOICE_MONEY_FIELDS);
+    const items = itemsRows.map((row) => unscaleMoneyRow(row, PURCHASE_ITEM_MONEY_FIELDS));
+    return { ...inv, items };
+  }
+
+  /** Internal read used by mutations; public reads additionally require `purchases.view`. */
+  private readPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+    const { invoiceSql, invoiceParams, itemsSql, itemsParams } = this.buildPurchaseByIdQueries(id);
+    const rows = this.db.query<PurchaseInvoice>(invoiceSql, invoiceParams);
+    const items = this.db.query<PurchaseInvoiceItem>(itemsSql, itemsParams);
+    return this.mapPurchaseById(rows, items);
+  }
+
+  private async readPurchaseByIdAsync(id: string): Promise<(PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null> {
+    const { invoiceSql, invoiceParams, itemsSql, itemsParams } = this.buildPurchaseByIdQueries(id);
+    const [rows, items] = await Promise.all([
+      this.db.queryAsync<PurchaseInvoice>(invoiceSql, invoiceParams),
+      this.db.queryAsync<PurchaseInvoiceItem>(itemsSql, itemsParams),
+    ]);
+    return this.mapPurchaseById(rows, items);
   }
 
   private preparePurchaseItems(sqliteDb: any, purchaseId: string, items: CreatePurchaseDTO['items']): { subtotal: number; preparedItems: any[] } {
@@ -232,7 +283,7 @@ export class PurchaseService {
           id, purchase_id, product_id, product_name, grade, quantity_m2, boxes_count,
           unit_cost, total_cost, meters_per_box, pieces_per_box,
           landed_cost_share, effective_unit_cost, ordered_unit_cost, grn_accepted_qty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?)
       `, [
         item.id, item.purchaseId, item.productId, item.productName, item.grade,
         item.quantityM2, item.boxesCount, item.unitCost, item.totalCost,
@@ -244,7 +295,7 @@ export class PurchaseService {
       if (!trackInventory) {
         // No stock ledger for this business: keep the last purchase cost on the
         // product as an expense reference, but never create stock or cost layers.
-        sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [round2(item.effectiveUnitCost), item.productId]);
+        sqliteDb.run(`UPDATE products SET cost_price = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [round2(item.effectiveUnitCost), item.productId]);
         continue;
       }
       if (!alreadyReceivedInGrn) {
@@ -270,7 +321,7 @@ export class PurchaseService {
       }
 
       const prevQty = stockRow ? Number(stockRow.quantityM2) : 0;
-      const prevCost = Number(sqliteDb.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
+      const prevCost = Number(sqliteDb.query(`SELECT cost_price / 100.0 AS cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
       const grnQuantityAlreadyInStock = alreadyReceivedInGrn ? Math.min(prevQty, item.grnAcceptedQty) : 0;
       const newCost = method === 'FIFO'
         ? round2(item.effectiveUnitCost)
@@ -280,7 +331,7 @@ export class PurchaseService {
           alreadyReceivedInGrn ? item.grnAcceptedQty : item.quantityM2,
           item.effectiveUnitCost
         );
-      sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
+      sqliteDb.run(`UPDATE products SET cost_price = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
 
       if (!alreadyReceivedInGrn) {
         const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
@@ -289,7 +340,7 @@ export class PurchaseService {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
             reference_id, notes, performed_by
-          ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
+          ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'PURCHASE', ?, ?, ?)
         `, [
           inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
           item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.effectiveUnitCost,
@@ -345,8 +396,8 @@ export class PurchaseService {
         unitCost: number;
         originalUnitCost: number | null;
       }>(`
-        SELECT id, quantity_received AS quantityReceived, unit_cost AS unitCost,
-               original_unit_cost AS originalUnitCost
+        SELECT id, quantity_received AS quantityReceived, unit_cost / 100.0 AS unitCost,
+               original_unit_cost / 100.0 AS originalUnitCost
         FROM inventory_cost_layers
         WHERE goods_receipt_id = ? AND product_id = ? AND warehouse_id = ?
           AND purchase_invoice_id IS NULL
@@ -378,8 +429,8 @@ export class PurchaseService {
         db.run(`
           UPDATE inventory_cost_layers
           SET source_type = 'PURCHASE', source_id = ?, purchase_invoice_id = ?,
-              original_unit_cost = COALESCE(original_unit_cost, ?),
-              unit_cost = ?, landed_cost_share = ?, cost_updated_at = CURRENT_TIMESTAMP
+              original_unit_cost = COALESCE(original_unit_cost, ROUND(?*100)),
+              unit_cost = ROUND(?*100), landed_cost_share = ROUND(?*100), cost_updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `, [
           purchaseId, purchaseId, layer.originalUnitCost,
@@ -445,6 +496,14 @@ export class PurchaseService {
       const remainingAmount = round2(Math.max(0, totalAmount - dto.paidAmount));
       const paymentStatus: PaymentStatus = remainingAmount <= 0 ? 'PAID' : (dto.paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
 
+      // بُعدا المبلغ والنطاق على إجمالي فاتورة الشراء الفعلي.
+      PermissionService.require(actor, 'ui.purchases.invoices.create', undefined, {
+        branchId,
+        warehouseId: dto.warehouseId,
+        amount: totalAmount,
+        operation: 'ui.purchases.invoices.create',
+      });
+
       sqliteDb.run(`
         INSERT INTO purchase_invoices (
           id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id, branch_id, company_id,
@@ -453,7 +512,7 @@ export class PurchaseService {
           grn_id, purchase_order_id, landed_freight, landed_loading, landed_customs_taxes,
           landed_insurance, landed_other, landed_allocation_method, is_no_number_supplier,
           matching_status, price_variance_amount, qty_variance_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ROUND(?*100), ROUND(?*100))
       `, [
         purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId, branchId, companyId,
         subtotal, discountAmount, taxAmount, shippingCost, totalAmount,
@@ -472,15 +531,15 @@ export class PurchaseService {
 
       sqliteDb.run(`
         UPDATE suppliers SET
-          total_purchases = total_purchases + ?,
-          current_balance = current_balance + ?,
+          total_purchases = total_purchases + ROUND(?*100),
+          current_balance = current_balance + ROUND(?*100),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [totalAmount, remainingAmount, dto.supplierId]);
 
       if (dto.paidAmount > 0 && dto.paymentType === 'CASH') {
         sqliteDb.run(`
-          UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
+          UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?
         `, [dto.paidAmount, branchRegisterId]);
       }
 
@@ -489,7 +548,7 @@ export class PurchaseService {
         const receiptNumber = sqliteDb.nextNumber('PAY');
         sqliteDb.run(`
           INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?)
         `, [
           paymentId,
           receiptNumber,
@@ -502,7 +561,7 @@ export class PurchaseService {
           `دفعة مع فاتورة توريد ${invoiceNumber}`,
           performedBy,
         ]);
-        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
           [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, dto.paidAmount]);
         postLedgerEntry(sqliteDb.getDatabase(), {
           date: today,
@@ -607,7 +666,7 @@ export class PurchaseService {
         const prior = db.query<any>(
           `SELECT * FROM supplier_payments WHERE idempotency_key = ?`,
           [idempotencyKey]
-        )[0];
+        ).map((row) => unscaleMoneyRow(row, ['amount']))[0];
         if (prior) {
           const alloc = db.query<{ purchaseInvoiceId: string }>(
             `SELECT purchase_invoice_id AS purchaseInvoiceId FROM supplier_payment_allocations WHERE payment_id = ?`,
@@ -619,6 +678,13 @@ export class PurchaseService {
           return { id: prior.id, receiptNumber: prior.receiptNumber, amount: prior.amount };
         }
       }
+      // بُعدا المبلغ والنطاق داخل المعاملة — استهلاك اعتماد المبلغ ذرّي
+      // مع قيد سند الصرف.
+      PermissionService.require(actor, 'ui.suppliers.supplier_detail.payment', undefined, {
+        branchId,
+        amount: value,
+        operation: 'ui.suppliers.supplier_detail.payment',
+      });
       const receiptNumber = db.nextNumber('PAY');
       const newPaid = round2(invoice.paidAmount + value);
       const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
@@ -626,21 +692,21 @@ export class PurchaseService {
 
       db.run(
         `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`,
         [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, branchId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id, idempotencyKey || null]
       );
-      db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+      db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
         [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, value]);
       db.run(
-        `UPDATE purchase_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ? WHERE id = ?`,
+        `UPDATE purchase_invoices SET paid_amount = ROUND(?*100), remaining_amount = ROUND(?*100), payment_status = ? WHERE id = ?`,
         [newPaid, newRemaining, status, purchaseId]
       );
       db.run(
-        `UPDATE suppliers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE suppliers SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [value, invoice.supplierId]
       );
       if (paymentType === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [value, registerId]);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?`, [value, registerId]);
       }
       postLedgerEntry(db.getDatabase(), {
         date: today,
@@ -685,8 +751,8 @@ export class PurchaseService {
       }
       db.run(
         `UPDATE suppliers SET
-           current_balance = current_balance - ?,
-           total_purchases = total_purchases - ?,
+           current_balance = current_balance - ROUND(?*100),
+           total_purchases = total_purchases - ROUND(?*100),
            updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         [invoice.remainingAmount, invoice.totalAmount, invoice.supplierId]
@@ -776,7 +842,7 @@ export class PurchaseService {
            id, transaction_number, type, product_id, warehouse_id,
            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
            reference_id, notes, performed_by
-         ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'PURCHASE_DELETE', ?, ?, ?)`,
+         ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'PURCHASE_DELETE', ?, ?, ?)`,
         [
           `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-VOID'),
           item.productId, invoice.warehouseId, -item.quantityM2, item.boxesCount,
@@ -794,7 +860,7 @@ export class PurchaseService {
     actor: ReturnType<typeof AuthService.requireAuth>
   ): void {
     const relatedPayments = db.query<any>(
-      `SELECT id, amount, payment_type, register_id FROM supplier_payments
+      `SELECT id, amount / 100.0 AS amount, payment_type, register_id FROM supplier_payments
        WHERE supplier_id = ? AND branch_id = ? AND notes LIKE ?`,
       [invoice.supplierId, invoiceBranchId, `%${invoice.invoiceNumber}%`]
     );
@@ -811,13 +877,13 @@ export class PurchaseService {
         ],
       });
       if (payment.payment_type === 'CASH' && payment.register_id) {
-        db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [payment.amount, payment.register_id]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [payment.amount, payment.register_id]);
       }
       db.run('DELETE FROM supplier_payments WHERE id = ?', [payment.id]);
     }
     if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
       const registerId = this.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
-      db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [invoice.paidAmount, registerId]);
+      db.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?`, [invoice.paidAmount, registerId]);
     }
   }
 

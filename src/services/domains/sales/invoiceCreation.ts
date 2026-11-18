@@ -27,6 +27,10 @@ import { evaluateManualDiscountPolicy } from './discountPolicy';
 import { AppConfigService } from '../config/AppConfigService';
 import { basePriceFromUnitPrice } from '../../../utils/products/uom';
 import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const PRODUCT_PRICE_MONEY_FIELDS = ['cost_price','costPrice','selling_price_m2','sellingPriceM2','selling_price_box','sellingPriceBox','wholesale_price_m2','wholesalePriceM2','min_selling_price_m2','minSellingPriceM2'] as const;
 
 type PreparedSaleItem = {
   id: string;
@@ -143,7 +147,7 @@ function validateProductPricing(sqliteDb: { query: <T = any>(sql: string, params
   if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) throw new Error('سعر بيع الصنف غير صحيح.');
   if (item.pricingSource === 'ORDER') {
     const agreed = dto.orderId && item.orderItemId ? sqliteDb.query<any>(
-      `SELECT oi.quantity_m2 AS quantityM2, oi.unit_price AS unitPrice, oi.discount_amount AS discountAmount
+      `SELECT oi.quantity_m2 AS quantityM2, oi.unit_price / 100.0 AS unitPrice, oi.discount_amount / 100.0 AS discountAmount
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
        WHERE o.id = ? AND o.customer_id = ? AND oi.id = ? AND oi.product_id = ?`,
       [dto.orderId, dto.customerId, item.orderItemId, item.productId]
@@ -155,7 +159,7 @@ function validateProductPricing(sqliteDb: { query: <T = any>(sql: string, params
     }
   } else if (item.pricingSource === 'QUOTATION') {
     const agreed = dto.quotationId && item.quotationItemId ? sqliteDb.query<any>(
-      `SELECT qi.quantity_m2 AS quantityM2, qi.unit_price AS unitPrice, qi.discount_amount AS discountAmount
+      `SELECT qi.quantity_m2 AS quantityM2, qi.unit_price / 100.0 AS unitPrice, qi.discount_amount / 100.0 AS discountAmount
        FROM quotation_items qi JOIN quotations q ON q.id = qi.quotation_id
        WHERE q.id = ? AND q.customer_id = ? AND q.status = 'PENDING' AND qi.id = ? AND qi.product_id = ?`,
       [dto.quotationId, dto.customerId, item.quotationItemId, item.productId]
@@ -179,9 +183,8 @@ function validateProductPricing(sqliteDb: { query: <T = any>(sql: string, params
   if (!hasValidatedAgreedPrice && round2(baseUnitPrice) !== approvedPolicyPrice && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
-  if (round2(baseUnitPrice) < (product.minSellingPriceM2 || 0)) {
-    PermissionService.require(actor, 'ui.sales.invoices.approve');
-  }
+  // البيع تحت الحد الأدنى لا يُمنع هنا؛ الفاتورة تُقيَّم ككل في
+  // validateBelowCostPricing حيث يُطلب اعتماد PRICE_OVERRIDE عند الحاجة.
 }
 
 function getAvailableStockM2(sqliteDb: any, productId: string, warehouseId: string): number {
@@ -262,7 +265,7 @@ function buildPreparedItem(
   allowNegativeStock: boolean,
   plannedSpecialStock: Map<string, number>
 ): PreparedSaleItem {
-  const product = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
+  const product = unscaleMoneyRow(sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any, PRODUCT_PRICE_MONEY_FIELDS) as any;
   if (!product) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
 
   const units = resolveSaleUnits(item, product);
@@ -278,7 +281,7 @@ function buildPreparedItem(
     specialStock = sqliteDb.query(`
       SELECT id, special_number AS specialNumber, product_id AS productId,
         warehouse_id AS warehouseId, status, remaining_quantity_m2 AS remainingQuantityM2,
-        discounted_unit_price AS discountedUnitPrice, unit_cost AS unitCost
+        discounted_unit_price / 100.0 AS discountedUnitPrice, unit_cost / 100.0 AS unitCost
       FROM inventory_special_stocks WHERE id = ?
     `, [item.specialStockId])[0];
     if (!specialStock || specialStock.status !== 'DOWNGRADED_SALE'
@@ -499,7 +502,7 @@ function validateDiscountAndCredit(
   if (totals.remainingAmount <= 0) return;
 
   const customer = sqliteDb.query(
-    `SELECT name, credit_limit, current_balance FROM customers WHERE id = ?`,
+    `SELECT name, credit_limit / 100.0 AS credit_limit, current_balance / 100.0 AS current_balance FROM customers WHERE id = ?`,
     [dto.customerId]
   )[0] as { name: string; creditLimit?: number; currentBalance?: number } | undefined;
   if (!customer) throw new Error('العميل المحدد غير موجود.');
@@ -510,6 +513,86 @@ function validateDiscountAndCredit(
       `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
     );
   }
+}
+
+/**
+ * البيع تحت الحد الأدنى (min_selling_price_m2) أو تحت التكلفة يتطلب اعتماد
+ * PRICE_OVERRIDE. من يملك صلاحية ui.sales.invoices.approve يتجاوز مباشرة،
+ * وغيره يحتاج طلب اعتماد معتمد يُستهلك عند إصدار الفاتورة (مثل الخصم).
+ */
+function validateBelowCostPricing(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  actor: any,
+  preparedItems: PreparedSaleItem[],
+  invoiceId: string,
+  branchId: string
+): void {
+  if (PermissionService.can(actor, 'ui.sales.invoices.approve')) return;
+
+  // مبيعات المخزون المخفض (special stock) لها سعر معتمد مسبقاً — تُستثنى.
+  const regularItems = preparedItems.filter((item) => !item.specialStockId);
+  const costShortfall = round2(regularItems.reduce(
+    (sum, item) => sum + Math.max(0, round2(Number(item.totalCost || 0) - Number(item.totalPrice || 0))),
+    0
+  ));
+
+  const minPriceByProduct = new Map<string, number>();
+  let minShortfall = 0;
+  for (const item of regularItems) {
+    if (!minPriceByProduct.has(item.productId)) {
+      const row = sqliteDb.query(
+        `SELECT min_selling_price_m2 / 100.0 AS minPrice FROM products WHERE id = ?`, [item.productId]
+      )[0];
+      minPriceByProduct.set(item.productId, Number(row?.minPrice) || 0);
+    }
+    const minPrice = minPriceByProduct.get(item.productId) || 0;
+    if (minPrice > 0 && Number(item.unitPrice) < minPrice) {
+      minShortfall = round2(minShortfall + (minPrice - Number(item.unitPrice)) * Number(item.quantityM2 || 0));
+    }
+  }
+
+  const shortfall = round2(costShortfall + minShortfall);
+  if (shortfall <= 0) return;
+
+  const gate = new OperationApprovalGate(sqliteDb);
+  const { policy, required: policyRequired } = gate.evaluate('sales.price.override', shortfall);
+  const required = minShortfall > 0 || policyRequired;
+  if (!required) return;
+
+  const approval = (sqliteDb.query(
+    `SELECT id FROM approval_requests
+     WHERE request_type = 'PRICE_OVERRIDE' AND status = 'APPROVED'
+       AND requested_by = ?
+       AND ABS(COALESCE(requested_value, 0) - ?) <= 0.01
+       AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))
+       AND (reference_id IS NULL OR reference_id = ?)
+     ORDER BY decided_at DESC, created_at DESC LIMIT 1`,
+    [actor.id, shortfall, dto.customerId]
+  ) as { id: string }[])[0];
+  if (approval) {
+    sqliteDb.run(
+      `UPDATE approval_requests SET reference_type = 'SALES_INVOICE', reference_id = ?
+       WHERE id = ? AND request_type = 'PRICE_OVERRIDE' AND status = 'APPROVED'
+         AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))`,
+      [invoiceId, approval.id]
+    );
+    if ((sqliteDb.getDatabase() as any).getRowsModified() !== 1) {
+      throw new Error('تم استهلاك اعتماد تجاوز الحد الأدنى من عملية بيع أخرى؛ اطلب اعتماداً جديداً.');
+    }
+    return;
+  }
+
+  const approvalId = gate.requestApproval({
+    operationCode: 'sales.price.override',
+    requestType: 'PRICE_OVERRIDE',
+    title: `بيع تحت الحد الأدنى/التكلفة — عجز ${shortfall} ج`,
+    description: `إجمالي فارق السعر عن الحد الأدنى أو التكلفة في الفاتورة: ${shortfall} ج`,
+    branchId,
+    requestedValue: shortfall,
+    details: { customerId: dto.customerId, shortfall, costShortfall, minShortfall, dedupeKey: `pricex:${dto.customerId ?? ''}:${shortfall}`, policy },
+  }, sqliteDb);
+  gate.throwRequested(approvalId);
 }
 
 function validatePromotionEligibility(
@@ -574,7 +657,7 @@ function insertInvoiceItems(
         id, invoice_id, product_id, product_name, product_sku, product_grade, size,
         sold_by, quantity_m2, quantity, uom, boxes_count, pieces_count, unit_price, original_unit_price,
         unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box, special_stock_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, ?)
     `, [
       item.id, item.invoiceId, item.productId, item.productName, item.productSku, item.productGrade,
       item.size, item.soldBy, item.quantityM2, item.quantityM2, item.baseUom, item.boxesCount, item.piecesCount,
@@ -603,7 +686,7 @@ function insertInvoiceItems(
           id, transaction_number, type, product_id, warehouse_id,
           quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
           reference_id, notes, performed_by
-        ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'SPECIAL_STOCK_SALE', ?, ?, ?)
+        ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'SPECIAL_STOCK_SALE', ?, ?, ?)
       `, [
         txId, sqliteDb.nextNumber('TX-SALE'), item.productId, dto.warehouseId,
         -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
@@ -640,7 +723,7 @@ function insertInvoiceItems(
         id, transaction_number, type, product_id, warehouse_id,
         quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
         reference_id, notes, performed_by
-      ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
+      ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'INVOICE', ?, ?, ?)
     `, [
       txId, sqliteDb.nextNumber('TX-SALE'), item.productId, dto.warehouseId,
       -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
@@ -698,8 +781,8 @@ function updateCustomerAndCash(
 ): void {
   sqliteDb.run(`
     UPDATE customers SET
-      total_purchases = total_purchases + ?,
-      current_balance = current_balance + ?,
+      total_purchases = total_purchases + ROUND(?*100),
+      current_balance = current_balance + ROUND(?*100),
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `, [totals.totalAmount, totals.remainingAmount, dto.customerId]);
@@ -712,7 +795,7 @@ function updateCustomerAndCash(
   // Cash portion goes to the cash register drawer (net of changeDue).
   const cashPortion = cappedPayments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
   if (cashPortion > 0) {
-    sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [cashPortion, cashRegisterId]);
+    sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?`, [cashPortion, cashRegisterId]);
   }
   for (const payment of cappedPayments.filter((row) => row.method === 'BANK_TRANSFER')) {
     const bank = getActiveBankAccount(sqliteDb, payment.bankAccountId);
@@ -725,9 +808,9 @@ function updateCustomerAndCash(
   const cashTotal = cappedPayments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
   const cardTotal = cappedPayments.filter((p) => p.method === 'CARD').reduce((s, p) => s + p.amount, 0);
   const transferTotal = cappedPayments.filter((p) => p.method === 'BANK_TRANSFER' || p.method === 'CHEQUE').reduce((s, p) => s + p.amount, 0);
-  if (cashTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = total_sales_cash + ? WHERE id = ?`, [cashTotal, shiftId]);
-  if (cardTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_card = total_sales_card + ? WHERE id = ?`, [cardTotal, shiftId]);
-  if (transferTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_transfer = total_sales_transfer + ? WHERE id = ?`, [transferTotal, shiftId]);
+  if (cashTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = total_sales_cash + ROUND(?*100) WHERE id = ?`, [cashTotal, shiftId]);
+  if (cardTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_card = total_sales_card + ROUND(?*100) WHERE id = ?`, [cardTotal, shiftId]);
+  if (transferTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_transfer = total_sales_transfer + ROUND(?*100) WHERE id = ?`, [transferTotal, shiftId]);
 }
 
 function buildLedgerEntries(
@@ -851,8 +934,19 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       paidAmount: dto.paidAmount,
     });
 
+    // بُعد المبلغ والنطاق: permission_amount_limits على إنشاء الفاتورة
+    // تُقيَّم على الإجمالي الفعلي بعد الضريبة/الرسوم، ومخزن/فرع العملية
+    // يقيّدانها عبر users_branches + user_warehouse_grants.
+    PermissionService.require(actor, 'ui.sales.invoices.create', undefined, {
+      branchId,
+      warehouseId: dto.warehouseId,
+      amount: totals.totalAmount,
+      operation: 'ui.sales.invoices.create',
+    });
+
     validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount,
       Number(sysSettings.discountApprovalThresholdPercent ?? 10), invoiceId, branchId);
+    validateBelowCostPricing(sqliteDb, dto, actor, preparedItems, invoiceId, branchId);
 
     // Without inventory tracking there is no inventory asset to relieve, so the
     // invoice-level cost and margin stay at zero. Line costs are still stored so
@@ -875,7 +969,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
         subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
         shipping_cost, extra_fees, total_amount, paid_amount, remaining_amount, payment_type,
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ?, ROUND(? * 100), ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, 'COMPLETED', ROUND(? * 100), ROUND(? * 100), 0, ?, ?)
     `, [
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, shiftId || null,
       dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null,
@@ -934,7 +1028,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
         || (Number(promotion.usageLimit) > 0 && Number(promotion.usageCount) >= Number(promotion.usageLimit))) {
         throw new Error('العرض لم يعد صالحاً أو تجاوز حد الاستخدام؛ أُلغيت الفاتورة.');
       }
-      sqliteDb.run('INSERT INTO promotion_usage (id, promotion_id, invoice_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?)', [`pu_${uuidv4().substring(0, 8)}`, promotionId, invoiceId, couponCode || null, discountAmount]);
+      sqliteDb.run('INSERT INTO promotion_usage (id, promotion_id, invoice_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ROUND(?*100))', [`pu_${uuidv4().substring(0, 8)}`, promotionId, invoiceId, couponCode || null, discountAmount]);
       sqliteDb.run('UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)', [promotionId]);
       const currentUsage = sqliteDb.query<{ usageCount: number }>('SELECT usage_count AS usageCount FROM promotions WHERE id = ?', [promotionId])[0]?.usageCount;
       if (Number(currentUsage) !== Number(promotion.usageCount) + 1) throw new Error('تجاوز العرض حد الاستخدام بالتزامن؛ أُلغيت الفاتورة.');
@@ -943,7 +1037,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     // Persist split-payment breakdown (one row per method).
     for (const p of payments) {
       sqliteDb.run(
-        `INSERT INTO sales_invoice_payments (id, invoice_id, method, amount, reference, bank_account_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sales_invoice_payments (id, invoice_id, method, amount, reference, bank_account_id) VALUES (?, ?, ?, ROUND(?*100), ?, ?)`,
         [`sip_${uuidv4().substring(0, 8)}`, invoiceId, p.method, round2(p.amount), p.reference || null, p.bankAccountId || null]
       );
     }

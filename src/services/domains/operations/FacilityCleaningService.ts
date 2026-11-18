@@ -586,7 +586,7 @@ export class FacilityCleaningService {
               cs.reorder_quantity AS reorderQuantity, cs.location_id AS locationId,
               fl.name AS locationName, cs.branch_id AS branchId, b.name AS branchName,
               cs.supplier_id AS supplierId, s.name AS supplierName,
-              cs.unit_cost AS unitCost, cs.expiry_date AS expiryDate, cs.status,
+              cs.unit_cost / 100.0 AS unitCost, cs.expiry_date AS expiryDate, cs.status,
               cs.notes, cs.created_by AS createdBy, u.full_name AS createdByName,
               cs.created_at AS createdAt, cs.updated_at AS updatedAt
        FROM facility_cleaning_supplies cs
@@ -626,7 +626,7 @@ export class FacilityCleaningService {
          (id, supply_code, supply_name, supply_type, unit_of_measure,
           quantity_on_hand, minimum_threshold, reorder_quantity, location_id,
           branch_id, supplier_id, unit_cost, expiry_date, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
       [id, supplyCode, input.supplyName.trim(), input.supplyType,
         input.unitOfMeasure ?? 'unit', Math.max(0, Number(input.quantityOnHand || 0)),
         Math.max(0, Number(input.minimumThreshold || 0)),

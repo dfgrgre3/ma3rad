@@ -137,7 +137,7 @@ public createClaim(dto: {
         INSERT INTO supplier_claims (
           id, claim_number, date, supplier_id, branch_id, purchase_invoice_id, grn_id, purchase_order_id,
           claim_type, severity, claimed_amount, agreed_amount, status, resolution_type, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'OPEN', 'PENDING', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 0, 'OPEN', 'PENDING', ?, ?)
       `, [
         claimId, claimNumber, today, dto.supplierId, branchId, dto.purchaseInvoiceId || null,
         dto.grnId || null, dto.purchaseOrderId || null, dto.claimType, dto.severity || 'MEDIUM',
@@ -150,7 +150,7 @@ public createClaim(dto: {
           const itemTotal = round2(Number(item.quantityM2) * Number(item.unitCost));
           db.run(`
             INSERT INTO supplier_claim_items (id, claim_id, product_id, product_name, defect_type, quantity_m2, unit_cost, total_amount, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?)
           `, [
             `sclmi_${uuidv4().substring(0, 8)}`, claimId, item.productId, prod?.name || 'صنف',
             item.defectType || null, Number(item.quantityM2), Number(item.unitCost), itemTotal, item.notes || null,

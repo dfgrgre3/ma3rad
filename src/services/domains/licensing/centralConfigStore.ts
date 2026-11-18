@@ -48,3 +48,21 @@ export function getCachedUsageLimits(): Record<string, any> {
   const value = readCachedCentralConfig()?.config?.usageLimits;
   return value && typeof value === 'object' ? value : {};
 }
+
+export interface CachedPermissionLimit {
+  permissionCode: string;
+  maxAmount?: number | null;
+  costVisible?: number | null;
+  profitVisible?: number | null;
+  disabled?: number;
+}
+
+/**
+ * حدود صلاحيات المنصة الموقّعة لهذا المستأجر (tenant_permission_limits
+ * مركزيًا). المنصة تقيّد ولا توسّع — تُفرض في AuthorizationService قبل
+ * أي بُعد محلي.
+ */
+export function getCachedPermissionLimits(): CachedPermissionLimit[] {
+  const value = readCachedCentralConfig()?.config?.permissionLimits;
+  return Array.isArray(value) ? (value as CachedPermissionLimit[]) : [];
+}

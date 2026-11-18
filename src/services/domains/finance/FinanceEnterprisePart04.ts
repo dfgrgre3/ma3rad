@@ -17,7 +17,7 @@ public createBankReconciliation(input: {
 
     // Calculate current book balance from GL up to statement date
     const glRes = this.db.query<any>(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) as balance
+      SELECT COALESCE(SUM(l.debit - l.credit), 0) / 100.0 as balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date <= ?
@@ -39,7 +39,7 @@ public createBankReconciliation(input: {
           id, reconciliation_number, bank_account_id, statement_date,
           statement_balance, book_balance, unreconciled_difference,
           cleared_deposits, cleared_withdrawals, status, reconciled_by, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECONCILED', ?, ?)
+        ) VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 'RECONCILED', ?, ?)
       `, [
         recId, recNumber, input.bankAccountId, input.statementDate,
         round2(input.statementBalance), bookBalance, unreconciledDifference,
@@ -51,7 +51,7 @@ public createBankReconciliation(input: {
           INSERT INTO bank_reconciliation_lines (
             id, reconciliation_id, journal_line_id, cheque_id, transaction_date,
             reference, description, type, amount, is_cleared, cleared_date
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 1, ?)
         `, [
           `brl_${uuidv4().substring(0, 8)}`, recId, t.journalLineId || null, t.chequeId || null,
           t.date, t.reference, t.description, t.type, round2(t.amount), input.statementDate,
@@ -59,7 +59,7 @@ public createBankReconciliation(input: {
       }
 
       // Update bank account current_balance with statement balance if verified
-      tx.run('UPDATE bank_accounts SET current_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      tx.run('UPDATE bank_accounts SET current_balance = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [round2(input.statementBalance), input.bankAccountId]);
     });
 
@@ -88,11 +88,11 @@ public getBankReconciliations(bankAccountId?: string): BankReconciliation[] {
       bankAccountId: r.bankAccountId,
       bankAccountName: r.bankAccountName,
       statementDate: r.statementDate,
-      statementBalance: Number(r.statementBalance),
-      bookBalance: Number(r.bookBalance),
-      unreconciledDifference: Number(r.unreconciledDifference),
-      clearedDeposits: Number(r.clearedDeposits),
-      clearedWithdrawals: Number(r.clearedWithdrawals),
+      statementBalance: Number(r.statementBalance) / 100,
+      bookBalance: Number(r.bookBalance) / 100,
+      unreconciledDifference: Number(r.unreconciledDifference) / 100,
+      clearedDeposits: Number(r.clearedDeposits) / 100,
+      clearedWithdrawals: Number(r.clearedWithdrawals) / 100,
       status: r.status,
       reconciledBy: r.reconciledBy,
       reconciledByName: r.reconciledByName,

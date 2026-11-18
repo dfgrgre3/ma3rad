@@ -16,7 +16,7 @@ export interface PurchaseKpi {
   returnsCount: number;
 }
 
-export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
+export async function loadPurchaseKpi(from: string, to: string): Promise<PurchaseKpi> {
   const actor = AuthService.requireAuth();
   PermissionService.requireAny(actor, ['ui.reports.purchases.view', 'ui.purchases.invoices.view']);
   const db = DatabaseManager.getInstance();
@@ -32,23 +32,23 @@ export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
   const base = `pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}`;
   const params = [from, to, ...purchaseScope.params];
 
-  const summary = db.query<any>(`
+  const summary = (await db.queryAsync<any>(`
     SELECT
-      COALESCE(SUM(pi.total_amount), 0) AS total,
+      COALESCE(SUM(pi.total_amount), 0) / 100.0 AS total,
       COUNT(*) AS count,
-      COALESCE(SUM(pi.paid_amount), 0) AS paid
+      COALESCE(SUM(pi.paid_amount), 0) / 100.0 AS paid
     FROM purchase_invoices pi WHERE ${base}
-  `, params)[0] || {};
+  `, params))[0] || {};
 
-  const topSuppliers = db.query<any>(`
-    SELECT s.name, COALESCE(SUM(pi.total_amount), 0) AS total, COUNT(*) AS count
+  const topSuppliers = (await db.queryAsync<any>(`
+    SELECT s.name, COALESCE(SUM(pi.total_amount), 0) / 100.0 AS total, COUNT(*) AS count
     FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
     WHERE ${base} GROUP BY s.id ORDER BY total DESC LIMIT 8
-  `, params).map((row) => ({ name: row.name, total: Number(row.total), count: Number(row.count) }));
+  `, params)).map((row) => ({ name: row.name, total: Number(row.total), count: Number(row.count) }));
 
-  const topCategories = db.query<any>(`
+  const topCategories = (await db.queryAsync<any>(`
     SELECT COALESCE(c.name, 'غير مصنف') AS category,
-      COALESCE(SUM(pii.unit_cost * pii.quantity_m2), 0) AS total,
+      COALESCE(SUM(pii.unit_cost * pii.quantity_m2), 0) / 100.0 AS total,
       COALESCE(SUM(pii.quantity_m2), 0) AS qty,
       p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
     FROM purchase_invoices pi
@@ -56,7 +56,7 @@ export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
     JOIN products p ON p.id = pii.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE ${base} GROUP BY c.id, p.product_type, p.base_unit, p.custom_unit ORDER BY total DESC LIMIT 8
-  `, params).map((row) => ({
+  `, params)).map((row) => ({
     category: row.category,
     total: Number(row.total),
     qty: Number(row.qty),
@@ -65,14 +65,14 @@ export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
     customUnit: row.customUnit,
   }));
 
-  const returnsSummary = db.query<any>(`
-    SELECT COALESCE(SUM(pr.total_amount), 0) AS total, COUNT(*) AS count,
-      COALESCE(SUM(pr.refunded_amount), 0) AS refunded,
-      COALESCE(SUM(pr.remaining_to_balance), 0) AS credited
+  const returnsSummary = (await db.queryAsync<any>(`
+    SELECT COALESCE(SUM(pr.total_amount), 0) / 100.0 AS total, COUNT(*) AS count,
+      COALESCE(SUM(pr.refunded_amount), 0) / 100.0 AS refunded,
+      COALESCE(SUM(pr.remaining_to_balance), 0) / 100.0 AS credited
     FROM purchase_returns pr
     LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
     WHERE pr.date >= ? AND pr.date <= ? AND ${returnScope.clause}
-  `, [from, to, ...returnScope.params])[0] || {};
+  `, [from, to, ...returnScope.params]))[0] || {};
 
   const grossPurchases = Number(summary.total || 0);
   const returnsTotal = Number(returnsSummary.total || 0);
@@ -90,6 +90,6 @@ export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
   };
 }
 
-export function loadInventoryKpi(): InventoryKpi {
+export async function loadInventoryKpi(): Promise<InventoryKpi> {
   return new InventoryValuationService().getKpi('ui.reports.inventory.view');
 }

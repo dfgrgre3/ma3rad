@@ -8,7 +8,7 @@ interface PriceListsForProductProps {
 
 export const PriceListsForProduct: React.FC<PriceListsForProductProps> = ({ productId, unitLabel }) => {
   const rows = DatabaseManager.getInstance().query<{ id: string; name: string; priceM2: number; currency: string }>(
-    `SELECT pl.id, pl.name, pli.price_m2 AS priceM2, pl.currency
+    `SELECT pl.id, pl.name, pli.price_m2 / 100.0 AS priceM2, pl.currency
      FROM price_list_items pli JOIN price_lists pl ON pl.id = pli.price_list_id
      WHERE pli.product_id = ? ORDER BY pl.name`, [productId]
   );

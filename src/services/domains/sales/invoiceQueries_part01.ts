@@ -3,6 +3,12 @@ import type { BranchAccessService } from '../auth/BranchAccessService';
 import type { SalesInvoice } from '../../../types';
 import type { SalesContext } from './context';
 import type { InvoiceFilters } from '../../../types/sales/serviceTypes';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const INVOICE_ROW_MONEY_FIELDS = [
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'extra_fees',
+  'total_amount', 'paid_amount', 'remaining_amount', 'total_cost', 'gross_profit', 'returned_amount',
+] as const;
 
 export function buildInvoiceWhere(
   branchAccess: BranchAccessService,
@@ -60,7 +66,30 @@ export function fetchInvoicesFiltered(
     `SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
             w.name as warehouseName, u.full_name as createdByName,
             (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
-            (SELECT COALESCE(SUM(sr.remaining_to_balance), 0) FROM sales_returns sr
+            (SELECT COALESCE(SUM(sr.remaining_to_balance) / 100.0, 0) FROM sales_returns sr
+             WHERE sr.original_invoice_id = si.id) AS returnBalanceCredit
+     FROM sales_invoices si
+     JOIN customers c ON si.customer_id = c.id
+     JOIN warehouses w ON si.warehouse_id = w.id
+     LEFT JOIN users u ON si.created_by = u.id
+     ${where}
+     ORDER BY si.created_at DESC`,
+    params
+  ).map((row) => unscaleMoneyRow(row, INVOICE_ROW_MONEY_FIELDS));
+}
+
+export async function fetchInvoicesFilteredAsync(
+  ctx: SalesContext,
+  filters: InvoiceFilters = {},
+  includeVoid = true
+): Promise<(SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number })[]> {
+  AuthService.requireAuth();
+  const { where, params } = buildInvoiceWhere(ctx.branchAccess, filters, includeVoid);
+  const rows = await ctx.db.queryAsync<SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number }>(
+    `SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
+            w.name as warehouseName, u.full_name as createdByName,
+            (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
+            (SELECT COALESCE(SUM(sr.remaining_to_balance) / 100.0, 0) FROM sales_returns sr
              WHERE sr.original_invoice_id = si.id) AS returnBalanceCredit
      FROM sales_invoices si
      JOIN customers c ON si.customer_id = c.id
@@ -70,4 +99,5 @@ export function fetchInvoicesFiltered(
      ORDER BY si.created_at DESC`,
     params
   );
+  return rows.map((row) => unscaleMoneyRow(row, INVOICE_ROW_MONEY_FIELDS));
 }

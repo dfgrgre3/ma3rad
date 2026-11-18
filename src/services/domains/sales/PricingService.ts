@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
 
 export interface PriceList {
   id: string;
@@ -161,7 +162,7 @@ export class PricingService {
        FROM price_list_items i JOIN products p ON p.id = i.product_id
        WHERE i.price_list_id = ? ORDER BY p.name`,
       [priceListId]
-    );
+    ).map((r: any) => unscaleMoneyRow(r, ['priceM2','priceBox','price_m2','price_box']));
   }
 
   public addPriceListItem(input: { priceListId: string; productId: string; priceM2: number; priceBox?: number; minQuantityM2?: number }): void {
@@ -183,7 +184,7 @@ export class PricingService {
     this.db.executeTransaction((db) => {
       db.run(
         `INSERT INTO price_list_items (id, price_list_id, product_id, price_m2, price_box, min_quantity_m2)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ROUND(?*100), ROUND(?*100), ?)`,
         [id, input.priceListId, input.productId, priceM2, priceBox, minQuantityM2]
       );
       this.auditPriceChange(db, actor, 'Add price list item', id, null, {
@@ -196,7 +197,7 @@ export class PricingService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
     this.db.executeTransaction((db) => {
-      const old = db.query<any>('SELECT * FROM price_list_items WHERE id = ?', [id])[0];
+      const old = db.query<any>('SELECT * FROM price_list_items WHERE id = ?', [id]).map((r: any) => unscaleMoneyRow(r, ['price_m2','priceM2','price_box','priceBox']))[0];
       if (!old) return;
       db.run('DELETE FROM price_list_items WHERE id = ?', [id]);
       this.auditPriceChange(db, actor, 'Delete price list item', id, old, null);
@@ -220,7 +221,9 @@ export class PricingService {
     const today = localDateString();
     return this.db.query<any>(sql, params).map((p) => ({
       ...p,
-      bundlePrice: Number(p.discountAmount) || 0,
+      discountAmount: (Number(p.discountAmount) || 0) / 100,
+      minOrderAmount: (Number(p.minOrderAmount) || 0) / 100,
+      bundlePrice: (Number(p.discountAmount) || 0) / 100,
       isActive: Boolean(p.isActive),
       currentlyRunning: Boolean(p.isActive) && p.startsAt <= today && p.endsAt >= today,
     }));
@@ -252,7 +255,7 @@ export class PricingService {
           id, code, name, promotion_type, discount_percentage, discount_amount,
           buy_quantity, get_quantity, min_order_amount, applies_to, starts_at, ends_at,
           usage_limit, notes, created_by, coupon_code
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, code, input.name.trim(), input.promotionType, input.discountPercentage || 0,
           input.promotionType === 'BUNDLE_PRICE' ? (input.bundlePrice || 0) : (input.discountAmount || 0), input.buyQuantity || 0, input.getQuantity || 0,
@@ -284,7 +287,7 @@ export class PricingService {
   public getCustomerOverrides(customerId: string): Array<{ id: string; productId: string; productName: string; priceM2: number; validFrom?: string | null; validTo?: string | null }> {
     PermissionService.require(AuthService.requireAuth(), 'ui.pricing.pricing.view');
     return this.db.query(
-      `SELECT o.id, o.product_id AS productId, p.name AS productName, o.price_m2 AS priceM2,
+      `SELECT o.id, o.product_id AS productId, p.name AS productName, o.price_m2 / 100.0 AS priceM2,
               o.valid_from AS validFrom, o.valid_to AS validTo
        FROM customer_price_overrides o JOIN products p ON p.id = o.product_id
        WHERE o.customer_id = ? ORDER BY p.name`,
@@ -304,17 +307,17 @@ export class PricingService {
     this.db.executeTransaction((db) => {
       const old = db.query<any>(
         'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [input.customerId, input.productId]
-      )[0] || null;
+      ).map((r: any) => unscaleMoneyRow(r, ['price_m2','priceM2']))[0] || null;
       db.run(
         `INSERT INTO customer_price_overrides (id, customer_id, product_id, price_m2, valid_from, valid_to, approved_by, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?)
          ON CONFLICT(customer_id, product_id) DO UPDATE SET price_m2 = excluded.price_m2,
            valid_from = excluded.valid_from, valid_to = excluded.valid_to, approved_by = excluded.approved_by, notes = excluded.notes`,
         [uuidv4(), input.customerId, input.productId, priceM2, validFrom, validTo, actor.id, input.notes ?? old?.notes ?? null]
       );
       const updated = db.query<any>(
         'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [input.customerId, input.productId]
-      )[0];
+      ).map((r: any) => unscaleMoneyRow(r, ['price_m2','priceM2']))[0];
       this.auditPriceChange(db, actor, old ? 'Update customer price override' : 'Create customer price override', updated.id, old, updated);
     });
   }
@@ -325,7 +328,7 @@ export class PricingService {
     this.db.executeTransaction((db) => {
       const old = db.query<any>(
         'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [customerId, productId]
-      )[0];
+      ).map((r: any) => unscaleMoneyRow(r, ['price_m2','priceM2']))[0];
       if (!old) return;
       db.run('DELETE FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [customerId, productId]);
       this.auditPriceChange(db, actor, 'Delete customer price override', old.id, old, null);
@@ -340,13 +343,13 @@ export class PricingService {
     priceM2: number; priceBox?: number; source: 'OVERRIDE' | 'PRICE_LIST' | 'DEFAULT_LIST' | 'BASE';
     listName?: string; originalPrice: number;
   } {
-    const product = this.db.query<any>(`SELECT selling_price_m2 AS basePrice, category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?`, [productId])[0];
+    const product = this.db.query<any>(`SELECT selling_price_m2 / 100.0 AS basePrice, category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?`, [productId])[0];
     const basePrice = Number(product?.basePrice) || 0;
     const today = localDateString();
 
     if (customerId) {
       const override = this.db.query<any>(
-        `SELECT price_m2 AS price FROM customer_price_overrides
+        `SELECT price_m2 / 100.0 AS price FROM customer_price_overrides
          WHERE customer_id = ? AND product_id = ?
            AND (valid_from IS NULL OR valid_from <= ?) AND (valid_to IS NULL OR valid_to >= ?)`,
         [customerId, productId, today, today]
@@ -363,7 +366,7 @@ export class PricingService {
 
     if (mappedType) {
       const listItem = this.db.query<any>(
-        `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
+        `SELECT i.price_m2 / 100.0 AS price, i.price_box / 100.0 AS priceBox, pl.name AS listName
          FROM price_list_items i JOIN price_lists pl ON pl.id = i.price_list_id
          WHERE i.product_id = ? AND pl.is_active = 1 AND pl.customer_type = ?
            AND (pl.valid_from IS NULL OR pl.valid_from <= ?) AND (pl.valid_to IS NULL OR pl.valid_to >= ?)
@@ -377,7 +380,7 @@ export class PricingService {
     }
 
     const defaultItem = this.db.query<any>(
-      `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
+      `SELECT i.price_m2 / 100.0 AS price, i.price_box / 100.0 AS priceBox, pl.name AS listName
        FROM price_list_items i JOIN price_lists pl ON pl.id = i.price_list_id
        WHERE i.product_id = ? AND pl.is_active = 1 AND pl.is_default = 1
          AND (pl.valid_from IS NULL OR pl.valid_from <= ?) AND (pl.valid_to IS NULL OR pl.valid_to >= ?)
@@ -411,7 +414,7 @@ export class PricingService {
        WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ?
          AND (? IS NULL OR id = ?)
          AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)
-         AND (min_order_amount = 0 OR min_order_amount <= ?)
+         AND (min_order_amount = 0 OR min_order_amount <= ? * 100)
        ORDER BY discount_percentage DESC, discount_amount DESC, starts_at DESC`,
       [today, today, onlyPromotionId || null, onlyPromotionId || null, cart.reduce((sum, item) => sum + item.amount, 0)]
     );
@@ -428,7 +431,7 @@ export class PricingService {
           discount = subtotal * Number(promo.discountPercentage || 0) / 100;
           break;
         case 'FIXED_AMOUNT':
-          discount = Number(promo.discountAmount || 0);
+          discount = (Number(promo.discountAmount) || 0) / 100;
           break;
         case 'BUY_X_GET_Y': {
           const buy = Number(promo.buyQuantity || 0);
@@ -451,7 +454,7 @@ export class PricingService {
             if (bundleQuantity > 0 && totalQuantity >= bundleQuantity) {
               const bundleCount = Math.floor(totalQuantity / bundleQuantity);
               const regularBundleTotal = subtotal / totalQuantity * bundleQuantity;
-              discount = Math.max(0, regularBundleTotal - Number(promo.discountAmount || 0)) * bundleCount;
+              discount = Math.max(0, regularBundleTotal - (Number(promo.discountAmount) || 0) / 100) * bundleCount;
             }
           }
           break;

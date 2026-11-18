@@ -153,12 +153,12 @@ export class EmployeeSelfServiceService {
     const { employeeId } = this.requirePortal();
     return this.db.query<any>(
       `SELECT pri.id, pr.period, pr.status AS runStatus,
-              pri.gross_amount AS grossAmount, pri.net_amount AS netAmount,
-              pri.base_amount AS baseAmount, pri.overtime_amount AS overtimeAmount,
-              pri.bonus_amount AS bonusAmount, pri.commission_amount AS commissionAmount,
-              pri.allowance_amount AS allowanceAmount, pri.loan_deduction_amount AS loanDeductionAmount,
-              pri.advance_amount AS advanceAmount, pri.attendance_deduction_amount AS attendanceDeductionAmount,
-              pri.tax_amount AS taxAmount, pri.payout_status AS payoutStatus,
+              pri.gross_amount / 100.0 AS grossAmount, pri.net_amount / 100.0 AS netAmount,
+              pri.base_amount / 100.0 AS baseAmount, pri.overtime_amount / 100.0 AS overtimeAmount,
+              pri.bonus_amount / 100.0 AS bonusAmount, pri.commission_amount / 100.0 AS commissionAmount,
+              pri.allowance_amount / 100.0 AS allowanceAmount, pri.loan_deduction_amount / 100.0 AS loanDeductionAmount,
+              pri.advance_amount / 100.0 AS advanceAmount, pri.attendance_deduction_amount / 100.0 AS attendanceDeductionAmount,
+              pri.tax_amount / 100.0 AS taxAmount, pri.payout_status AS payoutStatus,
               pri.payment_method AS paymentMethod, pr.paid_at AS paidAt
        FROM payroll_run_items pri
        JOIN payroll_runs pr ON pr.id = pri.payroll_run_id
@@ -189,22 +189,22 @@ export class EmployeeSelfServiceService {
     const { employeeId } = this.requirePortal();
     const row = this.db.query<any>(
       `SELECT pri.id, pri.period, pri.employee_id AS employeeId, pri.branch_id AS branchId,
-              pri.salary_type AS salaryType, pri.base_salary AS baseSalary,
+              pri.salary_type AS salaryType, pri.base_salary / 100.0 AS baseSalary,
               pri.expected_workdays AS expectedWorkdays, pri.absent_days AS absentDays,
               pri.unpaid_leave_days AS unpaidLeaveDays, pri.late_minutes AS lateMinutes,
-              pri.overtime_minutes AS overtimeMinutes, pri.base_amount AS baseAmount,
-              pri.overtime_amount AS overtimeAmount, pri.bonus_amount AS bonusAmount,
-              pri.commission_amount AS commissionAmount, pri.allowance_amount AS allowanceAmount,
-              pri.loan_deduction_amount AS loanDeductionAmount, pri.advance_amount AS advanceAmount,
-              pri.manual_deduction_amount AS manualDeductionAmount,
-              pri.attendance_deduction_amount AS attendanceDeductionAmount, pri.tax_amount AS taxAmount,
-              pri.social_insurance_base AS socialInsuranceBase,
-              pri.social_insurance_employee_share AS socialInsuranceEmployeeShare,
-              pri.social_insurance_employer_share AS socialInsuranceEmployerShare,
-              pri.social_insurance_total AS socialInsuranceTotal,
-              pri.gross_amount AS grossAmount, pri.net_amount AS netAmount,
+              pri.overtime_minutes AS overtimeMinutes, pri.base_amount / 100.0 AS baseAmount,
+              pri.overtime_amount / 100.0 AS overtimeAmount, pri.bonus_amount / 100.0 AS bonusAmount,
+              pri.commission_amount / 100.0 AS commissionAmount, pri.allowance_amount / 100.0 AS allowanceAmount,
+              pri.loan_deduction_amount / 100.0 AS loanDeductionAmount, pri.advance_amount / 100.0 AS advanceAmount,
+              pri.manual_deduction_amount / 100.0 AS manualDeductionAmount,
+              pri.attendance_deduction_amount / 100.0 AS attendanceDeductionAmount, pri.tax_amount / 100.0 AS taxAmount,
+              pri.social_insurance_base / 100.0 AS socialInsuranceBase,
+              pri.social_insurance_employee_share / 100.0 AS socialInsuranceEmployeeShare,
+              pri.social_insurance_employer_share / 100.0 AS socialInsuranceEmployerShare,
+              pri.social_insurance_total / 100.0 AS socialInsuranceTotal,
+              pri.gross_amount / 100.0 AS grossAmount, pri.net_amount / 100.0 AS netAmount,
               pri.payment_method AS paymentMethod, pri.payout_status AS payoutStatus,
-              pri.paid_amount AS paidAmount, pri.payment_reference AS paymentReference,
+              pri.paid_amount / 100.0 AS paidAmount, pri.payment_reference AS paymentReference,
               pri.warning_json AS warningJson, pri.detail_json AS detailJson,
               pr.status AS runStatus, pr.paid_at AS paidAt
        FROM payroll_run_items pri
@@ -279,7 +279,7 @@ export class EmployeeSelfServiceService {
       [employeeId]
     ).map((r) => ({ id: r.id, warningType: r.warningType, issuedAt: r.issuedAt, notes: r.notes || null, status: r.status }));
     const penalties = this.db.query<any>(
-      `SELECT id, penalty_type AS penaltyType, amount, status, approved_at AS approvedAt, notes
+      `SELECT id, penalty_type AS penaltyType, amount / 100.0 AS amount, status, approved_at AS approvedAt, notes
        FROM hr_penalties WHERE employee_id = ? AND status != 'DRAFT' ORDER BY created_at DESC`,
       [employeeId]
     ).map((r) => ({ id: r.id, penaltyType: r.penaltyType, amount: Number(r.amount) || 0, status: r.status, approvedAt: r.approvedAt || null, notes: r.notes || null }));
@@ -363,19 +363,19 @@ export class EmployeeSelfServiceService {
   static getMyBenefits(): MyBenefits {
     const { employeeId } = this.requirePortal();
     const allowances = this.db.query<any>(
-      `SELECT id, allowance_type AS allowanceType, amount, frequency,
+      `SELECT id, allowance_type AS allowanceType, amount / 100.0 AS amount, frequency,
               effective_from AS effectiveFrom, effective_to AS effectiveTo, is_active AS isActive
        FROM hr_allowances WHERE employee_id = ? ORDER BY effective_from DESC`,
       [employeeId]
     ).map((r) => ({ id: r.id, allowanceType: r.allowanceType, amount: Number(r.amount) || 0, frequency: r.frequency, effectiveFrom: r.effectiveFrom, effectiveTo: r.effectiveTo || null, isActive: Boolean(r.isActive) }));
     const benefits = this.db.query<any>(
       `SELECT id, benefit_type AS benefitType, provider, policy_number AS policyNumber,
-              start_date AS startDate, amount, status
+              start_date AS startDate, amount / 100.0 AS amount, status
        FROM hr_benefits WHERE employee_id = ? ORDER BY start_date DESC`,
       [employeeId]
     ).map((r) => ({ id: r.id, benefitType: r.benefitType, provider: r.provider || null, policyNumber: r.policyNumber || null, startDate: r.startDate, amount: Number(r.amount) || 0, status: r.status }));
     const loans = this.db.query<any>(
-      `SELECT id, principal, installment_amount AS installmentAmount, start_date AS startDate,
+      `SELECT id, principal / 100.0 AS principal, installment_amount / 100.0 AS installmentAmount, start_date AS startDate,
               remaining_balance AS remainingBalance, status
        FROM hr_loans WHERE employee_id = ? ORDER BY start_date DESC`,
       [employeeId]
@@ -387,7 +387,7 @@ export class EmployeeSelfServiceService {
     if (loans.length > 0) {
       const loanIds = loans.map((l) => l.id);
       const installments = this.db.query<any>(
-        `SELECT id, loan_id AS loanId, due_date AS dueDate, amount, status
+        `SELECT id, loan_id AS loanId, due_date AS dueDate, amount / 100.0 AS amount, status
          FROM hr_loan_installments WHERE loan_id IN (${loanIds.map(() => '?').join(', ')}) ORDER BY due_date`,
         loanIds
       );

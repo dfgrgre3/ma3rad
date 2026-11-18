@@ -138,17 +138,17 @@ export class FinancialStatementsService {
     return 'تعرض هذه القوائم بيانات الفرع النشط فقط؛ القيود غير المرتبطة بفرع لا تدخل في الإجماليات.';
   }
 
-  public getReconciliation(): ReconciliationCheck[] {
+  public async getReconciliation(): Promise<ReconciliationCheck[]> {
     this.requireView('finance.view');
     const actor = AuthService.requireAuth();
     const scope = this.ledgerScope();
-    const accountBalance = (code: string, normal: 'DEBIT' | 'CREDIT') => {
-      const row = this.db.query<{ balance: number }>(`
+    const accountBalance = async (code: string, normal: 'DEBIT' | 'CREDIT') => {
+      const row = (await this.db.queryAsync<{ balance: number }>(`
         SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
         WHERE e.is_posted = 1 AND a.code = ? AND ${scope.clause}
-      `, [code, ...scope.params])[0];
+      `, [code, ...scope.params]))[0];
       const signed = Number(row?.balance || 0);
       return round2(normal === 'DEBIT' ? signed : -signed);
     };
@@ -163,23 +163,23 @@ export class FinancialStatementsService {
     const activeCompanyScope = this.branchAccess.companyScope('company_id', actor);
     const activeCompanyId = activeCompanyScope.params[0];
     const companyBranches = activeCompanyId
-      ? this.db.query<{ id: string }>(
+      ? (await this.db.queryAsync<{ id: string }>(
         'SELECT id FROM branches WHERE company_id = ?',
         [activeCompanyId],
-      ).map((row) => row.id)
+      )).map((row) => row.id)
       : [];
     const allowedBranches = this.branchAccess.getAccessibleBranchIds(actor);
     const canCompareCompanyWide = allowedBranches === null ||
       companyBranches.every((branchId) => allowedBranches.includes(branchId));
-    const companyAccountBalance = (code: string, normal: 'DEBIT' | 'CREDIT') => {
+    const companyAccountBalance = async (code: string, normal: 'DEBIT' | 'CREDIT') => {
       if (!canCompareCompanyWide) return null;
       const companyScope = this.branchAccess.companyScope('e.company_id', actor);
-      const row = this.db.query<{ balance: number }>(`
+      const row = (await this.db.queryAsync<{ balance: number }>(`
         SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
         WHERE e.is_posted = 1 AND a.code = ? AND ${companyScope.clause}
-      `, [code, ...companyScope.params])[0];
+      `, [code, ...companyScope.params]))[0];
       const signed = Number(row?.balance || 0);
       return round2(normal === 'DEBIT' ? signed : -signed);
     };
@@ -189,7 +189,7 @@ export class FinancialStatementsService {
       });
     };
 
-    const integrity = this.db.query<{ entries: number; unbalanced: number; debit: number; credit: number }>(`
+    const integrity = (await this.db.queryAsync<{ entries: number; unbalanced: number; debit: number; credit: number }>(`
       WITH entry_totals AS (
         SELECT e.id, e.total_debit, e.total_credit,
                COALESCE(SUM(l.debit), 0) AS line_debit,
@@ -203,7 +203,7 @@ export class FinancialStatementsService {
                THEN 1 ELSE 0 END), 0) AS unbalanced,
              COALESCE(SUM(line_debit), 0) AS debit, COALESCE(SUM(line_credit), 0) AS credit
       FROM entry_totals
-    `, scope.params)[0];
+    `, scope.params))[0];
     const journalDifference = round2(Number(integrity?.debit || 0) - Number(integrity?.credit || 0));
     const unbalancedEntries = Number(integrity?.unbalanced || 0);
     checks.push({ key: 'journal', label: 'توازن القيود المرحلة', ledger: round2(integrity?.debit || 0),
@@ -211,7 +211,7 @@ export class FinancialStatementsService {
       status: unbalancedEntries === 0 ? 'MATCH' : 'DIFFERENCE',
       detail: `${unbalancedEntries} قيد غير متوازن من ${Number(integrity?.entries || 0)} قيد مرحل` });
 
-    const cachedAccounts = this.db.query<{ ledger: number; cached: number }>(`
+    const cachedAccounts = (await this.db.queryAsync<{ ledger: number; cached: number }>(`
       WITH scoped_accounts AS (
         SELECT DISTINCT l.account_id
         FROM journal_entry_lines l
@@ -227,7 +227,7 @@ export class FinancialStatementsService {
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       WHERE e.is_posted = 1 AND ${scope.clause}
-    `, scope.params)[0];
+    `, scope.params))[0];
     const cachedLedger = Number(cachedAccounts?.ledger || 0);
     const cachedSource = Number(cachedAccounts?.cached || 0);
     add('cached', 'إتساق الرصيد المخزن في الحسابات مع القيود المرحّلة', cachedLedger, cachedSource,
@@ -235,21 +235,21 @@ export class FinancialStatementsService {
 
     if (canCompareCompanyWide) {
       const customerCompanyScope = this.branchAccess.companyScope('c.company_id', actor);
-      const customerBalance = Number(this.db.query<{ balance: number }>(`
-        SELECT COALESCE(SUM(current_balance), 0) AS balance
+      const customerBalance = Number((await this.db.queryAsync<{ balance: number }>(`
+        SELECT COALESCE(SUM(current_balance), 0) / 100.0 AS balance
         FROM customers c
         WHERE ${customerCompanyScope.clause}
-      `, customerCompanyScope.params)[0]?.balance || 0);
-      add('customers', 'ذمم العملاء مقابل الأستاذ العام', companyAccountBalance('1103', 'DEBIT') || 0, customerBalance,
+      `, customerCompanyScope.params))[0]?.balance || 0);
+      add('customers', 'ذمم العملاء مقابل الأستاذ العام', (await companyAccountBalance('1103', 'DEBIT')) || 0, customerBalance,
         'أرصدة العملاء والقيود المرحلة على مستوى الشركة؛ المقارنة حالية وليست تاريخية.');
 
       const supplierCompanyScope = this.branchAccess.companyScope('s.company_id', actor);
-      const supplierBalance = Number(this.db.query<{ balance: number }>(`
-        SELECT COALESCE(SUM(current_balance), 0) AS balance
+      const supplierBalance = Number((await this.db.queryAsync<{ balance: number }>(`
+        SELECT COALESCE(SUM(current_balance), 0) / 100.0 AS balance
         FROM suppliers s
         WHERE ${supplierCompanyScope.clause}
-      `, supplierCompanyScope.params)[0]?.balance || 0);
-      add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', companyAccountBalance('2101', 'CREDIT') || 0, supplierBalance,
+      `, supplierCompanyScope.params))[0]?.balance || 0);
+      add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', (await companyAccountBalance('2101', 'CREDIT')) || 0, supplierBalance,
         'أرصدة الموردين والقيود المرحلة على مستوى الشركة؛ المقارنة حالية وليست تاريخية.');
     } else {
       const detail = 'غير قابلة للمقارنة: أرصدة العملاء والموردين لا تخزن الفرع، والمستخدم لا يملك نطاق جميع فروع الشركة.';
@@ -261,15 +261,15 @@ export class FinancialStatementsService {
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
     );
-    const inventory = this.db.query<{ value: number; estimatedLayers: number }>(`
-      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value,
+    const inventory = (await this.db.queryAsync<{ value: number; estimatedLayers: number }>(`
+      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) / 100.0 AS value,
              COALESCE(SUM(CASE WHEN icl.is_estimated = 1 AND icl.quantity_remaining > 0.009 THEN 1 ELSE 0 END), 0) AS estimatedLayers
       FROM inventory_cost_layers icl
       JOIN warehouses w ON w.id = icl.warehouse_id
       WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause}
-    `, warehouseScope.params)[0];
-    const costingMethod = this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='costingMethod'`)[0]?.value || 'AVERAGE_COST';
-    const ledgerValue = accountBalance('1104', 'DEBIT');
+    `, warehouseScope.params))[0];
+    const costingMethod = (await this.db.queryAsync<{ value: string }>(`SELECT value FROM system_settings WHERE key='costingMethod'`))[0]?.value || 'AVERAGE_COST';
+    const ledgerValue = await accountBalance('1104', 'DEBIT');
 
     if (costingMethod === 'FIFO') {
       const inventoryValue = Number(inventory.value || 0);
@@ -277,24 +277,24 @@ export class FinancialStatementsService {
         `${Number(inventory.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
     } else {
       // For AVERAGE_COST, compare ledger with calculated value from stock * cost_price
-      const stockValue = this.db.query<{ value: number }>(`
-        SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
+      const stockValue = (await this.db.queryAsync<{ value: number }>(`
+        SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 AS value
         FROM warehouse_stock ws
         JOIN warehouses w ON w.id = ws.warehouse_id
         JOIN products p ON p.id = ws.product_id
         WHERE ${warehouseScope.clause}
-      `, warehouseScope.params)[0]?.value || 0;
+      `, warehouseScope.params))[0]?.value || 0;
       add('inventory', 'قيمة المخزون حسب التكلفة المتوسطة (Stock × Cost Price)', ledgerValue, Number(stockValue),
         'الفرق بسبب طريقة التكلفة المتوسطة المرجحة');
     }
 
     const bankScope = this.branchAccess.sqlScope('ba.branch_id');
-    const bankAccounts = this.db.query<{ count: number; balance: number }>(`
-      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) AS balance
+    const bankAccounts = (await this.db.queryAsync<{ count: number; balance: number }>(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) / 100.0 AS balance
       FROM bank_accounts ba WHERE ${bankScope.clause}
-    `, bankScope.params)[0];
+    `, bankScope.params))[0];
     if (Number(bankAccounts?.count || 0)) {
-      add('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102', 'DEBIT'), Number(bankAccounts.balance || 0),
+      add('banks', 'أرصدة البنوك مقابل الأستاذ العام', await accountBalance('1102', 'DEBIT'), Number(bankAccounts.balance || 0),
         'أرصدة الحسابات البنكية المرتبطة بالفرع النشط.');
     }
 
@@ -302,12 +302,12 @@ export class FinancialStatementsService {
   }
 
   // ── Balance sheet ────────────────────────────────────────────────────────
-  public getBalanceSheet(asOf?: string): BalanceSheet {
+  public async getBalanceSheet(asOf?: string): Promise<BalanceSheet> {
     this.requireView('finance.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid balance sheet date.');
     const scope = this.ledgerScope();
-    const accounts = this.db.query<{
+    const accounts = await this.db.queryAsync<{
       code: string;
       name: string;
       type: string;
@@ -396,12 +396,12 @@ export class FinancialStatementsService {
   }
 
   // ── Cash flow (simplified direct method with activity classification) ─────────────────────────────────
-  public getCashFlow(dateFrom?: string, dateTo?: string): {
+  public async getCashFlow(dateFrom?: string, dateTo?: string): Promise<{
     months: CashFlowMonth[];
     totals: CashFlowMonth;
     balances: { opening: number; closing: number };
     byActivity: { operating: CashFlowMonth; investing: CashFlowMonth; financing: CashFlowMonth };
-  } {
+  }> {
     this.requireView('finance.view');
     const from = dateFrom || localDateString(new Date(new Date().getFullYear(), 0, 1));
     const to = dateTo || localDateString();
@@ -409,7 +409,7 @@ export class FinancialStatementsService {
       throw new Error('Invalid cash flow date range.');
     }
     const scope = this.ledgerScope();
-    const balances = this.db.query<{ opening: number; closing: number }>(`
+    const balances = (await this.db.queryAsync<{ opening: number; closing: number }>(`
       SELECT
         COALESCE(SUM(CASE WHEN e.date < ? THEN l.debit - l.credit ELSE 0 END), 0) AS opening,
         COALESCE(SUM(l.debit - l.credit), 0) AS closing
@@ -417,10 +417,10 @@ export class FinancialStatementsService {
       JOIN journal_entry_lines l ON l.entry_id = e.id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date <= ? AND a.code IN ('1101', '1102', '1106') AND ${scope.clause}
-    `, [from, to, ...scope.params])[0] || { opening: 0, closing: 0 };
+    `, [from, to, ...scope.params]))[0] || { opening: 0, closing: 0 };
 
     // Operating activities: all operating cash movements (sales, purchases, expenses, manual adjustments)
-    const operatingRows = this.db.query<any>(`
+    const operatingRows = await this.db.queryAsync<any>(`
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
@@ -442,7 +442,7 @@ export class FinancialStatementsService {
     `, [from, to, ...scope.params]);
 
     // Investing activities: fixed assets, investments
-    const investingRows = this.db.query<any>(`
+    const investingRows = await this.db.queryAsync<any>(`
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
@@ -462,7 +462,7 @@ export class FinancialStatementsService {
     `, [from, to, ...scope.params]);
 
     // Financing activities: loans, capital, dividends
-    const financingRows = this.db.query<any>(`
+    const financingRows = await this.db.queryAsync<any>(`
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
@@ -562,7 +562,7 @@ export class FinancialStatementsService {
   }
 
   // ── AR / AP aging ────────────────────────────────────────────────────────
-  public getCustomerAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
+  public async getCustomerAging(asOf?: string): Promise<{ rows: AgingRow[]; bucket: AgingBucket }> {
     this.requireView('finance.debts.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
@@ -574,29 +574,29 @@ export class FinancialStatementsService {
     };
     return this.buildAging(`
       SELECT c.id, c.name, c.phone, COALESCE(si.due_date, si.date) AS docDate,
-        MAX(0, si.total_amount
-          - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
+        MAX(0, si.total_amount / 100.0
+          - MAX(0, si.paid_amount / 100.0 - COALESCE((SELECT SUM(cpa0.amount) / 100.0 FROM customer_payment_allocations cpa0
               WHERE cpa0.sales_invoice_id = si.id), 0))
-          - COALESCE((SELECT SUM(cpa.amount) FROM customer_payment_allocations cpa
+          - COALESCE((SELECT SUM(cpa.amount) / 100.0 FROM customer_payment_allocations cpa
               JOIN customer_payments cp ON cp.id=cpa.payment_id
               WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
           - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
-              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0)
+              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) / 100.0
         ) AS remaining
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
       WHERE si.invoice_status != 'VOID' AND si.date <= ? AND ${agingScope.clause}
-        AND si.total_amount
-          - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
+        AND si.total_amount / 100.0
+          - MAX(0, si.paid_amount / 100.0 - COALESCE((SELECT SUM(cpa0.amount) / 100.0 FROM customer_payment_allocations cpa0
               WHERE cpa0.sales_invoice_id = si.id), 0))
-          - COALESCE((SELECT SUM(cpa.amount) FROM customer_payment_allocations cpa
+          - COALESCE((SELECT SUM(cpa.amount) / 100.0 FROM customer_payment_allocations cpa
               JOIN customer_payments cp ON cp.id=cpa.payment_id
               WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
           - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
-              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) > 0.009
+              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) / 100.0 > 0.009
     `, [date, date, date, ...agingScope.params, date, date], date);
   }
 
-  public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
+  public async getSupplierAging(asOf?: string): Promise<{ rows: AgingRow[]; bucket: AgingBucket }> {
     this.requireView('finance.debts.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
@@ -608,31 +608,31 @@ export class FinancialStatementsService {
     };
     return this.buildAging(`
       SELECT s.id, s.name, s.phone, COALESCE(pi.due_date, pi.date) AS docDate,
-        MAX(0, pi.total_amount
-          - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
+        MAX(0, pi.total_amount / 100.0
+          - MAX(0, pi.paid_amount / 100.0 - COALESCE((SELECT SUM(spa0.amount) / 100.0 FROM supplier_payment_allocations spa0
               WHERE spa0.purchase_invoice_id = pi.id), 0))
-          - COALESCE((SELECT SUM(spa.amount) FROM supplier_payment_allocations spa
+          - COALESCE((SELECT SUM(spa.amount) / 100.0 FROM supplier_payment_allocations spa
               JOIN supplier_payments sp ON sp.id=spa.payment_id
               WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
           - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
-              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0)
+              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) / 100.0
         ) AS remaining
       FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
       WHERE pi.date <= ? AND ${agingScope.clause}
-        AND pi.total_amount
-          - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
+        AND pi.total_amount / 100.0
+          - MAX(0, pi.paid_amount / 100.0 - COALESCE((SELECT SUM(spa0.amount) / 100.0 FROM supplier_payment_allocations spa0
               WHERE spa0.purchase_invoice_id = pi.id), 0))
-          - COALESCE((SELECT SUM(spa.amount) FROM supplier_payment_allocations spa
+          - COALESCE((SELECT SUM(spa.amount) / 100.0 FROM supplier_payment_allocations spa
               JOIN supplier_payments sp ON sp.id=spa.payment_id
               WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
           - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
-              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) > 0.009
+              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) / 100.0 > 0.009
     `, [date, date, date, ...agingScope.params, date, date], date);
   }
 
-  private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
+  private async buildAging(sql: string, params: any[], asOf?: string): Promise<{ rows: AgingRow[]; bucket: AgingBucket }> {
     const reference = calendarDayNumber(asOf || localDateString());
-    const docs = this.db.query<any>(sql, params);
+    const docs = await this.db.queryAsync<any>(sql, params);
     const map = new Map<string, AgingRow>();
 
     for (const doc of docs) {
@@ -674,13 +674,13 @@ export class FinancialStatementsService {
   }
 
   // ── Party sub-ledger (AR/AP) ─────────────────────────────────────────────
-  public getSubledgerParties(partyType: 'CUSTOMER' | 'SUPPLIER'): PartyOption[] {
+  public async getSubledgerParties(partyType: 'CUSTOMER' | 'SUPPLIER'): Promise<PartyOption[]> {
     this.requireView('finance.view');
     const actor = AuthService.requireAuth();
     const table = partyType === 'CUSTOMER' ? 'customers' : 'suppliers';
     const company = this.branchAccess.companyScope('p.company_id', actor);
-    return this.db.query<PartyOption>(`
-      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) AS balance
+    return this.db.queryAsync<PartyOption>(`
+      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) / 100.0 AS balance
       FROM ${table} p
       WHERE ${company.clause}
       ORDER BY p.name
@@ -692,12 +692,12 @@ export class FinancialStatementsService {
    * accompanies every AR/AP control-account posting. The baseline row covers
    * legacy balances captured before the event log started.
    */
-  public getPartyStatement(
+  public async getPartyStatement(
     partyType: 'CUSTOMER' | 'SUPPLIER',
     partyId: string,
     dateFrom?: string,
     dateTo?: string,
-  ): PartyStatement {
+  ): Promise<PartyStatement> {
     this.requireView('finance.view');
     const actor = AuthService.requireAuth();
     const from = dateFrom || '0000-01-01';
@@ -707,24 +707,24 @@ export class FinancialStatementsService {
     }
     const table = partyType === 'CUSTOMER' ? 'customers' : 'suppliers';
     const company = this.branchAccess.companyScope('p.company_id', actor);
-    const party = this.db.query<{ id: string; name: string; phone: string | null; currentBalance: number }>(`
-      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) AS current_balance
+    const party = (await this.db.queryAsync<{ id: string; name: string; phone: string | null; currentBalance: number }>(`
+      SELECT p.id, p.name, p.phone, COALESCE(p.current_balance, 0) / 100.0 AS current_balance
       FROM ${table} p WHERE p.id = ? AND ${company.clause}
-    `, [partyId, ...company.params])[0];
+    `, [partyId, ...company.params]))[0];
     if (!party) throw new Error('الطرف غير موجود ضمن نطاق صلاحيتك.');
 
     const companyId = company.params[0];
-    const baseline = Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(balance, 0) AS balance FROM finance_subledger_party_baselines
+    const baseline = Number((await this.db.queryAsync<{ balance: number }>(`
+      SELECT COALESCE(balance, 0) / 100.0 AS balance FROM finance_subledger_party_baselines
       WHERE company_id = ? AND party_type = ? AND party_id = ?
-    `, [companyId, partyType, partyId])[0]?.balance || 0);
-    const priorMovement = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(amount), 0) AS amount FROM finance_subledger_events
+    `, [companyId, partyType, partyId]))[0]?.balance || 0);
+    const priorMovement = Number((await this.db.queryAsync<{ amount: number }>(`
+      SELECT COALESCE(SUM(amount) / 100.0, 0) AS amount FROM finance_subledger_events
       WHERE company_id = ? AND party_type = ? AND party_id = ? AND effective_date < ?
-    `, [companyId, partyType, partyId, from])[0]?.amount || 0);
+    `, [companyId, partyType, partyId, from]))[0]?.amount || 0);
     const opening = round2(baseline + priorMovement);
 
-    const events = this.db.query<{
+    const events = await this.db.queryAsync<{
       date: string;
       entryNumber: string;
       description: string;
@@ -733,7 +733,7 @@ export class FinancialStatementsService {
       amount: number;
     }>(`
       SELECT se.effective_date AS date, e.entry_number AS entryNumber, e.description AS description,
-             se.reference_type AS referenceType, se.reference_id AS referenceId, se.amount AS amount
+             se.reference_type AS referenceType, se.reference_id AS referenceId, se.amount / 100.0 AS amount
       FROM finance_subledger_events se
       JOIN journal_entries e ON e.id = se.journal_entry_id
       WHERE se.company_id = ? AND se.party_type = ? AND se.party_id = ?
@@ -759,18 +759,18 @@ export class FinancialStatementsService {
 
     const controlAccountCode: '1103' | '2101' = partyType === 'CUSTOMER' ? '1103' : '2101';
     const controlScope = this.branchAccess.companyScope('e.company_id', actor);
-    const signed = Number(this.db.query<{ balance: number }>(`
+    const signed = Number((await this.db.queryAsync<{ balance: number }>(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND a.code = ? AND e.date <= ? AND ${controlScope.clause}
-    `, [controlAccountCode, to, ...controlScope.params])[0]?.balance || 0);
+    `, [controlAccountCode, to, ...controlScope.params]))[0]?.balance || 0);
     const controlBalance = round2(partyType === 'CUSTOMER' ? signed : -signed);
 
-    const coverageStartDate = this.db.query<{ coverageStartDate: string }>(`
+    const coverageStartDate = (await this.db.queryAsync<{ coverageStartDate: string }>(`
       SELECT coverage_start_date AS coverageStartDate FROM finance_subledger_coverage WHERE id = 1
-    `)[0]?.coverageStartDate ?? null;
+    `))[0]?.coverageStartDate ?? null;
     const closing = round2(running);
     const masterBalance = round2(Number(party.currentBalance) || 0);
     const isCurrentAsOf = to >= localDateString();
@@ -787,31 +787,31 @@ export class FinancialStatementsService {
   }
 
   // ── General ledger ───────────────────────────────────────────────────────
-  public getAccountsForLedger(): Array<{ id: string; code: string; name: string; type: string }> {
+  public async getAccountsForLedger(): Promise<Array<{ id: string; code: string; name: string; type: string }>> {
     this.requireView('finance.view');
-    return this.db.query(`
+    return this.db.queryAsync(`
       SELECT id, code, name, type FROM chart_of_accounts WHERE is_active = 1 ORDER BY code
     `);
   }
 
-  public getGeneralLedger(accountId: string, dateFrom?: string, dateTo?: string): {
+  public async getGeneralLedger(accountId: string, dateFrom?: string, dateTo?: string): Promise<{
     opening: number; lines: LedgerLine[]; closing: number; account?: { code: string; name: string };
-  } {
+  }> {
     this.requireView('finance.view');
-    const account = this.db.query<any>(`SELECT code, name FROM chart_of_accounts WHERE id = ?`, [accountId])[0];
+    const account = (await this.db.queryAsync<any>(`SELECT code, name FROM chart_of_accounts WHERE id = ?`, [accountId]))[0];
     const from = dateFrom || '0000-01-01';
     const to = dateTo || '9999-12-31';
     if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || from > to) {
       throw new Error('Invalid general ledger date range.');
     }
     const scope = this.ledgerScope();
-    const opening = this.scalar(`
+    const opening = await this.scalar(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0)
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date < ? AND ${scope.clause}
     `, [accountId, from, ...scope.params]);
 
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT e.date, e.entry_number AS entryNumber, e.description,
              l.debit, l.credit, l.description AS lineDescription,
              e.reference_type AS referenceType, e.reference_id AS referenceId
@@ -838,8 +838,8 @@ export class FinancialStatementsService {
     return { opening: round2(opening), lines, closing: round2(running), account };
   }
 
-  private scalar(sql: string, params: any[] = []): number {
-    const row = this.db.query<any>(sql, params)[0];
+  private async scalar(sql: string, params: any[] = []): Promise<number> {
+    const row = (await this.db.queryAsync<any>(sql, params))[0];
     if (!row) return 0;
     const value = Object.values(row)[0];
     return Number(value) || 0;

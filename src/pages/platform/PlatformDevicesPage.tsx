@@ -1,6 +1,8 @@
 import React from 'react';
 import { Cpu, Search, ShieldAlert, ShieldX, Link } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformDevice, PlatformTenant } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
@@ -21,12 +23,27 @@ export const PlatformDevicesPage: React.FC = () => {
   const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
   const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
   const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
+  const [centralMode, setCentralMode] = React.useState(false);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setDevices(platformAdminService.listDevices());
-      setTenants(platformAdminService.listTenants());
+      const central = getCentralDataSourceState();
+      setCentralMode(central.active);
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      if (central.active) {
+        const [centralDevices, centralTenants] = await Promise.all([
+          centralPlatformClient.listDevices(),
+          centralPlatformClient.listTenants(),
+        ]);
+        setDevices(centralDevices);
+        setTenants(centralTenants);
+      } else {
+        setDevices(platformAdminService.listDevices());
+        setTenants(platformAdminService.listTenants());
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل الأجهزة.');
@@ -35,7 +52,7 @@ export const PlatformDevicesPage: React.FC = () => {
     }
   }, []);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => { void load(); }, [load]);
 
   const filtered = devices.filter((device) =>
     !search.trim() ||
@@ -44,8 +61,28 @@ export const PlatformDevicesPage: React.FC = () => {
     (device.os || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const detectClones = () => {
+  const detectClones = async () => {
     if (!canManageDevices) { toast.error('لا تملك صلاحية إدارة الأجهزة'); return; }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
+    if (central.active) {
+      try {
+        const result = await centralPlatformClient.detectCloneDevices();
+        setCloneAlerts(result.alerts);
+        if (result.alerts.length > 0) {
+          toast.warning(`تم اكتشاف ${result.alerts.length} حالة اشتباه استنساخ`);
+        } else {
+          toast.success('لا يوجد اشتباه استنساخ بين الأجهزة');
+        }
+        await load();
+      } catch (err) {
+        toast.error('تعذر الكشف عن الاستنساخ', err instanceof Error ? err.message : undefined);
+      }
+      return;
+    }
     try {
       // Use the license page's detection by listing devices and checking for duplicates
       const hwids = new Map<string, PlatformDevice[]>();
@@ -76,11 +113,25 @@ export const PlatformDevicesPage: React.FC = () => {
     setDeviceAction(action);
   };
 
-  const executeDeviceAction = () => {
+  const executeDeviceAction = async () => {
     if (!deviceTarget || !deviceAction) return;
     if (!canManageDevices) { toast.error('لا تملك صلاحية إدارة الأجهزة'); return; }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (deviceAction === 'suspend') {
+      if (central.active) {
+        const reason = `إجراء ${deviceAction} عبر لوحة الأجهزة`;
+        if (deviceAction === 'suspend') {
+          await centralPlatformClient.suspendDevice(deviceTarget.id, reason);
+        } else if (deviceAction === 'release') {
+          await centralPlatformClient.releaseDevice(deviceTarget.id, reason);
+        } else {
+          await centralPlatformClient.revokeDevice(deviceTarget.id, reason);
+        }
+      } else if (deviceAction === 'suspend') {
         platformAdminService.suspendDevice(deviceTarget.id, 'إيقاف عبر لوحة الأجهزة');
       } else if (deviceAction === 'release') {
         platformAdminService.releaseDevice(deviceTarget.id, 'تحرير عبر لوحة الأجهزة');
@@ -90,7 +141,7 @@ export const PlatformDevicesPage: React.FC = () => {
       toast.success(`تم ${deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'} الجهاز`);
       setDeviceTarget(null);
       setDeviceAction(null);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر تنفيذ الإجراء', err instanceof Error ? err.message : undefined);
     }
@@ -105,7 +156,7 @@ export const PlatformDevicesPage: React.FC = () => {
         actions={
           <div className="flex flex-wrap gap-2">
             {canManageDevices && (
-              <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
+              <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={() => void detectClones()}>
                 كشف الاستنساخ
               </Button>
             )}
@@ -174,14 +225,16 @@ export const PlatformDevicesPage: React.FC = () => {
                         <div className="flex items-center gap-1">
                           {canManageDevices && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); load(); }}
-                                className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                                title="إيقاف/تفعيل"
-                              >
-                                <Cpu className="h-3.5 w-3.5" />
-                              </button>
+                              {!centralMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); void load(); }}
+                                  className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                                  title="إيقاف/تفعيل"
+                                >
+                                  <Cpu className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               {device.status === 'ACTIVE' && (
                                 <button
                                   type="button"
@@ -212,14 +265,16 @@ export const PlatformDevicesPage: React.FC = () => {
                                   <ShieldX className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); load(); } }}
-                                className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                                title="حذف التفعيل"
-                              >
-                                <Cpu className="h-3.5 w-3.5" />
-                              </button>
+                              {!centralMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); void load(); } }}
+                                  className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                                  title="حذف التفعيل"
+                                >
+                                  <Cpu className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -242,7 +297,7 @@ export const PlatformDevicesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
-            <Button variant="danger" onClick={executeDeviceAction} disabled={!canManageDevices}>
+            <Button variant="danger" onClick={() => void executeDeviceAction()} disabled={!canManageDevices}>
               {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
             </Button>
           </div>

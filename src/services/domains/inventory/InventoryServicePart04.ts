@@ -37,8 +37,8 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
         w_in.name as toWarehouse,
         ABS(out_tx.quantity_m2) as quantityM2,
         ABS(out_tx.boxes_count) as boxesCount,
-        out_tx.unit_cost as unitCost,
-        out_tx.total_cost as totalCost,
+        out_tx.unit_cost / 100.0 as unitCost,
+        out_tx.total_cost / 100.0 as totalCost,
         u.full_name as performedByName
       FROM inventory_transactions out_tx
       JOIN (

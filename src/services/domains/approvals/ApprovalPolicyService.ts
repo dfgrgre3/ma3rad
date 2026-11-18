@@ -34,18 +34,22 @@ export const APPROVAL_OPERATIONS: ApprovalOperationDefinition[] = [
   { code: 'inventory.count.post', label: 'ترحيل الجرد', category: 'المخزون والمستودعات', permission: 'inventory.count', integrated: false },
   { code: 'inventory.return.create', label: 'إرجاع المنتجات للمخزون', category: 'المخزون والمستودعات', permission: 'inventory.adjust', integrated: false },
   { code: 'products.create', label: 'إضافة منتج', category: 'المنتجات', permission: 'ui.products.catalog.create', integrated: false },
-  { code: 'products.update', label: 'تعديل بيانات المنتج والأسعار', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: false },
+  { code: 'products.update', label: 'تعديل بيانات المنتج', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: false },
+  { code: 'products.price.update', label: 'تعديل أسعار المنتج فوق الحد المسموح', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: true },
   { code: 'products.delete', label: 'حذف منتج', category: 'المنتجات', permission: 'ui.products.catalog.delete', integrated: false },
   { code: 'sales.invoice.create', label: 'إنشاء فاتورة وخصم استثنائي', category: 'المبيعات', permission: 'ui.sales.invoices.create', integrated: false },
+  { code: 'sales.price.override', label: 'البيع تحت الحد الأدنى', category: 'المبيعات', permission: 'ui.sales.invoices.create', integrated: true },
   { code: 'sales.invoice.update', label: 'تعديل فاتورة', category: 'المبيعات', permission: 'ui.sales.invoices.update', integrated: false },
   { code: 'sales.invoice.cancel', label: 'إلغاء فاتورة', category: 'المبيعات', permission: 'ui.sales.invoices.delete', integrated: false },
-  { code: 'sales.return.create', label: 'مرتجع أو استرداد أموال', category: 'المبيعات', permission: 'ui.sales.returns.create', integrated: false },
+  { code: 'sales.invoice.void', label: 'إلغاء (Void) فاتورة حسب قيمتها', category: 'المبيعات', permission: 'ui.sales.invoices.void', integrated: true },
+  { code: 'sales.return.create', label: 'مرتجع أو استرداد أموال', category: 'المبيعات', permission: 'ui.returns.returns.create', integrated: true },
   { code: 'purchases.request.create', label: 'إنشاء طلب شراء', category: 'المشتريات', permission: 'ui.purchases.requests.create', integrated: false },
   { code: 'purchases.order.create', label: 'إنشاء أمر شراء', category: 'المشتريات', permission: 'ui.purchases.orders.create', integrated: false },
   { code: 'purchases.receive', label: 'استلام بضاعة', category: 'المشتريات', permission: 'ui.purchases.orders.create', integrated: false },
   { code: 'purchases.invoice.create', label: 'إنشاء فاتورة شراء', category: 'المشتريات', permission: 'ui.purchases.invoices.create', integrated: false },
   { code: 'purchases.return.create', label: 'مرتجع مورد', category: 'المشتريات', permission: 'ui.purchases.returns.return', integrated: false },
-  { code: 'finance.expense.create', label: 'إضافة مصروف', category: 'الحسابات والخزينة', permission: 'ui.cashier.expenses.expense', integrated: false },
+  { code: 'finance.expense.create', label: 'إضافة مصروف كبير أو تجاوز سقف المصروفات', category: 'الحسابات والخزينة', permission: 'ui.cashier.expenses.expense', integrated: true },
+  { code: 'purchases.supplier.payment', label: 'صرف دفعة لمورد فوق الحد المالي', category: 'المشتريات', permission: 'ui.suppliers.suppliers.payment', integrated: true },
   { code: 'finance.income.create', label: 'إضافة إيراد أو صرف أموال', category: 'الحسابات والخزينة', permission: 'finance.approve', integrated: false },
   { code: 'finance.transfer.create', label: 'تحويل أموال أو تعديل أرصدة', category: 'الحسابات والخزينة', permission: 'finance.approve', integrated: false },
   { code: 'finance.journal.delete', label: 'حذف قيد مالي', category: 'الحسابات والخزينة', permission: 'finance.journal.post', integrated: false },
@@ -111,7 +115,7 @@ export class ApprovalPolicyService {
       INSERT INTO approval_policies (
         operation_code, mode, executor_roles, approver_roles, min_approvals,
         allow_self_approval, max_value, expires_after_hours, approval_mode, scope_type, updated_by, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(operation_code) DO UPDATE SET mode = excluded.mode,
         executor_roles = excluded.executor_roles, approver_roles = excluded.approver_roles,
         min_approvals = excluded.min_approvals, allow_self_approval = excluded.allow_self_approval,
@@ -132,7 +136,7 @@ export class ApprovalPolicyService {
       operationCode: row.operationCode, mode: row.mode, executorRoles: parseRoles(row.executorRoles), approverRoles: parseRoles(row.approverRoles),
       minApprovals: Number(row.minApprovals) || 1, allowSelfApproval: Boolean(row.allowSelfApproval),
       approvalMode: row.approvalMode === 'MULTI' ? 'MULTI' : 'SINGLE', scopeType: ['BRANCH','WAREHOUSE','GLOBAL'].includes(row.scopeType) ? row.scopeType : 'BRANCH',
-      maxValue: row.maxValue == null ? null : Number(row.maxValue), expiresAfterHours: row.expiresAfterHours == null ? null : Number(row.expiresAfterHours),
+      maxValue: (row.max_value ?? row.maxValue) == null ? null : Number(row.max_value ?? row.maxValue) / 100, expiresAfterHours: row.expiresAfterHours == null ? null : Number(row.expiresAfterHours),
       updatedAt: row.updatedAt,
     };
   }

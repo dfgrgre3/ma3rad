@@ -46,7 +46,7 @@ export class InventoryCostingService {
       (id,product_id,warehouse_id,source_transaction_id,source_type,source_id,received_at,
        quantity_received,quantity_remaining,unit_cost,is_estimated,goods_receipt_id,
        purchase_invoice_id,batch_id,supplier_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [id, input.productId, input.warehouseId,
+      VALUES (?,?,?,?,?,?,?,?,?,ROUND(?*100),?,?,?,?,?)`, [id, input.productId, input.warehouseId,
       input.sourceTransactionId || null, input.sourceType, input.sourceId || null,
       input.date, quantity, quantity, unitCost, input.estimated ? 1 : 0,
       input.goodsReceiptId || null, input.purchaseInvoiceId || null, input.batchId || null, input.supplierId || null]);
@@ -57,7 +57,7 @@ export class InventoryCostingService {
     reservedByLayer: Map<string, number> = new Map()): FifoCostPlan {
     const quantity = round2(requestedQuantity);
     if (quantity <= 0) throw new Error('FIFO issue quantity must be positive.');
-    const stock = db.query<{ quantity: number; costPrice: number }>(`SELECT ws.quantity_m2 AS quantity,p.cost_price AS costPrice
+    const stock = db.query<{ quantity: number; costPrice: number }>(`SELECT ws.quantity_m2 AS quantity,p.cost_price / 100.0 AS costPrice
       FROM warehouse_stock ws JOIN products p ON p.id=ws.product_id
       WHERE ws.product_id=? AND ws.warehouse_id=?`, [productId,warehouseId])[0];
     if (!stock) throw new Error(`No stock record exists for FIFO product ${productId} in warehouse ${warehouseId}.`);
@@ -70,7 +70,7 @@ export class InventoryCostingService {
     } else if (unlayered < -0.009) {
       throw new Error(`FIFO layers exceed physical stock by ${Math.abs(unlayered)} m² for product ${productId}. Reconcile inventory before posting.`);
     }
-    const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost AS unitCost
+    const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost / 100.0 AS unitCost
       FROM inventory_cost_layers WHERE product_id=? AND warehouse_id=? AND quantity_remaining>0.009
       ORDER BY received_at,created_at,rowid`, [productId, warehouseId]);
     let needed = quantity;
@@ -97,13 +97,13 @@ export class InventoryCostingService {
       if (!result) throw new Error('A FIFO layer changed while the transaction was being posted. Retry the transaction.');
       db.run(`UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?`, [row.quantity, row.layerId]);
       db.run(`INSERT INTO inventory_cost_allocations
-        (id,outbound_transaction_id,layer_id,allocation_order,quantity,unit_cost,invoice_item_id) VALUES (?,?,?,?,?,?,?)`,
+        (id,outbound_transaction_id,layer_id,allocation_order,quantity,unit_cost,invoice_item_id) VALUES (?,?,?,?,?,ROUND(?*100),?)`,
         [`icla_${uuidv4().replace(/-/g, '').slice(0, 12)}`, transactionId, row.layerId, allocationOrder, row.quantity, row.unitCost, invoiceItemId || null]);
     }
   }
 
   static restoreIssue(db: DatabaseManager, outboundTransactionId: string, quantityToRestore?: number, legacyOnly = false): number {
-    const allocs = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
+    const allocs = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost / 100.0 AS unitCost
       FROM inventory_cost_allocations WHERE outbound_transaction_id=? AND (?=0 OR invoice_item_id IS NULL)
       ORDER BY allocation_order,created_at,id`, [outboundTransactionId, legacyOnly ? 1 : 0]);
     let remaining = quantityToRestore === undefined
@@ -124,7 +124,7 @@ export class InventoryCostingService {
   }
 
   static previewRestoreCost(db: DatabaseManager, outboundTransactionId: string, quantityToRestore: number, legacyOnly = false): number {
-    const rows = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
+    const rows = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost / 100.0 AS unitCost
       FROM inventory_cost_allocations WHERE outbound_transaction_id=? AND (?=0 OR invoice_item_id IS NULL)
       ORDER BY allocation_order,created_at,id`, [outboundTransactionId, legacyOnly ? 1 : 0]);
     let needed = round2(quantityToRestore);
@@ -177,7 +177,7 @@ export class InventoryCostingService {
 
   static getSourceLayerPlan(db: DatabaseManager, productId: string, warehouseId: string, sourceType: string, sourceId: string, quantity: number): FifoCostPlan {
     const requested = round2(quantity);
-    const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost AS unitCost
+    const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost / 100.0 AS unitCost
       FROM inventory_cost_layers WHERE product_id=? AND warehouse_id=? AND source_type=? AND source_id=? AND quantity_remaining>0.009
       ORDER BY received_at,created_at,rowid`, [productId, warehouseId, sourceType, sourceId]);
     let needed = requested;

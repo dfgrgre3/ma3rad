@@ -8,9 +8,13 @@ import type { SalesContext } from './context';
 import type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnDisposition, ReturnStats } from '../../../types/sales/serviceTypes';
 import {
   fetchInvoiceById,
+  fetchInvoiceByIdAsync,
   fetchInvoicePayments,
+  fetchInvoicePaymentsAsync,
   fetchInvoiceStats,
+  fetchInvoiceStatsAsync,
   fetchInvoicesFiltered,
+  fetchInvoicesFilteredAsync,
 } from './invoiceQueries';
 import { createSalesInvoice } from './invoiceCreation';
 import {
@@ -25,10 +29,15 @@ import { voidSalesInvoice } from './invoiceVoid';
 import {
   fetchReturnableItems,
   fetchReturnById,
+  fetchReturnByIdAsync,
   fetchReturnItems,
+  fetchReturnItemsAsync,
   fetchReturns,
+  fetchReturnsAsync,
   fetchReturnStats,
+  fetchReturnStatsAsync,
   fetchTopReturnReasons,
+  fetchTopReturnReasonsAsync,
 } from './returnQueries';
 
 export type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnDisposition, ReturnStats };
@@ -62,6 +71,11 @@ export class SalesService {
     return this.getInvoicesFiltered({ search, dateFrom, dateTo }, false);
   }
 
+  public async getAllInvoicesAsync(search?: string, dateFrom?: string, dateTo?: string): Promise<SalesInvoice[]> {
+    this.requireSalesView();
+    return this.getInvoicesFilteredAsync({ search, dateFrom, dateTo }, false);
+  }
+
   public getInvoicesFiltered(
     filters: InvoiceFilters = {},
     includeVoid = true
@@ -70,14 +84,32 @@ export class SalesService {
     return fetchInvoicesFiltered(this.context(), filters, includeVoid);
   }
 
+  public async getInvoicesFilteredAsync(
+    filters: InvoiceFilters = {},
+    includeVoid = true
+  ): Promise<(SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number })[]> {
+    this.requireSalesView();
+    return fetchInvoicesFilteredAsync(this.context(), filters, includeVoid);
+  }
+
   public getStats(filters: InvoiceFilters = {}, includeVoid = true): InvoiceStats {
     this.requireSalesView();
     return fetchInvoiceStats(this.context(), filters, includeVoid);
   }
 
+  public async getStatsAsync(filters: InvoiceFilters = {}, includeVoid = true): Promise<InvoiceStats> {
+    this.requireSalesView();
+    return fetchInvoiceStatsAsync(this.context(), filters, includeVoid);
+  }
+
   public getInvoiceById(id: string): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
     this.requireSalesView();
     return this.readInvoice(id);
+  }
+
+  public async getInvoiceByIdAsync(id: string): Promise<(SalesInvoice & { items: SalesInvoiceItem[] }) | null> {
+    this.requireSalesView();
+    return fetchInvoiceByIdAsync(this.context(), id);
   }
 
   public createSale(dto: CreateSaleDTO): SalesInvoice {
@@ -149,6 +181,11 @@ export class SalesService {
   public getInvoicePayments(invoiceId: string): CustomerPayment[] {
     this.requireSalesView();
     return fetchInvoicePayments(this.context(), invoiceId);
+  }
+
+  public async getInvoicePaymentsAsync(invoiceId: string): Promise<CustomerPayment[]> {
+    this.requireSalesView();
+    return fetchInvoicePaymentsAsync(this.context(), invoiceId);
   }
 
   public deleteInvoicePayment(paymentId: string): void {
@@ -233,9 +270,19 @@ export class SalesService {
     return fetchReturns(this.context(), search, dateFrom, dateTo);
   }
 
+  public async getReturnsAsync(search = '', dateFrom?: string, dateTo?: string): Promise<(SalesReturn & { customerName: string; invoiceNumber: string })[]> {
+    this.requireSalesView();
+    return fetchReturnsAsync(this.context(), search, dateFrom, dateTo);
+  }
+
   public getReturnById(id: string): (SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string }) | null {
     this.requireSalesView();
     return fetchReturnById(this.context(), id);
+  }
+
+  public async getReturnByIdAsync(id: string): Promise<(SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string }) | null> {
+    this.requireSalesView();
+    return fetchReturnByIdAsync(this.context(), id);
   }
 
   public getReturnsStats(): ReturnStats {
@@ -243,14 +290,29 @@ export class SalesService {
     return fetchReturnStats(this.context());
   }
 
+  public async getReturnsStatsAsync(): Promise<ReturnStats> {
+    this.requireSalesView();
+    return fetchReturnStatsAsync(this.context());
+  }
+
   public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
     this.requireSalesView();
     return fetchTopReturnReasons(this.context(), limit);
   }
 
+  public async getTopReturnReasonsAsync(limit = 5): Promise<{ reason: string; count: number; amount: number }[]> {
+    this.requireSalesView();
+    return fetchTopReturnReasonsAsync(this.context(), limit);
+  }
+
   public getReturnItems(returnId: string): SalesReturnItem[] {
     this.requireSalesView();
     return fetchReturnItems(this.context(), returnId);
+  }
+
+  public async getReturnItemsAsync(returnId: string): Promise<SalesReturnItem[]> {
+    this.requireSalesView();
+    return fetchReturnItemsAsync(this.context(), returnId);
   }
 
   /** Remaining returnable quantity per product for an invoice, after prior returns. */

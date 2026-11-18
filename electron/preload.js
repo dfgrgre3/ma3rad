@@ -31,6 +31,19 @@ contextBridge.exposeInMainWorld('ceramisys', {
     clearCredential: () => ipcRenderer.invoke('central:clear-credential'),
     request: (request) => ipcRenderer.invoke('central:request', request),
   },
+  centralAppBackup: {
+    status: () => ipcRenderer.invoke('central-app-backup:status'),
+    list: () => ipcRenderer.invoke('central-app-backup:list'),
+    pending: () => ipcRenderer.invoke('central-app-backup:pending'),
+    upload: (payload) => ipcRenderer.invoke('central-app-backup:upload', payload),
+    fetchRestore: (payload) => ipcRenderer.invoke('central-app-backup:fetch-restore', payload),
+    reportResult: (payload) => ipcRenderer.invoke('central-app-backup:report-result', payload),
+    onPendingRestore: (callback) => {
+      const handler = (_event, pending) => callback(pending);
+      ipcRenderer.on('central-app-backup:pending', handler);
+      return () => ipcRenderer.removeListener('central-app-backup:pending', handler);
+    },
+  },
   sync: {
     status: () => ipcRenderer.invoke('sync:status'),
     pushEvents: (events) => ipcRenderer.invoke('sync:push', events),

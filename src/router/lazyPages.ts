@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import './lazyPages_part01';
 import './lazyPages_part02';
 import './lazyPages_part03';
@@ -42,7 +43,7 @@ export { ReorderPlanningPage } from './lazyPages_part02';
 export { WarehouseLocationsPage } from './lazyPages_part02';
 export { DamageQuarantinePage } from './lazyPages_part02';
 export { InventoryReconciliationPage } from './lazyPages_part02';
-export { InventoryAlertsPage } from '../pages/inventory/inventory-alerts/InventoryAlertsPage';
+export const InventoryAlertsPage = lazy(() => import('../pages/inventory/inventory-alerts/InventoryAlertsPage').then(m => ({ default: m.InventoryAlertsPage })));
 export { BranchesPage } from './lazyPages_part02';
 export { WarehousesPage } from './lazyPages_part02';
 export { FleetDashboardPage } from './lazyPages_part02';

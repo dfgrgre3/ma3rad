@@ -786,7 +786,7 @@ export class DocumentService {
            (id, company_id, branch_id, contract_number, title, party_type, party_id, party_name,
             start_date, end_date, value, currency, status, auto_renew, renewal_notice_days,
             owner_user_id, document_id, notes, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           dto.companyId,
@@ -867,7 +867,7 @@ export class DocumentService {
       tx.run(
         `UPDATE enterprise_contracts SET
            title = ?, party_type = ?, party_id = ?, party_name = ?, start_date = ?, end_date = ?,
-           value = ?, currency = ?, auto_renew = ?, renewal_notice_days = ?, owner_user_id = ?,
+           value = ROUND(?*100), currency = ?, auto_renew = ?, renewal_notice_days = ?, owner_user_id = ?,
            document_id = ?, notes = ?, updated_at = ?
          WHERE id = ?`,
         [
@@ -1004,7 +1004,7 @@ export class DocumentService {
 
     this.db.executeTransaction((tx) => {
       tx.run(
-        'UPDATE enterprise_contracts SET end_date = ?, value = ?, updated_at = ? WHERE id = ?',
+        'UPDATE enterprise_contracts SET end_date = ?, value = ROUND(?*100), updated_at = ? WHERE id = ?',
         [endDate, value, nowIso(), id]
       );
       this.recordEvent('CONTRACT', id, 'RENEWED', actor, {
@@ -1064,7 +1064,7 @@ export class DocumentService {
       partyName: row.party_name ?? row.partyName,
       startDate,
       endDate,
-      value: Number(row.value || 0),
+      value: Number(row.value || 0) / 100,
       currency: row.currency,
       status,
       effectiveStatus,

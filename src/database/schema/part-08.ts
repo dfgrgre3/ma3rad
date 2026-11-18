@@ -69,9 +69,9 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
   supplier_id TEXT NOT NULL,
   warehouse_id TEXT NOT NULL,
   date TEXT NOT NULL,
-  total_amount REAL NOT NULL,
-  refunded_amount REAL NOT NULL DEFAULT 0,
-  remaining_to_balance REAL NOT NULL DEFAULT 0,
+  total_amount INTEGER NOT NULL,
+  refunded_amount INTEGER NOT NULL DEFAULT 0,
+  remaining_to_balance INTEGER NOT NULL DEFAULT 0,
   reason TEXT NOT NULL,
   created_by TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
   grade TEXT NOT NULL,
   quantity_m2 REAL NOT NULL,
   boxes_count REAL NOT NULL DEFAULT 0,
-  unit_cost REAL NOT NULL,
-  total_refund REAL NOT NULL,
+  unit_cost INTEGER NOT NULL,
+  total_refund INTEGER NOT NULL,
   FOREIGN KEY (return_id) REFERENCES purchase_returns(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS stock_transfers (
     'RECEIVED_FULL', 'RECEIVED_PARTIAL', 'REJECTED', 'CANCELLED', 'COMPLETED'
   )),
   total_quantity_m2 REAL NOT NULL DEFAULT 0,
-  total_cost REAL NOT NULL DEFAULT 0,
+  total_cost INTEGER NOT NULL DEFAULT 0,
   shipped_at TEXT,
   received_at TEXT,
   received_by TEXT,
@@ -133,8 +133,8 @@ CREATE TABLE IF NOT EXISTS stock_transfer_items (
   quantity_m2 REAL NOT NULL,
   boxes_count REAL DEFAULT 0,
   received_m2 REAL NOT NULL DEFAULT 0,
-  unit_cost REAL NOT NULL DEFAULT 0,
-  total_cost REAL NOT NULL DEFAULT 0,
+  unit_cost INTEGER NOT NULL DEFAULT 0,
+  total_cost INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (transfer_id) REFERENCES stock_transfers(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id)
 );

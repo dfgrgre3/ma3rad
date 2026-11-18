@@ -230,24 +230,24 @@ export class HistoricalReturnReconciliationService {
 
       tx.run(
         `UPDATE sales_returns
-         SET return_tax_amount = ?, refunded_amount = ?, remaining_to_balance = ?
+         SET return_tax_amount = ROUND(? * 100), refunded_amount = ROUND(? * 100), remaining_to_balance = ROUND(? * 100)
          WHERE id = ? AND return_tax_amount IS NULL`,
         [taxReduction, confirmedCashAmount, confirmedBalanceAmount, input.returnId]
       );
       tx.run(
         `UPDATE customers
-         SET current_balance = COALESCE(current_balance, 0) - ?,
-             total_purchases = COALESCE(total_purchases, 0) - ?,
+         SET current_balance = COALESCE(current_balance, 0) - ROUND(?*100),
+             total_purchases = COALESCE(total_purchases, 0) - ROUND(?*100),
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         [balanceDelta, customerPurchaseTaxReduction, fresh.customer_id]
       );
       tx.run(
         `UPDATE sales_invoices
-         SET returned_amount = COALESCE(returned_amount, 0) + ?,
-             remaining_amount = MAX(0, COALESCE(remaining_amount, 0) - ?),
+         SET returned_amount = COALESCE(returned_amount, 0) + ROUND(? * 100),
+             remaining_amount = MAX(0, COALESCE(remaining_amount, 0) - ROUND(? * 100)),
              payment_status = CASE
-               WHEN MAX(0, COALESCE(remaining_amount, 0) - ?) <= 0.009 THEN 'PAID'
+               WHEN MAX(0, COALESCE(remaining_amount, 0) - ROUND(? * 100)) <= 1 THEN 'PAID'
                WHEN COALESCE(paid_amount, 0) > 0 THEN 'PARTIAL'
                ELSE 'UNPAID'
              END,
@@ -261,7 +261,7 @@ export class HistoricalReturnReconciliationService {
            calculated_tax_amount, confirmed_cash_amount, confirmed_balance_amount,
            customer_purchase_tax_included, existing_ledger_summary, correction_entry_id,
            approved_by, approved_at, notes
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, ?, ?, ?, ?)`,
         [
           reconciliationId, input.returnId, freshCandidate.invoiceReturnedAmount,
           freshCandidate.storedCashAmount, freshCandidate.storedBalanceAmount, taxReduction,
@@ -335,20 +335,20 @@ export class HistoricalReturnReconciliationService {
     if (returnId) params.push(returnId);
     return queryLedgerRows<CandidateRow>(database, `
       SELECT sr.id, sr.customer_id, sr.return_number, sr.date, sr.original_invoice_id,
-             sr.total_amount AS net_amount,
+             sr.total_amount / 100.0 AS net_amount,
              si.invoice_number,
              COALESCE(si.branch_id, w.branch_id) AS branch_id,
-             MAX(0, COALESCE(si.subtotal, 0) - COALESCE(si.discount_amount, 0)) AS invoice_taxable_base,
-             COALESCE(si.tax_amount, 0) AS invoice_tax_amount,
-             COALESCE(sr.refunded_amount, 0) AS stored_cash_amount,
-             COALESCE(sr.remaining_to_balance, 0) AS stored_balance_amount,
-             COALESCE(si.returned_amount, 0) AS invoice_returned_amount,
-             COALESCE(c.current_balance, 0) AS customer_balance,
-             COALESCE(c.total_purchases, 0) AS customer_total_purchases,
-             COALESCE(si.remaining_amount, 0) AS invoice_remaining_amount,
+             MAX(0, COALESCE(si.subtotal, 0) - COALESCE(si.discount_amount, 0)) / 100.0 AS invoice_taxable_base,
+             COALESCE(si.tax_amount, 0) / 100.0 AS invoice_tax_amount,
+             COALESCE(sr.refunded_amount, 0) / 100.0 AS stored_cash_amount,
+             COALESCE(sr.remaining_to_balance, 0) / 100.0 AS stored_balance_amount,
+             COALESCE(si.returned_amount, 0) / 100.0 AS invoice_returned_amount,
+             COALESCE(c.current_balance, 0) / 100.0 AS customer_balance,
+             COALESCE(c.total_purchases, 0) / 100.0 AS customer_total_purchases,
+             COALESCE(si.remaining_amount, 0) / 100.0 AS invoice_remaining_amount,
              sr.register_id, sr.shift_id, c.name AS customer_name,
-             cr.current_balance AS cash_register_balance,
-             cs.total_refunds AS shift_total_refunds,
+             cr.current_balance / 100.0 AS cash_register_balance,
+             cs.total_refunds / 100.0 AS shift_total_refunds,
              COALESCE(ledger.entry_ids, '') AS ledger_entry_ids,
              COALESCE(ledger.entry_numbers, '') AS ledger_entry_numbers,
              COALESCE(ledger.lines_summary, '') AS ledger_lines_summary,
@@ -371,10 +371,10 @@ export class HistoricalReturnReconciliationService {
                GROUP_CONCAT(coa.code || ' D' || printf('%.2f', jel.debit) ||
                  ' C' || printf('%.2f', jel.credit), ' | ') AS lines_summary,
                SUM(CASE WHEN coa.code IN ('1101','1102','1105','1106')
-                   THEN jel.credit - jel.debit ELSE 0 END) AS cash_amount,
-               SUM(CASE WHEN coa.code = '4101' THEN jel.debit - jel.credit ELSE 0 END) AS revenue_amount,
-               SUM(CASE WHEN coa.code = '2102' THEN jel.debit - jel.credit ELSE 0 END) AS tax_amount,
-               SUM(CASE WHEN coa.code = '1103' THEN jel.credit - jel.debit ELSE 0 END) AS balance_amount
+                   THEN jel.credit - jel.debit ELSE 0 END) / 100.0 AS cash_amount,
+               SUM(CASE WHEN coa.code = '4101' THEN jel.debit - jel.credit ELSE 0 END) / 100.0 AS revenue_amount,
+               SUM(CASE WHEN coa.code = '2102' THEN jel.debit - jel.credit ELSE 0 END) / 100.0 AS tax_amount,
+               SUM(CASE WHEN coa.code = '1103' THEN jel.credit - jel.debit ELSE 0 END) / 100.0 AS balance_amount
         FROM journal_entries je
         JOIN journal_entry_lines jel ON jel.entry_id = je.id
         JOIN chart_of_accounts coa ON coa.id = jel.account_id
@@ -434,7 +434,7 @@ export class HistoricalReturnReconciliationService {
   ): { accountCode: string; debit: number; credit: number }[] {
     const existing = queryLedgerRows<{ code: string; signed_amount: number }>(
       tx.getDatabase(),
-      `SELECT coa.code, SUM(jel.debit - jel.credit) AS signed_amount
+      `SELECT coa.code, SUM(jel.debit - jel.credit) / 100.0 AS signed_amount
        FROM journal_entries je
        JOIN journal_entry_lines jel ON jel.entry_id = je.id
        JOIN chart_of_accounts coa ON coa.id = jel.account_id

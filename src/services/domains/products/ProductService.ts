@@ -7,10 +7,14 @@ import { PermissionService } from '../auth/PermissionService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { SettingsService } from '../config/SettingsService';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const PRODUCT_MONEY_FIELDS = ['costPrice','cost_price','sellingPriceM2','selling_price_m2','sellingPriceBox','selling_price_box','wholesalePriceM2','wholesale_price_m2','minSellingPriceM2','min_selling_price_m2'] as const;
 import { localDateString } from '../../../utils/shared/date';
 import { parseBusinessConfiguration } from '../../../config/businessProfiles';
 import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 
 export interface ProductQueryOptions {
   brandId?: string;
@@ -40,7 +44,13 @@ export class ProductService {
   private sync = new MasterDataSyncService(this.db);
 
   private productColumns(alias = 'p'): string {
-    const canViewCosts = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.overview.view');
+    // رؤية التكلفة: كود الحساسية المخصص finance.cost.view هو الأساس، مع
+    // الإبقاء على ui.finance.overview.view كبديل ترحيل حتى لا تنقطع
+    // القدرات عن الأدوار التي لم تُزرع لها الأكواد الجديدة بعد.
+    const user = AuthService.getCurrentUser();
+    const canViewCosts =
+      PermissionService.can(user, 'finance.cost.view')
+      || PermissionService.can(user, 'ui.finance.overview.view');
     return [
       `${alias}.id`, `${alias}.product_type`, `${alias}.custom_unit`, `${alias}.sku`, `${alias}.barcode`,
       `${alias}.name`, `${alias}.category_id`, `${alias}.brand_id`, `${alias}.grade`, `${alias}.size`,
@@ -66,8 +76,7 @@ export class ProductService {
     };
   }
 
-  public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
-    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+  private buildProductListQuery(search?: string, categoryId?: string, brandId?: string): { sql: string; params: any[] } {
     const scope = this.branchAccess.companyScope('p.company_id');
     let sql = `
       SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
@@ -95,18 +104,28 @@ export class ProductService {
     }
 
     sql += ` ORDER BY p.name ASC`;
-    return this.db.query<Product>(sql, params);
+    return { sql, params };
   }
 
-  public getProductsPage(
-    search = '',
-    categoryId?: string,
-    brandId?: string,
-    page = 1,
-    pageSize = 25,
-    options: ProductQueryOptions = {},
-  ) {
+  public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
     PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductListQuery(search, categoryId, brandId);
+    return this.db.query<Product>(sql, params).map((r) => unscaleMoneyRow(r, PRODUCT_MONEY_FIELDS));
+  }
+
+  public async getAllProductsAsync(search?: string, categoryId?: string, brandId?: string): Promise<Product[]> {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductListQuery(search, categoryId, brandId);
+    const rows = await this.db.queryAsync<Product>(sql, params);
+    return rows.map((r) => unscaleMoneyRow(r, PRODUCT_MONEY_FIELDS));
+  }
+
+  private buildProductsPageQuery(
+    search: string,
+    categoryId: string | undefined,
+    brandId: string | undefined,
+    options: ProductQueryOptions,
+  ): { dataSql: string; countSql: string; params: any[]; countParams: any[] } {
     const stock = this.stockSubquery();
     const scope = this.branchAccess.companyScope('p.company_id');
     const filters: string[] = [scope.clause];
@@ -172,35 +191,80 @@ export class ProductService {
       ...params.slice(stock.params.length),
     ];
 
-    return this.db.queryPage<Product>(
-      `SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName,
-              COALESCE(st.qty, 0) as totalStockM2,
-              CASE
-                WHEN p.product_type = 'GENERAL' AND p.base_unit = 'BOX' THEN COALESCE(st.qty, 0)
-                WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
-                WHEN p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box
-                ELSE 0
-              END as totalStockBoxes,
-              CASE
-                WHEN p.product_type = 'GENERAL' AND p.base_unit = 'PIECE' THEN COALESCE(st.qty, 0)
-                WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
-                WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
-                  THEN (COALESCE(st.qty, 0) / p.meters_per_box) * p.pieces_per_box
-                ELSE 0
-              END as totalStockPieces
-       ${fromSql} ORDER BY ${orderBy}`,
-      `SELECT COUNT(*) as total_items ${countFromSql}`,
-      params, page, pageSize, countParams,
-    );
+    const dataSql = `SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName,
+            COALESCE(st.qty, 0) as totalStockM2,
+            CASE
+              WHEN p.product_type = 'GENERAL' AND p.base_unit = 'BOX' THEN COALESCE(st.qty, 0)
+              WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
+              WHEN p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box
+              ELSE 0
+            END as totalStockBoxes,
+            CASE
+              WHEN p.product_type = 'GENERAL' AND p.base_unit = 'PIECE' THEN COALESCE(st.qty, 0)
+              WHEN p.product_type = 'GENERAL' AND p.base_unit <> 'M2' THEN 0
+              WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
+                THEN (COALESCE(st.qty, 0) / p.meters_per_box) * p.pieces_per_box
+              ELSE 0
+            END as totalStockPieces
+     ${fromSql} ORDER BY ${orderBy}`;
+
+    return { dataSql, countSql: `SELECT COUNT(*) as total_items ${countFromSql}`, params, countParams };
   }
 
-  public getProductStats(): ProductStats {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.products.catalog.view');
-    const canViewCosts = PermissionService.can(actor, 'ui.finance.overview.view');
+  private async queryProductsPageAsync(
+    dataSql: string,
+    countSql: string,
+    params: any[],
+    page: number,
+    pageSize: number,
+    countParams: any[],
+  ) {
+    const safePageSize = Math.min(Math.max(Math.floor(pageSize) || 25, 1), 100);
+    const countRows = await this.db.queryAsync<{ total_items: number }>(countSql, countParams);
+    const totalItems = Number(countRows[0]?.total_items ?? (countRows[0] as any)?.totalItems ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+    const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), totalPages);
+    const items = await this.db.queryAsync<Product>(
+      `${dataSql} LIMIT ? OFFSET ?`,
+      [...params, safePageSize, (safePage - 1) * safePageSize],
+    );
+    return { items, page: safePage, pageSize: safePageSize, totalItems, totalPages };
+  }
+
+  public getProductsPage(
+    search = '',
+    categoryId?: string,
+    brandId?: string,
+    page = 1,
+    pageSize = 25,
+    options: ProductQueryOptions = {},
+  ) {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { dataSql, countSql, params, countParams } = this.buildProductsPageQuery(search, categoryId, brandId, options);
+    const pageResult = this.db.queryPage<Product>(dataSql, countSql, params, page, pageSize, countParams);
+    pageResult.items = pageResult.items.map((r) => unscaleMoneyRow(r, PRODUCT_MONEY_FIELDS));
+    return pageResult;
+  }
+
+  public async getProductsPageAsync(
+    search = '',
+    categoryId?: string,
+    brandId?: string,
+    page = 1,
+    pageSize = 25,
+    options: ProductQueryOptions = {},
+  ) {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { dataSql, countSql, params, countParams } = this.buildProductsPageQuery(search, categoryId, brandId, options);
+    const pageResult = await this.queryProductsPageAsync(dataSql, countSql, params, page, pageSize, countParams);
+    pageResult.items = pageResult.items.map((r) => unscaleMoneyRow(r, PRODUCT_MONEY_FIELDS));
+    return pageResult;
+  }
+
+  private buildProductStatsQuery(actor: ReturnType<typeof AuthService.requireAuth>) {
     const stock = this.stockSubquery();
     const companyScope = this.branchAccess.companyScope('p.company_id', actor);
-    const rows = this.db.query<any>(`
+    const sql = `
       SELECT
         COUNT(*) as totalProducts,
         COALESCE(SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END), 0) as activeProducts,
@@ -208,12 +272,17 @@ export class ProductService {
         COALESCE(SUM(CASE WHEN p.is_active = 1 AND COALESCE(st.qty, 0) <= 0 THEN 1 ELSE 0 END), 0) as outOfStock,
         COALESCE(SUM(CASE WHEN p.is_active = 1 AND COALESCE(st.qty, 0) > 0 AND COALESCE(st.qty, 0) <= p.min_stock_level THEN 1 ELSE 0 END), 0) as lowStock,
         COALESCE(SUM(CASE WHEN p.is_active = 1 THEN COALESCE(st.qty, 0) ELSE 0 END), 0) as totalStockM2,
-        COALESCE(SUM(CASE WHEN p.is_active = 1 THEN COALESCE(st.qty, 0) * p.cost_price ELSE 0 END), 0) as totalStockValue,
+        COALESCE(SUM(CASE WHEN p.is_active = 1 THEN COALESCE(st.qty, 0) * p.cost_price ELSE 0 END), 0) / 100.0 as totalStockValue,
         COALESCE(SUM(CASE WHEN p.is_active = 1 AND p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box ELSE 0 END), 0) as totalBoxes
       FROM products p
       LEFT JOIN ${stock.sql} st ON st.product_id = p.id
       WHERE ${companyScope.clause}
-    `, [...stock.params, ...companyScope.params]);
+    `;
+    return { sql, params: [...stock.params, ...companyScope.params] };
+  }
+
+  private mapProductStatsRows(rows: any[], actor: ReturnType<typeof AuthService.requireAuth>): ProductStats {
+    const canViewCosts = PermissionService.can(actor, 'ui.finance.overview.view');
     const r = rows[0] || {};
     return {
       totalProducts: Number(r.totalProducts) || 0,
@@ -227,17 +296,44 @@ export class ProductService {
     };
   }
 
-  public getProductById(id: string): Product | null {
-    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+  public getProductStats(): ProductStats {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductStatsQuery(actor);
+    return this.mapProductStatsRows(this.db.query<any>(sql, params), actor);
+  }
+
+  public async getProductStatsAsync(): Promise<ProductStats> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductStatsQuery(actor);
+    return this.mapProductStatsRows(await this.db.queryAsync<any>(sql, params), actor);
+  }
+
+  private buildProductByIdQuery(id: string): { sql: string; params: any[] } {
     const scope = this.branchAccess.companyScope('p.company_id');
-    const rows = this.db.query<Product>(`
+    const sql = `
       SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
       WHERE p.id = ? AND ${scope.clause}
-    `, [id, ...scope.params]);
-    return rows.length > 0 ? rows[0] : null;
+    `;
+    return { sql, params: [id, ...scope.params] };
+  }
+
+  public getProductById(id: string): Product | null {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductByIdQuery(id);
+    const rows = this.db.query<Product>(sql, params);
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], PRODUCT_MONEY_FIELDS) : null;
+  }
+
+  public async getProductByIdAsync(id: string): Promise<Product | null> {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductByIdQuery(id);
+    const rows = await this.db.queryAsync<Product>(sql, params);
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], PRODUCT_MONEY_FIELDS) : null;
   }
 
   public getProductByBarcode(barcode: string): Product | null {
@@ -250,7 +346,7 @@ export class ProductService {
       LEFT JOIN brands b ON p.brand_id = b.id
       WHERE (p.barcode = ? OR p.sku = ?) AND p.is_active = 1 AND ${scope.clause}
     `, [barcode, barcode, ...scope.params]);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], PRODUCT_MONEY_FIELDS) : null;
   }
 
   public generateNextBarcode(currentValue = ''): string {
@@ -317,7 +413,7 @@ export class ProductService {
           pieces_per_box, meters_per_box, weight_per_box, cost_price,
           selling_price_m2, selling_price_box, wholesale_price_m2, min_selling_price_m2,
           min_stock_level, max_stock_level, image_path, notes, is_active, company_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?)
       `, [
         id, product.productType || defaultProductType, product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
           product.grade || 'GRADE_1', product.size || '', product.thickness || 0, product.color || '', product.tone || '', product.finish || '',
@@ -345,7 +441,7 @@ export class ProductService {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
             notes, performed_by
-          ) VALUES (?, ?, 'OPENING_BALANCE', ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', 'رصيد افتتاحي عند تعريف الصنف', ?)
+          ) VALUES (?, ?, 'OPENING_BALANCE', ?, ?, ?, ROUND(?*100), ROUND(?*100), 'ADJUSTMENT', 'رصيد افتتاحي عند تعريف الصنف', ?)
         `, [
           txId, txNum, id, initialStock.warehouseId,
           initialStock.quantityM2,
@@ -373,10 +469,61 @@ export class ProductService {
     });
   }
 
-  public updateProduct(id: string, updates: Partial<Product>, performedBy = 'usr_admin'): Product {
+  public updateProduct(
+    id: string,
+    updates: Partial<Product>,
+    performedBy = 'usr_admin',
+    options: { approvalId?: string } = {}
+  ): Product {
     PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const existing = this.getProductById(id);
     if (!existing) throw new Error('المنتج غير موجود.');
+
+    // ── Approval gate: تغيير أسعار المنتج يتطلب موافقة عند تجاوز الحد ──
+    const priceFields = ['costPrice', 'sellingPriceM2', 'sellingPriceBox', 'wholesalePriceM2', 'minSellingPriceM2'] as const;
+    const priceChanges: Record<string, { from: number; to: number }> = {};
+    let maxPriceDelta = 0;
+    for (const field of priceFields) {
+      const next = updates[field];
+      if (next === undefined || next === null) continue;
+      const from = Number((existing as any)[field] ?? 0);
+      const to = Number(next);
+      if (!Number.isFinite(to)) continue;
+      const delta = Math.abs(to - from);
+      if (delta > 0.0001) {
+        priceChanges[field] = { from, to };
+        maxPriceDelta = Math.max(maxPriceDelta, delta);
+      }
+    }
+    const gate = new OperationApprovalGate(this.db);
+    let priceApprovalRequired = false;
+    let resolvedApprovalId: string | null = null;
+    let pricePolicy: unknown = null;
+    if (maxPriceDelta > 0) {
+      const evalResult = gate.evaluate('products.price.update', maxPriceDelta);
+      pricePolicy = evalResult.policy;
+      priceApprovalRequired = evalResult.required;
+      if (priceApprovalRequired) {
+        resolvedApprovalId = options.approvalId
+          ?? gate.findApproved('products.price.update', 'PRICE_CHANGE', { productId: id });
+        if (options.approvalId) {
+          gate.assertApproved(options.approvalId, 'products.price.update', { productId: id });
+        }
+        if (!resolvedApprovalId) {
+          const productName = existing.name ?? id;
+          const approvalId = gate.requestApproval({
+            operationCode: 'products.price.update',
+            requestType: 'PRICE_CHANGE',
+            title: `تعديل أسعار ${productName}`,
+            description: Object.entries(priceChanges).map(([f, c]) => `${f}: ${c.from} → ${c.to}`).join('، '),
+            requestedValue: maxPriceDelta,
+            currentValue: null,
+            details: { productId: id, changes: priceChanges, dedupeKey: `price:${id}:${JSON.stringify(priceChanges)}`, policy: pricePolicy },
+          });
+          gate.throwRequested(approvalId);
+        }
+      }
+    }
 
     if (updates.sku && updates.sku !== existing.sku) {
       const dup = this.db.query('SELECT id FROM products WHERE sku = ? AND id != ?', [updates.sku, id]);
@@ -416,11 +563,11 @@ export class ProductService {
         pieces_per_box = COALESCE(?, pieces_per_box),
         meters_per_box = COALESCE(?, meters_per_box),
         weight_per_box = COALESCE(?, weight_per_box),
-        cost_price = COALESCE(?, cost_price),
-        selling_price_m2 = COALESCE(?, selling_price_m2),
-        selling_price_box = COALESCE(?, selling_price_box),
-        wholesale_price_m2 = COALESCE(?, wholesale_price_m2),
-        min_selling_price_m2 = COALESCE(?, min_selling_price_m2),
+        cost_price = COALESCE(ROUND(?*100), cost_price),
+        selling_price_m2 = COALESCE(ROUND(?*100), selling_price_m2),
+        selling_price_box = COALESCE(ROUND(?*100), selling_price_box),
+        wholesale_price_m2 = COALESCE(ROUND(?*100), wholesale_price_m2),
+        min_selling_price_m2 = COALESCE(ROUND(?*100), min_selling_price_m2),
         min_stock_level = COALESCE(?, min_stock_level),
         max_stock_level = COALESCE(?, max_stock_level),
         notes = COALESCE(?, notes),
@@ -446,12 +593,55 @@ export class ProductService {
         VALUES (?, ?, 'المدير', 'تعديل بيانات صنف', 'PRODUCTS', ?, ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
+      if (resolvedApprovalId) {
+        gate.consume(resolvedApprovalId, 'PRICE_CHANGE', id, sqliteDb);
+      }
+
       return this.getProductById(id)!;
     });
   }
 
-  public deleteProduct(id: string, performedBy = 'usr_admin'): void {
-    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.delete');
+  public deleteProduct(
+    id: string,
+    performedBy = 'usr_admin',
+    options: { approvalId?: string; reason?: string } = {}
+  ): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.products.catalog.delete');
+    const existing = this.getProductById(id);
+    if (!existing) throw new Error('المنتج غير موجود.');
+
+    // ── Approval gate: حذف بيانات يتطلب موافقة إدارية وتسجيل السبب ──
+    const gate = new OperationApprovalGate(this.db);
+    const { policy: deletePolicy } = gate.evaluate('products.delete');
+    const isAdmin = actor.role === 'ADMIN' || actor.role === 'SUPER_ADMIN';
+    const deleteApprovalRequired = !isAdmin;
+    if (deleteApprovalRequired && !options.reason?.trim()) {
+      throw new Error('سبب حذف البيانات مطلوب عند الحاجة لموافقة.');
+    }
+    let resolvedApprovalId: string | null = null;
+    if (deleteApprovalRequired) {
+      resolvedApprovalId = options.approvalId
+        ?? gate.findApproved('products.delete', 'DATA_DELETE', { productId: id });
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'products.delete', { productId: id });
+      }
+      if (!resolvedApprovalId) {
+        const approvalId = gate.requestApproval({
+          operationCode: 'products.delete',
+          requestType: 'DATA_DELETE',
+          title: `حذف منتج ${existing.name ?? id}`,
+          description: options.reason!.trim(),
+          details: {
+            productId: id, productName: existing.name ?? null,
+            reason: options.reason!.trim(),
+            dedupeKey: `delete:product:${id}`, policy: deletePolicy,
+          },
+        });
+        gate.throwRequested(approvalId);
+      }
+    }
+
     this.db.executeTransaction((sqliteDb) => {
       const hasSales = sqliteDb.query(`SELECT id FROM sales_invoice_items WHERE product_id = ? LIMIT 1`, [id]);
       if (hasSales.length > 0) {
@@ -466,6 +656,10 @@ export class ProductService {
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
         VALUES (?, ?, 'المدير', 'حذف/تعطيل صنف', 'PRODUCTS', ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id]);
+
+      if (resolvedApprovalId) {
+        gate.consume(resolvedApprovalId, 'DATA_DELETE', id, sqliteDb);
+      }
     });
   }
 
@@ -528,11 +722,9 @@ export class ProductService {
     }, undefined, performedBy);
   }
 
-  public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.products.catalog.view');
+  private buildProductStockSummaryQuery(productId: string, actor: ReturnType<typeof AuthService.requireAuth>) {
     const scope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
-    const rows = this.db.query<WarehouseStock>(`
+    const sql = `
       SELECT ws.*, w.name as warehouseName,
              p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
              p.meters_per_box as metersPerBox,
@@ -541,8 +733,11 @@ export class ProductService {
       JOIN warehouses w ON ws.warehouse_id = w.id
       JOIN products p ON ws.product_id = p.id
       WHERE ws.product_id = ? AND ${scope.clause}
-    `, [productId, ...scope.params]);
+    `;
+    return { sql, params: [productId, ...scope.params] };
+  }
 
+  private mapProductStockSummaryRows(rows: WarehouseStock[]): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
     let totalM2 = 0;
     let totalBoxes = 0;
     let totalPieces = 0;
@@ -575,6 +770,20 @@ export class ProductService {
       totalPieces,
       byWarehouse: mapped
     };
+  }
+
+  public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductStockSummaryQuery(productId, actor);
+    return this.mapProductStockSummaryRows(this.db.query<WarehouseStock>(sql, params));
+  }
+
+  public async getProductStockSummaryAsync(productId: string): Promise<{ totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] }> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.products.catalog.view');
+    const { sql, params } = this.buildProductStockSummaryQuery(productId, actor);
+    return this.mapProductStockSummaryRows(await this.db.queryAsync<WarehouseStock>(sql, params));
   }
 }
 

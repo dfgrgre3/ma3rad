@@ -12,6 +12,8 @@ import {
   ROLE_DEFAULTS,
   EMPLOYEE_PERMISSION_ALIASES,
 } from './catalog';
+import { AuthorizationService } from '../authorization/AuthorizationService';
+import type { AuthContext } from '../authorization/AuthorizationService';
 
 /** Alphabetical comparator backed by String.localeCompare for deterministic text sorts. */
 const compareAlphabetically = (a: string, b: string) => a.localeCompare(b, 'ar');
@@ -102,12 +104,15 @@ export class PermissionChecker {
     return Array.from(PermissionChecker.loadSets(user).grants).sort(compareAlphabetically);
   }
 
-  public static can(user: User | null, required: string, scope?: string): boolean {
-    if (!user) return false;
-    // القيود المنشورة من منصة الإدارة المركزية تتقدّم على صلاحيات الأدوار،
-    // فتُخفى الأزرار/الإجراءات تلقائياً في كل واجهة تعتمد على هذه الطبقة.
-    if (!CentralFeaturePermissionService.allowsPermission(required, scope)) return false;
-    return PermissionChecker.hasRoleGrant(user, required);
+  public static can(user: User | null, required: string, scope?: string, ctx?: AuthContext): boolean {
+    // scope التاريخي هو مسار الصفحة — يُمرَّر كـ ctx.path إلى محرك الصلاحيات
+    // الموحد الذي يقيّم الأبعاد: central → grant → scope → amount → sensitivity.
+    return AuthorizationService.evaluate(user, required, { path: scope, ...ctx }).allowed;
+  }
+
+  /** تقييم موسّع بالسياق الكامل (فرع/مخزن/مبلغ/عملية) — للمرحلة 1+. */
+  public static evaluate(user: User | null, required: string, ctx: AuthContext = {}): ReturnType<typeof AuthorizationService.evaluate> {
+    return AuthorizationService.evaluate(user, required, ctx);
   }
 
   /**
@@ -150,8 +155,8 @@ export class PermissionChecker {
     return grants.has(`${mod}.*`) || grants.has('*');
   }
 
-  public static canAny(user: User | null, required: string[], scope?: string): boolean {
-    return required.some((code) => PermissionChecker.can(user, code, scope));
+  public static canAny(user: User | null, required: string[], scope?: string, ctx?: AuthContext): boolean {
+    return required.some((code) => PermissionChecker.can(user, code, scope, ctx));
   }
 
   /**
@@ -188,34 +193,32 @@ export class PermissionChecker {
   }
 
   /** Server-side (service-layer) enforcement — never trust the UI. */
-  public static require(user: User | null, required: string, scope?: string): void {
+  public static require(user: User | null, required: string, scope?: string, ctx?: AuthContext): void {
     if (user?.mustChangePassword) {
       PermissionChecker.audit(user, 'محاولة استخدام النظام قبل إكمال إعداد الحساب', 'SECURITY', `perm:${required}`, null, { required, path: scope ?? null });
       throw new Error('يجب إكمال إعداد الحساب قبل استخدام خدمات النظام.');
     }
-    const locallyAllowed = PermissionChecker.hasRoleGrant(user, required);
-    const centrallyDisabled = CentralFeaturePermissionService.isPermissionDisabled(required);
-    const pageAllowed = scope === undefined || CentralFeaturePermissionService.allowsPermission(required, scope);
-    if (!locallyAllowed || centrallyDisabled || !pageAllowed) {
-      PermissionChecker.audit(
-        user,
-        'محاولة وصول مرفوضة',
-        'SECURITY',
-        `perm:${required}`,
-        null,
-        { required, path: scope ?? null }
-      );
-      throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${required}).`);
-    }
+    const decision = AuthorizationService.evaluate(user, required, { path: scope, ...ctx });
+    if (decision.allowed) return;
+    const detail = decision.dimension === 'amount' && decision.requiresApproval
+      ? 'يتطلب موافقة'
+      : decision.reason;
+    PermissionChecker.audit(
+      user,
+      'محاولة وصول مرفوضة',
+      'SECURITY',
+      `perm:${required}`,
+      null,
+      { required, path: scope ?? null, dimension: decision.dimension ?? null, reason: detail, approvalRequestId: decision.approvalRequestId ?? null }
+    );
+    throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${required} — ${detail}).`);
   }
 
   /** Require any one of several permission codes (least-privilege alternatives). */
-  public static requireAny(user: User | null, required: string[], scope?: string): void {
+  public static requireAny(user: User | null, required: string[], scope?: string, ctx?: AuthContext): void {
     if (required.length === 0) throw new Error('لم تُحدد صلاحية مطلوبة.');
     const allowed = required.some((code) =>
-      PermissionChecker.hasRoleGrant(user, code)
-      && !CentralFeaturePermissionService.isPermissionDisabled(code)
-      && (scope === undefined || CentralFeaturePermissionService.allowsPermission(code, scope))
+      AuthorizationService.evaluate(user, code, { path: scope, ...ctx }).allowed
     );
     if (!allowed) {
       const codes = required.join(' أو ');
@@ -234,6 +237,7 @@ export class PermissionChecker {
   public static invalidate(user?: User): void {
     if (user && PermissionChecker.cache) PermissionChecker.cache.delete(user.id);
     else PermissionChecker.cache = null;
+    AuthorizationService.invalidate(user?.id);
   }
 }
 

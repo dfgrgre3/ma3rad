@@ -14,7 +14,9 @@ const {
   registerDatabaseHandlers,
   decryptDatabaseBytes,
   readOrCreateDatabaseKey,
+  verifySQLiteDatabaseBytes,
 } = require('./databaseHandlers');
+const { createAppBackupClient, registerCentralAppBackupHandlers, startPendingRestoreWatcher } = require('./centralAppBackup');
 const { registerAppHandlers } = require('./appHandlers');
 const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
@@ -30,7 +32,7 @@ const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 // electron-updater is lazily loaded in autoUpdater.js to avoid accessing 'app' before ready
 const { getMaxDatabaseSize, getMaxV8HeapSize } = require('./databaseMemoryPolicy');
-const { configureHwidCache, warmUpHardwareId } = require('./hardwareId');
+const { configureHwidCache, warmUpHardwareId, getHardwareId } = require('./hardwareId');
 
 // ───────────────────────────── Environment ────────────────────────────────────
 //   LICENSE_MODE=account|hardwa   (default: hardwa; overridden by the protected saved mode)
@@ -331,6 +333,39 @@ registerDatabaseHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
+});
+
+// ─── Central application (ERP) backup channel ────────────────────────────────
+// Binary artifact transfer bypasses the JSON-only central:request bridge. The
+// artifact stays encrypted with this device's database key end-to-end; the
+// central server only ever sees opaque bytes.
+const centralAppBackupClient = createAppBackupClient({
+  getOrigin: async () => CENTRAL_API_URL?.origin || null,
+  getCredential: () => loadCentralCredential(),
+  getDeviceId: async () => getHardwareId(),
+});
+registerCentralAppBackupHandlers({
+  ipcMain,
+  validateIpcSender,
+  client: centralAppBackupClient,
+  getStatus: async () => ({
+    configured: Boolean(CENTRAL_API_URL),
+    activated: Boolean(await loadCentralCredential()),
+  }),
+  BACKUP_DIR,
+  MAX_DB_SIZE,
+  decryptArtifact: async (encrypted) => {
+    const data = Buffer.from(encrypted);
+    const key = await readOrCreateDatabaseKey({
+      appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
+    });
+    const plaintext = decryptDatabaseBytes(data, key);
+    if (plaintext.length > MAX_DB_SIZE) {
+      throw new Error(`Database size exceeds the device limit (${Math.floor(MAX_DB_SIZE / (1024 * 1024))} MiB).`);
+    }
+    await verifySQLiteDatabaseBytes(plaintext);
+    return plaintext;
+  },
 });
 registerAppHandlers({
   ipcMain, validateIpcSender, app, fs, shell, dialog, BrowserWindow,
@@ -844,6 +879,16 @@ app.whenReady().then(async () => {
     console.warn('[central] CENTRAL_API_URL is unset or invalid; central API requests are disabled.');
   }
   createWindow();
+  // Periodically detect platform-requested ERP restores and notify the UI;
+  // applying still requires an explicit user action in the backup page.
+  startPendingRestoreWatcher({
+    client: centralAppBackupClient,
+    broadcast: (pending) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('central-app-backup:pending', pending);
+      }
+    },
+  });
   updateController = configureAutoUpdater({
     app,
     ipcMain,

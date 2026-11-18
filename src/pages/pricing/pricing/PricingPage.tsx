@@ -32,11 +32,11 @@ export const PricingPage: React.FC = () => {
   const [items, setItems] = useState<PriceListItem[]>([]);
   const [itemForm, setItemForm] = useState({ productId: '', priceM2: '', priceBox: '', minQuantityM2: '' });
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setLists(service.getPriceLists());
-      setProducts(new ProductService().getAllProducts());
+      setProducts(await new ProductService().getAllProductsAsync());
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل قوائم الأسعار.');

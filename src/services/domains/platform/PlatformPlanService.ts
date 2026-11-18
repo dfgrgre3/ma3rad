@@ -4,7 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformPlan,
   PlatformPlanInput,
   PlatformPlanVersion,
@@ -122,7 +122,7 @@ export class PlatformPlanService {
          seats_limit, branches_limit, devices_limit, storage_limit_mb, max_products, max_warehouses,
          trial_days, included_modules, features, permissions, is_active, is_default, sort_order,
          subscriber_count, offline_grace_period_days, versioned, current_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, code, input.name.trim(), input.description?.trim() ?? null,
         input.billingCycle ?? 'MONTHLY',
@@ -137,9 +137,9 @@ export class PlatformPlanService {
         toNumber(input.maxProducts, 1000),
         toNumber(input.maxWarehouses, 2),
         toNumber(input.trialDays, 14),
-        input.includedModules ?? [],
-        input.features ?? [],
-        input.permissions ?? [],
+        JSON.stringify(input.includedModules ?? []),
+        JSON.stringify(input.features ?? []),
+        JSON.stringify(input.permissions ?? []),
         input.isActive !== false ? 1 : 0,
         0,
         0,
@@ -207,7 +207,7 @@ export class PlatformPlanService {
 
     this.db.run(
       `UPDATE platform_plans SET
-         code = ?, name = ?, description = ?, billing_cycle = ?, price = ?, monthly_price = ?, yearly_price = ?, currency = ?,
+         code = ?, name = ?, description = ?, billing_cycle = ?, price = ROUND(?*100), monthly_price = ROUND(?*100), yearly_price = ROUND(?*100), currency = ?,
          seats_limit = ?, branches_limit = ?, devices_limit = ?, storage_limit_mb = ?, max_products = ?, max_warehouses = ?,
          trial_days = ?, included_modules = ?, features = ?, permissions = ?, is_active = ?,
          offline_grace_period_days = ?, updated_at = ?
@@ -226,9 +226,9 @@ export class PlatformPlanService {
         toNumber(input.maxProducts ?? existing.maxProducts),
         toNumber(input.maxWarehouses ?? existing.maxWarehouses),
         toNumber(input.trialDays ?? existing.trialDays),
-        input.includedModules ?? existing.includedModules,
-        input.features ?? existing.features,
-        input.permissions ?? existing.permissions,
+        JSON.stringify(input.includedModules ?? existing.includedModules),
+        JSON.stringify(input.features ?? existing.features),
+        JSON.stringify(input.permissions ?? existing.permissions),
         input.isActive !== undefined ? (input.isActive ? 1 : 0) : (existing.isActive ? 1 : 0),
         toNumber(input.offlineGracePeriodDays ?? existing.offlineGracePeriodDays),
         now, id,
@@ -240,7 +240,7 @@ export class PlatformPlanService {
     if (newPrice !== existing.price) {
       this.db.run(
         `INSERT INTO platform_price_history (id, plan_id, old_price, new_price, changed_at, changed_by)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ROUND(?*100), ROUND(?*100), ?, ?)`,
         [`ph_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, existing.price, newPrice, now, AuthService.getCurrentUser()?.id ?? 'system']
       );
     }
@@ -288,8 +288,8 @@ export class PlatformPlanService {
     return rows.map((row) => ({
       id: String(row.id),
       planId: String(row.plan_id),
-      oldPrice: toNumber(row.old_price, 0),
-      newPrice: toNumber(row.new_price, 0),
+      oldPrice: toNumber(row.old_price, 0) / 100,
+      newPrice: toNumber(row.new_price, 0) / 100,
       changedAt: String(row.changed_at),
       changedBy: String(row.changed_by),
     }));
@@ -320,13 +320,13 @@ export class PlatformPlanService {
          seats_limit, branches_limit, devices_limit, storage_limit_mb, max_products, max_warehouses,
          trial_days, included_modules, features, permissions, is_active, is_default, sort_order,
          subscriber_count, offline_grace_period_days, versioned, current_version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, code, newName.trim(), source.description,
         source.billingCycle, source.price, source.monthlyPrice, source.yearlyPrice, source.currency,
         source.seatsLimit, source.branchesLimit, source.devicesLimit,
         source.storageLimitMb, source.maxProducts, source.maxWarehouses,
-        source.trialDays, source.includedModules, source.features, source.permissions,
+        source.trialDays, JSON.stringify(source.includedModules), JSON.stringify(source.features), JSON.stringify(source.permissions),
         0, 0, source.sortOrder + 1,
         0, source.offlineGracePeriodDays, source.versioned, source.versioned ? 1 : null,
         effective, effective,
@@ -488,13 +488,13 @@ export class PlatformPlanService {
          seats_limit, branches_limit, devices_limit, storage_limit_mb, max_products, max_warehouses,
          trial_days, included_modules, features, permissions, is_active, is_default, sort_order,
          offline_grace_period_days, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, input.planId, input.version, input.name, input.description ?? null,
         input.billingCycle, input.price, input.monthlyPrice, input.yearlyPrice, input.currency,
         input.seatsLimit, input.branchesLimit, input.devicesLimit,
         input.storageLimitMb, input.maxProducts, input.maxWarehouses,
-        input.trialDays, input.includedModules, input.features, input.permissions,
+        input.trialDays, JSON.stringify(input.includedModules), JSON.stringify(input.features), JSON.stringify(input.permissions),
         input.isActive ? 1 : 0, input.isDefault ? 1 : 0, input.sortOrder,
         input.offlineGracePeriodDays, input.createdBy, now,
       ]
@@ -510,9 +510,9 @@ export class PlatformPlanService {
       name: String(row.name),
       description: row.description ?? null,
       billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0),
-      monthlyPrice: toNumber(row.monthly_price, 0),
-      yearlyPrice: toNumber(row.yearly_price, 0),
+      price: toNumber(row.price, 0) / 100,
+      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
+      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
       currency: row.currency ?? 'EGP',
       seatsLimit: toNumber(row.seats_limit, 1),
       branchesLimit: toNumber(row.branches_limit, 1),
@@ -542,9 +542,9 @@ export class PlatformPlanService {
       name: String(row.name),
       description: row.description ?? null,
       billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0),
-      monthlyPrice: toNumber(row.monthly_price, 0),
-      yearlyPrice: toNumber(row.yearly_price, 0),
+      price: toNumber(row.price, 0) / 100,
+      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
+      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
       currency: row.currency ?? 'EGP',
       seatsLimit: toNumber(row.seats_limit, 1),
       branchesLimit: toNumber(row.branches_limit, 1),

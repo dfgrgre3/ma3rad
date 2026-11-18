@@ -12,7 +12,7 @@ export const DATABASE_INDEXES = String.raw`
 CREATE INDEX IF NOT EXISTS idx_sales_invoices_customer_date ON sales_invoices(customer_id, date);
 CREATE INDEX IF NOT EXISTS idx_sales_invoices_date_status ON sales_invoices(date, invoice_status);
 CREATE INDEX IF NOT EXISTS idx_sales_invoices_warehouse_date ON sales_invoices(warehouse_id, date);
-CREATE INDEX IF NOT EXISTS idx_sales_invoices_remaining ON sales_invoices(remaining_amount) WHERE remaining_amount > 0.01;
+CREATE INDEX IF NOT EXISTS idx_sales_invoices_remaining ON sales_invoices(remaining_amount) WHERE remaining_amount > 1;
 CREATE INDEX IF NOT EXISTS idx_sales_invoices_customer ON sales_invoices(customer_id);
 
 -- ============================================

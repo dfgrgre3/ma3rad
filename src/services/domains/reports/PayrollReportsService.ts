@@ -31,9 +31,9 @@ export class PayrollReportsService {
   public payrollSummary({ from, to }: ReportParams): ReportResult {
     const scope = this.payrollScope();
     const rows = this.db.query<any>(`
-      SELECT e.id AS employeeId, e.name AS employeeName, e.baseSalary AS baseSalary,
+      SELECT e.id AS employeeId, e.name AS employeeName, e.baseSalary / 100.0 AS baseSalary,
         e.salary_type AS salaryType, e.status AS employeeStatus,
-        COALESCE(SUM(pt.amount), 0) AS totalTransactions
+        COALESCE(SUM(pt.amount), 0) / 100.0 AS totalTransactions
       FROM employees e
       LEFT JOIN payroll_transactions pt ON pt.employee_id = e.id
         AND pt.date >= ? AND pt.date <= ?
@@ -69,7 +69,7 @@ export class PayrollReportsService {
   public payrollPayouts({ from, to }: ReportParams): ReportResult {
     const scope = this.payrollScope();
     const rows = this.db.query<any>(`
-      SELECT pt.id, e.name AS employeeName, pt.type, pt.amount, pt.date, pt.notes,
+      SELECT pt.id, e.name AS employeeName, pt.type, pt.amount / 100.0 AS amount, pt.date, pt.notes,
         pt.paymentMethod, pt.createdAt
       FROM payroll_transactions pt
       JOIN employees e ON e.id = pt.employee_id

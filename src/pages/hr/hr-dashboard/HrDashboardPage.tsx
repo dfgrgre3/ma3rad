@@ -56,12 +56,12 @@ function buildHrStats(): HrStats {
 
   // Advances pending
   const advanceRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(pt.amount), 0) AS total
+    `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
      FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
      WHERE pt.type = 'ADVANCE' AND ${scope.clause}`, scope.params
   )[0];
   const payoutRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(pt.amount), 0) AS total
+    `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
      FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
      WHERE pt.type = 'SALARY_PAYOUT' AND ${scope.clause}`, scope.params
   )[0];

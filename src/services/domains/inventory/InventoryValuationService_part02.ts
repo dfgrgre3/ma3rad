@@ -8,7 +8,7 @@ import type { InventoryKpi, InventoryKpiPermission, WarehouseValuation } from '.
 
 const FIFO_LAYER_VALUES_JOIN = `
   LEFT JOIN (
-    SELECT product_id, warehouse_id, SUM(quantity_remaining * unit_cost) AS value
+    SELECT product_id, warehouse_id, SUM(quantity_remaining * unit_cost) / 100.0 AS value
     FROM inventory_cost_layers
     WHERE quantity_remaining > 0
     GROUP BY product_id, warehouse_id
@@ -31,19 +31,19 @@ export class InventoryValuationService {
       join: fifo ? FIFO_LAYER_VALUES_JOIN : '',
       value: fifo
         ? 'COALESCE(icl.value, 0)'
-        : 'COALESCE(ws.quantity_m2, 0) * COALESCE(p.cost_price, 0)',
+        : 'COALESCE(ws.quantity_m2, 0) * COALESCE(p.cost_price, 0) / 100.0',
     };
   }
 
-  getByWarehouse(): WarehouseValuation[] {
+  async getByWarehouse(): Promise<WarehouseValuation[]> {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.valuation.view');
     const scope = this.branches.warehouseBranchScope('w', undefined, actor);
     const { join, value } = this.valuePlan();
-    const warehouses = this.db.query<any>(`
+    const warehouses = await this.db.queryAsync<any>(`
       SELECT w.id, w.name, COUNT(DISTINCT p.id) AS itemsCount,
         COALESCE(SUM(CASE WHEN p.id IS NOT NULL THEN ${value} ELSE 0 END),0) AS costValue,
-        COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2),0) AS retailValue
+        COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2),0) / 100.0 AS retailValue
       FROM warehouses w
       LEFT JOIN warehouse_stock ws ON ws.warehouse_id = w.id
       LEFT JOIN products p ON p.id = ws.product_id
@@ -51,7 +51,7 @@ export class InventoryValuationService {
       WHERE w.is_active = 1 AND ${scope.clause}
       GROUP BY w.id, w.name ORDER BY w.name
     `, scope.params);
-    const quantities = this.db.query<any>(`
+    const quantities = await this.db.queryAsync<any>(`
       SELECT ws.warehouse_id AS warehouseId, p.product_type AS productType,
         p.base_unit AS baseUnit, p.custom_unit AS customUnit, SUM(ws.quantity_m2) AS quantity
       FROM warehouse_stock ws
@@ -76,12 +76,12 @@ export class InventoryValuationService {
     }));
   }
 
-  getKpi(requiredPermission: InventoryKpiPermission = 'ui.inventory.valuation.view'): InventoryKpi {
+  async getKpi(requiredPermission: InventoryKpiPermission = 'ui.inventory.valuation.view'): Promise<InventoryKpi> {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, requiredPermission);
     const scope = this.branches.warehouseBranchScope('w', undefined, actor);
     const { join, value } = this.valuePlan();
-    const summary = this.db.query<any>(`
+    const summary = (await this.db.queryAsync<any>(`
       SELECT COUNT(DISTINCT p.id) AS skus,
         COALESCE(SUM(${value}),0) AS value,
         SUM(CASE WHEN (ws.quantity_m2 - COALESCE(ws.reserved_m2, 0)) <= p.min_stock_level
@@ -91,8 +91,8 @@ export class InventoryValuationService {
       JOIN products p ON p.id = ws.product_id
       ${join}
       WHERE ${scope.clause}
-    `, scope.params)[0] || {};
-    const topValueItems = this.db.query<any>(`
+    `, scope.params))[0] || {};
+    const topValueItems = (await this.db.queryAsync<any>(`
       SELECT p.name, COALESCE(SUM(ws.quantity_m2),0) AS qty,
         COALESCE(SUM(${value}),0) AS value,
         p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
@@ -101,15 +101,15 @@ export class InventoryValuationService {
       ${join}
       WHERE ws.quantity_m2 > 0 AND ${scope.clause}
       GROUP BY p.id ORDER BY value DESC LIMIT 10
-    `, scope.params).map((r) => ({ ...r, value: Number(r.value), qty: Number(r.qty) }));
-    const categoryBreakdown = this.db.query<any>(`
+    `, scope.params)).map((r) => ({ ...r, value: Number(r.value), qty: Number(r.qty) }));
+    const categoryBreakdown = (await this.db.queryAsync<any>(`
       SELECT COALESCE(c.name, 'غير مصنف') AS category, COUNT(DISTINCT p.id) AS items,
         COALESCE(SUM(${value}),0) AS value
       FROM warehouse_stock ws JOIN warehouses w ON w.id = ws.warehouse_id
       JOIN products p ON p.id = ws.product_id LEFT JOIN categories c ON c.id = p.category_id
       ${join}
       WHERE ${scope.clause} GROUP BY c.id ORDER BY value DESC LIMIT 8
-    `, scope.params).map((r) => ({ ...r, items: Number(r.items), value: Number(r.value) }));
+    `, scope.params)).map((r) => ({ ...r, items: Number(r.items), value: Number(r.value) }));
     return {
       totalValue: Number(summary.value) || 0,
       totalSkus: Number(summary.skus) || 0,

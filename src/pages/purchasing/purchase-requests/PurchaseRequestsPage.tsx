@@ -70,14 +70,16 @@ export const PurchaseRequestsPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      setRequests(service.getRequests(search, statusFilter));
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل طلبات الشراء.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        setRequests(await service.getRequestsAsync(search, statusFilter));
+        setError(null);
+      } catch (e: any) {
+        setError(e?.message || 'تعذر تحميل طلبات الشراء.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [service, setLoading, setRequests, setError, search, statusFilter]);
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export const PurchaseRequestsPage: React.FC = () => {
     setExpanded(r.id);
     setItemsLoading(true);
     try {
-      setItems(service.getItems(r.id));
+      setItems(await service.getItemsAsync(r.id));
     } catch (e: any) {
       alert(e?.message);
     } finally {
@@ -101,18 +103,20 @@ export const PurchaseRequestsPage: React.FC = () => {
   };
 
   const openModal = () => {
-    try {
-      setProducts(new ProductService().getAllProducts());
-      setWarehouses(new OperationsService().getWarehouses().map((w) => ({ id: w.id, name: w.name })));
-      setWarehouseId('');
-      setNeededBy('');
-      setPriority('NORMAL');
-      setNotes('');
-      setLines([{ productId: '', quantityM2: 0, estimatedUnitCost: 0, notes: '' }]);
-      setModalOpen(true);
-    } catch (e: any) {
-      alert(e?.message);
-    }
+    (async () => {
+      try {
+        setProducts(await new ProductService().getAllProductsAsync());
+        setWarehouses(new OperationsService().getWarehouses().map((w) => ({ id: w.id, name: w.name })));
+        setWarehouseId('');
+        setNeededBy('');
+        setPriority('NORMAL');
+        setNotes('');
+        setLines([{ productId: '', quantityM2: 0, estimatedUnitCost: 0, notes: '' }]);
+        setModalOpen(true);
+      } catch (e: any) {
+        alert(e?.message);
+      }
+    })();
   };
 
   const openReorderSuggestions = () => {

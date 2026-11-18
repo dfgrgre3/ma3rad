@@ -6,12 +6,16 @@ import { BranchAccessService } from '../auth/BranchAccessService';
 import { SalesService } from './SalesService';
 import { OrderService, type Order } from './OrderService';
 import { round2 } from '../finance/financials';
+import { unscaleMoneyRow } from '../../../utils/money';
 import type { PaymentType, SalesInvoice } from '../../../types';
 import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import { getUomLabel, normalizeUom } from '../../../utils/products/uom';
 import { resolveSaleUnits } from './unitResolution';
 
 export type QuotationStatus = 'PENDING' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
+
+const QUOTATION_MONEY_FIELDS = ['subtotal', 'discount_amount', 'tax_amount', 'total_amount'] as const;
+const QUOTATION_ITEM_MONEY_FIELDS = ['unit_price', 'discount_amount', 'total_price'] as const;
 
 export interface QuotationItemInput {
   productId: string;
@@ -182,7 +186,7 @@ export class QuotationService {
        ${where}
        ORDER BY q.date DESC, q.created_at DESC`,
       [...scope.params, ...params]
-    );
+    ).map((row) => unscaleMoneyRow(row, QUOTATION_MONEY_FIELDS));
   }
 
   public getQuotation(id: string): Quotation | null {
@@ -203,7 +207,7 @@ export class QuotationService {
        LEFT JOIN orders o ON o.id = q.converted_order_id
        WHERE q.id = ? AND ${scope.clause}`,
       [id, ...scope.params]
-    );
+    ).map((row) => unscaleMoneyRow(row, QUOTATION_MONEY_FIELDS));
     if (rows.length === 0) return null;
     return {
       ...rows[0],
@@ -222,7 +226,7 @@ export class QuotationService {
     const scope = this.quotationScope(actor);
     return this.db.query<QuotationServiceItem>(
       `SELECT id, quotation_id AS quotationId, product_id AS productId, description, unit, quantity,
-              unit_price AS unitPrice, discount_amount AS discountAmount, total_price AS totalPrice
+              unit_price / 100.0 AS unitPrice, discount_amount / 100.0 AS discountAmount, total_price / 100.0 AS totalPrice
        FROM quotation_service_items qsi WHERE quotation_id = ? AND EXISTS (
          SELECT 1 FROM quotations q WHERE q.id = qsi.quotation_id AND ${scope.clause}
        ) ORDER BY rowid ASC`,
@@ -248,7 +252,7 @@ export class QuotationService {
        )
        ORDER BY qi.rowid ASC`,
       [quotationId, ...scope.params]
-    );
+    ).map((row) => unscaleMoneyRow(row, QUOTATION_ITEM_MONEY_FIELDS));
   }
 
   public getStats(filters: QuotationFilters = {}): QuotationStats {
@@ -259,11 +263,11 @@ export class QuotationService {
     const row = this.db.query<any>(
       `SELECT
          COUNT(*) AS total,
-         COALESCE(SUM(q.total_amount), 0) AS total_value,
+         COALESCE(SUM(q.total_amount) / 100.0, 0) AS total_value,
          COALESCE(SUM(CASE WHEN q.status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending,
-         COALESCE(SUM(CASE WHEN q.status = 'PENDING' THEN q.total_amount ELSE 0 END), 0) AS pending_value,
+         COALESCE(SUM(CASE WHEN q.status = 'PENDING' THEN q.total_amount ELSE 0 END) / 100.0, 0) AS pending_value,
          COALESCE(SUM(CASE WHEN q.status = 'CONVERTED' THEN 1 ELSE 0 END), 0) AS converted,
-         COALESCE(SUM(CASE WHEN q.status = 'CONVERTED' THEN q.total_amount ELSE 0 END), 0) AS converted_value,
+         COALESCE(SUM(CASE WHEN q.status = 'CONVERTED' THEN q.total_amount ELSE 0 END) / 100.0, 0) AS converted_value,
          COALESCE(SUM(CASE WHEN q.status = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS expired,
          COALESCE(SUM(CASE WHEN q.status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled,
          COALESCE(SUM(CASE WHEN q.status = 'PENDING' AND q.follow_up_date IS NOT NULL
@@ -329,7 +333,7 @@ export class QuotationService {
            id, quotation_number, date, valid_until, customer_id, customer_name, customer_phone,
            branch_id, company_id, warehouse_id, subtotal, discount_amount, tax_amount, total_amount, status, notes,
            sales_rep_id, project_id, created_by, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 'PENDING', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
         [
           id, quotationNumber, today, validUntil, input.customerId, customer.name, customer.phone || null,
           branchId, companyId, input.warehouseId || null, subtotal, headerDiscount, taxAmount, totalAmount,
@@ -342,7 +346,7 @@ export class QuotationService {
           `INSERT INTO quotation_items (
              id, quotation_id, product_id, product_name, grade, size, sku,
              quantity_m2, boxes_count, unit_price, discount_amount, total_price
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100))`,
           [
             `qti_${uuidv4().substring(0, 8)}`, id, item.productId, item.productName, item.grade,
             item.size, item.sku, item.quantityM2, item.boxesCount, item.unitPrice,
@@ -398,7 +402,7 @@ export class QuotationService {
       db.run(
         `UPDATE quotations SET
            customer_id = ?, customer_name = ?, customer_phone = ?, branch_id = ?, company_id = ?, warehouse_id = ?,
-           valid_until = ?, subtotal = ?, discount_amount = ?, tax_amount = ?, total_amount = ?,
+           valid_until = ?, subtotal = ROUND(?*100), discount_amount = ROUND(?*100), tax_amount = ROUND(?*100), total_amount = ROUND(?*100),
            status = 'PENDING', notes = ?, sales_rep_id = ?, project_id = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
         [
@@ -415,7 +419,7 @@ export class QuotationService {
           `INSERT INTO quotation_items (
              id, quotation_id, product_id, product_name, grade, size, sku,
              quantity_m2, boxes_count, unit_price, discount_amount, total_price
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100))`,
           [
             `qti_${uuidv4().substring(0, 8)}`, id, item.productId, item.productName, item.grade,
             item.size, item.sku, item.quantityM2, item.boxesCount, item.unitPrice,
@@ -718,7 +722,7 @@ export class QuotationService {
     return items.map((item) => {
       const product = this.db.query<any>(
         `SELECT id, name, sku, grade, size, meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox,
-                min_selling_price_m2, is_active,
+                min_selling_price_m2 / 100.0 AS min_selling_price_m2, is_active,
                 product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
          FROM products WHERE id = ?`,
         [item.productId]
@@ -805,7 +809,7 @@ export class QuotationService {
       db.run(
         `INSERT INTO quotation_service_items
           (id, quotation_id, product_id, description, unit, quantity, unit_price, discount_amount, total_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100))`,
         [
           `qsi_${uuidv4().substring(0, 8)}`, quotationId, item.productId || null, item.description, item.unit,
           item.quantity, item.unitPrice, item.discountAmount, item.totalPrice,

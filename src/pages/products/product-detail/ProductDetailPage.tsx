@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -57,11 +57,15 @@ export const ProductDetailPage: React.FC = () => {
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
 
-  const load = useCallback(() => {
+  const loadSeq = useRef(0);
+
+  const load = useCallback(async () => {
     if (!id) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
-      const p = productService.getProductById(id);
+      const p = await productService.getProductByIdAsync(id);
+      if (seq !== loadSeq.current) return;
       setConfiguredGradeLabels(operationalFieldService.getProductGradeOptions(true));
       setProduct(p);
       if (p) {
@@ -71,40 +75,45 @@ export const ProductDetailPage: React.FC = () => {
         const salesScope = branchAccess.sqlScope('si.branch_id', undefined, actor);
         const purchaseScope = branchAccess.sqlScope('pi.branch_id', undefined, actor);
         if (can('inventory.view')) {
-          const s = productService.getProductStockSummary(id);
+          const s = await productService.getProductStockSummaryAsync(id);
+          if (seq !== loadSeq.current) return;
           setStock({ totalM2: s.totalM2, totalBoxes: s.totalBoxes, totalPieces: s.totalPieces, rows: s.byWarehouse });
         } else {
           setStock({ totalM2: 0, totalBoxes: 0, totalPieces: 0, rows: [] });
         }
 
-        setSales(can('sales.view') ? db.query(
-          `SELECT si.date AS date, COALESCE(cu.name, 'عميل نقدي') AS customer,
-                  sii.quantity_m2 AS qty, sii.total_price AS price
-           FROM sales_invoice_items sii
-           JOIN sales_invoices si ON si.id = sii.invoice_id
-           LEFT JOIN customers cu ON cu.id = si.customer_id
-           WHERE sii.product_id = ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}
-           ORDER BY si.date DESC, si.created_at DESC LIMIT 15`, [id, ...salesScope.params]
-        ) : []);
-
-        setPurchases(can('purchases.view') ? db.query(
-          `SELECT pi.date AS date, COALESCE(s.name, '—') AS supplier,
-                  pii.quantity_m2 AS qty, pii.total_cost AS cost
-           FROM purchase_invoice_items pii
-           JOIN purchase_invoices pi ON pi.id = pii.purchase_id
-           LEFT JOIN suppliers s ON s.id = pi.supplier_id
-           WHERE pii.product_id = ? AND ${purchaseScope.clause}
-           ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id, ...purchaseScope.params]
-        ) : []);
-
-        setActivity(can('audit.view') ? db.query(
-          `SELECT action, user_name AS user, created_at AS at, COALESCE(new_values, '') AS details
-           FROM audit_logs WHERE module = 'PRODUCTS' AND (record_id = ? OR new_values LIKE ?)
-           ORDER BY created_at DESC LIMIT 30`, [id, `%${id}%`]
-        ) : []);
+        const [sales, purchases, activity] = await Promise.all([
+          can('sales.view') ? db.queryAsync(
+            `SELECT si.date AS date, COALESCE(cu.name, 'عميل نقدي') AS customer,
+                    sii.quantity_m2 AS qty, sii.total_price AS price
+             FROM sales_invoice_items sii
+             JOIN sales_invoices si ON si.id = sii.invoice_id
+             LEFT JOIN customers cu ON cu.id = si.customer_id
+             WHERE sii.product_id = ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}
+             ORDER BY si.date DESC, si.created_at DESC LIMIT 15`, [id, ...salesScope.params]
+          ) : Promise.resolve([]),
+          can('purchases.view') ? db.queryAsync(
+            `SELECT pi.date AS date, COALESCE(s.name, '—') AS supplier,
+                    pii.quantity_m2 AS qty, pii.total_cost / 100.0 AS cost
+             FROM purchase_invoice_items pii
+             JOIN purchase_invoices pi ON pi.id = pii.purchase_id
+             LEFT JOIN suppliers s ON s.id = pi.supplier_id
+             WHERE pii.product_id = ? AND ${purchaseScope.clause}
+             ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id, ...purchaseScope.params]
+          ) : Promise.resolve([]),
+          can('audit.view') ? db.queryAsync(
+            `SELECT action, user_name AS user, created_at AS at, COALESCE(new_values, '') AS details
+             FROM audit_logs WHERE module = 'PRODUCTS' AND (record_id = ? OR new_values LIKE ?)
+             ORDER BY created_at DESC LIMIT 30`, [id, `%${id}%`]
+          ) : Promise.resolve([]),
+        ]);
+        if (seq !== loadSeq.current) return;
+        setSales(sales as SalesRow[]);
+        setPurchases(purchases as PurchaseRow[]);
+        setActivity(activity as ActivityRow[]);
       }
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { if (seq === loadSeq.current) setLoading(false); }
   }, [id, can, productService, operationalFieldService, branchAccess, db]);
 
   useEffect(() => { load(); }, [load]);

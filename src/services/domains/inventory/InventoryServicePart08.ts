@@ -24,7 +24,7 @@ public getTransferItems(transferId: string): any[] {
         sti.quantity_m2 as quantityM2, sti.boxes_count as boxesCount,
         sti.shipped_m2 as shippedM2, sti.received_m2 as receivedM2,
         sti.lost_m2 as lostM2, sti.damaged_m2 as damagedM2,
-        sti.unit_cost as unitCost, sti.total_cost as totalCost,
+        sti.unit_cost / 100.0 as unitCost, sti.total_cost / 100.0 as totalCost,
         sti.item_notes as itemNotes
       FROM stock_transfer_items sti
       JOIN products p ON sti.product_id = p.id
@@ -47,7 +47,7 @@ public getTransferItems(transferId: string): any[] {
         a.destination_batch_id AS destinationBatchId, a.batch_number AS batchNumber,
         a.tone_shade AS toneShade, a.caliber, a.grade, a.quantity_m2 AS quantityM2,
         a.received_m2 AS receivedM2, a.lost_m2 AS lostM2, a.reverted_m2 AS revertedM2,
-        a.unit_cost AS unitCost, sti.product_id AS productId, sti.product_name AS productName
+        a.unit_cost / 100.0 AS unitCost, sti.product_id AS productId, sti.product_name AS productName
       FROM stock_transfer_batch_allocations a
       JOIN stock_transfer_items sti ON sti.id = a.transfer_item_id
       WHERE sti.transfer_id = ?
@@ -74,7 +74,9 @@ public createTransferRequest(input: {
   }): string {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'inventory.transfer', undefined, {
+      warehouseIds: [input.fromWarehouseId, input.toWarehouseId],
+    });
 
     if (input.fromWarehouseId === input.toWarehouseId) {
       throw new Error('لا يمكن التحويل لنفس المخزن.');
@@ -118,7 +120,7 @@ public createTransferRequest(input: {
           throw new Error(`الرصيد المتاح للصنف ${item.productId} (${stock?.availableM2 || 0} ${unitLabel}) لا يكفي لتحويل ${item.quantityM2} ${unitLabel}`);
         }
 
-        const prod = txDb.query<any>(`SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [item.productId])[0];
+        const prod = txDb.query<any>(`SELECT name, cost_price / 100.0 AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [item.productId])[0];
         const unitCost = Number(prod?.costPrice || 0);
         const itemCost = Number((item.quantityM2 * unitCost).toFixed(2));
         const boxes = prod?.productType === 'GENERAL'
@@ -146,7 +148,7 @@ public createTransferRequest(input: {
           id, transfer_number, date, from_warehouse_id, to_warehouse_id,
           status, total_quantity_m2, total_cost, total_shipped_m2, total_received_m2,
           total_lost_m2, notes, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, 'REQUESTED', ?, ?, 0, 0, 0, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, 'REQUESTED', ?, ROUND(?*100), 0, 0, 0, ?, ?, CURRENT_TIMESTAMP)
       `, [
         transferId, transferNum, localDateString(), input.fromWarehouseId, input.toWarehouseId,
         totalQty, totalCost, input.notes?.trim() || null, actor.id
@@ -159,7 +161,7 @@ public createTransferRequest(input: {
             id, transfer_id, product_id, product_name, quantity_m2,
             boxes_count, shipped_m2, received_m2, lost_m2, damaged_m2,
             unit_cost, total_cost, item_notes
-          ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ROUND(?*100), ROUND(?*100), ?)
         `, [
           pi.id, transferId, pi.productId, pi.productName,
           pi.quantityM2, pi.boxesCount, pi.unitCost, pi.itemCost, pi.notes

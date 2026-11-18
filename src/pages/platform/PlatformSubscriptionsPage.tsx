@@ -15,6 +15,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformSubscription,
@@ -57,17 +59,34 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   const [renewMonths, setRenewMonths] = useState(12);
   const [newPlanId, setNewPlanId] = useState('');
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const subs = platformAdminService.listSubscriptions({
-        status: statusFilter,
-        planId: planFilter,
-        search,
-      });
-      const plns = platformAdminService.listPlans();
-      setSubscriptions(subs);
-      setPlans(plns);
+      const central = getCentralDataSourceState();
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      if (central.active) {
+        const [subs, plns] = await Promise.all([
+          centralPlatformClient.listSubscriptions({
+            status: statusFilter || undefined,
+            planId: planFilter || undefined,
+            search: search || undefined,
+          }),
+          centralPlatformClient.listPlans(),
+        ]);
+        setSubscriptions(subs);
+        setPlans(plns);
+      } else {
+        const subs = platformAdminService.listSubscriptions({
+          status: statusFilter,
+          planId: planFilter,
+          search,
+        });
+        const plns = platformAdminService.listPlans();
+        setSubscriptions(subs);
+        setPlans(plns);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل الاشتراكات.');
@@ -77,7 +96,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   }, [search, statusFilter, planFilter]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const handleRenew = (sub: PlatformSubscription) => {
@@ -93,37 +112,63 @@ export const PlatformSubscriptionsPage: React.FC = () => {
     setRenewMonths(12);
   };
 
-  const handleExecuteModal = () => {
+  const handleExecuteModal = async () => {
     if (!activeSub) return;
     if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      alert('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
       if (actionType === 'RENEW') {
-        platformAdminService.renewTenantSubscription(activeSub.tenantId, renewMonths);
+        if (central.active) {
+          await centralPlatformClient.renewSubscription(activeSub.tenantId, renewMonths);
+        } else {
+          platformAdminService.renewTenantSubscription(activeSub.tenantId, renewMonths);
+        }
         alert(`تم تجديد الاشتراك بنجاح لمدة ${renewMonths} شهر.`);
       } else {
         if (!newPlanId) {
           alert('يرجى اختيار الباقة الجديدة.');
           return;
         }
-        platformAdminService.changeTenantPlan(activeSub.tenantId, newPlanId, {
-          months: renewMonths,
-          seats: activeSub.seats,
-        });
+        if (central.active) {
+          await centralPlatformClient.changeSubscriptionPlan(activeSub.tenantId, newPlanId, {
+            months: renewMonths,
+            seats: activeSub.seats,
+            reason: 'تغيير باقة من لوحة الاشتراكات',
+          });
+        } else {
+          platformAdminService.changeTenantPlan(activeSub.tenantId, newPlanId, {
+            months: renewMonths,
+            seats: activeSub.seats,
+          });
+        }
         alert('تم نقل العميل إلى الخطة الجديدة بنجاح.');
       }
       setActiveSub(null);
-      loadData();
+      await loadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
-  const handleCancelSub = (sub: PlatformSubscription) => {
+  const handleCancelSub = async (sub: PlatformSubscription) => {
     if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     if (!confirm(`هل أنت متأكد من إلغاء اشتراك "${sub.tenantName || sub.tenantId}"؟ سيتم إبطال التراخيص والحساب المرتبط.`)) return;
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      alert('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      platformAdminService.cancelTenantSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
-      loadData();
+      if (central.active) {
+        await centralPlatformClient.cancelSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
+      } else {
+        platformAdminService.cancelTenantSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
+      }
+      await loadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر إلغاء الاشتراك.');
     }
@@ -167,7 +212,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             )}
             <Button
               size="sm"
-              onClick={loadData}
+              onClick={() => void loadData()}
               leadingIcon={<RefreshCw className="h-4 w-4" />}
             >
               تحديث البيانات
@@ -346,7 +391,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
 
                             {sub.status !== 'CANCELLED' && (
                               <button
-                                onClick={() => handleCancelSub(sub)}
+                                onClick={() => void handleCancelSub(sub)}
                                 className="text-rose-400 hover:text-rose-300 text-xs"
                                 title="إلغاء الاشتراك فوراً"
                               >
@@ -414,7 +459,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setActiveSub(null)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={handleExecuteModal} disabled={!canManageSubscriptions}>
+            <Button size="sm" onClick={() => void handleExecuteModal()} disabled={!canManageSubscriptions}>
               تأكيد العملية
             </Button>
           </div>

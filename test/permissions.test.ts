@@ -24,6 +24,14 @@ function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
 }
 
+function loginAdmin() {
+  const user = AuthService.login('admin', 'admin123');
+  // الاختبارات تمارس خدمات الأعمال مباشرة؛ نتجاوز بوابة تغيير كلمة المرور الافتراضية.
+  user.mustChangePassword = false;
+  user.securityKeySetupRequired = false;
+  return user;
+}
+
 function makeUser(db: DatabaseManager, id: string, role: string): any {
   db.run(
     'INSERT INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)',
@@ -36,7 +44,7 @@ test('finance navigation separates calendar viewing from close access', async ()
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_finance_close_only', name: 'Finance close only test' }, admin);
   PermissionService.setRolePermissions(role.code, ['finance.close'], admin);
   const closeOnly = makeUser(db, 'usr_finance_close_only_test', role.code);
@@ -108,15 +116,15 @@ test('inventory valuation data requires its service-layer permission', async () 
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_inventory_valuation_denied', name: 'Inventory valuation denied test' }, admin);
   PermissionService.setRolePermissions(role.code, ['sales.view'], admin);
   const limited = makeUser(db, 'usr_inventory_valuation_denied', role.code);
 
   try {
     AuthService.setCurrentUser(limited);
-    assert.throws(() => new InventoryValuationService().getKpi(), /غير مصرح/);
-    assert.throws(() => new InventoryValuationService().getByWarehouse(), /غير مصرح/);
+    await assert.rejects(() => new InventoryValuationService().getKpi(), /غير مصرح/);
+    await assert.rejects(() => new InventoryValuationService().getByWarehouse(), /غير مصرح/);
   } finally {
     AuthService.setCurrentUser(admin);
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
@@ -128,9 +136,9 @@ test('permissions: admin has everything, limited role is denied, override grants
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  loginAdmin();
 
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   assert.equal(PermissionService.can(admin, 'sales.create'), true);
   assert.equal(PermissionService.can(admin, 'roles.manage'), true);
   assert.equal(PermissionService.can(null, 'sales.create'), false);
@@ -165,7 +173,7 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   await db.initialize();
   PermissionService.seed();
   assert.equal(q('SELECT pin_code FROM users WHERE id = ?', ['usr_admin'])[0]?.pinCode ?? null, null);
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
 
   const role = PermissionService.createRole({ code: 'test_wildcard', name: 'اختبار wildcard' }, admin);
   const w = makeUser(db, 'usr_wildcard_test', role.code);
@@ -198,7 +206,7 @@ test('permissions: supplier financial statements require finance debt access', a
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'supplier_statement_viewer', name: 'عارض موردين' }, admin);
   PermissionService.setRolePermissions(role.code, ['suppliers.view', 'suppliers.update'], admin);
   const limited = makeUser(db, 'usr_supplier_statement_viewer', role.code);
@@ -212,7 +220,7 @@ test('permissions: supplier financial statements require finance debt access', a
     assert.throws(() => suppliers.getPaymentsWithAllocations('supplier_missing'), /غير مصرح/);
     assert.throws(() => suppliers.updateSupplier('supplier_missing', { isActive: 0 }), /غير مصرح/);
   } finally {
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -252,7 +260,7 @@ test('permissions: reverse, expense mutation, and shift closing require their de
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_action_limits', name: 'اختبار حدود العمليات' }, admin);
   PermissionService.setRolePermissions(role.code, [
     'customers.payment',
@@ -276,7 +284,7 @@ test('permissions: reverse, expense mutation, and shift closing require their de
     assert.throws(() => new CashierService().closeShift('missing', 0), /ui\.cashier\.cashier\.close_shift/);
   } finally {
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -286,7 +294,7 @@ test('permissions: system health view works alone and maintenance actions requir
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_system_health_guard', name: 'System health guard test' }, admin);
   PermissionService.setRolePermissions(role.code, ['settings.health.view'], admin);
   const limited = makeUser(db, 'usr_system_health_guard_test', role.code);
@@ -314,8 +322,9 @@ test('permissions: system health view works alone and maintenance actions requir
     assert.throws(() => new SystemDiagnosticsService().reindex(), /ui\.settings\.system_health\.manage/);
 
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
-    PermissionService.setRolePermissions(role.code, ['settings.health.manage'], admin);
+    loginAdmin();
+    // manage لا يكفي وحده: الوصول للشاشة يتطلب view أيضاً (بُعد screen الموحد).
+    PermissionService.setRolePermissions(role.code, ['settings.health.view', 'settings.health.manage'], admin);
     AuthService.logout();
     AuthService.login(limited.username, 'test-password');
     assert.equal(PermissionService.can(limited, 'settings.health.manage'), true);
@@ -323,7 +332,7 @@ test('permissions: system health view works alone and maintenance actions requir
     new SystemDiagnosticsService().reindex();
   } finally {
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -333,7 +342,7 @@ test('system diagnostics report measured database checks and mark unavailable de
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  loginAdmin();
 
   const service = new SystemDiagnosticsService();
   const report = service.runDiagnostics();
@@ -359,7 +368,7 @@ test('permissions: audit reads require audit.view inside the service', async () 
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_audit_read_guard', name: 'Audit read guard test' }, admin);
   PermissionService.setRolePermissions(role.code, ['admin.view'], admin);
   const limited = makeUser(db, 'usr_audit_read_guard_test', role.code);
@@ -371,7 +380,7 @@ test('permissions: audit reads require audit.view inside the service', async () 
     assert.throws(() => new AuditService().getAuditLogs({ page: 1, pageSize: 8 }), /ui\.audit\.log\.view/);
   } finally {
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -381,7 +390,7 @@ test('permissions: customer reads and supply requests require their view grants'
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_customer_read_limits', name: 'اختبار قراءة العملاء' }, admin);
   PermissionService.setRolePermissions(role.code, ['reports.view'], admin);
   const limited = makeUser(db, 'usr_customer_read_limits_test', role.code);
@@ -397,7 +406,7 @@ test('permissions: customer reads and supply requests require their view grants'
     assert.throws(() => new CustomerSupplyService().getOpenRequests(), /ui\.sales\.invoices\.view/);
   } finally {
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -407,7 +416,7 @@ test('permissions: payroll access is separate from employee directory and financ
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_payroll_read_split', name: 'Payroll read split test' }, admin);
   PermissionService.setRolePermissions(role.code, ['employees.view', 'employees.payroll.view', 'branches.access_all'], admin);
   const limited = makeUser(db, 'usr_payroll_read_split_test', role.code);
@@ -422,7 +431,7 @@ test('permissions: payroll access is separate from employee directory and financ
     assert.throws(() => EmployeeService.getEmployeeFinancials('missing'), /employees\.financials\.view/);
   } finally {
     AuthService.logout();
-    AuthService.login('admin', 'admin123');
+    loginAdmin();
     db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
@@ -440,7 +449,7 @@ test('auth: wrong password fails, and repeated failures lock the account for 15 
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  loginAdmin();
 
   // wrong password
   assert.throws(() => AuthService.login('admin', 'wrong-pass'), /غير صحيحة/);
@@ -452,13 +461,13 @@ test('auth: wrong password fails, and repeated failures lock the account for 15 
     for (let i = 0; i < 3; i++) {
       assert.throws(() => AuthService.login('admin', 'wrong-pass'), /غير صحيحة/);
     }
-    assert.throws(() => AuthService.login('admin', 'admin123'), /إيقاف المحاولات/);
+    assert.throws(() => loginAdmin(), /إيقاف المحاولات/);
   } finally {
     // reset the lockout window so other tests are not affected
     q(`DELETE FROM login_history WHERE username_attempted = 'admin'`);
     db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
   }
-  const user = AuthService.login('admin', 'admin123');
+  const user = loginAdmin();
   assert.equal(user.username, 'admin');
 });
 
@@ -466,8 +475,9 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const auth = new AuthService();
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   const created = auth.createUser({
     username: 'pin_hash_test',
     password: 'TestPass123!',
@@ -499,14 +509,14 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   );
 
   db.run('DELETE FROM users WHERE id = ?', [created.id]);
-  AuthService.login('admin', 'admin123');
+  loginAdmin();
 });
 
 test('auth: createUser enforces the same password policy as password changes', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const auth = new AuthService();
 
   try {
@@ -560,7 +570,7 @@ test('permission matrix: legacy grants keep working and page access resolves rou
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_granular_compat', name: 'Granular compatibility test' }, admin);
   PermissionService.setRolePermissions(role.code, ['crm.create', 'inventory.export', 'finance.close', 'deliveries.manage'], admin);
   const limited = makeUser(db, 'usr_granular_compat_test', role.code);
@@ -593,7 +603,7 @@ test('permission matrix: non-admin backfill never grants destructive granular pe
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  const admin = AuthService.login('admin', 'admin123');
+  const admin = loginAdmin();
   const role = PermissionService.createRole({ code: 'test_granular_backfill', name: 'Granular backfill test' }, admin);
   PermissionService.setRolePermissions(role.code, ['products.view', 'products.delete', 'sales.view', 'sales.create'], admin);
 

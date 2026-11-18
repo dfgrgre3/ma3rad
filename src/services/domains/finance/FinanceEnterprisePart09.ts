@@ -22,7 +22,7 @@ public getPaymentGateways(): PaymentGateway[] {
       glAccountId: r.gl_account_id,
       glAccountCode: r.glAccountCode,
       commissionRate: Number(r.commission_rate),
-      fixedFee: Number(r.fixed_fee),
+      fixedFee: Number(r.fixed_fee) / 100,
       settlementPeriodDays: Number(r.settlement_period_days),
       isActive: r.is_active === 1,
       configJson: r.config_json,
@@ -37,7 +37,7 @@ public savePaymentGateway(input: Partial<PaymentGateway> & { name: string; provi
     if (input.id) {
       this.db.run(`
         UPDATE payment_gateways
-        SET name = ?, provider_code = ?, gl_account_id = ?, commission_rate = ?, fixed_fee = ?,
+        SET name = ?, provider_code = ?, gl_account_id = ?, commission_rate = ?, fixed_fee = ROUND(?*100),
             settlement_period_days = ?, is_active = ?
         WHERE id = ?
       `, [
@@ -50,7 +50,7 @@ public savePaymentGateway(input: Partial<PaymentGateway> & { name: string; provi
       const id = `gw_${uuidv4().substring(0, 8)}`;
       this.db.run(`
         INSERT INTO payment_gateways (id, name, provider_code, gl_account_id, commission_rate, fixed_fee, settlement_period_days, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, 1)
       `, [
         id, input.name.trim(), input.providerCode.trim(), input.glAccountId,
         Number(input.commissionRate || 0), Number(input.fixedFee || 0), Number(input.settlementPeriodDays || 1),
@@ -74,10 +74,10 @@ public getPaymentGatewaySettlements(): PaymentGatewaySettlement[] {
       gatewayId: r.gateway_id,
       gatewayName: r.gatewayName,
       settlementDate: r.settlement_date,
-      grossAmount: Number(r.gross_amount),
-      commissionAmount: Number(r.commission_amount),
-      taxDeduction: Number(r.tax_deduction),
-      netAmount: Number(r.net_amount),
+      grossAmount: Number(r.gross_amount) / 100,
+      commissionAmount: Number(r.commission_amount) / 100,
+      taxDeduction: Number(r.tax_deduction) / 100,
+      netAmount: Number(r.net_amount) / 100,
       bankAccountId: r.bank_account_id,
       bankAccountName: r.bankAccountName,
       journalEntryId: r.journal_entry_id,
@@ -138,14 +138,14 @@ public recordGatewaySettlement(input: {
           id, settlement_number, gateway_id, settlement_date, gross_amount,
           commission_amount, tax_deduction, net_amount, bank_account_id,
           journal_entry_id, status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SETTLED', ?, ?)
+        ) VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, 'SETTLED', ?, ?)
       `, [
         settlementId, settlementNumber, input.gatewayId, input.settlementDate,
         gross, comm, tax, net, input.bankAccountId, jvId, input.notes || null, actor.id,
       ]);
 
       // 3. Update bank account balance
-      tx.run('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      tx.run('UPDATE bank_accounts SET current_balance = current_balance + ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [net, input.bankAccountId]);
     });
 

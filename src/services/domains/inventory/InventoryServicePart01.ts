@@ -2,6 +2,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import type { Warehouse, WarehouseStock, UnitType } from '../../../types';
 import { AuthService } from '../auth/AuthService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { maskCostFields } from '../auth/sensitiveFields';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { StockLedgerMovementPolicy } from './StockLedgerMovementPolicy';
@@ -40,16 +41,27 @@ protected getUnitLabel(productId: string): string {
 
 public getAllWarehouses(): Warehouse[] {
       AuthService.requireAuth();
+      const { sql, params } = this.buildWarehousesQuery();
+      return this.db.query<Warehouse>(sql, params);
+  }
+
+  private buildWarehousesQuery(): { sql: string; params: any[] } {
       const scope = this.branchAccess.sqlScope(
         'w.branch_id',
         '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
       );
       const company = this.branchAccess.companyScope('w.company_id');
-      return this.db.query<Warehouse>(
-        `SELECT w.* FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} AND ${company.clause}
+      return {
+        sql: `SELECT w.* FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} AND ${company.clause}
          ORDER BY w.is_default DESC, w.name ASC`,
-        [...scope.params, ...company.params]
-      );
+        params: [...scope.params, ...company.params],
+      };
+  }
+
+  public async getAllWarehousesAsync(): Promise<Warehouse[]> {
+      AuthService.requireAuth();
+      const { sql, params } = this.buildWarehousesQuery();
+      return this.db.queryAsync<Warehouse>(sql, params);
   }
 
 public getWarehouseStock(warehouseId?: string, search?: string): WarehouseStockView[] {
@@ -60,9 +72,15 @@ public getInactiveWarehouseStock(warehouseId?: string, search?: string): Warehou
     return this.queryWarehouseStock(warehouseId, search, 'inactive');
   }
 
-private queryWarehouseStock(warehouseId: string | undefined, search: string | undefined, productStatus: 'active' | 'inactive'): WarehouseStockView[] {
-    AuthService.requireAuth();
-    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId);
+  public getWarehouseStockAsync(warehouseId?: string, search?: string): Promise<WarehouseStockView[]> {
+    return this.queryWarehouseStockAsync(warehouseId, search, 'active');
+  }
+
+  public getInactiveWarehouseStockAsync(warehouseId?: string, search?: string): Promise<WarehouseStockView[]> {
+    return this.queryWarehouseStockAsync(warehouseId, search, 'inactive');
+  }
+
+private buildWarehouseStockQuery(warehouseId: string | undefined, search: string | undefined, productStatus: 'active' | 'inactive'): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
@@ -77,7 +95,7 @@ private queryWarehouseStock(warehouseId: string | undefined, search: string | un
         p.name as productName, p.sku, p.barcode, p.grade, p.size,
         p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
         p.meters_per_box as metersPerBox, p.pieces_per_box as piecesPerBox,
-        p.cost_price as costPrice, p.selling_price_m2 as sellingPriceM2,
+        p.cost_price / 100.0 as costPrice, p.selling_price_m2 / 100.0 as sellingPriceM2,
         COALESCE(p.min_stock_level, 0) as minStockLevel,
         COALESCE(movement_totals.quantity_in, 0) AS quantityIn,
         COALESCE(movement_totals.quantity_out, 0) AS quantityOut
@@ -109,9 +127,12 @@ private queryWarehouseStock(warehouseId: string | undefined, search: string | un
     }
 
     sql += ` ORDER BY p.name ASC`;
+    return { sql, params };
+  }
 
-    const rows = this.db.query<any>(sql, params);
+  private mapWarehouseStockRows(rows: any[]): WarehouseStockView[] {
     return rows.map(r => {
+      maskCostFields(r, ['costPrice']);
       const isGeneral = r.productType === 'GENERAL';
       const mPerBox = r.metersPerBox || 1.44;
       const boxes = isGeneral
@@ -130,31 +151,66 @@ private queryWarehouseStock(warehouseId: string | undefined, search: string | un
     });
   }
 
-public getProductStock(productId: string, warehouseId: string): WarehouseStock | null {
+  private queryWarehouseStock(warehouseId: string | undefined, search: string | undefined, productStatus: 'active' | 'inactive'): WarehouseStockView[] {
     AuthService.requireAuth();
-    this.branchAccess.requireWarehouseAccess(warehouseId);
-    const rows = this.db.query<WarehouseStock>(`
+    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId);
+    const { sql, params } = this.buildWarehouseStockQuery(warehouseId, search, productStatus);
+    return this.mapWarehouseStockRows(this.db.query<any>(sql, params));
+  }
+
+  private async queryWarehouseStockAsync(warehouseId: string | undefined, search: string | undefined, productStatus: 'active' | 'inactive'): Promise<WarehouseStockView[]> {
+    AuthService.requireAuth();
+    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId);
+    const { sql, params } = this.buildWarehouseStockQuery(warehouseId, search, productStatus);
+    return this.mapWarehouseStockRows(await this.db.queryAsync<any>(sql, params));
+  }
+
+private buildProductStockQuery(productId: string, warehouseId: string): { sql: string; params: any[] } {
+    return {
+      sql: `
       SELECT ws.*, p.meters_per_box as metersPerBox, p.product_type as productType, p.base_unit as baseUnit
       FROM warehouse_stock ws
       JOIN products p ON ws.product_id = p.id
       WHERE ws.product_id = ? AND ws.warehouse_id = ?
-    `, [productId, warehouseId]);
+    `,
+      params: [productId, warehouseId],
+    };
+  }
 
-    if (rows.length === 0) return null;
-    const r = rows[0];
-    if ((r as any).productType === 'GENERAL') {
+  private mapProductStockRow(r: WarehouseStock & { metersPerBox?: number; productType?: string; baseUnit?: UnitType }): WarehouseStock {
+    if (r.productType === 'GENERAL') {
       return {
         ...r,
         quantityBoxes: (r as any).baseUnit === 'BOX' ? r.quantityM2 : 0,
         quantityPieces: (r as any).baseUnit === 'PIECE' ? r.quantityM2 : 0,
         availableM2: Number((r.quantityM2 - (r.reservedM2 || 0)).toFixed(2)),
-      };
+      } as WarehouseStock;
     }
     const mPerBox = (r as any).metersPerBox || 1.44;
     return {
       ...r,
       quantityBoxes: Number((r.quantityM2 / mPerBox).toFixed(2)),
       availableM2: Number((r.quantityM2 - (r.reservedM2 || 0)).toFixed(2))
-    };
+    } as WarehouseStock;
+  }
+
+public getProductStock(productId: string, warehouseId: string): WarehouseStock | null {
+    AuthService.requireAuth();
+    this.branchAccess.requireWarehouseAccess(warehouseId);
+    const { sql, params } = this.buildProductStockQuery(productId, warehouseId);
+    const rows = this.db.query<any>(sql, params);
+
+    if (rows.length === 0) return null;
+    return this.mapProductStockRow(rows[0]);
+  }
+
+  public async getProductStockAsync(productId: string, warehouseId: string): Promise<WarehouseStock | null> {
+    AuthService.requireAuth();
+    this.branchAccess.requireWarehouseAccess(warehouseId);
+    const { sql, params } = this.buildProductStockQuery(productId, warehouseId);
+    const rows = await this.db.queryAsync<any>(sql, params);
+
+    if (rows.length === 0) return null;
+    return this.mapProductStockRow(rows[0]);
   }
 }

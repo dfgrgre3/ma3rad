@@ -7,6 +7,7 @@ import { BranchAccessService } from "../../../services/domains/auth/BranchAccess
 import { useToast } from "../../../components/ui/Toast";
 import { v4 as uuidv4 } from "uuid";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";
+import { unscaleMoneyRow } from "../../../utils/money";
 
 type Row = {
   id: string;
@@ -147,12 +148,12 @@ export const OtherReceivablesPage: React.FC = () => {
         ];
         if (selectedId)
           tx.run(
-            `UPDATE receivables SET title=?,type=?,responsible_name=?,phone=?,description=?,custom_fields_json=?,quantity=?,unit=?,amount=?,due_date=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND ${companyScope.clause}`,
+            `UPDATE receivables SET title=?,type=?,responsible_name=?,phone=?,description=?,custom_fields_json=?,quantity=?,unit=?,amount=ROUND(?*100),due_date=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND ${companyScope.clause}`,
             [...values, id, ...companyScope.params],
           );
         else
           tx.run(
-            `INSERT INTO receivables (id,company_id,title,type,responsible_name,phone,description,custom_fields_json,quantity,unit,amount,due_date,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            `INSERT INTO receivables (id,company_id,title,type,responsible_name,phone,description,custom_fields_json,quantity,unit,amount,due_date,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,ROUND(?*100),?,?,?,?,?)`,
             [id, companyScope.params[0], ...values, actor.id],
           );
         tx.run(

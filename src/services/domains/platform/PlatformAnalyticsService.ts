@@ -1,9 +1,10 @@
+import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformPeriod,
   PlatformBusinessPerformance,
   PlatformCustomerMetrics,
@@ -172,7 +173,7 @@ export class PlatformAnalyticsService {
 
     // Current period revenue
     const revenue = this.db.query<any>(
-      `SELECT COALESCE(SUM(i.total), 0) AS total
+      `SELECT COALESCE(SUM(i.total) / 100.0, 0) AS total
        FROM platform_invoices i
        JOIN platform_tenants t ON t.id = i.tenant_id
        JOIN platform_plans p ON p.id = t.plan_id
@@ -182,7 +183,7 @@ export class PlatformAnalyticsService {
 
     // Previous period revenue
     const prevRevenue = this.db.query<any>(
-      `SELECT COALESCE(SUM(i.total), 0) AS total
+      `SELECT COALESCE(SUM(i.total) / 100.0, 0) AS total
        FROM platform_invoices i
        JOIN platform_tenants t ON t.id = i.tenant_id
        JOIN platform_plans p ON p.id = t.plan_id
@@ -192,7 +193,7 @@ export class PlatformAnalyticsService {
 
     // MRR
     const mrr = this.db.query<any>(
-      `SELECT COALESCE(SUM(s.price), 0) AS total
+      `SELECT COALESCE(SUM(s.price) / 100.0, 0) AS total
        FROM platform_subscriptions s
        JOIN platform_plans p ON p.id = s.plan_id
        WHERE s.status = 'ACTIVE' ${planFilter}`,
@@ -201,7 +202,7 @@ export class PlatformAnalyticsService {
 
     // Previous MRR (approximate)
     const prevMrr = this.db.query<any>(
-      `SELECT COALESCE(SUM(s.price), 0) AS total
+      `SELECT COALESCE(SUM(s.price) / 100.0, 0) AS total
        FROM platform_subscriptions s
        JOIN platform_plans p ON p.id = s.plan_id
        WHERE s.status = 'ACTIVE' AND s.created_at <= ? ${planFilter}`,
@@ -232,7 +233,7 @@ export class PlatformAnalyticsService {
     ).map(r => createTimeSeriesPoint(r.month, toNumber(r.total, 0)));
 
     const mrrSeries = this.db.query<any>(
-      `SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(price), 0) AS total
+      `SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(price) / 100.0, 0) AS total
        FROM platform_subscriptions
        WHERE status = 'ACTIVE' AND created_at BETWEEN ? AND ?
        GROUP BY month
@@ -320,7 +321,7 @@ export class PlatformAnalyticsService {
     // Average revenue per customer
     const avgRevenue = this.db.query<any>(
       `SELECT COALESCE(AVG(tenant_revenue), 0) AS avg FROM (
-         SELECT t.id, COALESCE(SUM(i.total), 0) AS tenant_revenue
+         SELECT t.id, COALESCE(SUM(i.total) / 100.0, 0) AS tenant_revenue
          FROM platform_tenants t
          LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
          JOIN platform_plans p ON p.id = t.plan_id
@@ -332,7 +333,7 @@ export class PlatformAnalyticsService {
 
     const prevAvgRevenue = this.db.query<any>(
       `SELECT COALESCE(AVG(tenant_revenue), 0) AS avg FROM (
-         SELECT t.id, COALESCE(SUM(i.total), 0) AS tenant_revenue
+         SELECT t.id, COALESCE(SUM(i.total) / 100.0, 0) AS tenant_revenue
          FROM platform_tenants t
          LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
          JOIN platform_plans p ON p.id = t.plan_id
@@ -377,7 +378,7 @@ export class PlatformAnalyticsService {
 
     // Top customers by revenue
     const topCustomers = this.db.query<any>(
-      `SELECT t.id, t.code, t.name, COALESCE(SUM(i.total), 0) AS revenue, COUNT(i.id) AS invoicesCount, t.status
+      `SELECT t.id, t.code, t.name, COALESCE(SUM(i.total) / 100.0, 0) AS revenue, COUNT(i.id) AS invoicesCount, t.status
        FROM platform_tenants t
        LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
        JOIN platform_plans p ON p.id = t.plan_id
@@ -446,7 +447,7 @@ export class PlatformAnalyticsService {
         devicesUsed: 0,
         outstanding: 0,
         subscriptionId: t.subscription_id ?? null,
-        price: t.price ?? null,
+        price: t.price != null ? Number(t.price) / 100 : null,
         createdAt: String(t.created_at),
         updatedAt: String(t.updated_at),
       })),
@@ -469,7 +470,7 @@ export class PlatformAnalyticsService {
     }
 
     // MRR
-    const mrr = this.db.query<any>('SELECT COALESCE(SUM(price), 0) AS total FROM platform_subscriptions WHERE status = \'ACTIVE\'')[0]?.total ?? 0;
+    const mrr = this.db.query<any>('SELECT COALESCE(SUM(price) / 100.0, 0) AS total FROM platform_subscriptions WHERE status = \'ACTIVE\'')[0]?.total ?? 0;
 
     // New subscriptions (last 30 days)
     const newInPeriod = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_subscriptions WHERE created_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
@@ -523,7 +524,7 @@ export class PlatformAnalyticsService {
         tenantCode: String(r.code),
         planName: String(r.planName),
         endDate: String(r.end_date),
-        price: toNumber(r.price, 0),
+        price: toNumber(r.price, 0) / 100,
         billingCycle: r.billing_cycle as PlatformBillingCycle,
         autoRenew: Boolean(r.auto_renew),
         status: r.status as PlatformSubscriptionStatus,
@@ -536,7 +537,7 @@ export class PlatformAnalyticsService {
         startDate: String(s.start_date),
         endDate: s.end_date ?? null,
         seats: toNumber(s.seats, 1),
-        price: toNumber(s.price, 0),
+        price: toNumber(s.price, 0) / 100,
         billingCycle: s.billing_cycle as PlatformBillingCycle,
         autoRenew: Boolean(s.auto_renew),
         branchesLimit: toNumber(s.branches_limit, 1),
@@ -776,7 +777,7 @@ export class PlatformAnalyticsService {
          SUM(CASE WHEN status = 'PAID' THEN 1 ELSE 0 END) AS paid,
          SUM(CASE WHEN status IN ('SENT','PARTIAL','OVERDUE') THEN 1 ELSE 0 END) AS pending,
          SUM(CASE WHEN status = 'VOID' THEN 1 ELSE 0 END) AS voided,
-         COALESCE(SUM(CASE WHEN status = 'PAID' THEN total ELSE 0 END), 0) AS revenue
+         COALESCE(SUM(CASE WHEN status = 'PAID' THEN total ELSE 0 END) / 100.0, 0) AS revenue
        FROM platform_invoices`
     )[0] ?? {};
 
@@ -802,7 +803,9 @@ export class PlatformAnalyticsService {
     )[0] ?? {};
 
     const branchStats = this.db.query<any>(
-      `SELECT COALESCE(SUM(branches_limit), 0) AS totalLimit, COUNT(*) AS installationBranches FROM platform_branches`
+      `SELECT
+         (SELECT COALESCE(SUM(branches_limit), 0) FROM platform_tenants) AS totalLimit,
+         (SELECT COUNT(*) FROM platform_branches) AS installationBranches`
     )[0] ?? {};
 
     const recentTenants = this.db.query<any>(
@@ -926,7 +929,7 @@ export class PlatformAnalyticsService {
         devicesUsed: 0,
         outstanding: 0,
         subscriptionId: t.subscription_id ?? null,
-        price: t.price ?? null,
+        price: t.price != null ? Number(t.price) / 100 : null,
         createdAt: String(t.created_at),
         updatedAt: String(t.updated_at),
       })),
@@ -962,7 +965,7 @@ export class PlatformAnalyticsService {
         startDate: String(s.start_date),
         endDate: s.end_date ?? null,
         seats: toNumber(s.seats, 1),
-        price: toNumber(s.price, 0),
+        price: toNumber(s.price, 0) / 100,
         billingCycle: s.billing_cycle,
         autoRenew: Boolean(s.auto_renew),
         branchesLimit: toNumber(s.branches_limit, 1),
@@ -973,7 +976,7 @@ export class PlatformAnalyticsService {
         id: String(p.id),
         tenantId: String(p.tenant_id),
         invoiceId: p.invoice_id ?? null,
-        amount: toNumber(p.amount, 0),
+        amount: toNumber(p.amount, 0) / 100,
         method: p.method,
         reference: p.reference ?? null,
         paidAt: String(p.paid_at),
@@ -1142,6 +1145,29 @@ export class PlatformAnalyticsService {
         suggestedActions: ['التحقق من الجهاز', 'إيقاف الجهاز'],
         metadata: { hardwareId: dev.hardware_id },
       });
+    }
+
+    try {
+      const platformAccount = this.db.query<any>(
+        `SELECT password_hash AS passwordHash FROM users WHERE username = 'platform' LIMIT 1`
+      )[0];
+      if (platformAccount?.passwordHash && bcrypt.compareSync('Platform@2026', platformAccount.passwordHash)) {
+        alerts.push({
+          id: 'default-platform-password',
+          severity: 'warning',
+          title: 'كلمة مرور مالك المنصة الافتراضية',
+          description: 'ما زال الحساب يستخدم كلمة المرور الافتراضية. غيّرها الآن لحماية كل بيانات المنصة.',
+          link: '/platform/settings',
+          entityType: 'TENANT',
+          entityId: 'platform',
+          entityName: 'حساب المنصة',
+          actionRequired: true,
+          suggestedActions: ['تغيير كلمة المرور من الإعدادات', 'تفعيل المصادقة الثنائية'],
+          metadata: { account: 'platform' },
+        });
+      }
+    } catch {
+      // Password inspection is best-effort; never block the dashboard.
     }
 
     return alerts;

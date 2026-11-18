@@ -75,14 +75,16 @@ export const SupplierClaimsPage: React.FC = () => {
 
   const loadData = useCallback(() => {
     setLoading(true);
-    try {
-      const rows = service.getAllClaims(search, statusFilter, supplierFilter);
-      setClaims(rows);
-    } catch (e: any) {
-      toast.error(e?.message || 'تعذر تحميل مطالبات الموردين.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const rows = await service.getAllClaimsAsync(search, statusFilter, supplierFilter);
+        setClaims(rows);
+      } catch (e: any) {
+        toast.error(e?.message || 'تعذر تحميل مطالبات الموردين.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [service, setLoading, setClaims, toast, search, statusFilter]);
 
   useEffect(() => {
@@ -95,16 +97,20 @@ export const SupplierClaimsPage: React.FC = () => {
       setExpandedDetails(null);
       return;
     }
-    const det = service.getClaimById(id);
-    setExpandedDetails(det);
-    setExpandedId(id);
+    service.getClaimByIdAsync(id).then((det) => {
+      setExpandedDetails(det);
+      setExpandedId(id);
+    });
   };
 
   const openCreateModal = () => {
-    try {
-      const sups = new SupplierService().getAllSuppliers();
-      const prods = new ProductService().getAllProducts();
-      const receiptList = service.getAllGoodsReceipts('', 'ALL');
+    (async () => {
+      try {
+        const [sups, prods, receiptList] = await Promise.all([
+          new SupplierService().getAllSuppliersAsync(),
+          new ProductService().getAllProductsAsync(),
+          service.getAllGoodsReceiptsAsync('', 'ALL'),
+        ]);
 
       setSuppliers(sups);
       setProducts(prods);
@@ -122,10 +128,11 @@ export const SupplierClaimsPage: React.FC = () => {
         unitCost: prods[0]?.costPrice || 120,
         notes: '',
       }]);
-      setCreateModal(true);
-    } catch (e: any) {
-      toast.error(e?.message);
-    }
+        setCreateModal(true);
+      } catch (e: any) {
+        toast.error(e?.message);
+      }
+    })();
   };
 
   const handleCreateClaim = (e: React.FormEvent) => {

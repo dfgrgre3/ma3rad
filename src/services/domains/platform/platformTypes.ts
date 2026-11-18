@@ -1026,7 +1026,7 @@ export interface PlatformTrialCreateInput {
 
 
 export interface PlatformSettingsMap {
-  [key: string]: string | undefined;
+  [key: string]: string | number | undefined;
 }
 
 // ─── Per-Tenant Activity Customization & Versions ───────────────────────────

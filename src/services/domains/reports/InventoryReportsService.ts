@@ -38,7 +38,7 @@ export class InventoryReportsService {
     const rows = this.db.query<any>(`
       SELECT ws.product_id AS productId, p.name AS product, p.sku AS sku,
         w.name AS warehouse, ws.quantity_m2 AS quantity,
-        COALESCE(p.cost_price, 0) * ws.quantity_m2 AS stockValue,
+        COALESCE(p.cost_price, 0) * ws.quantity_m2 / 100.0 AS stockValue,
         (SELECT MAX(si.date) FROM sales_invoice_items sii
           JOIN sales_invoices si ON si.id = sii.invoice_id
           WHERE sii.product_id = p.id AND si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID') AS lastSaleDate,

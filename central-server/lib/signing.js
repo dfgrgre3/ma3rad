@@ -43,6 +43,11 @@ function getKeyId() {
   return currentKeyId;
 }
 
+function signString(payloadString) {
+  const signature = ed25519.sign(Buffer.from(payloadString, 'utf8'), currentSigningKey);
+  return { signature: signature.toString('base64'), key_id: currentKeyId };
+}
+
 function signCertificate(payload) {
   const body = JSON.stringify(payload);
   const signature = ed25519.sign(Buffer.from(body), currentSigningKey);
@@ -72,6 +77,7 @@ module.exports = {
   initSigningKeys,
   getVerifyingKey,
   getKeyId,
+  signString,
   signCertificate,
   verifyCertificate,
   generateLicenseKey,

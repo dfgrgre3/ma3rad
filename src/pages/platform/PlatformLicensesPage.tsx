@@ -16,12 +16,15 @@ import {
   Link,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformLicense,
   PlatformLicenseStatus,
   PlatformPlan,
   PlatformTenant,
+  PlatformDevice,
   PlatformCouplingMode,
 } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
@@ -86,11 +89,27 @@ export const PlatformLicensesPage: React.FC = () => {
   const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
   const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
   const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
+  const [centralMode, setCentralMode] = React.useState(false);
+  const [devices, setDevices] = React.useState<PlatformDevice[]>([]);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      setLicenses(platformAdminService.listLicenses(search, status));
+      const central = getCentralDataSourceState();
+      setCentralMode(central.active);
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      if (central.active) {
+        const [centralLicenses, centralDevices] = await Promise.all([
+          centralPlatformClient.listLicenses(search, status),
+          centralPlatformClient.listDevices(),
+        ]);
+        setLicenses(centralLicenses);
+        setDevices(centralDevices);
+      } else {
+        setLicenses(platformAdminService.listLicenses(search, status));
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل التراخيص.');
@@ -99,15 +118,32 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   }, [search, status]);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => { void load(); }, [load]);
 
   React.useEffect(() => {
-    try {
-      setTenants(platformAdminService.listTenants());
-      setPlans(platformAdminService.listPlans(false));
-    } catch {
-      /* handled by the list error */
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      setError('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
     }
+    const loadRefs = async () => {
+      try {
+        if (central.active) {
+          const [centralTenants, centralPlans] = await Promise.all([
+            centralPlatformClient.listTenants(),
+            centralPlatformClient.listPlans(),
+          ]);
+          setTenants(centralTenants);
+          setPlans(centralPlans);
+        } else {
+          setTenants(platformAdminService.listTenants());
+          setPlans(platformAdminService.listPlans(false));
+        }
+      } catch {
+        /* handled by the list error */
+      }
+    };
+    void loadRefs();
   }, []);
 
   const openIssue = () => {
@@ -125,7 +161,7 @@ export const PlatformLicensesPage: React.FC = () => {
     setIssueOpen(true);
   };
 
-  const issue = () => {
+  const issue = async () => {
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
@@ -134,19 +170,38 @@ export const PlatformLicensesPage: React.FC = () => {
       toast.error('اختر العميل والخطة');
       return;
     }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     setSaving(true);
     try {
-      const license = platformAdminService.issueLicense(issueForm.tenantId, issueForm.planId, {
-        months: issueForm.months,
-        seats: issueForm.seats,
-        branchesLimit: issueForm.branchesLimit,
-        offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
-        couplingMode: issueForm.couplingMode,
-        notes: issueForm.notes,
-      });
-      toast.success('تم إصدار الترخيص', license.licenseKey);
+      if (central.active) {
+        const result: any = await centralPlatformClient.issueLicense({
+          tenantId: issueForm.tenantId,
+          planId: issueForm.planId,
+          months: issueForm.months,
+          seats: issueForm.seats,
+          branchesLimit: issueForm.branchesLimit,
+          offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
+          couplingMode: issueForm.couplingMode,
+          notes: issueForm.notes || undefined,
+        });
+        toast.success('تم إصدار الترخيص', result?.license?.licenseKey ?? result?.license?.license_key ?? '');
+      } else {
+        const license = platformAdminService.issueLicense(issueForm.tenantId, issueForm.planId, {
+          months: issueForm.months,
+          seats: issueForm.seats,
+          branchesLimit: issueForm.branchesLimit,
+          offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
+          couplingMode: issueForm.couplingMode,
+          notes: issueForm.notes,
+        });
+        toast.success('تم إصدار الترخيص', license.licenseKey);
+      }
       setIssueOpen(false);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر إصدار الترخيص', err instanceof Error ? err.message : undefined);
     } finally {
@@ -154,52 +209,87 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   };
 
-  const changeStatus = (license: PlatformLicense, next: PlatformLicenseStatus) => {
+  const changeStatus = async (license: PlatformLicense, next: PlatformLicenseStatus) => {
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
     const verb = next === 'REVOKED' ? 'إلغاء' : next === 'SUSPENDED' ? 'إيقاف' : 'تفعيل';
     if (!window.confirm(`${verb} الترخيص ${license.licenseKey}؟`)) return;
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      platformAdminService.setLicenseStatus(license.id, next);
+      if (central.active) {
+        if (next === 'SUSPENDED') {
+          await centralPlatformClient.suspendLicense(license.id, 'إيقاف من لوحة التراخيص');
+        } else if (next === 'REVOKED') {
+          await centralPlatformClient.revokeLicense(license.id, 'إلغاء من لوحة التراخيص');
+        } else {
+          await centralPlatformClient.reactivateLicense(license.id, 'تفعيل من لوحة التراخيص');
+        }
+      } else {
+        platformAdminService.setLicenseStatus(license.id, next);
+      }
       toast.success(`تم ${verb} الترخيص`);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر تحديث الترخيص', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const renew = () => {
+  const renew = async () => {
     if (!renewTarget) return;
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
+    const central = getCentralDataSourceState();
     try {
-      platformAdminService.renewLicense(renewTarget.id, renewMonths);
+      if (central.active) {
+        await centralPlatformClient.renewLicense(renewTarget.id, renewMonths);
+      } else {
+        platformAdminService.renewLicense(renewTarget.id, renewMonths);
+      }
       toast.success('تم تجديد الترخيص');
       setRenewTarget(null);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر تجديد الترخيص', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const detectClones = () => {
+  const detectClones = async () => {
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      const result = platformAdminService.detectCloneDevices();
-      setCloneAlerts(result.alerts.map((a) => a.message));
-      if (result.alerts.length > 0) {
-        toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
+      if (central.active) {
+        const result = await centralPlatformClient.detectCloneDevices();
+        setCloneAlerts(result.alerts);
+        if (result.alerts.length > 0) {
+          toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
+        } else {
+          toast.success('لا يوجد اشتباه استنساخ');
+        }
       } else {
-        toast.success('لا يوجد اشتباه استنساخ');
+        const result = platformAdminService.detectCloneDevices();
+        setCloneAlerts(result.alerts.map((a) => a.message));
+        if (result.alerts.length > 0) {
+          toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
+        } else {
+          toast.success('لا يوجد اشتباه استنساخ');
+        }
       }
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر الكشف عن الاستنساخ', err instanceof Error ? err.message : undefined);
     }
@@ -210,14 +300,28 @@ export const PlatformLicensesPage: React.FC = () => {
     setDeviceAction(action);
   };
 
-  const executeDeviceAction = () => {
+  const executeDeviceAction = async () => {
     if (!deviceTarget || !deviceAction) return;
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (deviceAction === 'suspend') {
+      if (central.active) {
+        const reason = `إجراء ${deviceAction} عبر لوحة التراخيص`;
+        if (deviceAction === 'suspend') {
+          await centralPlatformClient.suspendDevice(deviceTarget.id, reason);
+        } else if (deviceAction === 'release') {
+          await centralPlatformClient.releaseDevice(deviceTarget.id, reason);
+        } else {
+          await centralPlatformClient.revokeDevice(deviceTarget.id, reason);
+        }
+      } else if (deviceAction === 'suspend') {
         platformAdminService.suspendDevice(deviceTarget.id, 'إيقاف عبر لوحة التحكم');
       } else if (deviceAction === 'release') {
         platformAdminService.releaseDevice(deviceTarget.id, 'تحرير عبر لوحة التحكم');
@@ -227,60 +331,86 @@ export const PlatformLicensesPage: React.FC = () => {
       toast.success(`تم ${deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'} الجهاز`);
       setDeviceTarget(null);
       setDeviceAction(null);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر تنفيذ الإجراء', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const bindHardware = () => {
+  const bindHardware = async () => {
     if (!hardwareTarget) return;
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
+    if (!hardwareId.trim()) {
+      toast.error('أدخل معرف الجهاز (Hardware ID)');
+      return;
+    }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      platformAdminService.bindLicenseHardware(hardwareTarget.id, hardwareId);
+      if (central.active) {
+        await centralPlatformClient.transferLicense(hardwareTarget.id, hardwareId.trim(), 'ربط جهاز من لوحة التراخيص');
+      } else {
+        platformAdminService.bindLicenseHardware(hardwareTarget.id, hardwareId);
+      }
       toast.success('تم ربط الترخيص بالجهاز');
       setHardwareTarget(null);
-      load();
+      await load();
     } catch (err) {
       toast.error('تعذر ربط الجهاز', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const exportCompliance = () => {
+  const exportCompliance = async () => {
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
+    const central = getCentralDataSourceState();
     try {
-      const report = platformAdminService.exportLicenseComplianceReport({
+      // The central API exposes the license list (already loaded, honouring the
+      // active filters); the compliance CSV is assembled client-side from it.
+      const reportLicenses = central.active ? licenses : (platformAdminService.exportLicenseComplianceReport({
         includeActivations: true,
         includeChanges: true,
-      });
+      }).licenses as any[]);
+      if (central.misconfigured) {
+        toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+        return;
+      }
       const rows = [
         ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
-        ...report.licenses.map((license: any) => [
-          license.license_key,
-          license.tenantName,
-          license.planName,
+        ...reportLicenses.map((license: any) => [
+          license.licenseKey ?? license.license_key,
+          license.tenantName ?? license.tenant_name ?? '',
+          license.planName ?? license.plan_name ?? '',
           license.status,
-          license.issued_at,
-          license.starts_at || '',
-          license.expires_at || '',
+          license.issuedAt ?? license.issued_at,
+          license.startsAt ?? license.starts_at ?? '',
+          license.expiresAt ?? license.expires_at ?? '',
           license.seats,
-          license.device_limit,
-          license.branches_limit,
-          license.hardware_id || '',
-          license.coupling_mode || 'FULL',
+          license.deviceLimit ?? license.device_limit,
+          license.branchesLimit ?? license.branches_limit,
+          license.hardwareId ?? license.hardware_id ?? '',
+          license.couplingMode ?? license.coupling_mode ?? 'FULL',
         ]),
       ];
       downloadCsv('license-compliance.csv', rows);
-      toast.success(`تم تصدير تقرير الامتثال (${report.summary.totalLicenses} ترخيص)`);
+      toast.success(`تم تصدير تقرير الامتثال (${reportLicenses.length} ترخيص)`);
     } catch (err) {
       toast.error('تعذر تصدير التقرير', err instanceof Error ? err.message : undefined);
     }
+  };
+
+  /** Central device actions need the platform_devices id, not the license id. */
+  const deviceIdForLicense = (license: PlatformLicense): string | null => {
+    if (!centralMode) return license.id;
+    return devices.find((device) => device.licenseId === license.id)?.id ?? null;
   };
 
   const exportRows = () => {
@@ -322,10 +452,10 @@ export const PlatformLicensesPage: React.FC = () => {
             )}
             {canManageLicenses && (
               <>
-                <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={detectClones}>
+                <Button variant="ghost" size="sm" leadingIcon={<ShieldAlert className="h-3.5 w-3.5" />} onClick={() => void detectClones()}>
                   كشف الاستنساخ
                 </Button>
-                <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={exportCompliance}>
+                <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={() => void exportCompliance()}>
                   تقرير الامتثال
                 </Button>
                 <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openIssue}>
@@ -427,7 +557,7 @@ export const PlatformLicensesPage: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
-                                changeStatus(license, next);
+                                void changeStatus(license, next);
                               }}
                               className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
                               title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
@@ -440,26 +570,32 @@ export const PlatformLicensesPage: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => changeStatus(license, 'REVOKED')}
+                              onClick={() => void changeStatus(license, 'REVOKED')}
                               className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                               title="إلغاء"
                             >
                               <ShieldX className="h-3.5 w-3.5" />
                             </button>
-                            {license.hardwareId && (
+                            {license.hardwareId && (!centralMode || deviceIdForLicense(license)) && (
                               <button
                                 type="button"
-                                onClick={() => openDeviceAction('release', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                                onClick={() => {
+                                  const deviceId = deviceIdForLicense(license);
+                                  if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
+                                }}
                                 className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
                                 title="تحرير الجهاز"
                               >
                                 <Link className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {license.status === 'ACTIVE' && (
+                            {license.status === 'ACTIVE' && (!centralMode || deviceIdForLicense(license)) && (
                               <button
                                 type="button"
-                                onClick={() => openDeviceAction('suspend', { id: license.id, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status })}
+                                onClick={() => {
+                                  const deviceId = deviceIdForLicense(license);
+                                  if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
+                                }}
                                 className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
                                 title="إيقاف الجهاز"
                               >
@@ -489,7 +625,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setIssueOpen(false)} disabled={saving}>إلغاء</Button>
-            <Button variant="primary" onClick={issue} loading={saving} disabled={!canManageLicenses}>إصدار الترخيص</Button>
+            <Button variant="primary" onClick={() => void issue()} loading={saving} disabled={!canManageLicenses}>إصدار الترخيص</Button>
           </div>
         }
       >
@@ -552,7 +688,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setRenewTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={renew} disabled={!canManageLicenses}>تجديد</Button>
+            <Button variant="primary" onClick={() => void renew()} disabled={!canManageLicenses}>تجديد</Button>
           </div>
         }
       >
@@ -576,7 +712,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setHardwareTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={bindHardware} disabled={!canManageLicenses}>حفظ الربط</Button>
+            <Button variant="primary" onClick={() => void bindHardware()} disabled={!canManageLicenses}>حفظ الربط</Button>
           </div>
         }
       >
@@ -614,7 +750,7 @@ export const PlatformLicensesPage: React.FC = () => {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
-            <Button variant="danger" onClick={executeDeviceAction} disabled={!canManageLicenses}>
+            <Button variant="danger" onClick={() => void executeDeviceAction()} disabled={!canManageLicenses}>
               {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
             </Button>
           </div>

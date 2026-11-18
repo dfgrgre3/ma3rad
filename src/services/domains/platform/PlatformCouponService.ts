@@ -4,7 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformCoupon,
   PlatformCouponInput,
 } from './platformTypes';
@@ -113,7 +113,7 @@ export class PlatformCouponService {
     this.db.run(
       `INSERT INTO platform_coupons
         (id, code, name, type, value, max_uses, used_count, expires_at, is_active, applicable_plans, min_subtotal, starts_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?)`,
       [
         id, code, input.name.trim(), input.type, input.value,
         input.maxUses ?? null, input.expiresAt ?? null, input.isActive !== false ? 1 : 0,
@@ -145,7 +145,7 @@ export class PlatformCouponService {
     const now = nowIso();
     this.db.run(
       `UPDATE platform_coupons SET
-         code = ?, name = ?, type = ?, value = ?, max_uses = ?, expires_at = ?, is_active = ?, applicable_plans = ?, min_subtotal = ?, starts_at = ?, notes = ?, updated_at = ?
+         code = ?, name = ?, type = ?, value = ?, max_uses = ?, expires_at = ?, is_active = ?, applicable_plans = ?, min_subtotal = ROUND(?*100), starts_at = ?, notes = ?, updated_at = ?
        WHERE id = ?`,
       [
         input.code?.trim().toUpperCase() ?? existing.code,
@@ -235,7 +235,7 @@ export class PlatformCouponService {
       name: String(row.name),
       type: row.type,
       value: toNumber(row.value, 0),
-      minSubtotal: toNumber(row.min_subtotal, 0),
+      minSubtotal: toNumber(row.min_subtotal, 0) / 100,
       maxUses: row.max_uses ?? null,
       usedCount: toNumber(row.used_count, 0),
       startsAt: row.starts_at ?? null,

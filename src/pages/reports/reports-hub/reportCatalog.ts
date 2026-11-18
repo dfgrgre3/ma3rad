@@ -43,6 +43,8 @@ import {
 } from 'lucide-react';
 import { ReportCenterService } from '../../../services/domains/reports/ReportCenterService';
 import type { ReportParams, ReportResult } from '../../../services/domains/reports/ReportCenterService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 export type ReportCategoryId =
   | 'core'
@@ -86,9 +88,38 @@ export interface ReportDefinition {
   dateMode: 'range' | 'asOf' | 'none';
   controls?: ReportControl[];
   legacyTab?: 'sales' | 'purchases' | 'pos' | 'finance' | 'profitLoss' | 'tax';
+  /** صلاحية عرض التقرير — تتجاوز صلاحية الفئة عند sensitivity أعلى. */
+  permission?: string;
   accent?: string;
   chart?: ReportChartType;
   drilldown?: ReportDrilldown;
+}
+
+/** صلاحية كل فئة تقارير عند غياب تجاوز على مستوى التقرير. */
+export const REPORT_CATEGORY_PERMISSION: Record<ReportCategoryId, string> = {
+  core: 'reports.view',
+  operations: 'reports.view',
+  sales: 'reports.sales.view',
+  credit: 'reports.financial.view',
+  inventory: 'reports.inventory.view',
+  finance: 'reports.financial.view',
+  forecast: 'reports.view',
+  hr: 'employees.view',
+};
+
+const LEGACY_TAB_PERMISSION: Record<NonNullable<ReportDefinition['legacyTab']>, string> = {
+  sales: 'reports.sales.view',
+  purchases: 'reports.purchases.view',
+  pos: 'reports.pos.view',
+  finance: 'reports.financial.view',
+  profitLoss: 'reports.profit_loss.view',
+  tax: 'reports.tax.view',
+};
+
+/** الصلاحية المطلوبة لعرض تقرير — legacyTab يتقدم على الفئة ثم الافتراضي reports.view. */
+export function reportPermission(report: ReportDefinition): string {
+  return report.permission
+    ?? (report.legacyTab ? LEGACY_TAB_PERMISSION[report.legacyTab] : REPORT_CATEGORY_PERMISSION[report.category]);
 }
 
 export const REPORT_CATEGORIES: ReportCategory[] = [
@@ -243,6 +274,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: Wallet,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'teal',
   },
   {
@@ -252,6 +284,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: Banknote,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'sky',
   },
   {
@@ -261,6 +294,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: ClipboardList,
     dateMode: 'range',
+    permission: 'employees.attendance.view',
     accent: 'emerald',
   },
   {
@@ -270,6 +304,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: CalendarClock,
     dateMode: 'range',
+    permission: 'hr.leave.view',
     accent: 'amber',
   },
   {
@@ -279,6 +314,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: Receipt,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'rose',
   },
   {
@@ -369,6 +405,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: Gift,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'emerald',
   },
   {
@@ -378,6 +415,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: HeartPulse,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'emerald',
   },
   {
@@ -387,6 +425,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: Landmark,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'emerald',
   },
   {
@@ -441,6 +480,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'hr',
     icon: GraduationCap,
     dateMode: 'range',
+    permission: 'employees.payroll.view',
     accent: 'emerald',
   },
 
@@ -481,6 +521,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'operations',
     icon: ShieldAlert,
     dateMode: 'range',
+    permission: 'reports.financial.view',
   },
   {
     id: 'approvals',
@@ -543,6 +584,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'sales',
     icon: Award,
     dateMode: 'range',
+    permission: 'reports.financial.view',
   },
   {
     id: 'customer-profitability',
@@ -551,6 +593,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'sales',
     icon: Users,
     dateMode: 'range',
+    permission: 'reports.financial.view',
   },
   {
     id: 'period-comparison',
@@ -718,6 +761,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'sales',
     icon: Award,
     dateMode: 'range',
+    permission: 'reports.financial.view',
   },
   {
     id: 'cash-flow-detailed',
@@ -758,183 +802,190 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
 
 const service = new ReportCenterService();
 
-export function runReport(id: string, params: ReportParams): ReportResult {
+export async function runReport(id: string, params: ReportParams): Promise<ReportResult> {
+  // فرض على مستوى الخدمة: إخفاء البطاقة في الواجهة لا يكفي — كل تشغيل تقرير
+  // يمر هنا ويُرفض بدون صلاحية التقرير المحددة (فئة أو تجاوز).
+  const definition = REPORT_DEFINITIONS.find((report) => report.id === id);
+  if (definition) {
+    PermissionService.require(AuthService.getCurrentUser(), reportPermission(definition));
+  }
+
   let result: ReportResult;
 
   switch (id) {
     case 'operations-log':
-      result = service.operationsLog(params);
+      result = await service.operationsLog(params);
       break;
     case 'user-activity':
-      result = service.userActivity(params);
+      result = await service.userActivity(params);
       break;
     case 'daily-movements':
-      result = service.dailyMovements(params);
+      result = await service.dailyMovements(params);
       break;
     case 'exceptions':
-      result = service.exceptionsLog(params);
+      result = await service.exceptionsLog(params);
       break;
     case 'approvals':
-      result = service.approvalsLog(params);
+      result = await service.approvalsLog(params);
       break;
     case 'received-reports':
-      result = service.receivedReports(params);
+      result = await service.receivedReports(params);
       break;
     case 'alerts':
-      result = service.alertsSummary(params);
+      result = await service.alertsSummary(params);
       break;
     case 'sales-analysis':
-      result = service.salesAnalysis(params);
+      result = await service.salesAnalysis(params);
       break;
     case 'product-sales':
-      result = service.productSales(params);
+      result = await service.productSales(params);
       break;
     case 'product-detail':
-      result = service.productDetail(params);
+      result = await service.productDetail(params);
       break;
     case 'product-profitability':
-      result = service.productProfitability(params);
+      result = await service.productProfitability(params);
       break;
     case 'customer-profitability':
-      result = service.customerProfitability(params);
+      result = await service.customerProfitability(params);
       break;
     case 'period-comparison':
-      result = service.periodComparison(params);
+      result = await service.periodComparison(params);
       break;
     case 'ar-aging':
-      result = service.arAging(params);
+      result = await service.arAging(params);
       break;
     case 'credit-exposure':
-      result = service.creditExposure(params);
+      result = await service.creditExposure(params);
       break;
     case 'payment-behavior':
-      result = service.paymentBehavior(params);
+      result = await service.paymentBehavior(params);
       break;
     case 'cheque-maturity':
-      result = service.chequeMaturity(params);
+      result = await service.chequeMaturity(params);
       break;
     case 'bounced-cheques':
-      result = service.bouncedCheques(params);
+      result = await service.bouncedCheques(params);
       break;
     case 'installment-aging':
-      result = service.installmentAging(params);
+      result = await service.installmentAging(params);
       break;
     case 'inventory-balances':
-      result = service.inventoryBalances();
+      result = await service.inventoryBalances();
       break;
     case 'slow-moving':
-      result = service.slowMoving(params);
+      result = await service.slowMoving(params);
       break;
     case 'purchase-analysis':
-      result = service.purchaseAnalysis(params);
+      result = await service.purchaseAnalysis(params);
       break;
     case 'supplier-prices':
-      result = service.supplierPrices(params);
+      result = await service.supplierPrices(params);
       break;
     case 'count-variance':
-      result = service.countVariance(params);
+      result = await service.countVariance(params);
       break;
     case 'financial-position':
-      result = service.financialPosition(params);
+      result = await service.financialPosition(params);
       break;
     case 'cash-movement':
-      result = service.cashMovement(params);
+      result = await service.cashMovement(params);
       break;
     case 'shift-closing':
-      result = service.shiftClosing(params);
+      result = await service.shiftClosing(params);
       break;
     case 'cash-flow-forecast':
-      result = service.cashFlowForecast(params);
+      result = await service.cashFlowForecast(params);
       break;
     case 'break-even':
-      result = service.breakEven(params);
+      result = await service.breakEven(params);
       break;
     case 'branch-performance':
-      result = service.branchPerformance(params);
+      result = await service.branchPerformance(params);
       break;
     case 'demand-forecast':
-      result = service.demandForecast(params);
+      result = await service.demandForecast(params);
       break;
     case 'customer-churn':
-      result = service.customerChurn(params);
+      result = await service.customerChurn(params);
       break;
     case 'basket':
-      result = service.basketAnalysis(params);
+      result = await service.basketAnalysis(params);
       break;
     case 'sales-rep-performance':
-      result = service.salesRepPerformance(params);
+      result = await service.salesRepPerformance(params);
       break;
     case 'cash-flow-detailed':
-      result = service.cashFlowDetailed(params);
+      result = await service.cashFlowDetailed(params);
       break;
     case 'hr-payroll-summary':
-      result = service.hrPayrollSummary(params);
+      result = await service.hrPayrollSummary(params);
       break;
     case 'hr-payroll-payouts':
-      result = service.hrPayrollPayouts(params);
+      result = await service.hrPayrollPayouts(params);
       break;
     case 'hr-attendance-summary':
-      result = service.hrAttendanceSummary(params);
+      result = await service.hrAttendanceSummary(params);
       break;
     case 'hr-leave-summary':
-      result = service.hrLeaveSummary(params);
+      result = await service.hrLeaveSummary(params);
       break;
     case 'hr-tax-summary':
-      result = service.hrTaxSummary(params);
+      result = await service.hrTaxSummary(params);
       break;
     case 'hr-vacancies':
-      result = service.hrVacancies(params);
+      result = await service.hrVacancies(params);
       break;
     case 'hr-onboarding':
-      result = service.hrOnboarding(params);
+      result = await service.hrOnboarding(params);
       break;
     case 'hr-probation':
-      result = service.hrProbation(params);
+      result = await service.hrProbation(params);
       break;
     case 'hr-violations':
-      result = service.hrViolations(params);
+      result = await service.hrViolations(params);
       break;
     case 'hr-complaints':
-      result = service.hrComplaints(params);
+      result = await service.hrComplaints(params);
       break;
     case 'hr-penalties-report':
-      result = service.hrPenaltiesReport(params);
+      result = await service.hrPenaltiesReport(params);
       break;
     case 'hr-warnings':
-      result = service.hrWarnings(params);
+      result = await service.hrWarnings(params);
       break;
     case 'hr-appeals':
-      result = service.hrAppeals(params);
+      result = await service.hrAppeals(params);
       break;
     case 'hr-attachments':
-      result = service.hrAttachments(params);
+      result = await service.hrAttachments(params);
       break;
     case 'hr-allowances':
-      result = service.hrAllowances(params);
+      result = await service.hrAllowances(params);
       break;
     case 'hr-benefits':
-      result = service.hrBenefits(params);
+      result = await service.hrBenefits(params);
       break;
     case 'hr-loans':
-      result = service.hrLoans(params);
+      result = await service.hrLoans(params);
       break;
     case 'hr-performance-evaluations':
-      result = service.hrPerformanceEvaluations(params);
+      result = await service.hrPerformanceEvaluations(params);
       break;
     case 'hr-performance-goals':
-      result = service.hrPerformanceGoals(params);
+      result = await service.hrPerformanceGoals(params);
       break;
     case 'hr-performance-pips':
-      result = service.hrPerformancePips(params);
+      result = await service.hrPerformancePips(params);
       break;
     case 'mfg-production-kpis':
-      result = service.mfgProductionKpis(params);
+      result = await service.mfgProductionKpis(params);
       break;
     case 'sales-target-kpis':
-      result = service.salesTargetKpis(params);
+      result = await service.salesTargetKpis(params);
       break;
     case 'hr-training-expenses':
-      result = service.hrTrainingExpenses(params);
+      result = await service.hrTrainingExpenses(params);
       break;
     default:
       throw new Error('تقرير غير معروف.');

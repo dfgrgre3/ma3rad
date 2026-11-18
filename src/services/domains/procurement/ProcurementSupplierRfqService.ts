@@ -3,7 +3,11 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
+import { unscaleMoneyRow } from '../../../utils/money';
 import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotationRow, SupplierQuotationItem } from '../../../types/procurement';
+
+const QUOTE_MONEY_FIELDS = ['total_amount'] as const;
+const QUOTE_ITEM_MONEY_FIELDS = ['unit_cost', 'total_cost'] as const;
 import { ProcurementServicePart01 } from './ProcurementServicePart01';
 
 export abstract class ProcurementSupplierRfqService extends ProcurementServicePart01 {
@@ -16,7 +20,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
         p.barcode,
         p.min_stock_level AS minStockLevel,
         p.max_stock_level AS maxStockLevel,
-        p.cost_price AS unitCost,
+        p.cost_price / 100.0 AS unitCost,
         COALESCE(NULLIF(p.custom_unit, ''), p.base_unit, 'م²') AS unit,
         c.name AS categoryName,
         b.name AS brandName,
@@ -93,7 +97,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
     });
   }
 
-  public getAllRfqs(search = '', status = 'ALL'): SupplierRfqRow[] {
+  private buildRfqsQuery(search: string, status: string): { sql: string; params: any[] } {
     let sql = `
       SELECT r.*, u.full_name AS createdByName,
         (SELECT COUNT(*) FROM supplier_rfq_items i WHERE i.rfq_id = r.id) AS itemsCount,
@@ -113,46 +117,102 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
       params.push(term, term);
     }
     sql += ` ORDER BY r.created_at DESC`;
+    return { sql, params };
+  }
+
+  public getAllRfqs(search = '', status = 'ALL'): SupplierRfqRow[] {
+    const { sql, params } = this.buildRfqsQuery(search, status);
     return this.db.query<SupplierRfqRow>(sql, params);
   }
 
-  public getRfqById(id: string): (SupplierRfqRow & { items: SupplierRfqItem[]; quotations: SupplierQuotationRow[] }) | null {
-    const row = this.db.query<SupplierRfqRow>(`
+  public async getAllRfqsAsync(search = '', status = 'ALL'): Promise<SupplierRfqRow[]> {
+    const { sql, params } = this.buildRfqsQuery(search, status);
+    return this.db.queryAsync<SupplierRfqRow>(sql, params);
+  }
+
+  private buildRfqDetailQueries(id: string): {
+    rowSql: string; rowParams: any[];
+    itemsSql: string; itemsParams: any[];
+    quotationsSql: string; quotationsParams: any[];
+    quotationItemsSql: string;
+  } {
+    return {
+      rowSql: `
       SELECT r.*, u.full_name AS createdByName
       FROM supplier_rfqs r
       LEFT JOIN users u ON u.id = r.created_by
       WHERE r.id = ?
-    `, [id])[0];
-    if (!row) return null;
-
-    const items = this.db.query<SupplierRfqItem>(`
+    `,
+      rowParams: [id],
+      itemsSql: `
       SELECT i.*, p.sku AS productSku, c.name AS categoryName,
              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
       FROM supplier_rfq_items i
       LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN categories c ON c.id = p.category_id
       WHERE i.rfq_id = ?
-    `, [id]);
-
-    const quotations = this.db.query<SupplierQuotationRow>(`
+    `,
+      itemsParams: [id],
+      quotationsSql: `
       SELECT q.*, s.name AS supplierName, s.phone AS supplierPhone
       FROM supplier_quotations q
       JOIN suppliers s ON s.id = q.supplier_id
       WHERE q.rfq_id = ?
       ORDER BY q.total_amount ASC
-    `, [id]);
-
-    for (const q of quotations) {
-      q.items = this.db.query<SupplierQuotationItem>(`
+    `,
+      quotationsParams: [id],
+      quotationItemsSql: `
         SELECT qi.*, p.name AS productName, p.product_type AS productType,
                p.base_unit AS baseUnit, p.custom_unit AS customUnit
         FROM supplier_quotation_items qi
         LEFT JOIN products p ON p.id = qi.product_id
         WHERE qi.quotation_id = ?
-      `, [q.id]);
+      `,
+    };
+  }
+
+  private mapRfqQuotations(quotations: SupplierQuotationRow[], itemsByQuote: Map<string, SupplierQuotationItem[]>): SupplierQuotationRow[] {
+    return quotations.map((q) => ({ ...q, items: itemsByQuote.get(q.id) || [] }));
+  }
+
+  public getRfqById(id: string): (SupplierRfqRow & { items: SupplierRfqItem[]; quotations: SupplierQuotationRow[] }) | null {
+    const { rowSql, rowParams, itemsSql, itemsParams, quotationsSql, quotationsParams, quotationItemsSql } = this.buildRfqDetailQueries(id);
+    const row = this.db.query<SupplierRfqRow>(rowSql, rowParams)[0];
+    if (!row) return null;
+
+    const items = this.db.query<SupplierRfqItem>(itemsSql, itemsParams);
+    const quotations = this.db.query<SupplierQuotationRow>(quotationsSql, quotationsParams)
+      .map((r) => unscaleMoneyRow(r, QUOTE_MONEY_FIELDS));
+
+    const itemsByQuote = new Map<string, SupplierQuotationItem[]>();
+    for (const q of quotations) {
+      itemsByQuote.set(q.id, this.db.query<SupplierQuotationItem>(quotationItemsSql, [q.id])
+        .map((r) => unscaleMoneyRow(r, QUOTE_ITEM_MONEY_FIELDS)));
     }
 
-    return { ...row, items, quotations };
+    return { ...row, items, quotations: this.mapRfqQuotations(quotations, itemsByQuote) };
+  }
+
+  public async getRfqByIdAsync(id: string): Promise<(SupplierRfqRow & { items: SupplierRfqItem[]; quotations: SupplierQuotationRow[] }) | null> {
+    const { rowSql, rowParams, itemsSql, itemsParams, quotationsSql, quotationsParams, quotationItemsSql } = this.buildRfqDetailQueries(id);
+    const [rows, items, quotationRows] = await Promise.all([
+      this.db.queryAsync<SupplierRfqRow>(rowSql, rowParams),
+      this.db.queryAsync<SupplierRfqItem>(itemsSql, itemsParams),
+      this.db.queryAsync<SupplierQuotationRow>(quotationsSql, quotationsParams),
+    ]);
+    const row = rows[0];
+    if (!row) return null;
+
+    const quotations = quotationRows.map((r) => unscaleMoneyRow(r, QUOTE_MONEY_FIELDS));
+    const itemsByQuote = new Map<string, SupplierQuotationItem[]>(
+      await Promise.all(quotations.map(async (q) => [
+        q.id,
+        (await this.db.queryAsync<SupplierQuotationItem>(quotationItemsSql, [q.id]))
+          .map((r) => unscaleMoneyRow(r, QUOTE_ITEM_MONEY_FIELDS)),
+      ] as const)),
+    );
+
+    return { ...row, items, quotations: this.mapRfqQuotations(quotations, itemsByQuote) };
   }
 
   public compareQuotationsForRfq(rfqId: string) {
@@ -212,7 +272,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
         INSERT INTO supplier_quotations (
           id, rfq_id, supplier_id, quotation_number, date, valid_until,
           total_amount, delivery_days, payment_terms, quality_rating, status, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED', ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, 'SUBMITTED', ?)
       `, [
         quoteId, dto.rfqId, dto.supplierId, dto.quotationNumber, today, dto.validUntil || null,
         totalAmount, dto.deliveryDays || 7, dto.paymentTerms || 'CASH', dto.qualityRating || 'GRADE_1', dto.notes || null,
@@ -222,7 +282,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
         const itemTotal = round2(Number(item.quantityM2) * Number(item.unitCost));
         db.run(`
           INSERT INTO supplier_quotation_items (id, quotation_id, rfq_item_id, product_id, quantity_m2, unit_cost, total_cost, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?)
         `, [`sqi_${uuidv4().substring(0, 8)}`, quoteId, item.rfqItemId || null, item.productId, Number(item.quantityM2), Number(item.unitCost), itemTotal, item.notes || null]);
       }
 
@@ -231,7 +291,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
       const res = db.query<SupplierQuotationRow>(`
         SELECT q.*, s.name AS supplierName
         FROM supplier_quotations q JOIN suppliers s ON s.id = q.supplier_id WHERE q.id = ?
-      `, [quoteId])[0];
+      `, [quoteId]).map((row) => unscaleMoneyRow(row, QUOTE_MONEY_FIELDS))[0];
       return res;
     });
   }
@@ -242,14 +302,14 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
 
     const quote = this.db.query<any>(`
       SELECT q.*, s.name AS supplierName FROM supplier_quotations q JOIN suppliers s ON s.id = q.supplier_id WHERE q.id = ?
-    `, [quotationId])[0];
+    `, [quotationId]).map((row) => unscaleMoneyRow(row, QUOTE_MONEY_FIELDS))[0];
     if (!quote) throw new Error('عرض السعر غير موجود.');
 
     const items = this.db.query<SupplierQuotationItem>(`
       SELECT qi.*, p.name AS productName, p.product_type AS productType,
              p.base_unit AS baseUnit, p.custom_unit AS customUnit
       FROM supplier_quotation_items qi LEFT JOIN products p ON p.id = qi.product_id WHERE qi.quotation_id = ?
-    `, [quotationId]);
+    `, [quotationId]).map((row) => unscaleMoneyRow(row, QUOTE_ITEM_MONEY_FIELDS));
 
     return this.db.executeTransaction((db) => {
       db.run(`UPDATE supplier_quotations SET status = 'ACCEPTED' WHERE id = ?`, [quotationId]);
@@ -266,7 +326,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
           INSERT INTO purchase_orders (
             id, order_number, date, supplier_id, warehouse_id, request_id,
             subtotal, discount_amount, tax_amount, shipping_cost, total_amount, status, notes, created_by
-          ) VALUES (?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, ?, 'SENT', ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, NULL, ROUND(?*100), 0, 0, 0, ROUND(?*100), 'SENT', ?, ?)
         `, [
           orderId, orderNumber, today, quote.supplierId, warehouseId,
           quote.totalAmount, quote.totalAmount,
@@ -279,7 +339,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
           db.run(`
             INSERT INTO purchase_order_items (
               id, purchase_order_id, product_id, product_name, quantity_m2, boxes_count, received_m2, unit_cost, total_cost
-            ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, 0, ROUND(?*100), ROUND(?*100))
           `, [`poi_${uuidv4().substring(0, 8)}`, orderId, item.productId, item.productName || 'صنف سيراميك', item.quantityM2, boxes, item.unitCost, item.totalCost]);
         }
       }

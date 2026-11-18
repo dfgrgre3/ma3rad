@@ -211,7 +211,7 @@ const CLAIM_SELECT = `
          wx.reference_id AS executionReferenceId,
          wx.return_id AS executionReturnId,
          wx.replacement_invoice_id AS executionReplacementInvoiceId,
-         wx.amount AS executionAmount, wx.details AS executionDetails,
+         wx.amount / 100.0 AS executionAmount, wx.details AS executionDetails,
          wx.executed_at AS executionDate
   FROM customer_warranty_claims c
   JOIN customers cu ON cu.id = c.customer_id
@@ -313,7 +313,7 @@ export class WarrantyClaimService {
     );
     const execution = this.db.query<any>(`SELECT resolution_type AS resolutionType,
       reference_type AS referenceType, reference_id AS referenceId, return_id AS returnId,
-      replacement_invoice_id AS replacementInvoiceId, amount, details, executed_at AS executedAt
+      replacement_invoice_id AS replacementInvoiceId, amount / 100.0 AS amount, details, executed_at AS executedAt
       FROM warranty_claim_executions WHERE claim_id = ?`, [id])[0];
     claim.execution = execution || null;
     return claim;
@@ -366,7 +366,7 @@ export class WarrantyClaimService {
               sii.product_name AS productName, sii.product_grade AS grade,
               sii.size, sii.quantity_m2 AS soldQuantity, sii.boxes_count AS boxesCount,
               sii.meters_per_box AS metersPerBox,
-              CASE WHEN sii.quantity_m2 > 0 THEN sii.total_price / sii.quantity_m2 ELSE 0 END AS unitPrice,
+              CASE WHEN sii.quantity_m2 > 0 THEN sii.total_price / sii.quantity_m2 / 100.0 ELSE 0 END AS unitPrice,
               p.sku AS productSku, p.product_type AS productType,
               p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM sales_invoice_items sii
@@ -632,7 +632,7 @@ export class WarrantyClaimService {
       if (!invoice) throw new Error('لا يمكن تنفيذ الحل لأن فاتورة البيع لم تعد مكتملة.');
       const sourceLines = db.query<any>(`SELECT id AS invoiceItemId, special_stock_id AS specialStockId,
         quantity_m2 AS quantity, boxes_count AS boxes, pieces_count AS pieces,
-        unit_price AS unitPrice, unit_cost AS unitCost, discount_amount AS discountAmount
+        unit_price / 100.0 AS unitPrice, unit_cost / 100.0 AS unitCost, discount_amount / 100.0 AS discountAmount
         FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ?`, [claim.invoiceId, claim.productId]);
       if (!sourceLines.length) throw new Error('بند الصنف غير موجود في الفاتورة الأصلية.');
       const sourceIds = new Set(sourceLines.map((line) => line.specialStockId || 'REGULAR'));
@@ -694,7 +694,7 @@ export class WarrantyClaimService {
     db.run(`INSERT INTO warranty_claim_executions (
       id, claim_id, resolution_type, status, reference_type, reference_id,
       return_id, replacement_invoice_id, amount, details, executed_by, executed_at
-    ) VALUES (?, ?, ?, 'EXECUTED', ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    ) VALUES (?, ?, ?, 'EXECUTED', ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`, [
       `wcex_${uuidv4()}`, claim.id, resolutionType, referenceType, referenceId,
       returnId, replacementInvoiceId, amount, details, actorId, new Date().toISOString(),
     ]);

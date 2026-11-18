@@ -10,6 +10,14 @@ import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const PURCHASE_RETURN_MONEY_FIELDS = ['total_amount', 'refunded_amount', 'remaining_to_balance'] as const;
+const PURCHASE_RETURN_ITEM_MONEY_FIELDS = ['unit_cost', 'total_refund'] as const;
+const PURCHASE_INVOICE_MONEY_FIELDS = [
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'total_amount',
+  'paid_amount', 'remaining_amount',
+] as const;
 
 export interface ReturnablePurchaseItem {
   productId: string;
@@ -96,7 +104,7 @@ export class PurchaseReturnService {
   private readReturnableItems(purchaseId: string): ReturnablePurchaseItem[] {
     return this.db.query<any>(`
       SELECT pii.product_id AS productId, pii.product_name AS productName, pii.grade,
-        pii.unit_cost AS unitCost, pii.quantity_m2 AS purchasedM2,
+        pii.unit_cost / 100.0 AS unitCost, pii.quantity_m2 AS purchasedM2,
         COALESCE(SUM(pri.quantity_m2), 0) AS returnedM2,
         COALESCE(p.meters_per_box, 1.44) AS metersPerBox,
         COALESCE(p.product_type, 'CERAMIC') AS productType,
@@ -126,8 +134,12 @@ export class PurchaseReturnService {
     return Number(row.refundedAmount) > 0 ? 'CASH' : 'BALANCE';
   }
 
-  public getAllReturns(search = '', dateFrom?: string, dateTo?: string): PurchaseReturnRow[] {
-    const actor = this.requirePurchasesView();
+  private buildReturnsQuery(
+    actor: ReturnType<typeof AuthService.requireAuth>,
+    search: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): { sql: string; params: any[] } {
     const scope = this.purchaseScope(actor);
     let sql = `
       SELECT pr.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName,
@@ -155,9 +167,26 @@ export class PurchaseReturnService {
       params.push(dateTo);
     }
     sql += ` ORDER BY pr.date DESC, pr.created_at DESC`;
-    return this.db
-      .query<RawReturnRow>(sql, params)
-      .map((row) => ({ ...row, refundMethod: this.inferRefundMethod(row) }));
+    return { sql, params };
+  }
+
+  private mapReturnRows(rows: RawReturnRow[]): PurchaseReturnRow[] {
+    return rows.map((row) => {
+      const unscaled = unscaleMoneyRow(row, PURCHASE_RETURN_MONEY_FIELDS);
+      return { ...unscaled, refundMethod: this.inferRefundMethod(unscaled) };
+    });
+  }
+
+  public getAllReturns(search = '', dateFrom?: string, dateTo?: string): PurchaseReturnRow[] {
+    const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildReturnsQuery(actor, search, dateFrom, dateTo);
+    return this.mapReturnRows(this.db.query<RawReturnRow>(sql, params));
+  }
+
+  public async getAllReturnsAsync(search = '', dateFrom?: string, dateTo?: string): Promise<PurchaseReturnRow[]> {
+    const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildReturnsQuery(actor, search, dateFrom, dateTo);
+    return this.mapReturnRows(await this.db.queryAsync<RawReturnRow>(sql, params));
   }
 
   private readReturnById(
@@ -176,21 +205,59 @@ export class PurchaseReturnService {
       WHERE pr.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
     `, [id, ...scope.branch.params, ...scope.company.params])[0];
     if (!row) return null;
+    const unscaledRow = unscaleMoneyRow(row, PURCHASE_RETURN_MONEY_FIELDS);
     const items = this.db.query(`
       SELECT pri.id, pri.product_id AS productId, pri.product_name AS productName, pri.grade,
              pri.quantity_m2 AS quantityM2, pri.boxes_count AS boxesCount,
-             pri.unit_cost AS unitCost, pri.total_refund AS totalRefund,
+             pri.unit_cost / 100.0 AS unitCost, pri.total_refund / 100.0 AS totalRefund,
              COALESCE(p.product_type, 'CERAMIC') AS productType,
              p.base_unit AS baseUnit, p.custom_unit AS customUnit
       FROM purchase_return_items pri
       LEFT JOIN products p ON p.id = pri.product_id
       WHERE pri.return_id = ?
     `, [id]);
-    return { ...row, refundMethod: this.inferRefundMethod(row), items };
+    return { ...unscaledRow, refundMethod: this.inferRefundMethod(unscaledRow), items };
+  }
+
+  private async readReturnByIdAsync(
+    id: string,
+    actor: ReturnType<typeof AuthService.requireAuth>
+  ): Promise<(PurchaseReturnRow & { items: any[] }) | null> {
+    const scope = this.purchaseScope(actor);
+    const [rows, items] = await Promise.all([
+      this.db.queryAsync<RawReturnRow>(`
+      SELECT pr.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName
+      FROM purchase_returns pr
+      JOIN suppliers s ON s.id = pr.supplier_id
+      JOIN warehouses w ON w.id = pr.warehouse_id
+      JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+      LEFT JOIN branches b ON b.id = COALESCE(pi.branch_id, w.branch_id)
+      LEFT JOIN users u ON u.id = pr.created_by
+      WHERE pr.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
+    `, [id, ...scope.branch.params, ...scope.company.params]),
+      this.db.queryAsync(`
+      SELECT pri.id, pri.product_id AS productId, pri.product_name AS productName, pri.grade,
+             pri.quantity_m2 AS quantityM2, pri.boxes_count AS boxesCount,
+             pri.unit_cost / 100.0 AS unitCost, pri.total_refund / 100.0 AS totalRefund,
+             COALESCE(p.product_type, 'CERAMIC') AS productType,
+             p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM purchase_return_items pri
+      LEFT JOIN products p ON p.id = pri.product_id
+      WHERE pri.return_id = ?
+    `, [id]),
+    ]);
+    const row = rows[0];
+    if (!row) return null;
+    const unscaledRow = unscaleMoneyRow(row, PURCHASE_RETURN_MONEY_FIELDS);
+    return { ...unscaledRow, refundMethod: this.inferRefundMethod(unscaledRow), items };
   }
 
   public getReturnById(id: string): (PurchaseReturnRow & { items: any[] }) | null {
     return this.readReturnById(id, this.requirePurchasesView());
+  }
+
+  public async getReturnByIdAsync(id: string): Promise<(PurchaseReturnRow & { items: any[] }) | null> {
+    return this.readReturnByIdAsync(id, this.requirePurchasesView());
   }
 
   public getReturnableItems(purchaseId: string): ReturnablePurchaseItem[] {
@@ -260,7 +327,7 @@ export class PurchaseReturnService {
     const purchase = this.db.query<any>(`
       SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.supplier_id AS supplierId,
         pi.warehouse_id AS warehouseId, pi.branch_id AS branchId,
-        pi.subtotal, pi.discount_amount AS discountAmount, pi.tax_amount AS taxAmount,
+        pi.subtotal / 100.0 AS subtotal, pi.discount_amount / 100.0 AS discountAmount, pi.tax_amount / 100.0 AS taxAmount,
         w.branch_id AS warehouseBranchId
       FROM purchase_invoices pi
       JOIN warehouses w ON w.id = pi.warehouse_id
@@ -293,10 +360,10 @@ export class PurchaseReturnService {
           supplierId: prior.supplier_id,
           warehouseId: prior.warehouse_id,
           date: prior.date,
-          totalAmount: Number(prior.total_amount),
-          refundedAmount: Number(prior.refunded_amount),
-          remainingToBalance: Number(prior.remaining_to_balance),
-          refundMethod: Number(prior.refunded_amount) > 0 ? 'CASH' : 'BALANCE',
+          totalAmount: Number(prior.total_amount) / 100,
+          refundedAmount: Number(prior.refunded_amount) / 100,
+          remainingToBalance: Number(prior.remaining_to_balance) / 100,
+          refundMethod: Number(prior.refunded_amount) > 1 ? 'CASH' : 'BALANCE',
           reason: prior.reason,
           createdAt: prior.created_at,
         };
@@ -338,7 +405,7 @@ export class PurchaseReturnService {
         INSERT INTO purchase_returns (
           id, return_number, original_purchase_id, original_invoice_number, supplier_id,
           warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by, idempotency_key
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?)
       `, [
         returnId, returnNumber, purchase.id, purchase.invoiceNumber, purchase.supplierId,
         purchase.warehouseId, today, total, isCash ? total : 0, isCash ? 0 : total, dto.reason.trim(), actor.id, dto.idempotencyKey || null,
@@ -349,7 +416,7 @@ export class PurchaseReturnService {
           INSERT INTO purchase_return_items (
             id, return_id, product_id, product_name, grade, quantity_m2,
             boxes_count, unit_cost, total_refund
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100))
         `, [
           `pritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, item.productName,
           item.grade, item.quantityM2, item.boxesCount, item.unitCost, item.totalRefund,
@@ -376,7 +443,7 @@ export class PurchaseReturnService {
           INSERT INTO inventory_transactions (
             id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
             unit_cost, total_cost, reference_type, reference_id, notes, performed_by
-          ) VALUES (?, ?, 'PURCHASE_RETURN', ?, ?, ?, ?, ?, ?, 'PURCHASE_RETURN', ?, ?, ?)
+          ) VALUES (?, ?, 'PURCHASE_RETURN', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'PURCHASE_RETURN', ?, ?, ?)
         `, [
           returnTransactionId, db.nextNumber('TX-PRET'), item.productId,
           purchase.warehouseId, -item.quantityM2, -item.boxesCount, item.unitCost,
@@ -387,10 +454,10 @@ export class PurchaseReturnService {
       }
 
       if (isCash) {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [total, registerId]);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?`, [total, registerId]);
       } else {
         db.run(`
-          UPDATE suppliers SET current_balance = current_balance - ?, total_purchases = total_purchases - ?,
+          UPDATE suppliers SET current_balance = current_balance - ROUND(?*100), total_purchases = total_purchases - ROUND(?*100),
             updated_at = CURRENT_TIMESTAMP WHERE id = ?
         `, [total, total, purchase.supplierId]);
       }
@@ -425,23 +492,27 @@ export class PurchaseReturnService {
     });
   }
 
-  public getStats(): PurchaseReturnStats {
-    const actor = this.requirePurchasesView();
+  private buildStatsQuery(actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.purchaseScope(actor);
     const today = localDateString();
-    const row = this.db.query<any>(`
+    return {
+      sql: `
       SELECT COUNT(*) AS count,
-             COALESCE(SUM(pr.total_amount), 0) AS totalAmount,
-             COALESCE(SUM(pr.refunded_amount), 0) AS cashRefunded,
-             COALESCE(SUM(pr.remaining_to_balance), 0) AS creditedToBalance,
+             COALESCE(SUM(pr.total_amount), 0) / 100.0 AS totalAmount,
+             COALESCE(SUM(pr.refunded_amount), 0) / 100.0 AS cashRefunded,
+             COALESCE(SUM(pr.remaining_to_balance), 0) / 100.0 AS creditedToBalance,
              COALESCE(SUM(CASE WHEN pr.date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
-             COALESCE(SUM(CASE WHEN pr.date = ? THEN pr.total_amount ELSE 0 END), 0) AS todayAmount
+             COALESCE(SUM(CASE WHEN pr.date = ? THEN pr.total_amount ELSE 0 END), 0) / 100.0 AS todayAmount
       FROM purchase_returns pr
       JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
       JOIN warehouses w ON w.id = pr.warehouse_id
       LEFT JOIN branches b ON b.id = COALESCE(pi.branch_id, w.branch_id)
-      WHERE ${scope.branch.clause} AND ${scope.company.clause}
-    `, [today, today, ...scope.branch.params, ...scope.company.params])[0] || {};
+      WHERE ${scope.branch.clause} AND ${scope.company.clause}`,
+      params: [today, today, ...scope.branch.params, ...scope.company.params],
+    };
+  }
+
+  private mapStatsRow(row: any): PurchaseReturnStats {
     return {
       count: Number(row.count) || 0,
       totalAmount: Number(row.totalAmount) || 0,
@@ -452,12 +523,25 @@ export class PurchaseReturnService {
     };
   }
 
-  /** أكثر أسباب الإرجاع تكرارًا لقيمة أكبر أثر مالي. */
-  public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+  public getStats(): PurchaseReturnStats {
     const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildStatsQuery(actor);
+    const row = this.db.query<any>(sql, params)[0] || {};
+    return this.mapStatsRow(row);
+  }
+
+  public async getStatsAsync(): Promise<PurchaseReturnStats> {
+    const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildStatsQuery(actor);
+    const rows = await this.db.queryAsync<any>(sql, params);
+    return this.mapStatsRow(rows[0] || {});
+  }
+
+  private buildTopReasonsQuery(actor: ReturnType<typeof AuthService.requireAuth>, limit: number): { sql: string; params: any[] } {
     const scope = this.purchaseScope(actor);
-    return this.db.query<any>(`
-      SELECT pr.reason, COUNT(*) AS count, COALESCE(SUM(pr.total_amount), 0) AS amount
+    return {
+      sql: `
+      SELECT pr.reason, COUNT(*) AS count, COALESCE(SUM(pr.total_amount), 0) / 100.0 AS amount
       FROM purchase_returns pr
       JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
       JOIN warehouses w ON w.id = pr.warehouse_id
@@ -465,11 +549,29 @@ export class PurchaseReturnService {
       WHERE ${scope.branch.clause} AND ${scope.company.clause}
       GROUP BY pr.reason
       ORDER BY count DESC, amount DESC
-      LIMIT ?
-    `, [...scope.branch.params, ...scope.company.params, Math.max(1, Math.min(20, limit))]).map((row) => ({
+      LIMIT ?`,
+      params: [...scope.branch.params, ...scope.company.params, Math.max(1, Math.min(20, limit))],
+    };
+  }
+
+  private mapTopReasons(rows: any[]): { reason: string; count: number; amount: number }[] {
+    return rows.map((row) => ({
       reason: row.reason || 'غير محدد',
       count: Number(row.count) || 0,
       amount: Number(row.amount) || 0,
     }));
+  }
+
+  /** أكثر أسباب الإرجاع تكرارًا لقيمة أكبر أثر مالي. */
+  public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+    const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildTopReasonsQuery(actor, limit);
+    return this.mapTopReasons(this.db.query<any>(sql, params));
+  }
+
+  public async getTopReturnReasonsAsync(limit = 5): Promise<{ reason: string; count: number; amount: number }[]> {
+    const actor = this.requirePurchasesView();
+    const { sql, params } = this.buildTopReasonsQuery(actor, limit);
+    return this.mapTopReasons(await this.db.queryAsync<any>(sql, params));
   }
 }

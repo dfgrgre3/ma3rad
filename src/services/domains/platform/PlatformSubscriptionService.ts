@@ -7,7 +7,7 @@ import { centralAuditService } from './CentralAuditService';
 import { platformAdminApiClient } from './PlatformAdminApiClient';
 import { provisioningQueueService } from './ProvisioningQueueService';
 import { provisioningExecutorService } from './ProvisioningExecutorService';
-import {
+import type {
   PlatformSubscription,
   PlatformSubscriptionCreateInput,
   PlatformTrialCreateInput,
@@ -168,7 +168,7 @@ export class PlatformSubscriptionService {
     this.db.run(
       `INSERT INTO platform_subscriptions
         (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
       [
         id, input.tenantId, input.planId,
         input.status ?? 'ACTIVE',
@@ -195,7 +195,7 @@ export class PlatformSubscriptionService {
         licenseId, input.tenantId, id, input.planId, licenseKey,
         'ACTIVE', start.toISOString(), start.toISOString(), end.toISOString(),
         toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
-        plan.includedModules, plan.features, activationCode, certificate,
+        JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
         toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'اشتراك جديد',
       ]
     );
@@ -259,7 +259,7 @@ export class PlatformSubscriptionService {
         licenseId, input.tenantId, id, input.planId, licenseKey,
         start.toISOString(), start.toISOString(), end.toISOString(),
         toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
-        plan.includedModules, plan.features, activationCode, certificate,
+        JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
         toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'تجريبي',
       ]
     );
@@ -367,6 +367,8 @@ export class PlatformSubscriptionService {
       priceLockMonths?: number;
       reason?: string;
       allowLocal?: boolean;
+      /** Approved platform_op_approvals id required when the upgrade rule demands approval. */
+      approvalId?: string;
     } = {}
   ): PlatformPlanChangeResult {
     PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
@@ -386,7 +388,7 @@ export class PlatformSubscriptionService {
       const rule = this.getUpgradeRule(currentPlanId, targetPlanId);
       if (rule && rule.allowed === false) throw new Error('لا يسمح بالترقية/التخفيض من الخطة الحالية إلى الخطة الهدف.');
       if (rule?.requiresApproval) {
-        // TODO: Create approval request
+        this.assertPlanChangeApproved(tenantId, targetPlanId, options);
       }
     }
 
@@ -429,15 +431,8 @@ export class PlatformSubscriptionService {
       this.db.run(
         `INSERT INTO platform_subscriptions
           (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-        [subscriptionId, tenantId, targetPlanId, allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), expires.toISOString(),
-         tenant.seatsLimit, price, targetPlan.billingCycle, branchesLimit]
-      );
-      this.db.run(
-        `INSERT INTO platform_subscriptions
-          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-        [subscriptionId, tenantId, targetPlanId, allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), expires.toISOString(),
+         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
+        [subscriptionId, tenantId, targetPlanId, 'ACTIVE', start.toISOString(), expires.toISOString(),
          tenant.seatsLimit, price, targetPlan.billingCycle, branchesLimit]
       );
 
@@ -451,9 +446,9 @@ export class PlatformSubscriptionService {
            seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [licenseId, tenantId, subscriptionId, targetPlanId, licenseKey,
-         allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), start.toISOString(), expires.toISOString(),
+         'ACTIVE', start.toISOString(), start.toISOString(), expires.toISOString(),
          tenant.seatsLimit, toNumber(targetPlan.devicesLimit, 1), branchesLimit,
-         targetPlan.includedModules, targetPlan.features, activationCode, certificate,
+         JSON.stringify(targetPlan.includedModules), JSON.stringify(targetPlan.features), activationCode, JSON.stringify(certificate),
          toNumber(targetPlan.offlineGracePeriodDays, 14), coupling, `تغيير باقة إلى ${targetPlan.name}${options.reason ? `: ${options.reason}` : ''}`]
       );
 
@@ -469,7 +464,7 @@ export class PlatformSubscriptionService {
       if (options.priceLockMonths && options.priceLockMonths > 0) {
         this.db.run(
           `INSERT INTO platform_subscription_price_locks (id, subscription_id, locked_price, locked_until, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ROUND(?*100), ?, ?)`,
           [`pl_${uuidv4().replace(/-/g, '').slice(0, 12)}`, subscriptionId, price, addMonths(new Date(), options.priceLockMonths).toISOString(), now]
         );
       }
@@ -505,11 +500,90 @@ export class PlatformSubscriptionService {
         currency: targetPlan.currency ?? 'EGP',
         proratedAmount: 0,
       },
-      status: allowLocal ? 'ACTIVE' : 'ACTIVE',
+      status: 'ACTIVE',
     };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Fail-closed gate for upgrade rules with `requiresApproval`.
+   *
+   * Without a valid approvalId a PENDING `PLAN_CHANGE` request is registered in
+   * platform_op_approvals (reusing an existing pending request for the same
+   * tenant+plan) and the change is rejected. After an operator approves the
+   * request, the caller re-invokes changeSubscriptionPlan with that approvalId.
+   */
+  private assertPlanChangeApproved(
+    tenantId: string,
+    targetPlanId: string,
+    options: { approvalId?: string; reason?: string }
+  ): void {
+    if (options.approvalId) {
+      const approval = this.getOpApproval(options.approvalId);
+      const payload = approval?.opPayload ?? {};
+      const matches =
+        approval?.opType === 'PLAN_CHANGE' &&
+        approval.status === 'APPROVED' &&
+        payload.tenantId === tenantId &&
+        payload.targetPlanId === targetPlanId;
+      if (!matches) {
+        throw new Error('طلب الموافقة غير صالح أو غير معتمد لتغيير الباقة هذا.');
+      }
+      return;
+    }
+
+    const pendingRows = this.db.query<any>(
+      `SELECT id, op_payload FROM platform_op_approvals WHERE op_type = 'PLAN_CHANGE' AND status = 'PENDING'`
+    );
+    const pending = pendingRows.find((row) => {
+      try {
+        const payload = JSON.parse(row.op_payload ?? '{}');
+        return payload.tenantId === tenantId && payload.targetPlanId === targetPlanId;
+      } catch {
+        return false;
+      }
+    });
+
+    const approvalId = String(pending?.id ?? `opa_${uuidv4().replace(/-/g, '').slice(0, 12)}`);
+    if (!pending) {
+      const actor = AuthService.getCurrentUser();
+      const now = nowIso();
+      this.db.run(
+        `INSERT INTO platform_op_approvals (id, op_type, op_payload, requested_by, status, created_at, updated_at)
+         VALUES (?, 'PLAN_CHANGE', ?, ?, 'PENDING', ?, ?)`,
+        [
+          approvalId,
+          JSON.stringify({ tenantId, targetPlanId, reason: options.reason ?? null }),
+          actor?.id ?? 'system',
+          now,
+          now,
+        ]
+      );
+    }
+
+    this.audit('طلب موافقة لتغيير باقة', 'OP_APPROVAL', approvalId, { tenantId, targetPlanId });
+    throw new Error(
+      `تغيير الباقة يتطلب موافقة. تم تسجيل طلب موافقة (${approvalId}). بعد اعتماده أعد تنفيذ العملية مع approvalId.`
+    );
+  }
+
+  private getOpApproval(id: string): { id: string; opType: string; opPayload: Record<string, unknown>; status: string } | null {
+    const row = this.db.query<any>('SELECT * FROM platform_op_approvals WHERE id = ?', [id])[0];
+    if (!row) return null;
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = row.op_payload ? JSON.parse(row.op_payload) : {};
+    } catch {
+      payload = {};
+    }
+    return {
+      id: String(row.id),
+      opType: String(row.op_type),
+      opPayload: payload,
+      status: String(row.status),
+    };
+  }
 
   private getTenant(id: string): PlatformTenant | null {
     const row = this.db.query<any>('SELECT * FROM platform_tenants WHERE id = ?', [id])[0];
@@ -540,7 +614,7 @@ export class PlatformSubscriptionService {
       devicesUsed: 0,
       outstanding: 0,
       subscriptionId: row.subscription_id ?? null,
-      price: row.price ?? null,
+      price: row.price != null ? Number(row.price) / 100 : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
@@ -555,9 +629,9 @@ export class PlatformSubscriptionService {
       name: String(row.name),
       description: row.description ?? null,
       billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0),
-      monthlyPrice: toNumber(row.monthly_price, 0),
-      yearlyPrice: toNumber(row.yearly_price, 0),
+      price: toNumber(row.price, 0) / 100,
+      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
+      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
       currency: row.currency ?? 'EGP',
       seatsLimit: toNumber(row.seats_limit, 1),
       branchesLimit: toNumber(row.branches_limit, 1),
@@ -600,7 +674,7 @@ export class PlatformSubscriptionService {
     if (row.expires_at && new Date(row.expires_at) < new Date()) return null;
     if (row.starts_at && new Date(row.starts_at) > new Date()) return null;
     if (row.max_uses && toNumber(row.used_count) >= toNumber(row.max_uses)) return null;
-    if (toNumber(row.min_subtotal, 0) > 0 && subtotal < toNumber(row.min_subtotal, 0)) return null;
+    if (toNumber(row.min_subtotal, 0) / 100 > 0 && subtotal < toNumber(row.min_subtotal, 0) / 100) return null;
 
     const coupon: PlatformCoupon = {
       id: String(row.id),
@@ -608,7 +682,7 @@ export class PlatformSubscriptionService {
       name: String(row.name),
       type: row.type,
       value: toNumber(row.value, 0),
-      minSubtotal: toNumber(row.min_subtotal, 0),
+      minSubtotal: toNumber(row.min_subtotal, 0) / 100,
       maxUses: row.max_uses ?? null,
       usedCount: toNumber(row.used_count, 0),
       startsAt: row.starts_at ?? null,
@@ -637,8 +711,8 @@ export class PlatformSubscriptionService {
   private enqueueTenantOutboxEvent(tenantId: string, eventType: string, payload: unknown): void {
     const id = `evt_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     this.db.run(
-      `INSERT INTO platform_outbox (id, tenant_id, event_type, payload, created_at, processed)
-       VALUES (?, ?, ?, ?, ?, 0)`,
+      `INSERT INTO platform_outbox (id, entity_type, entity_id, event_type, payload, created_at)
+       VALUES (?, 'TENANT', ?, ?, ?, ?)`,
       [id, tenantId, eventType, JSON.stringify(payload), nowIso()]
     );
   }
@@ -652,7 +726,7 @@ export class PlatformSubscriptionService {
       startDate: String(row.start_date),
       endDate: row.end_date ?? null,
       seats: toNumber(row.seats, 1),
-      price: toNumber(row.price, 0),
+      price: toNumber(row.price, 0) / 100,
       billingCycle: row.billing_cycle,
       autoRenew: Boolean(row.auto_renew),
       branchesLimit: toNumber(row.branches_limit, 1),

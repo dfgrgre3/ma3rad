@@ -350,6 +350,57 @@ router.post(
 );
 
 router.post(
+  '/:id/reactivate',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.licenses.update', 'platform.licenses.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const { reason } = req.body || {};
+
+      const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
+      if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
+      if (license.status === 'REVOKED') {
+        return res.status(400).json({ error: 'Revoked licenses cannot be reactivated' });
+      }
+      if (license.status === 'ACTIVE') {
+        return res.status(400).json({ error: 'License is already active' });
+      }
+
+      await db.run(
+        `UPDATE platform_licenses SET status = 'ACTIVE', updated_at = ? WHERE id = ?`,
+        [nowIso(), id]
+      );
+
+      await db.run(
+        `INSERT INTO platform_license_activations
+          (id, license_id, tenant_id, device_id, activation_code, mode, action, status, notes)
+         VALUES (?, ?, ?, ?, ?, 'ONLINE', 'ACTIVATE', 'SUCCESS', ?)`,
+        [`lact_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.tenant_id, license.hardware_id, license.activation_code, reason || 'إعادة تفعيل الترخيص من الخادم المركزي']
+      );
+
+      await db.run(
+        `INSERT INTO platform_license_changes
+          (id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason)
+         VALUES (?, ?, ?, 'REACTIVATE', ?, ?, ?, ?, ?)`,
+        [
+          `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.subscription_id,
+          JSON.stringify({ status: license.status }), JSON.stringify({ status: 'ACTIVE' }),
+          req.platformUser.id, req.platformUser.full_name, reason || 'إعادة تفعيل من الخادم المركزي',
+        ]
+      );
+
+      await auditLicenseChange(req, 'LICENSE_REACTIVATED', id, { reason: reason || null, previousStatus: license.status });
+      res.json({ licenseId: id, status: 'ACTIVE', previousStatus: license.status });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
   '/:id/revoke',
   authenticatePlatformUser,
   requirePlatformPermission(['platform.licenses.delete', 'platform.licenses.manage']),

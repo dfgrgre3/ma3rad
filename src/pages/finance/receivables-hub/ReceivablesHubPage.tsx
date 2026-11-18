@@ -1,28 +1,35 @@
 import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
-import { AuthService } from '../../../services/domains/auth/AuthService';
-import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 
 const DebtsDashboardPage = lazy(() => import('../debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
 const OtherReceivablesPage = lazy(() => import('../other-receivables/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));
 const InstallmentsPage = lazy(() => import('../installments/InstallmentsPage').then(m => ({ default: m.InstallmentsPage })));
 
+// Each tab is gated by the route rule of its canonical path — the same source
+// the MainLayout guard uses — instead of a private permission list that can
+// drift from ROUTE_PERMISSIONS.
 const tabs = [
-  { id: 'debts', label: 'ديون العملاء والموردين', icon: Banknote, permissions: ['finance.view', 'finance.debts.view'] },
-  { id: 'other', label: 'المطالبات الأخرى', icon: ClipboardList, permissions: ['finance.view', 'finance.receivables.view'] },
-  { id: 'installments', label: 'الأقساط', icon: CalendarDays, permissions: ['finance.view', 'finance.installments.view', 'finance.installments.manage'] },
-  { id: 'follow-up', label: 'التحصيل والمتابعة', icon: Clock3, permissions: ['finance.view', 'finance.debts.view', 'finance.installments.view', 'finance.installments.manage'] },
+  { id: 'debts', label: 'ديون العملاء والموردين', icon: Banknote, path: '/finance/receivables' },
+  { id: 'other', label: 'المطالبات الأخرى', icon: ClipboardList, path: '/finance/other-receivables' },
+  { id: 'installments', label: 'الأقساط', icon: CalendarDays, path: '/finance/installments' },
+  // Composite follow-up section: shown only when at least one of its source
+  // sections (debts / installments) is reachable.
+  { id: 'follow-up', label: 'التحصيل والمتابعة', icon: Clock3, path: null },
 ] as const;
 type TabId = (typeof tabs)[number]['id'];
 
 export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTab }) => {
   const [params, setParams] = useSearchParams();
-  const actor = AuthService.getCurrentUser();
-  const allowedTabs = useMemo(
-    () => tabs.filter((item) => item.permissions.some((permission) => PermissionService.can(actor, permission))),
-    [actor],
-  );
+  const canAccess = useRouteAccess();
+  const allowedTabs = useMemo(() => {
+    const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path));
+    const followUpAllowed = permitted.some((item) => item.id === 'debts' || item.id === 'installments');
+    return tabs.filter((item) =>
+      item.id === 'follow-up' ? followUpAllowed : permitted.includes(item),
+    );
+  }, [canAccess]);
   const requested = params.get('tab') as TabId | null;
   const requestedTab = requested ?? initialTab ?? null;
   const tab: TabId | null = allowedTabs.some(item => item.id === requestedTab)

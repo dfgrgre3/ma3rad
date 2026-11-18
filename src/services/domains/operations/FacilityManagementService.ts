@@ -129,7 +129,7 @@ export class FacilityManagementService {
   getExpenses(): ExpenseOption[] {
     const scope = this.scope('e.branch_id');
     return this.db.query<ExpenseOption>(`
-      SELECT e.id, e.date, e.description, e.amount, e.recipient
+      SELECT e.id, e.date, e.description, e.amount / 100.0 AS amount, e.recipient
       FROM expenses e WHERE ${scope.clause}
       ORDER BY e.date DESC, e.created_at DESC LIMIT 200
     `, scope.params);
@@ -218,7 +218,7 @@ export class FacilityManagementService {
         fa.status, fa.responsible_user_id AS responsibleUserId, u.full_name AS responsibleName,
         fa.responsible_employee_id AS responsibleEmployeeId, e.full_name AS responsibleEmployeeName,
         fa.warranty_expires_at AS warrantyExpiresAt,
-        fa.purchase_date AS purchaseDate, fa.supplier, fa.purchase_price AS purchasePrice,
+        fa.purchase_date AS purchaseDate, fa.supplier, fa.purchase_price / 100.0 AS purchasePrice,
         fa.installation_date AS installationDate, fa.useful_life_months AS usefulLifeMonths,
         fa.depreciation_rate AS depreciationRate, fa.replacement_date AS replacementDate,
         fa.qr_code AS qrCode, fa.archived_at AS archivedAt, fa.version
@@ -241,7 +241,7 @@ export class FacilityManagementService {
         wo.assigned_to AS assignedTo, assignee.full_name AS assigneeName,
         wo.assigned_employee_id AS assignedEmployeeId, assEmp.full_name AS assignedEmployeeName,
         wo.vendor_name AS vendorName, wo.scheduled_date AS scheduledDate, wo.completed_date AS completedDate,
-        wo.labor_cost AS laborCost, wo.parts_cost AS partsCost, wo.service_cost AS serviceCost,
+        wo.labor_cost / 100.0 AS laborCost, wo.parts_cost / 100.0 AS partsCost, wo.service_cost / 100.0 AS serviceCost,
         wo.expense_reference AS expenseReference, wo.stock_issue_reference AS stockIssueReference,
         wo.resolution_notes AS resolutionNotes, wo.expense_id AS expenseId,
         e.description AS expenseDescription, wo.inventory_transaction_id AS inventoryTransactionId,
@@ -301,7 +301,7 @@ export class FacilityManagementService {
     const scope = this.scope('fl.branch_id');
     return this.db.query(`
       SELECT l.id, l.asset_id AS assetId, l.work_order_id AS workOrderId,
-        l.maintenance_date AS maintenanceDate, l.cost, l.description,
+        l.maintenance_date AS maintenanceDate, l.cost / 100.0 AS cost, l.description,
         l.technician_id AS technicianId, l.technician_name AS technicianName
       FROM facility_asset_maintenance_logs l
       JOIN facility_work_orders wo ON wo.id = l.work_order_id
@@ -318,7 +318,7 @@ export class FacilityManagementService {
       SELECT fc.id, fc.contract_number AS contractNumber, fc.location_id AS locationId,
         fl.name AS locationName, fc.contract_type AS contractType, fc.title, fc.vendor_name AS vendorName,
         fc.starts_at AS startsAt, fc.ends_at AS endsAt, fc.next_payment_date AS nextPaymentDate,
-        fc.payment_amount AS paymentAmount, fc.payment_cycle AS paymentCycle, fc.status,
+        fc.payment_amount / 100.0 AS paymentAmount, fc.payment_cycle AS paymentCycle, fc.status,
         fc.expense_reference AS expenseReference
       FROM facility_contracts fc JOIN facility_locations fl ON fl.id = fc.location_id
       WHERE ${scope.clause} ORDER BY COALESCE(fc.next_payment_date, fc.ends_at), fc.title
@@ -412,7 +412,7 @@ export class FacilityManagementService {
     const workOrderId = uuidv4();
     this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`INSERT INTO facility_work_orders (id, work_order_number, location_id, asset_id, request_type, title, description, priority, requested_by, requested_employee_id, assigned_to, assigned_employee_id, vendor_name, scheduled_date, next_maintenance_date, labor_cost, parts_cost, service_cost, expense_id, inventory_transaction_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [workOrderId, number, input.locationId, input.assetId || null, input.requestType, input.title.trim(), input.description || null, input.priority, actor.id, input.requestedEmployeeId || null, input.assignedTo || null, input.assignedEmployeeId || null, input.vendorName || null, input.scheduledDate || null, input.nextMaintenanceDate || null, Math.max(0, Number(input.laborCost || 0)), Math.max(0, Number(input.partsCost || 0)), Math.max(0, Number(input.serviceCost || 0)), input.expenseId || null, input.inventoryTransactionId || null]);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?)`, [workOrderId, number, input.locationId, input.assetId || null, input.requestType, input.title.trim(), input.description || null, input.priority, actor.id, input.requestedEmployeeId || null, input.assignedTo || null, input.assignedEmployeeId || null, input.vendorName || null, input.scheduledDate || null, input.nextMaintenanceDate || null, Math.max(0, Number(input.laborCost || 0)), Math.max(0, Number(input.partsCost || 0)), Math.max(0, Number(input.serviceCost || 0)), input.expenseId || null, input.inventoryTransactionId || null]);
       if (intervalDays) {
         sqliteDb.run(`INSERT INTO facility_maintenance_schedules (id, location_id, asset_id, title, description, interval_days, next_due_date, assigned_to, assigned_employee_id, created_by)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [uuidv4(), input.locationId, input.assetId || null, input.title.trim(), input.description || null, intervalDays, input.nextMaintenanceDate, input.assignedTo || null, input.assignedEmployeeId || null, actor.id]);
@@ -465,7 +465,7 @@ export class FacilityManagementService {
     const count = this.db.query<{ count: number }>('SELECT COUNT(*) AS count FROM facility_contracts')[0]?.count || 0;
     const number = `FC-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
     this.db.run(`INSERT INTO facility_contracts (id, contract_number, location_id, contract_type, title, vendor_name, starts_at, ends_at, next_payment_date, payment_amount, payment_cycle, expense_reference, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [uuidv4(), number, input.locationId, input.contractType, input.title.trim(), input.vendorName.trim(), input.startsAt || null, input.endsAt || null, input.nextPaymentDate || null, Math.max(0, Number(input.paymentAmount || 0)), input.paymentCycle, input.expenseReference || null, actor.id]);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`, [uuidv4(), number, input.locationId, input.contractType, input.title.trim(), input.vendorName.trim(), input.startsAt || null, input.endsAt || null, input.nextPaymentDate || null, Math.max(0, Number(input.paymentAmount || 0)), input.paymentCycle, input.expenseReference || null, actor.id]);
   }
 
   createSafetyRecord(input: { locationId: string; assetId?: string; recordType: SafetyRecordType; title: string; checklistName?: string; result: string; riskLevel?: string; observations?: string; correctiveAction?: string; dueDate?: string }) {
@@ -583,7 +583,7 @@ export class FacilityManagementService {
     setField('notes', input.notes || null);
     setField('purchase_date', input.purchaseDate || null);
     setField('supplier', input.supplier || null);
-    setField('purchase_price', input.purchasePrice !== undefined ? input.purchasePrice : undefined);
+    if (input.purchasePrice !== undefined) { updates.push('purchase_price = ROUND(?*100)'); params.push(input.purchasePrice); }
     setField('installation_date', input.installationDate || null);
     setField('useful_life_months', input.usefulLifeMonths !== undefined ? input.usefulLifeMonths : undefined);
     setField('depreciation_rate', input.depreciationRate !== undefined ? input.depreciationRate : undefined);
@@ -709,9 +709,9 @@ export class FacilityManagementService {
     setField('priority', input.priority || null);
     setField('scheduled_date', input.scheduledDate || null);
     setField('vendor_name', input.vendorName || null);
-    setField('labor_cost', input.laborCost !== undefined ? Math.max(0, input.laborCost) : undefined);
-    setField('parts_cost', input.partsCost !== undefined ? Math.max(0, input.partsCost) : undefined);
-    setField('service_cost', input.serviceCost !== undefined ? Math.max(0, input.serviceCost) : undefined);
+    if (input.laborCost !== undefined) { updates.push('labor_cost = ROUND(?*100)'); params.push(Math.max(0, input.laborCost)); }
+    if (input.partsCost !== undefined) { updates.push('parts_cost = ROUND(?*100)'); params.push(Math.max(0, input.partsCost)); }
+    if (input.serviceCost !== undefined) { updates.push('service_cost = ROUND(?*100)'); params.push(Math.max(0, input.serviceCost)); }
     setField('expense_id', input.expenseId);
     setField('inventory_transaction_id', input.inventoryTransactionId);
     setField('requested_employee_id', input.requestedEmployeeId);

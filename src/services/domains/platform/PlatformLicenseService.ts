@@ -4,7 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformLicense,
   PlatformLicenseStatus,
   PlatformLicenseActivation,
@@ -126,7 +126,7 @@ export class PlatformLicenseService {
     return row ? this.mapLicense(row) : null;
   }
 
-  public async issueLicense(input: {
+  public issueLicense(input: {
     tenantId: string;
     planId: string;
     months?: number;
@@ -139,7 +139,7 @@ export class PlatformLicenseService {
     hardwareId?: string | null;
     notes?: string;
     allowLocal?: boolean;
-  }): Promise<PlatformLicense> {
+  }): PlatformLicense {
     PlatformLicenseService.requirePlatformAccess('licenses', 'platform.licenses.create');
 
     const tenant = this.getTenant(input.tenantId);
@@ -166,7 +166,7 @@ export class PlatformLicenseService {
     this.db.run(
       `INSERT INTO platform_subscriptions
         (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
       [subscriptionId, input.tenantId, input.planId, allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), expires.toISOString(),
        seats, plan.price, plan.billingCycle, branchesLimit]
     );
@@ -183,7 +183,7 @@ export class PlatformLicenseService {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [licenseId, input.tenantId, subscriptionId, input.planId, licenseKey,
        allowLocal ? 'ACTIVE' : 'ISSUED', start.toISOString(), start.toISOString(), expires.toISOString(),
-       seats, deviceLimit, branchesLimit, modules, features, activationCode, certificate,
+       seats, deviceLimit, branchesLimit, JSON.stringify(modules), JSON.stringify(features), activationCode, JSON.stringify(certificate),
        plan.offlineGracePeriodDays, couplingMode, input.notes ?? 'ترخيص جديد', input.hardwareId ?? null]
     );
 
@@ -203,7 +203,7 @@ export class PlatformLicenseService {
     return license;
   }
 
-  public async renewLicense(id: string, months = 12): Promise<PlatformLicense> {
+  public renewLicense(id: string, months = 12): PlatformLicense {
     PlatformLicenseService.requirePlatformAccess('licenses', 'platform.licenses.update');
 
     const license = this.getLicense(id);
@@ -288,6 +288,21 @@ export class PlatformLicenseService {
 
     const now = nowIso();
     this.db.run('UPDATE platform_licenses SET hardware_id = ?, updated_at = ? WHERE id = ?', [hardwareId, now, id]);
+
+    const existingDevice = this.db.query<any>('SELECT id FROM platform_devices WHERE hardware_id = ?', [hardwareId])[0];
+    if (existingDevice) {
+      this.db.run(
+        `UPDATE platform_devices SET license_id = ?, status = 'ACTIVE', last_seen_at = ?, updated_at = ? WHERE hardware_id = ?`,
+        [id, now, now, hardwareId]
+      );
+    } else {
+      this.db.run(
+        `INSERT INTO platform_devices
+          (id, tenant_id, license_id, hardware_id, status, last_seen_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
+        [`dev_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.tenantId, id, hardwareId, now, now, now]
+      );
+    }
 
     this.audit('ربط ترخيص بمعرف عتادي', 'LICENSE', id, { hardwareId });
   }
@@ -377,9 +392,9 @@ export class PlatformLicenseService {
       // Update existing device
       const now = nowIso();
       this.db.run(
-        `UPDATE platform_devices SET license_id = ?, device_name = ?, device_type = ?, os = ?, app_version = ?, status = 'ACTIVE', updated_at = ?
+        `UPDATE platform_devices SET license_id = ?, name = ?, os = ?, app_version = ?, status = 'ACTIVE', last_seen_at = ?, updated_at = ?
          WHERE hardware_id = ?`,
-        [input.licenseId, input.deviceName ?? null, input.deviceType ?? null, input.os ?? null, input.appVersion ?? null, now, input.hardwareId]
+        [input.licenseId, input.deviceName ?? null, input.os ?? null, input.appVersion ?? null, now, now, input.hardwareId]
       );
       this.audit('تحديث جهاز مسجل', 'DEVICE', existing.id, { licenseId: input.licenseId });
       return this.getDevice(existing.id)!;
@@ -390,9 +405,9 @@ export class PlatformLicenseService {
 
     this.db.run(
       `INSERT INTO platform_devices
-        (id, license_id, hardware_id, device_name, device_type, os, app_version, status, last_seen_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
-      [id, input.licenseId, input.hardwareId, input.deviceName ?? null, input.deviceType ?? null, input.os ?? null, input.appVersion ?? null, now, now, now]
+        (id, tenant_id, license_id, hardware_id, name, os, app_version, status, first_activated_at, last_seen_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?)`,
+      [id, license.tenantId, input.licenseId, input.hardwareId, input.deviceName ?? null, input.os ?? null, input.appVersion ?? null, now, now, now, now]
     );
 
     this.audit('تسجيل جهاز جديد', 'DEVICE', id, { licenseId: input.licenseId, hardwareId: input.hardwareId });
@@ -591,7 +606,7 @@ export class PlatformLicenseService {
       devicesUsed: 0,
       outstanding: 0,
       subscriptionId: row.subscription_id ?? null,
-      price: row.price ?? null,
+      price: row.price != null ? Number(row.price) / 100 : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
@@ -606,9 +621,9 @@ export class PlatformLicenseService {
       name: String(row.name),
       description: row.description ?? null,
       billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0),
-      monthlyPrice: toNumber(row.monthly_price, 0),
-      yearlyPrice: toNumber(row.yearly_price, 0),
+      price: toNumber(row.price, 0) / 100,
+      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
+      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
       currency: row.currency ?? 'EGP',
       seatsLimit: toNumber(row.seats_limit, 1),
       branchesLimit: toNumber(row.branches_limit, 1),
@@ -679,7 +694,7 @@ export class PlatformLicenseService {
       tenantId: String(row.tenant_id),
       licenseId: String(row.license_id),
       hardwareId: String(row.hardware_id),
-      name: row.device_name ?? null,
+      name: row.name ?? row.device_name ?? null,
       os: row.os ?? null,
       appVersion: row.app_version ?? null,
       ipAddress: row.ip_address ?? null,

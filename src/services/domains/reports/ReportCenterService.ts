@@ -143,11 +143,11 @@ export class ReportCenterService {
     reportCache.clear();
   }
 
-  private withCache(key: string, compute: () => ReportResult): ReportResult {
+  private async withCache(key: string, compute: () => Promise<ReportResult>): Promise<ReportResult> {
     const now = Date.now();
     const hit = reportCache.get(key);
     if (hit && hit.expiresAt > now) return hit.result;
-    const result = compute();
+    const result = await compute();
     reportCache.set(key, { expiresAt: now + CACHE_TTL_MS, result });
     return result;
   }
@@ -247,7 +247,7 @@ export class ReportCenterService {
 
   // ── Operations & audit ────────────────────────────────────────────────────
 
-  public operationsLog({ from, to }: ReportParams): ReportResult {
+  public async operationsLog({ from, to }: ReportParams): Promise<ReportResult> {
     const sales = this.salesScope();
     const purchases = this.purchaseScope();
     const cash = this.branchAccess.sqlScope(
@@ -266,9 +266,9 @@ export class ReportCenterService {
       this.actor(),
     );
 
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT si.date AS date, si.created_at AS createdAt, 'فاتورة بيع' AS docType,
-        si.invoice_number AS docNumber, c.name AS party, si.total_amount AS amount,
+        si.invoice_number AS docNumber, c.name AS party, si.total_amount / 100.0 AS amount,
         COALESCE(u.full_name, '—') AS userName, si.invoice_status AS status
       FROM sales_invoices si
       LEFT JOIN customers c ON c.id = si.customer_id
@@ -276,7 +276,7 @@ export class ReportCenterService {
       WHERE si.date >= ? AND si.date <= ? AND ${sales.clause}
 
       UNION ALL
-      SELECT pi.date, pi.created_at, 'فاتورة شراء', pi.invoice_number, s.name, pi.total_amount,
+      SELECT pi.date, pi.created_at, 'فاتورة شراء', pi.invoice_number, s.name, pi.total_amount / 100.0,
         COALESCE(u.full_name, '—'), pi.payment_status
       FROM purchase_invoices pi
       LEFT JOIN suppliers s ON s.id = pi.supplier_id
@@ -284,7 +284,7 @@ export class ReportCenterService {
       WHERE pi.date >= ? AND pi.date <= ? AND ${purchases.clause}
 
       UNION ALL
-      SELECT sr.date, sr.created_at, 'مرتجع بيع', sr.return_number, c.name, sr.total_amount,
+      SELECT sr.date, sr.created_at, 'مرتجع بيع', sr.return_number, c.name, sr.total_amount / 100.0,
         COALESCE(u.full_name, '—'), 'COMPLETED'
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -293,7 +293,7 @@ export class ReportCenterService {
       WHERE sr.date >= ? AND sr.date <= ? AND ${sales.clause}
 
       UNION ALL
-      SELECT pr.date, pr.created_at, 'مرتجع شراء', pr.return_number, s.name, pr.total_amount,
+      SELECT pr.date, pr.created_at, 'مرتجع شراء', pr.return_number, s.name, pr.total_amount / 100.0,
         COALESCE(u.full_name, '—'), 'COMPLETED'
       FROM purchase_returns pr
       JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
@@ -302,7 +302,7 @@ export class ReportCenterService {
       WHERE pr.date >= ? AND pr.date <= ? AND ${purchases.clause}
 
       UNION ALL
-      SELECT cp.date, cp.created_at, 'سند قبض', cp.receipt_number, c.name, cp.amount,
+      SELECT cp.date, cp.created_at, 'سند قبض', cp.receipt_number, c.name, cp.amount / 100.0,
         COALESCE(u.full_name, '—'), 'POSTED'
       FROM customer_payments cp
       LEFT JOIN customers c ON c.id = cp.customer_id
@@ -310,7 +310,7 @@ export class ReportCenterService {
       WHERE cp.date >= ? AND cp.date <= ? AND ${cash.clause}
 
       UNION ALL
-      SELECT sp.date, sp.created_at, 'سند صرف', sp.receipt_number, s.name, sp.amount,
+      SELECT sp.date, sp.created_at, 'سند صرف', sp.receipt_number, s.name, sp.amount / 100.0,
         COALESCE(u.full_name, '—'), 'POSTED'
       FROM supplier_payments sp
       LEFT JOIN suppliers s ON s.id = sp.supplier_id
@@ -318,7 +318,7 @@ export class ReportCenterService {
       WHERE sp.date >= ? AND sp.date <= ? AND ${supply.clause}
 
       UNION ALL
-      SELECT ex.date, ex.created_at, 'مصروف', COALESCE(ex.recipient, ex.description), ex.description, ex.amount,
+      SELECT ex.date, ex.created_at, 'مصروف', COALESCE(ex.recipient, ex.description), ex.description, ex.amount / 100.0,
         COALESCE(u.full_name, '—'), ex.payment_type
       FROM expenses ex
       LEFT JOIN users u ON u.id = ex.performed_by
@@ -366,8 +366,8 @@ export class ReportCenterService {
     };
   }
 
-  public userActivity({ from, to }: ReportParams): ReportResult {
-    const log = this.operationsLog({ from, to });
+  public async userActivity({ from, to }: ReportParams): Promise<ReportResult> {
+    const log = await this.operationsLog({ from, to });
     const grouped = new Map<string, { userName: string; types: Record<string, number>; total: number; count: number }>();
     for (const row of log.rows) {
       const key = String(row.userName || '—');
@@ -412,8 +412,8 @@ export class ReportCenterService {
     };
   }
 
-  public dailyMovements({ from, to }: ReportParams): ReportResult {
-    const log = this.operationsLog({ from, to });
+  public async dailyMovements({ from, to }: ReportParams): Promise<ReportResult> {
+    const log = await this.operationsLog({ from, to });
     const grouped = new Map<string, { date: string; userName: string; docType: string; count: number; total: number }>();
     for (const row of log.rows) {
       const key = `${row.date}|${row.userName}|${row.docType}`;
@@ -446,15 +446,15 @@ export class ReportCenterService {
 
   // ── Sales analytics ───────────────────────────────────────────────────────
 
-  private salesActivityRows(from: string, to: string) {
+  private async salesActivityRows(from: string, to: string) {
     const scope = this.salesScope();
-    return this.db.query<any>(`
+    return await this.db.queryAsync<any>(`
       SELECT si.date, si.customer_id AS customerId, c.name AS customerName,
         COALESCE(e.full_name, u.full_name, 'بدون مندوب') AS repName,
         COALESCE(w.name, 'بدون مخزن') AS warehouseName,
         sii.product_id AS productId, p.name AS productName,
-        sii.quantity_m2 AS quantity, sii.total_price AS revenue, sii.total_cost AS cost,
-        sii.discount_amount AS lineDiscount, 0 AS isReturn
+        sii.quantity_m2 AS quantity, sii.total_price / 100.0 AS revenue, sii.total_cost / 100.0 AS cost,
+        sii.discount_amount / 100.0 AS lineDiscount, 0 AS isReturn
       FROM sales_invoices si
       JOIN sales_invoice_items sii ON sii.invoice_id = si.id
       JOIN products p ON p.id = sii.product_id
@@ -470,7 +470,7 @@ export class ReportCenterService {
       SELECT sr.date, sr.customer_id, c.name,
         COALESCE(u.full_name, 'بدون مندوب'),
         COALESCE(w.name, 'بدون مخزن'),
-        sri.product_id, p.name, -sri.quantity_m2, -sri.total_refund, -(sri.quantity_m2 * sri.unit_cost),
+        sri.product_id, p.name, -sri.quantity_m2, -sri.total_refund / 100.0, -(sri.quantity_m2 * sri.unit_cost) / 100.0,
         0, 1
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -483,9 +483,9 @@ export class ReportCenterService {
     `, [from, to, ...scope.params, from, to, ...scope.params]);
   }
 
-  public salesAnalysis(params: ReportParams): ReportResult {
+  public async salesAnalysis(params: ReportParams): Promise<ReportResult> {
     const dimension = params.dimension || 'warehouse';
-    const rows = this.salesActivityRows(params.from, params.to);
+    const rows = await this.salesActivityRows(params.from, params.to);
     const keyOf = (row: any): string => {
       if (dimension === 'customer') return row.customerName || 'بدون عميل';
       if (dimension === 'rep') return row.repName || 'بدون مندوب';
@@ -537,8 +537,8 @@ export class ReportCenterService {
     };
   }
 
-  public productSales({ from, to }: ReportParams): ReportResult {
-    const result = this.salesAnalysis({ from, to, dimension: 'product' });
+  public async productSales({ from, to }: ReportParams): Promise<ReportResult> {
+    const result = await this.salesAnalysis({ from, to, dimension: 'product' });
     return {
       ...result,
       columns: [
@@ -552,18 +552,18 @@ export class ReportCenterService {
     };
   }
 
-  public productDetail({ from, to, productId }: ReportParams): ReportResult {
+  public async productDetail({ from, to, productId }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
     const purchaseScope = this.purchaseScope();
     const product = productId
-      ? this.db.query<any>('SELECT id, name, sku, cost_price AS costPrice, selling_price_m2 AS sellingPrice FROM products WHERE id = ?', [productId])[0]
+      ? (await this.db.queryAsync<any>('SELECT id, name, sku, cost_price / 100.0 AS costPrice, selling_price_m2 / 100.0 AS sellingPrice FROM products WHERE id = ?', [productId]))[0]
       : null;
     const sales = productId
-      ? this.db.query<any>(`
+      ? await this.db.queryAsync<any>(`
           SELECT si.date, si.invoice_number AS docNumber, 'فاتورة بيع' AS docType,
-            c.name AS party, sii.quantity_m2 AS quantity, sii.unit_price AS unitPrice,
-            sii.total_price AS amount, sii.total_cost AS cost,
-            (sii.total_price - sii.total_cost) AS profit
+            c.name AS party, sii.quantity_m2 AS quantity, sii.unit_price / 100.0 AS unitPrice,
+            sii.total_price / 100.0 AS amount, sii.total_cost / 100.0 AS cost,
+            (sii.total_price - sii.total_cost) / 100.0 AS profit
           FROM sales_invoice_items sii
           JOIN sales_invoices si ON si.id = sii.invoice_id
           LEFT JOIN customers c ON c.id = si.customer_id
@@ -572,11 +572,11 @@ export class ReportCenterService {
         `, [productId, from, to, ...scope.params])
       : [];
     const returns = productId
-      ? this.db.query<any>(`
+      ? await this.db.queryAsync<any>(`
           SELECT sr.date, sr.return_number AS docNumber, 'مرتجع بيع' AS docType,
-            c.name AS party, -sri.quantity_m2 AS quantity, sri.unit_price AS unitPrice,
-            -sri.total_refund AS amount, -(sri.quantity_m2 * sri.unit_cost) AS cost,
-            (-sri.total_refund + sri.quantity_m2 * sri.unit_cost) AS profit
+            c.name AS party, -sri.quantity_m2 AS quantity, sri.unit_price / 100.0 AS unitPrice,
+            -sri.total_refund / 100.0 AS amount, -(sri.quantity_m2 * sri.unit_cost) / 100.0 AS cost,
+            (-sri.total_refund + sri.quantity_m2 * sri.unit_cost) / 100.0 AS profit
           FROM sales_return_items sri
           JOIN sales_returns sr ON sr.id = sri.return_id
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -586,10 +586,10 @@ export class ReportCenterService {
         `, [productId, from, to, ...scope.params])
       : [];
     const purchases = productId
-      ? this.db.query<any>(`
+      ? await this.db.queryAsync<any>(`
           SELECT pi.date, pi.invoice_number AS docNumber, 'فاتورة شراء' AS docType,
-            s.name AS party, pii.quantity_m2 AS quantity, pii.unit_cost AS unitPrice,
-            pii.total_cost AS amount, 0 AS cost, 0 AS profit
+            s.name AS party, pii.quantity_m2 AS quantity, pii.unit_cost / 100.0 AS unitPrice,
+            pii.total_cost / 100.0 AS amount, 0 AS cost, 0 AS profit
           FROM purchase_invoice_items pii
           JOIN purchase_invoices pi ON pi.id = pii.purchase_id
           LEFT JOIN suppliers s ON s.id = pi.supplier_id
@@ -625,8 +625,8 @@ export class ReportCenterService {
     };
   }
 
-  public productProfitability({ from, to }: ReportParams): ReportResult {
-    const result = this.salesAnalysis({ from, to, dimension: 'product' });
+  public async productProfitability({ from, to }: ReportParams): Promise<ReportResult> {
+    const result = await this.salesAnalysis({ from, to, dimension: 'product' });
     const rows = result.rows.map((row) => ({ ...row }));
     const totalProfit = rows.reduce((total, row) => total + num(row.profit), 0);
     let cumulative = 0;
@@ -662,8 +662,8 @@ export class ReportCenterService {
     };
   }
 
-  public customerProfitability({ from, to }: ReportParams): ReportResult {
-    const rows = this.salesActivityRows(from, to);
+  public async customerProfitability({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.salesActivityRows(from, to);
     const groups = new Map<string, { customer: string; revenue: number; cost: number; returns: number; invoices: number; discounts: number; lastPurchase: string }>();
     for (const row of rows) {
       const key = row.customerName || 'بدون عميل';
@@ -716,10 +716,10 @@ export class ReportCenterService {
     };
   }
 
-  public periodComparison({ from, to }: ReportParams): ReportResult {
-    const current = this.periodMetrics(from, to);
+  public async periodComparison({ from, to }: ReportParams): Promise<ReportResult> {
+    const current = await this.periodMetrics(from, to);
     const previousRangeValue = previousRange(from, to);
-    const previous = this.periodMetrics(previousRangeValue.from, previousRangeValue.to);
+    const previous = await this.periodMetrics(previousRangeValue.from, previousRangeValue.to);
     const metrics = [
       ['المبيعات', 'sales', 'currency'],
       ['الربح', 'profit', 'currency'],
@@ -759,27 +759,27 @@ export class ReportCenterService {
     };
   }
 
-  private periodMetrics(from: string, to: string) {
+  private async periodMetrics(from: string, to: string) {
     const scope = this.salesScope();
-    const invoiceRow = this.db.query<any>(`
-      SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales,
-        COALESCE(SUM(si.gross_profit), 0) AS profit,
+    const invoiceRow = (await this.db.queryAsync<any>(`
+      SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales,
+        COALESCE(SUM(si.gross_profit), 0) / 100.0 AS profit,
         COUNT(DISTINCT si.id) AS invoices,
         COUNT(DISTINCT si.customer_id) AS customers
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
-    `, [from, to, ...scope.params])[0] || {};
+    `, [from, to, ...scope.params]))[0] || {};
     const returnScope = this.salesScope();
-    const returnRow = this.db.query<any>(`
-      SELECT COALESCE(SUM(sr.total_amount), 0) AS returns,
+    const returnRow = (await this.db.queryAsync<any>(`
+      SELECT COALESCE(SUM(sr.total_amount), 0) / 100.0 AS returns,
         COALESCE(SUM((
           SELECT SUM(sri.quantity_m2 * sri.unit_cost)
           FROM sales_return_items sri WHERE sri.return_id = sr.id
-        )), 0) AS returnedCost
+        )), 0) / 100.0 AS returnedCost
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${returnScope.clause}
-    `, [from, to, ...returnScope.params])[0] || {};
+    `, [from, to, ...returnScope.params]))[0] || {};
     return {
       sales: num(invoiceRow.sales) - num(returnRow.returns),
       profit: num(invoiceRow.profit) - num(returnRow.returns) + num(returnRow.returnedCost),
@@ -790,24 +790,24 @@ export class ReportCenterService {
 
   // ── Receivables & credit ──────────────────────────────────────────────────
 
-  public arAging({ to }: ReportParams): ReportResult {
+  public async arAging({ to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
-    const docs = this.db.query<any>(`
+    const docs = await this.db.queryAsync<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
-        COALESCE(c.credit_limit, 0) AS creditLimit,
+        COALESCE(c.credit_limit, 0) / 100.0 AS creditLimit,
         COALESCE(si.due_date, si.date) AS dueDate,
-        MAX(0, si.total_amount
-          - MAX(0, si.paid_amount - COALESCE((
-            SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
+        MAX(0, si.total_amount / 100.0
+          - MAX(0, si.paid_amount / 100.0 - COALESCE((
+            SELECT SUM(cpa0.amount) / 100.0 FROM customer_payment_allocations cpa0
             WHERE cpa0.sales_invoice_id = si.id
           ), 0))
           - COALESCE((
-            SELECT SUM(cpa.amount) FROM customer_payment_allocations cpa
+            SELECT SUM(cpa.amount) / 100.0 FROM customer_payment_allocations cpa
             JOIN customer_payments cp ON cp.id = cpa.payment_id
             WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?
           ), 0)
           - COALESCE((
-            SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
+            SELECT SUM(sr.remaining_to_balance) / 100.0 FROM sales_returns sr
             WHERE sr.original_invoice_id = si.id AND sr.date <= ?
           ), 0)
         ) AS outstanding
@@ -895,18 +895,18 @@ export class ReportCenterService {
     };
   }
 
-  public creditExposure({ to }: ReportParams): ReportResult {
+  public async creditExposure({ to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
-        COALESCE(c.credit_limit, 0) AS creditLimit,
+        COALESCE(c.credit_limit, 0) / 100.0 AS creditLimit,
         COALESCE(c.current_balance, 0) AS balance,
-        SUM(si.remaining_amount) AS outstanding,
-        SUM(CASE WHEN si.due_date IS NOT NULL AND si.due_date < ? THEN si.remaining_amount ELSE 0 END) AS overdue,
-        MIN(CASE WHEN si.remaining_amount > 0.01 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
+        SUM(si.remaining_amount) / 100.0 AS outstanding,
+        SUM(CASE WHEN si.due_date IS NOT NULL AND si.due_date < ? THEN si.remaining_amount ELSE 0 END) / 100.0 AS overdue,
+        MIN(CASE WHEN si.remaining_amount > 1 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
       FROM customers c
       LEFT JOIN sales_invoices si ON si.customer_id = c.id
-        AND si.remaining_amount > 0.01 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+        AND si.remaining_amount > 1 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY c.id
       HAVING outstanding > 0.01 OR balance > 0.01
       ORDER BY outstanding DESC
@@ -949,10 +949,10 @@ export class ReportCenterService {
     };
   }
 
-  public chequeMaturity({ to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async chequeMaturity({ to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT cheque_number AS chequeNumber, type, party_name AS party, bank_name AS bank,
-        amount, due_date AS dueDate,
+        amount / 100.0 AS amount, due_date AS dueDate,
         CAST(julianday(due_date) - julianday(?) AS INTEGER) AS daysLeft,
         status
       FROM cheques
@@ -980,10 +980,10 @@ export class ReportCenterService {
     };
   }
 
-  public bouncedCheques({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async bouncedCheques({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT c.cheque_number AS chequeNumber, c.type, c.party_name AS party, c.bank_name AS bank,
-        c.amount, c.due_date AS dueDate, c.status,
+        c.amount / 100.0 AS amount, c.due_date AS dueDate, c.status,
         COALESCE((SELECT h.notes FROM cheque_status_history h
           WHERE h.cheque_id = c.id AND h.to_status = 'BOUNCED'
           ORDER BY h.changed_at DESC LIMIT 1), c.notes, '') AS reason,
@@ -1015,9 +1015,9 @@ export class ReportCenterService {
     };
   }
 
-  public installmentAging({ to }: ReportParams): ReportResult {
+  public async installmentAging({ to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('p.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT p.plan_number AS planNumber, c.name AS customer, i.sequence_number AS sequence,
         i.due_date AS dueDate, i.amount, i.paid_amount AS paid, i.remaining_amount AS remaining,
         i.status,
@@ -1058,18 +1058,18 @@ export class ReportCenterService {
 
   // ── Inventory & purchasing ────────────────────────────────────────────────
 
-  public inventoryBalances(): ReportResult {
+  public async inventoryBalances(): Promise<ReportResult> {
     const scope = this.tableScope(
       'br.id',
       'w.id',
     );
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT p.id AS productId, p.sku, p.name AS product, c.name AS category,
         w.name AS warehouse, ws.quantity_m2 AS quantity, ws.reserved_m2 AS reserved,
         (ws.quantity_m2 - ws.reserved_m2) AS available,
-        COALESCE(p.cost_price, 0) AS unitCost,
-        (ws.quantity_m2 * COALESCE(p.cost_price, 0)) AS stockValue,
-        (ws.quantity_m2 * COALESCE(p.selling_price_m2, 0)) AS retailValue,
+        COALESCE(p.cost_price, 0) / 100.0 AS unitCost,
+        (ws.quantity_m2 * COALESCE(p.cost_price, 0)) / 100.0 AS stockValue,
+        (ws.quantity_m2 * COALESCE(p.selling_price_m2, 0)) / 100.0 AS retailValue,
         COALESCE(p.min_stock_level, 0) AS minLevel
       FROM warehouse_stock ws
       JOIN products p ON p.id = ws.product_id
@@ -1111,14 +1111,14 @@ export class ReportCenterService {
     };
   }
 
-  public slowMoving({ from, to }: ReportParams): ReportResult {
+  public async slowMoving({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
     const stockScope = this.tableScope('w.branch_id');
     const days = Math.max(1, daysBetween(from, to));
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT p.id AS productId, p.sku, p.name AS product,
         w.name AS warehouse, ws.quantity_m2 AS quantity,
-        (ws.quantity_m2 * COALESCE(p.cost_price, 0)) AS stockValue,
+        (ws.quantity_m2 * COALESCE(p.cost_price, 0)) / 100.0 AS stockValue,
         COALESCE((
           SELECT MAX(si.date) FROM sales_invoice_items sii
           JOIN sales_invoices si ON si.id = sii.invoice_id
@@ -1176,13 +1176,13 @@ export class ReportCenterService {
     };
   }
 
-  public purchaseAnalysis(params: ReportParams): ReportResult {
+  public async purchaseAnalysis(params: ReportParams): Promise<ReportResult> {
     const dimension = params.dimension || 'supplier';
     const scope = this.purchaseScope();
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT pi.date, COALESCE(s.name, 'بدون مورد') AS supplier,
         COALESCE(w.name, 'بدون مخزن') AS warehouse, p.name AS product,
-        pii.quantity_m2 AS quantity, pii.total_cost AS amount, 0 AS isReturn
+        pii.quantity_m2 AS quantity, pii.total_cost / 100.0 AS amount, 0 AS isReturn
       FROM purchase_invoice_items pii
       JOIN purchase_invoices pi ON pi.id = pii.purchase_id
       JOIN products p ON p.id = pii.product_id
@@ -1193,7 +1193,7 @@ export class ReportCenterService {
       UNION ALL
 
       SELECT pr.date, COALESCE(s.name, 'بدون مورد'), COALESCE(w.name, 'بدون مخزن'), p.name,
-        -pri.quantity_m2, -pri.total_refund, 1
+        -pri.quantity_m2, -pri.total_refund / 100.0, 1
       FROM purchase_return_items pri
       JOIN purchase_returns pr ON pr.id = pri.return_id
       JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
@@ -1245,13 +1245,13 @@ export class ReportCenterService {
     };
   }
 
-  public supplierPrices({ from, to }: ReportParams): ReportResult {
+  public async supplierPrices({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.purchaseScope();
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT p.id AS productId, p.name AS product, s.name AS supplier,
-        MIN(pii.unit_cost) AS minPrice, MAX(pii.unit_cost) AS maxPrice,
-        AVG(pii.unit_cost) AS avgPrice,
-        (SELECT pii2.unit_cost FROM purchase_invoice_items pii2
+        MIN(pii.unit_cost) / 100.0 AS minPrice, MAX(pii.unit_cost) / 100.0 AS maxPrice,
+        AVG(pii.unit_cost) / 100.0 AS avgPrice,
+        (SELECT pii2.unit_cost / 100.0 FROM purchase_invoice_items pii2
           JOIN purchase_invoices pi2 ON pi2.id = pii2.purchase_id
           WHERE pii2.product_id = p.id AND pi2.supplier_id = s.id AND pi2.date <= ?
           ORDER BY pi2.date DESC, pii2.id DESC LIMIT 1) AS lastPrice,
@@ -1301,13 +1301,13 @@ export class ReportCenterService {
     };
   }
 
-  public countVariance({ from, to }: ReportParams): ReportResult {
+  public async countVariance({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('w.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT sc.count_number AS countNumber, sc.date, w.name AS warehouse,
         p.name AS product, sci.system_quantity_m2 AS systemQty,
         sci.counted_quantity_m2 AS countedQty, sci.variance_m2 AS variance,
-        sci.unit_cost AS unitCost, sci.variance_value AS varianceValue,
+        sci.unit_cost / 100.0 AS unitCost, sci.variance_value / 100.0 AS varianceValue,
         sc.status
       FROM stock_count_items sci
       JOIN stock_counts sc ON sc.id = sci.count_id
@@ -1348,16 +1348,16 @@ export class ReportCenterService {
 
   // ── Governance, shifts & approvals ────────────────────────────────────────
 
-  public shiftClosing({ from, to }: ReportParams): ReportResult {
+  public async shiftClosing({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('cs.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT cs.shift_number AS shiftNumber, cs.opened_at AS openedAt, cs.closed_at AS closedAt,
         cr.name AS register, COALESCE(u.full_name, '—') AS cashier, cs.status,
-        cs.opening_balance AS opening, cs.total_sales_cash AS cashSales,
-        cs.total_sales_card AS cardSales, cs.total_customer_payments AS collections,
-        cs.total_expenses AS expenses, cs.total_refunds AS refunds,
-        cs.expected_ending_cash AS expected, cs.actual_ending_cash AS actual,
-        cs.cash_difference AS difference
+        cs.opening_balance / 100.0 AS opening, cs.total_sales_cash / 100.0 AS cashSales,
+        cs.total_sales_card / 100.0 AS cardSales, cs.total_customer_payments / 100.0 AS collections,
+        cs.total_expenses / 100.0 AS expenses, cs.total_refunds / 100.0 AS refunds,
+        cs.expected_ending_cash / 100.0 AS expected, cs.actual_ending_cash / 100.0 AS actual,
+        cs.cash_difference / 100.0 AS difference
       FROM cash_shifts cs
       LEFT JOIN cash_registers cr ON cr.id = cs.register_id
       LEFT JOIN users u ON u.id = cs.user_id
@@ -1403,9 +1403,9 @@ export class ReportCenterService {
     };
   }
 
-  public approvalsLog({ from, to }: ReportParams): ReportResult {
+  public async approvalsLog({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('a.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT a.request_number AS requestNumber, a.request_type AS requestType, a.title,
         a.status, a.priority, a.requested_value AS requestedValue,
         a.current_value AS currentValue, a.created_at AS createdAt, a.decided_at AS decidedAt,
@@ -1440,13 +1440,13 @@ export class ReportCenterService {
     };
   }
 
-  public exceptionsLog({ from, to }: ReportParams): ReportResult {
+  public async exceptionsLog({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
-    const priceRows = this.db.query<any>(`
+    const priceRows = await this.db.queryAsync<any>(`
       SELECT si.date, 'بيع تحت الحد الأدنى' AS exceptionType,
         ('فاتورة ' || si.invoice_number || ' - ' || p.name) AS details,
         COALESCE(u.full_name, '—') AS userName,
-        ((p.min_selling_price_m2 - sii.unit_price) * sii.quantity_m2) AS value,
+        ((p.min_selling_price_m2 - sii.unit_price / 100.0) * sii.quantity_m2) AS value,
         COALESCE(c.name, '—') AS party
       FROM sales_invoice_items sii
       JOIN sales_invoices si ON si.id = sii.invoice_id
@@ -1454,9 +1454,9 @@ export class ReportCenterService {
       LEFT JOIN users u ON u.id = si.created_by
       LEFT JOIN customers c ON c.id = si.customer_id
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
-        AND p.min_selling_price_m2 > 0 AND sii.unit_price < p.min_selling_price_m2 AND ${scope.clause}
+        AND p.min_selling_price_m2 > 0 AND sii.unit_price / 100.0 < p.min_selling_price_m2 AND ${scope.clause}
     `, [from, to, ...scope.params]);
-    const voidRows = this.db.query<any>(`
+    const voidRows = await this.db.queryAsync<any>(`
       SELECT substr(al.created_at, 1, 10) AS date,
         CASE WHEN al.action LIKE '%DELETE%' THEN 'حذف سطر/مستند' ELSE 'إلغاء عملية' END AS exceptionType,
         (al.module || ' - ' || COALESCE(al.record_id, '')) AS details,
@@ -1466,10 +1466,10 @@ export class ReportCenterService {
         AND (al.action LIKE '%DELETE%' OR al.action LIKE '%VOID%' OR al.action LIKE '%CANCEL%')
       ORDER BY al.created_at DESC
     `, [from, to]);
-    const returnRows = this.db.query<any>(`
+    const returnRows = await this.db.queryAsync<any>(`
       SELECT sr.date, 'مرتجع بدون ربط فاتورة' AS exceptionType,
         ('مرتجع ' || sr.return_number) AS details, COALESCE(u.full_name, '—') AS userName,
-        sr.total_amount AS value, COALESCE(c.name, '—') AS party
+        sr.total_amount / 100.0 AS value, COALESCE(c.name, '—') AS party
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
       LEFT JOIN users u ON u.id = sr.created_by
@@ -1477,7 +1477,7 @@ export class ReportCenterService {
       WHERE sr.date >= ? AND sr.date <= ? AND (sr.original_invoice_id IS NULL OR sr.original_invoice_id = '') AND ${scope.clause}
     `, [from, to, ...scope.params]);
     const approvalScope = this.tableScope('a.branch_id');
-    const approvalRows = this.db.query<any>(`
+    const approvalRows = await this.db.queryAsync<any>(`
       SELECT substr(a.created_at, 1, 10) AS date,
         ('موافقة: ' || a.request_type) AS exceptionType, a.title AS details,
         COALESCE(ru.full_name, '—') AS userName, COALESCE(a.requested_value, 0) AS value,
@@ -1512,9 +1512,9 @@ export class ReportCenterService {
     };
   }
 
-  public receivedReports({ from, to }: ReportParams): ReportResult {
+  public async receivedReports({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('d.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT d.document_number AS documentNumber, d.title, d.category,
         d.status, d.created_at AS createdAt, d.updated_at AS updatedAt,
         b.name AS branch, COALESCE(u.full_name, '—') AS createdBy,
@@ -1547,7 +1547,7 @@ export class ReportCenterService {
     };
   }
 
-  public alertsSummary({ to }: ReportParams): ReportResult {
+  public async alertsSummary({ to }: ReportParams): Promise<ReportResult> {
     const stockScope = this.tableScope(
       'w.branch_id',
       'ws.warehouse_id',
@@ -1555,7 +1555,7 @@ export class ReportCenterService {
     const registerScope = this.tableScope('cr.branch_id');
     const customerScope = this.tableScope('c.branch_id');
     const approvalScope = this.tableScope('a.branch_id');
-    const lowStock = this.db.query<any>(`
+    const lowStock = await this.db.queryAsync<any>(`
       SELECT p.name, ws.quantity_m2 AS quantity, p.min_stock_level AS minLevel
       FROM warehouse_stock ws
       JOIN products p ON p.id = ws.product_id
@@ -1564,29 +1564,29 @@ export class ReportCenterService {
         AND ${stockScope.clause}
       ORDER BY ws.quantity_m2 ASC LIMIT 200
     `, [...stockScope.params]);
-    const negativeRegisters = this.db.query<any>(`
-      SELECT cr.name, cr.current_balance AS balance
+    const negativeRegisters = await this.db.queryAsync<any>(`
+      SELECT cr.name, cr.current_balance / 100.0 AS balance
       FROM cash_registers cr
       WHERE cr.current_balance < 0 AND ${registerScope.clause}
     `, [...registerScope.params]);
-    const overLimit = this.db.query<any>(`
-      SELECT c.name, c.current_balance AS balance, c.credit_limit AS creditLimit
+    const overLimit = await this.db.queryAsync<any>(`
+      SELECT c.name, c.current_balance / 100.0 AS balance, c.credit_limit AS creditLimit
       FROM customers c
       WHERE c.credit_limit > 0 AND c.current_balance > c.credit_limit
         AND ${customerScope.clause}
     `, [...customerScope.params]);
-    const dueCheques = this.db.query<any>(`
-      SELECT cheque_number AS number, party_name AS party, amount, due_date AS dueDate
+    const dueCheques = await this.db.queryAsync<any>(`
+      SELECT cheque_number AS number, party_name AS party, amount / 100.0 AS amount, due_date AS dueDate
       FROM cheques WHERE status IN ('PENDING', 'DEPOSITED', 'RE_PRESENTED')
         AND due_date <= ? AND due_date >= ?
     `, [shiftDate(to, 7), to]);
-    const pendingApprovals = this.db.query<any>(`
+    const pendingApprovals = await this.db.queryAsync<any>(`
       SELECT a.request_number AS number, a.title, a.requested_value AS value, a.created_at AS createdAt
       FROM approval_requests a
       WHERE a.status = 'PENDING' AND ${approvalScope.clause}
     `, [...approvalScope.params]);
-    const lowMargin = this.db.query<any>(`
-      SELECT p.name, p.selling_price_m2 AS price, p.cost_price AS cost
+    const lowMargin = await this.db.queryAsync<any>(`
+      SELECT p.name, p.selling_price_m2 / 100.0 AS price, p.cost_price / 100.0 AS cost
       FROM products p
       WHERE p.is_active = 1 AND p.selling_price_m2 > 0
         AND ((p.selling_price_m2 - p.cost_price) / p.selling_price_m2) < 0.1
@@ -1620,54 +1620,54 @@ export class ReportCenterService {
 
   // ── Branch & finance ─────────────────────────────────────────────────────
 
-  public branchPerformance({ from, to }: ReportParams): ReportResult {
+  public async branchPerformance({ from, to }: ReportParams): Promise<ReportResult> {
     const previous = previousRange(from, to);
     const branches = this.branchAccess.getSelectableBranches(this.actor());
-    const rows = branches.map((branch) => {
-      const sales = this.db.query<any>(`
-        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales,
-          COALESCE(SUM(si.gross_profit), 0) AS profit, COUNT(DISTINCT si.id) AS invoices
+    const rows = await Promise.all(branches.map(async (branch) => {
+      const sales = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales,
+          COALESCE(SUM(si.gross_profit), 0) / 100.0 AS profit, COUNT(DISTINCT si.id) AS invoices
         FROM sales_invoices si
         WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
-      `, [from, to, branch.id, branch.id])[0] || {};
-      const previousSales = this.db.query<any>(`
-        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales
+      `, [from, to, branch.id, branch.id]))[0] || {};
+      const previousSales = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales
         FROM sales_invoices si
         WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
-      `, [previous.from, previous.to, branch.id, branch.id])[0]?.sales || 0;
-      const returns = this.db.query<any>(`
-        SELECT COALESCE(SUM(sr.total_amount), 0) AS returns,
+      `, [previous.from, previous.to, branch.id, branch.id]))[0]?.sales || 0;
+      const returns = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(sr.total_amount), 0) / 100.0 AS returns,
           COALESCE(SUM((
             SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_return_items sri WHERE sri.return_id = sr.id
-          )), 0) AS returnedCost
+          )), 0) / 100.0 AS returnedCost
         FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
-      `, [from, to, branch.id, branch.id])[0] || {};
-      const expenses = this.db.query<any>(`
-        SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
+      `, [from, to, branch.id, branch.id]))[0] || {};
+      const expenses = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM expenses
         WHERE date >= ? AND date <= ? AND branch_id = ?
-      `, [from, to, branch.id])[0]?.total || 0;
-      const collections = this.db.query<any>(`
-        SELECT COALESCE(SUM(amount), 0) AS total FROM customer_payments
+      `, [from, to, branch.id]))[0]?.total || 0;
+      const collections = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM customer_payments
         WHERE date >= ? AND date <= ? AND branch_id = ?
-      `, [from, to, branch.id])[0]?.total || 0;
+      `, [from, to, branch.id]))[0]?.total || 0;
       const stock = InventoryCostingService.costingMethod(this.db) === 'FIFO'
-        ? this.db.query<any>(`
-            SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+        ? (await this.db.queryAsync<any>(`
+            SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) / 100.0 AS value
             FROM inventory_cost_layers icl
             JOIN warehouses w ON w.id = icl.warehouse_id
             WHERE icl.quantity_remaining > 0.009 AND w.branch_id = ?
-          `, [branch.id])[0] || {}
-        : this.db.query<any>(`
-            SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS value
+          `, [branch.id]))[0] || {}
+        : (await this.db.queryAsync<any>(`
+            SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) / 100.0 AS value
             FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
             JOIN warehouses w ON w.id = ws.warehouse_id
             WHERE w.branch_id = ?
-          `, [branch.id])[0] || {};
+          `, [branch.id]))[0] || {};
       const salesValue = round2(num(sales.sales));
       const returnsValue = round2(num(returns.returns));
       const netSales = round2(salesValue - returnsValue);
@@ -1686,7 +1686,7 @@ export class ReportCenterService {
         stockValue: round2(num(stock.value)),
         growth: num(previousSales) ? round2(((salesValue - num(previousSales)) / Math.abs(num(previousSales))) * 100) : 0,
       };
-    });
+    }));
     const totalSales = round2(rows.reduce((total, row) => total + row.netSales, 0));
     const result = rows.map((row) => ({ ...row, share: totalSales ? round2((row.netSales / totalSales) * 100) : 0 }))
       .sort((a, b) => b.netSales - a.netSales);
@@ -1717,8 +1717,8 @@ export class ReportCenterService {
     };
   }
 
-  public financialPosition({ to }: ReportParams): ReportResult {
-    const balance = new FinancialStatementsService().getBalanceSheet(to);
+  public async financialPosition({ to }: ReportParams): Promise<ReportResult> {
+    const balance = await new FinancialStatementsService().getBalanceSheet(to);
     const rows: Array<Record<string, any>> = [
       ...balance.assets.map((row) => ({ section: 'الأصول', label: row.label, amount: row.amount })),
       ...balance.liabilities.map((row) => ({ section: 'الالتزامات', label: row.label, amount: row.amount })),
@@ -1741,7 +1741,7 @@ export class ReportCenterService {
     };
   }
 
-  public cashMovement({ from, to, registerId }: ReportParams): ReportResult {
+  public async cashMovement({ from, to, registerId }: ReportParams): Promise<ReportResult> {
     const sales = this.salesScope();
     const purchases = this.purchaseScope();
     const registerScope = registerId
@@ -1750,7 +1750,7 @@ export class ReportCenterService {
     const registerListScope = registerId
       ? { clause: 'id = ?', params: [registerId] }
       : this.allBranchesTableScope('branch_id');
-    const paymentRows = this.db.query<any>(`
+    const paymentRows = await this.db.queryAsync<any>(`
       SELECT date, cp.created_at AS createdAt, 'وارد' AS direction, 'سند قبض' AS source, receipt_number AS document,
         c.name AS party, amount, cp.register_id AS registerId
       FROM customer_payments cp
@@ -1759,14 +1759,14 @@ export class ReportCenterService {
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount, sp.register_id
+      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount / 100.0, sp.register_id
       FROM supplier_payments sp
       LEFT JOIN suppliers s ON s.id = sp.supplier_id
       LEFT JOIN cash_registers cr ON cr.id = sp.register_id
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount, ex.register_id
+      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount / 100.0, ex.register_id
       FROM expenses ex
       LEFT JOIN cash_registers cr ON cr.id = ex.register_id
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
@@ -1775,16 +1775,16 @@ export class ReportCenterService {
       from, to, ...registerScope.params,
       from, to, ...registerScope.params,
     ]);
-    const invoiceRows = this.db.query<any>(`
+    const invoiceRows = await this.db.queryAsync<any>(`
       SELECT date, si.created_at AS createdAt, 'وارد' AS direction, 'تحصيل فاتورة' AS source,
-        invoice_number AS document, c.name AS party, paid_amount AS amount, NULL AS registerId
+        invoice_number AS document, c.name AS party, paid_amount / 100.0 AS amount, NULL AS registerId
       FROM sales_invoices si LEFT JOIN customers c ON c.id = si.customer_id
       WHERE date >= ? AND date <= ? AND paid_amount > 0 AND invoice_status != 'VOID' AND ${sales.clause}
 
       UNION ALL
-      SELECT date, pi.created_at, 'منصرف', 'سداد فاتورة شراء', invoice_number, s.name, paid_amount, NULL
+      SELECT date, pi.created_at, 'منصرف', 'سداد فاتورة شراء', invoice_number, s.name, paid_amount / 100.0, NULL
       FROM purchase_invoices pi LEFT JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND ${purchases.clause}
+      WHERE date >= ? AND date <= ? AND paid_amount > 1 AND ${purchases.clause}
     `, [from, to, ...sales.params, from, to, ...purchases.params]);
     const rows = [...paymentRows, ...(registerId ? [] : invoiceRows)]
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
@@ -1796,7 +1796,7 @@ export class ReportCenterService {
     });
     const inflow = round2(result.filter((row) => row.direction === 'وارد').reduce((total, row) => total + row.amount, 0));
     const outflow = round2(result.filter((row) => row.direction === 'منصرف').reduce((total, row) => total + row.amount, 0));
-    const registerList = this.db.query<any>(`SELECT id, name, current_balance AS balance FROM cash_registers WHERE ${registerListScope.clause} ORDER BY name`, registerListScope.params);
+    const registerList = await this.db.queryAsync<any>(`SELECT id, name, current_balance / 100.0 AS balance FROM cash_registers WHERE ${registerListScope.clause} ORDER BY name`, registerListScope.params);
     return {
       kpis: [
         { label: 'إجمالي الوارد', value: inflow, tone: 'success' },
@@ -1818,7 +1818,7 @@ export class ReportCenterService {
     };
   }
 
-  public cashFlowForecast({ to }: ReportParams): ReportResult {
+  public async cashFlowForecast({ to }: ReportParams): Promise<ReportResult> {
     const start = shiftDate(to, 1);
     const salesScope = this.salesScope();
     const purchaseScope = this.purchaseScope();
@@ -1826,49 +1826,49 @@ export class ReportCenterService {
     const payrollScope = this.tableScope('e.branch_id');
     const installmentScope = this.tableScope('ip.branch_id');
     const cashScope = this.allBranchesTableScope('cr.branch_id');
-    const openingBalance = this.db.query<any>(`
-      SELECT COALESCE(SUM(cr.current_balance), 0) AS total FROM cash_registers cr
+    const openingBalance = (await this.db.queryAsync<any>(`
+      SELECT COALESCE(SUM(cr.current_balance) / 100.0, 0) AS total FROM cash_registers cr
       WHERE ${cashScope.clause}
-    `, cashScope.params)[0]?.total || 0;
-    const weeklyPayroll = this.db.query<any>(`
+    `, cashScope.params))[0]?.total || 0;
+    const weeklyPayroll = (await this.db.queryAsync<any>(`
       SELECT COALESCE(SUM(
         CASE
-          WHEN e.salary_type = 'MONTHLY' THEN e.base_salary / 4.0
-          WHEN e.salary_type = 'DAILY' THEN (e.base_salary * 26) / 4.0
-          ELSE e.base_salary / 4.0
+          WHEN e.salary_type = 'MONTHLY' THEN e.base_salary / 400.0
+          WHEN e.salary_type = 'DAILY' THEN (e.base_salary * 26) / 400.0
+          ELSE e.base_salary / 400.0
         END), 0) AS total
       FROM employees e
       WHERE e.is_active = 1 AND e.status = 'ACTIVE' AND ${payrollScope.clause}
-    `, payrollScope.params)[0]?.total || 0;
+    `, payrollScope.params))[0]?.total || 0;
     const weeks: Array<Record<string, any>> = [];
     for (let week = 0; week < 8; week += 1) {
       const weekStart = shiftDate(start, week * 7);
       const weekEnd = shiftDate(weekStart, 6);
-      const invoices = this.db.query<any>(`
-        SELECT COALESCE(SUM(si.total_amount - si.paid_amount), 0) AS total FROM sales_invoices si
-        WHERE si.remaining_amount > 0.01 AND si.due_date >= ? AND si.due_date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}
-      `, [weekStart, weekEnd, ...salesScope.params])[0]?.total || 0;
-      const purchases = this.db.query<any>(`
-        SELECT COALESCE(SUM(pi.remaining_amount), 0) AS total FROM purchase_invoices pi
-        WHERE pi.remaining_amount > 0.01 AND pi.due_date >= ? AND pi.due_date <= ? AND ${purchaseScope.clause}
-      `, [weekStart, weekEnd, ...purchaseScope.params])[0]?.total || 0;
-      const chequesIn = this.db.query<any>(`
-        SELECT COALESCE(SUM(amount), 0) AS total FROM cheques
+      const invoices = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(si.total_amount - si.paid_amount), 0) / 100.0 AS total FROM sales_invoices si
+        WHERE si.remaining_amount > 1 AND si.due_date >= ? AND si.due_date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}
+      `, [weekStart, weekEnd, ...salesScope.params]))[0]?.total || 0;
+      const purchases = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(pi.remaining_amount), 0) / 100.0 AS total FROM purchase_invoices pi
+        WHERE pi.remaining_amount > 1 AND pi.due_date >= ? AND pi.due_date <= ? AND ${purchaseScope.clause}
+      `, [weekStart, weekEnd, ...purchaseScope.params]))[0]?.total || 0;
+      const chequesIn = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM cheques
         WHERE type = 'RECEIVED' AND status IN ('PENDING', 'DEPOSITED', 'RE_PRESENTED') AND due_date >= ? AND due_date <= ?
-      `, [weekStart, weekEnd])[0]?.total || 0;
-      const chequesOut = this.db.query<any>(`
-        SELECT COALESCE(SUM(amount), 0) AS total FROM cheques
+      `, [weekStart, weekEnd]))[0]?.total || 0;
+      const chequesOut = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM cheques
         WHERE type = 'ISSUED' AND status IN ('PENDING', 'DEPOSITED', 'RE_PRESENTED') AND due_date >= ? AND due_date <= ?
-      `, [weekStart, weekEnd])[0]?.total || 0;
-      const installments = this.db.query<any>(`
+      `, [weekStart, weekEnd]))[0]?.total || 0;
+      const installments = (await this.db.queryAsync<any>(`
         SELECT COALESCE(SUM(i.remaining_amount), 0) AS total FROM installments i
         JOIN installment_plans ip ON ip.id = i.plan_id
         WHERE i.remaining_amount > 0.01 AND i.due_date >= ? AND i.due_date <= ? AND ${installmentScope.clause}
-      `, [weekStart, weekEnd, ...installmentScope.params])[0]?.total || 0;
-      const expenses = this.db.query<any>(`
-        SELECT COALESCE(SUM(e.amount), 0) / 30.0 * 7 AS total FROM expenses e
+      `, [weekStart, weekEnd, ...installmentScope.params]))[0]?.total || 0;
+      const expenses = (await this.db.queryAsync<any>(`
+        SELECT COALESCE(SUM(e.amount), 0) / 100.0 / 30.0 * 7 AS total FROM expenses e
         WHERE e.date >= ? AND e.date <= ? AND ${expenseScope.clause}
-      `, [shiftDate(to, -30), to, ...expenseScope.params])[0]?.total || 0;
+      `, [shiftDate(to, -30), to, ...expenseScope.params]))[0]?.total || 0;
       const inflow = round2(num(invoices) + num(chequesIn) + num(installments));
       const outflow = round2(num(purchases) + num(chequesOut) + num(weeklyPayroll) + num(expenses));
       weeks.push({
@@ -1917,11 +1917,11 @@ export class ReportCenterService {
     };
   }
 
-  public breakEven({ from, to }: ReportParams): ReportResult {
-    const metrics = this.periodMetrics(from, to);
+  public async breakEven({ from, to }: ReportParams): Promise<ReportResult> {
+    const metrics = await this.periodMetrics(from, to);
     const scope = this.tableScope('branch_id');
-    const expenseRows = this.db.query<any>(`
-      SELECT amount, category, description FROM expenses
+    const expenseRows = await this.db.queryAsync<any>(`
+      SELECT amount / 100.0 AS amount, category, description FROM expenses
       WHERE date >= ? AND date <= ? AND ${scope.clause}
     `, [from, to, ...scope.params]);
     const totals = { fixed: 0, variable: 0, semi: 0 };
@@ -1967,14 +1967,14 @@ export class ReportCenterService {
 
   // ── Customer behaviour & forecasting ─────────────────────────────────────
 
-  public customerChurn({ to }: ReportParams): ReportResult {
+  public async customerChurn({ to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
         COUNT(si.id) AS invoices,
         MIN(si.date) AS firstPurchase,
         MAX(si.date) AS lastPurchase,
-        COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS totalSpend
+        COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS totalSpend
       FROM customers c
       JOIN sales_invoices si ON si.customer_id = c.id AND si.invoice_status != 'VOID'
       WHERE si.date <= ? AND ${scope.clause}
@@ -2026,9 +2026,9 @@ export class ReportCenterService {
     };
   }
 
-  public paymentBehavior({ from, to }: ReportParams): ReportResult {
+  public async paymentBehavior({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('cp.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
         COALESCE(c.payment_terms_days, 0) AS terms,
         COUNT(DISTINCT cp.id) AS payments,
@@ -2087,13 +2087,13 @@ export class ReportCenterService {
     };
   }
 
-  public basketAnalysis({ from, to }: ReportParams): ReportResult {
+  public async basketAnalysis({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.salesScope();
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT a.product_id AS productA, pa.name AS productAName,
         b.product_id AS productB, pb.name AS productBName,
         COUNT(*) AS invoices,
-        SUM(a.total_price) AS valueA, SUM(b.total_price) AS valueB
+        SUM(a.total_price) / 100.0 AS valueA, SUM(b.total_price) / 100.0 AS valueB
       FROM sales_invoice_items a
       JOIN sales_invoice_items b ON b.invoice_id = a.invoice_id AND a.product_id < b.product_id
       JOIN sales_invoices si ON si.id = a.invoice_id
@@ -2104,10 +2104,10 @@ export class ReportCenterService {
       ORDER BY invoices DESC
       LIMIT 200
     `, [from, to, ...scope.params]);
-    const invoiceCount = this.db.query<any>(`
+    const invoiceCount = (await this.db.queryAsync<any>(`
       SELECT COUNT(DISTINCT si.id) AS count FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
-    `, [from, to, ...scope.params])[0]?.count || 0;
+    `, [from, to, ...scope.params]))[0]?.count || 0;
     const result = rows.map((row) => ({
       productA: row.productAName,
       productB: row.productBName,
@@ -2137,10 +2137,10 @@ export class ReportCenterService {
   // New Enhanced Reports: Cash Flow Detailed & Sales Rep Performance
   // --------------------------------------------------------------------------
 
-  public cashFlowDetailed(params: ReportParams): ReportResult {
+  public async cashFlowDetailed(params: ReportParams): Promise<ReportResult> {
     const actor = this.actor();
     const key = `${this.cachePartition(actor)}:cashFlowDetailed:${params.from}:${params.to}:${params.registerId || 'all'}`;
-    return this.withCache(key, () => {
+    return await this.withCache(key, async () => {
     const sales = this.allBranchesScope();
     const customerPayment = this.allBranchesTableScope(
       'cp.branch_id',
@@ -2155,10 +2155,10 @@ export class ReportCenterService {
       '(SELECT br.branch_id FROM cash_registers br WHERE br.id = ex.register_id)',
     );
     const registerFilter = params.registerId ? 'AND registerId = ?' : '';
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT * FROM (
         SELECT si.date AS transDate, 'IN' AS transType, COALESCE(sip.method, si.payment_type) AS category,
-          COALESCE(sip.amount, si.paid_amount) AS amount, 'تحصيل فاتورة بيع ' || si.invoice_number AS description,
+          COALESCE(sip.amount / 100.0, si.paid_amount / 100.0) AS amount, 'تحصيل فاتورة بيع ' || si.invoice_number AS description,
           cr.id AS registerId, cr.name AS registerName, u.full_name AS userName
         FROM sales_invoices si
         LEFT JOIN sales_invoice_payments sip ON sip.invoice_id = si.id
@@ -2181,7 +2181,7 @@ export class ReportCenterService {
         WHERE cp.date BETWEEN ? AND ? AND ${customerPayment.clause}
 
         UNION ALL
-        SELECT sp.date, 'OUT', sp.payment_type, sp.amount,
+        SELECT sp.date, 'OUT', sp.payment_type, sp.amount / 100.0,
           'سند صرف ' || sp.receipt_number, cr.id, cr.name, u.full_name
         FROM supplier_payments sp
         LEFT JOIN cash_registers cr ON cr.id = sp.register_id
@@ -2189,7 +2189,7 @@ export class ReportCenterService {
         WHERE sp.date BETWEEN ? AND ? AND ${supplierPayment.clause}
 
         UNION ALL
-        SELECT ex.date, 'OUT', ex.payment_type, ex.amount,
+        SELECT ex.date, 'OUT', ex.payment_type, ex.amount / 100.0,
           COALESCE(ex.description, ex.category), cr.id, cr.name, u.full_name
         FROM expenses ex
         LEFT JOIN cash_registers cr ON cr.id = ex.register_id
@@ -2256,19 +2256,19 @@ export class ReportCenterService {
     });
   }
 
-  public salesRepPerformance(params: ReportParams): ReportResult {
+  public async salesRepPerformance(params: ReportParams): Promise<ReportResult> {
     const actor = this.actor();
     const key = `${this.cachePartition(actor)}:salesRepPerformance:${params.from}:${params.to}`;
-    return this.withCache(key, () => {
+    return await this.withCache(key, async () => {
       const scope = this.salesScope();
-      const rows = this.db.query<any>(`
+      const rows = await this.db.queryAsync<any>(`
         SELECT
           COALESCE(e.full_name, u.full_name, 'غير محدد') AS repName,
           COUNT(si.id) AS invoiceCount,
-          COALESCE(SUM(si.total_amount), 0) AS totalSales,
-          COALESCE(SUM(si.paid_amount), 0) AS totalCollected,
-          COALESCE(SUM(si.remaining_amount), 0) AS totalPending,
-          COALESCE(SUM(si.gross_profit), 0) AS estimatedProfit
+          COALESCE(SUM(si.total_amount), 0) / 100.0 AS totalSales,
+          COALESCE(SUM(si.paid_amount), 0) / 100.0 AS totalCollected,
+          COALESCE(SUM(si.remaining_amount), 0) / 100.0 AS totalPending,
+          COALESCE(SUM(si.gross_profit), 0) / 100.0 AS estimatedProfit
         FROM sales_invoices si
         LEFT JOIN orders o ON o.invoice_id = si.id
         LEFT JOIN employees e ON e.id = o.sales_rep_id
@@ -2328,10 +2328,10 @@ export class ReportCenterService {
     });
   }
 
-  public demandForecast({ to }: ReportParams): ReportResult {
+  public async demandForecast({ to }: ReportParams): Promise<ReportResult> {
     const salesScope = this.salesScope();
     const stockScope = this.tableScope('w.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT p.id AS productId, p.sku, p.name AS product,
         COALESCE(SUM(CASE WHEN si.id IS NOT NULL THEN sii.quantity_m2 ELSE 0 END), 0) AS sold12m,
         COALESCE(SUM(CASE WHEN si.date >= ? THEN sii.quantity_m2 ELSE 0 END), 0) AS soldLast90,
@@ -2391,19 +2391,19 @@ export class ReportCenterService {
     };
   }
 
-  public hrPayrollSummary({ from, to }: ReportParams): ReportResult {
+  public async hrPayrollSummary({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('pr.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT pr.period, COALESCE(e.name, '—') AS employeeName,
-        COALESCE(prt.base_amount, 0) AS baseAmount,
-        COALESCE(prt.overtime_amount, 0) AS overtimeAmount,
-        COALESCE(prt.bonus_amount, 0) AS bonusAmount,
-        COALESCE(prt.commission_amount, 0) AS commissionAmount,
-        COALESCE(prt.attendance_deduction_amount, 0) AS attendanceDeduction,
-        COALESCE(prt.manual_deduction_amount, 0) AS manualDeduction,
-        COALESCE(prt.advance_amount, 0) AS advanceAmount,
-        COALESCE(prt.tax_amount, 0) AS taxAmount,
-        COALESCE(prt.net_amount, 0) AS netAmount,
+        COALESCE(prt.base_amount, 0) / 100.0 AS baseAmount,
+        COALESCE(prt.overtime_amount, 0) / 100.0 AS overtimeAmount,
+        COALESCE(prt.bonus_amount, 0) / 100.0 AS bonusAmount,
+        COALESCE(prt.commission_amount, 0) / 100.0 AS commissionAmount,
+        COALESCE(prt.attendance_deduction_amount, 0) / 100.0 AS attendanceDeduction,
+        COALESCE(prt.manual_deduction_amount, 0) / 100.0 AS manualDeduction,
+        COALESCE(prt.advance_amount, 0) / 100.0 AS advanceAmount,
+        COALESCE(prt.tax_amount, 0) / 100.0 AS taxAmount,
+        COALESCE(prt.net_amount, 0) / 100.0 AS netAmount,
         COALESCE(prt.payment_method, 'CASH') AS paymentMethod,
         COALESCE(prt.payout_status, 'PENDING') AS payoutStatus
       FROM payroll_runs pr
@@ -2451,10 +2451,10 @@ export class ReportCenterService {
     };
   }
 
-  public hrPayrollPayouts({ from, to }: ReportParams): ReportResult {
+  public async hrPayrollPayouts({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('pt.branch_id');
-    const rows = this.db.query<any>(`
-      SELECT pt.date, COALESCE(e.name, '—') AS employeeName, pt.type, pt.amount,
+    const rows = await this.db.queryAsync<any>(`
+      SELECT pt.date, COALESCE(e.name, '—') AS employeeName, pt.type, pt.amount / 100.0 AS amount,
         COALESCE(pt.payment_method, 'CASH') AS paymentMethod,
         pt.bank_account_id AS bankAccountId, pt.reference_number AS referenceNumber,
         pt.proof_reference AS proofReference, pt.payment_status AS paymentStatus
@@ -2490,9 +2490,9 @@ export class ReportCenterService {
     };
   }
 
-  public hrAttendanceSummary({ from, to }: ReportParams): ReportResult {
+  public async hrAttendanceSummary({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('e.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT e.id AS employeeId, COALESCE(e.name, '—') AS employeeName,
         COUNT(a.id) AS days, COALESCE(SUM(a.worked_minutes), 0) AS workedMinutes,
         COALESCE(SUM(a.late_minutes), 0) AS lateMinutes,
@@ -2532,9 +2532,9 @@ export class ReportCenterService {
     };
   }
 
-  public hrLeaveSummary({ from, to }: ReportParams): ReportResult {
+  public async hrLeaveSummary({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('lr.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, lr.leave_type AS leaveType,
         lr.start_date AS startDate, lr.end_date AS endDate, lr.days, lr.status,
         lr.reason, lr.decision_note AS decisionNote
@@ -2565,11 +2565,11 @@ export class ReportCenterService {
     };
   }
 
-  public hrTaxSummary({ from, to }: ReportParams): ReportResult {
+  public async hrTaxSummary({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('pr.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT pr.period, COALESCE(e.name, '—') AS employeeName,
-        COALESCE(prt.tax_amount, 0) AS taxAmount,
+        COALESCE(prt.tax_amount, 0) / 100.0 AS taxAmount,
         COALESCE(json_extract(prt.detail_json, '$.taxRuleName'), '—') AS taxRuleName,
         COALESCE(json_extract(prt.detail_json, '$.taxSource'), '—') AS taxSource,
         COALESCE(json_extract(prt.detail_json, '$.taxableAmount'), 0) AS taxableAmount,
@@ -2607,9 +2607,9 @@ export class ReportCenterService {
   }
 
 
-  public hrVacancies({ from: _from, to: _to }: ReportParams): ReportResult {
+  public async hrVacancies({ from: _from, to: _to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('d.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT d.id AS departmentId, d.name AS departmentName,
         COALESCE(d.required_headcount, 0) AS requiredHeadcount,
         (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND e.is_active = 1) AS actualHeadcount
@@ -2640,9 +2640,9 @@ export class ReportCenterService {
     };
   }
 
-  public hrOnboarding({ from: _from, to: _to }: ReportParams): ReportResult {
+  public async hrOnboarding({ from: _from, to: _to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('e.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT e.id AS employeeId, COALESCE(e.name, '—') AS employeeName,
         COUNT(t.id) AS total,
         SUM(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
@@ -2680,9 +2680,9 @@ export class ReportCenterService {
     };
   }
 
-  public hrProbation({ from, to }: ReportParams): ReportResult {
+  public async hrProbation({ from, to }: ReportParams): Promise<ReportResult> {
     const scope = this.tableScope('e.branch_id');
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, r.review_date AS reviewDate,
         r.score, r.rating, r.recommendation, r.status
       FROM employee_probation_reviews r
@@ -2711,8 +2711,8 @@ export class ReportCenterService {
   }
 
 
-  public hrViolations({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrViolations({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, v.violation_type AS violationType,
         v.severity, v.status, v.occurred_at AS occurredAt, v.description
       FROM hr_violations v
@@ -2742,8 +2742,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrComplaints({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrComplaints({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, c.subject, c.status, c.submitted_at AS submittedAt,
         c.resolved_at AS resolvedAt, c.resolution
       FROM hr_complaints c
@@ -2771,8 +2771,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrPenaltiesReport({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrPenaltiesReport({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, p.penalty_type AS penaltyType, p.amount, p.status,
         p.approved_at AS approvedAt, p.notes
       FROM hr_penalties p
@@ -2801,8 +2801,8 @@ export class ReportCenterService {
   }
 
 
-  public hrWarnings({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrWarnings({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, w.warning_type AS warningType, w.status,
         w.issued_at AS issuedAt, w.notes
       FROM hr_warnings w
@@ -2828,8 +2828,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrAppeals({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrAppeals({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, a.reference_type AS referenceType, a.reference_id AS referenceId,
         a.status, a.created_at AS createdAt, a.decided_at AS decidedAt, a.decision
       FROM hr_appeals a
@@ -2859,8 +2859,8 @@ export class ReportCenterService {
   }
 
 
-  public hrAttachments({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrAttachments({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT a.reference_type AS referenceType, a.reference_id AS referenceId,
         a.file_name AS fileName, COALESCE(u.full_name, '—') AS uploadedBy, a.created_at AS createdAt
       FROM hr_case_attachments a
@@ -2888,8 +2888,8 @@ export class ReportCenterService {
   }
 
 
-  public hrAllowances({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrAllowances({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, a.allowance_type AS allowanceType,
         a.amount, a.frequency, a.effective_from AS effectiveFrom,
         COALESCE(a.effective_to, '—') AS effectiveTo,
@@ -2919,8 +2919,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrBenefits({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrBenefits({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, b.benefit_type AS benefitType,
         COALESCE(b.provider, '—') AS provider, COALESCE(b.policy_number, '—') AS policyNumber,
         b.start_date AS startDate, COALESCE(b.end_date, '—') AS endDate, b.amount, b.status
@@ -2952,8 +2952,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrLoans({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrLoans({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, '—') AS employeeName, l.id AS loanId, l.principal,
         l.installment_amount AS installmentAmount, l.remaining_balance AS remainingBalance,
         l.start_date AS startDate, l.status,
@@ -2996,8 +2996,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrPerformanceEvaluations({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrPerformanceEvaluations({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, COALESCE(pc.name, '—') AS cycleName,
         pe.evaluator_type AS evaluatorType, pe.score, pe.rating, pe.status,
         pe.submitted_at AS submittedAt, COALESCE(pe.notes, '—') AS notes,
@@ -3032,8 +3032,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrPerformanceGoals({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrPerformanceGoals({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, g.title, g.weight,
         g.target_value AS targetValue, g.actual_value AS actualValue, g.status,
         CASE WHEN g.target_value IS NOT NULL AND g.target_value > 0
@@ -3072,8 +3072,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrPerformancePips({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrPerformancePips({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, p.start_date AS startDate,
         p.end_date AS endDate, p.reason, COALESCE(p.goals, '—') AS goals,
         p.status, COALESCE(p.outcome, '—') AS outcome, p.review_date AS reviewDate
@@ -3103,8 +3103,8 @@ export class ReportCenterService {
     };
   }
 
-  public mfgProductionKpis({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async mfgProductionKpis({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT po.order_number AS orderNumber, COALESCE(p.name, '—') AS productName, po.quantity,
         po.status, po.priority, po.start_date AS startDate, po.due_date AS dueDate,
         po.completed_at AS completedAt, b.name AS branchName,
@@ -3156,12 +3156,12 @@ export class ReportCenterService {
     };
   }
 
-  public salesTargetKpis({ from, to }: ReportParams): ReportResult {
+  public async salesTargetKpis({ from, to }: ReportParams): Promise<ReportResult> {
     const daysInRange = Math.max(1, Math.round((new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86400000) + 1);
-    const rows = this.db.query<any>(`
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(e.name, e.full_name, '—') AS repName, e.monthly_target AS monthlyTarget,
         e.commission_percentage AS commissionPct,
-        COALESCE(SUM(CASE WHEN si.date BETWEEN ? AND ? THEN si.total_amount ELSE 0 END), 0) AS totalSales
+        COALESCE(SUM(CASE WHEN si.date BETWEEN ? AND ? THEN si.total_amount ELSE 0 END), 0) / 100.0 AS totalSales
       FROM employees e
       LEFT JOIN orders o ON o.sales_rep_id = e.id
       LEFT JOIN sales_invoices si ON si.id = o.invoice_id AND si.invoice_status != 'VOID'
@@ -3210,8 +3210,8 @@ export class ReportCenterService {
     };
   }
 
-  public hrTrainingExpenses({ from, to }: ReportParams): ReportResult {
-    const rows = this.db.query<any>(`
+  public async hrTrainingExpenses({ from, to }: ReportParams): Promise<ReportResult> {
+    const rows = await this.db.queryAsync<any>(`
       SELECT COALESCE(c.name, '—') AS courseName, COALESCE(e.name, e.full_name, '—') AS employeeName,
         te.amount, te.expense_date AS expenseDate, te.payment_method AS paymentMethod,
         COALESCE(te.description, '—') AS description
@@ -3245,12 +3245,12 @@ export class ReportCenterService {
     };
   }
 
-  public workforceAnalytics({ from, to }: ReportParams): ReportResult {
+  public async workforceAnalytics({ from, to }: ReportParams): Promise<ReportResult> {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
 
-    const headcountByBranch = this.db.query<any>(`
+    const headcountByBranch = await this.db.queryAsync<any>(`
       SELECT b.id AS branchId, b.name AS branchName,
              COUNT(e.id) AS headcount,
              COALESCE(SUM(e.base_salary), 0) AS totalSalaryCost
@@ -3278,11 +3278,11 @@ export class ReportCenterService {
     };
   }
 
-  public assetAnalytics({ from, to }: ReportParams): ReportResult {
+  public async assetAnalytics({ from, to }: ReportParams): Promise<ReportResult> {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('fa.branch_id', undefined, actor);
 
-    const assetsByStatus = this.db.query<any>(`
+    const assetsByStatus = await this.db.queryAsync<any>(`
       SELECT fa.status, COUNT(*) AS count
       FROM facility_assets fa
       WHERE ${branchScope.clause}
@@ -3304,14 +3304,14 @@ export class ReportCenterService {
     };
   }
 
-  public facilityAnalytics({ from, to }: ReportParams): ReportResult {
+  public async facilityAnalytics({ from, to }: ReportParams): Promise<ReportResult> {
     const actor = this.actor();
     const companyId = this.branchAccess.companyScope('company_id', actor).params[0] || 'cmp_main';
 
-    const utilityConsumption = this.db.query<any>(`
+    const utilityConsumption = await this.db.queryAsync<any>(`
       SELECT um.utility_type AS type,
              SUM(ur.consumption) AS totalConsumption,
-             SUM(ur.cost) AS totalCost
+             SUM(ur.cost) / 100.0 AS totalCost
       FROM facility_utility_readings ur
       JOIN facility_utility_meters um ON um.id = ur.meter_id
       WHERE um.company_id = ? AND ur.reading_date >= ? AND ur.reading_date <= ?

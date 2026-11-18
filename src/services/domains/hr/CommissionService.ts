@@ -24,7 +24,7 @@ export class CommissionService {
     let sql = `
       SELECT c.id, c.employee_id AS employeeId, e.full_name AS employeeName,
              c.source_type AS sourceType, c.source_id AS sourceId, c.period_month AS periodMonth,
-             c.base_amount AS baseAmount, c.percentage, c.commission_amount AS commissionAmount,
+             c.base_amount / 100.0 AS baseAmount, c.percentage, c.commission_amount / 100.0 AS commissionAmount,
              c.status, c.paid_at AS paidAt, c.notes, c.created_at AS createdAt,
              si.invoice_number AS invoiceNumber
       FROM commissions c
@@ -48,7 +48,7 @@ export class CommissionService {
     params.push(...scope.params, ...departmentScope.params);
     if (month) { conditions.push('c.period_month = ?'); params.push(month); }
     const rows = this.db.query<any>(
-      `SELECT c.status, COUNT(*) AS count, COALESCE(SUM(c.commission_amount), 0) AS total
+      `SELECT c.status, COUNT(*) AS count, COALESCE(SUM(c.commission_amount), 0) / 100.0 AS total
        FROM commissions c JOIN employees e ON e.id = c.employee_id
        WHERE ${conditions.join(' AND ')} GROUP BY c.status`,
       params
@@ -92,8 +92,8 @@ export class CommissionService {
     const scope = this.branchAccess.sqlScope('si.branch_id');
 
     const invoices = this.db.query<any>(`
-      SELECT si.id, si.invoice_number AS invoiceNumber, si.total_amount AS totalAmount,
-             si.tax_amount AS taxAmount, si.sales_rep_id AS salesRepId,
+      SELECT si.id, si.invoice_number AS invoiceNumber, si.total_amount / 100.0 AS totalAmount,
+             si.tax_amount / 100.0 AS taxAmount, si.sales_rep_id AS salesRepId,
              c.assigned_rep_id AS assignedRepId, si.branch_id AS branchId
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
       WHERE substr(si.date, 1, 7) = ? AND si.invoice_status != 'VOID' AND ${scope.clause}
@@ -130,7 +130,7 @@ export class CommissionService {
         db.run(
           `INSERT INTO commissions (id, employee_id, source_type, source_id, period_month, branch_id,
              base_amount, percentage, commission_amount, status, notes, created_by)
-           VALUES (?, ?, 'SALES_INVOICE', ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+           VALUES (?, ?, 'SALES_INVOICE', ?, ?, ?, ROUND(?*100), ?, ROUND(?*100), 'PENDING', ?, ?)`,
           [
             `com_${uuidv4().substring(0, 8)}`, employeeId, invoice.id, month, invoice.branchId,
             base, percentage, commission, `عمولة فاتورة ${invoice.invoiceNumber}`, actor.id,
@@ -156,7 +156,7 @@ export class CommissionService {
       periodMonth: string;
       branchId: string | null;
     }>(`
-      SELECT c.status, c.commission_amount AS amount, c.employee_id AS employeeId, c.period_month AS periodMonth,
+      SELECT c.status, c.commission_amount / 100.0 AS amount, c.employee_id AS employeeId, c.period_month AS periodMonth,
              COALESCE(c.branch_id, e.branch_id) AS branchId
       FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
     `, [id])[0];
@@ -227,13 +227,13 @@ export class CommissionService {
             referenceType: 'COMMISSION_PAYMENT', referenceId: id, createdBy: actor.id, branchId,
             lines: [{ accountCode: '2103', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }],
           });
-          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, register.id]);
+          db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id=?', [amount, register.id]);
           const shift = db.query<{ id: string }>(
             `SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN'
              ORDER BY opened_at DESC LIMIT 1`,
             [actor.id, register.id]
           )[0];
-          if (shift) db.run('UPDATE cash_shifts SET total_expenses=total_expenses+? WHERE id=?', [amount, shift.id]);
+          if (shift) db.run('UPDATE cash_shifts SET total_expenses=total_expenses+ROUND(?*100) WHERE id=?', [amount, shift.id]);
         }
       } else if (row.status === 'APPROVED') {
         const payment = db.query<{ id: string }>(

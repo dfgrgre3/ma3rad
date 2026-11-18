@@ -188,6 +188,175 @@ test('inventory approval posts stock and its movement atomically through the app
   )[0].quantity, 7);
 });
 
+test('expense approval gate blocks, approves and consumes exactly once', async () => {
+  const db = await boot();
+  const suffix = `${Date.now()}e`;
+  const cashier: User = {
+    id: `usr_gate_cashier_${suffix}`, username: `gate-cashier-${suffix}`, fullName: 'Gate Cashier',
+    role: 'MANAGER', isActive: true, createdAt: '', updatedAt: '',
+  };
+  const approver: User = {
+    id: `usr_gate_approver_${suffix}`, username: `gate-approver-${suffix}`, fullName: 'Gate Approver',
+    role: 'MANAGER', isActive: true, createdAt: '', updatedAt: '',
+  };
+  for (const user of [cashier, approver]) {
+    db.run(`INSERT INTO users (id, username, password_hash, full_name, role, is_active) VALUES (?, ?, 'test', ?, ?, 1)`,
+      [user.id, user.username, user.fullName, user.role]);
+    db.run(`INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, 'br_main')`, [user.id]);
+    PermissionService.invalidate(user);
+  }
+  db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, 'ui.cashier.expenses.expense', 'GRANT')`, [cashier.id]);
+  db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, 'approvals.create', 'GRANT')`, [cashier.id]);
+  db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, 'ui.approvals.inbox.approve', 'GRANT')`, [approver.id]);
+  db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, 'ui.approvals.inbox.reject', 'GRANT')`, [approver.id]);
+  PermissionService.invalidate(cashier);
+  PermissionService.invalidate(approver);
+
+  AuthService.setCurrentUser(admin);
+  PermissionService.invalidate(admin);
+  ModuleRegistryService.setModuleSetting('approvals', 'requireSegregationOfDuties', true, admin);
+  new ApprovalPolicyService().setPolicy({
+    operationCode: 'finance.expense.create', mode: 'APPROVAL', executorRoles: [], approverRoles: [],
+    minApprovals: 1, allowSelfApproval: false, maxValue: null, expiresAfterHours: null,
+  });
+
+  const { CashierService } = await import('../src/services/domains/finance/CashierService.ts');
+  AuthService.setCurrentUser(cashier);
+  PermissionService.invalidate(cashier);
+  const cashierService = new CashierService();
+  assert.throws(
+    () => cashierService.addExpense('إيجار', 500, 'إيجار فرع', 'cr_main'),
+    /تتطلب موافقة/
+  );
+  const pending = db.query<{ id: string; payload: string }>(
+    `SELECT id, payload FROM approval_requests WHERE request_type = 'EXPENSE' AND status = 'PENDING' AND requested_by = ?`,
+    [cashier.id]
+  )[0];
+  assert.ok(pending);
+  assert.equal(JSON.parse(pending.payload).operationCode, 'finance.expense.create');
+  assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM expenses WHERE description = 'إيجار فرع'`)[0].count, 0);
+
+  // Self-approval is blocked while segregation of duties is enabled.
+  const approvals = new ApprovalService();
+  assert.throws(() => approvals.decide(pending.id, true), /فصل المهام/);
+
+  AuthService.setCurrentUser(approver);
+  PermissionService.invalidate(approver);
+  approvals.decide(pending.id, true);
+
+  AuthService.setCurrentUser(cashier);
+  PermissionService.invalidate(cashier);
+  // Retrying the identical operation auto-resolves the approved request —
+  // no approvalId needs to be threaded through the UI.
+  const expense = cashierService.addExpense('إيجار', 500, 'إيجار فرع', 'cr_main');
+  assert.ok(expense.id);
+  assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM expenses WHERE id = ?`, [expense.id])[0].count, 1);
+  const consumed = db.query<{ referenceType: string; referenceId: string }>(
+    `SELECT reference_type AS referenceType, reference_id AS referenceId FROM approval_requests WHERE id = ?`, [pending.id]
+  )[0];
+  assert.equal(consumed.referenceType, 'EXPENSE');
+  assert.equal(consumed.referenceId, expense.id);
+  // The approval is single-use.
+  assert.throws(
+    () => cashierService.addExpense('إيجار', 500, 'إيجار فرع ثانٍ', 'cr_main', undefined, 'CASH', '', 'usr_x', { approvalId: pending.id }),
+    /استهلاك|استُهلك|لا يخص|غير معتمد|تفاصيل/
+  );
+});
+
+test('product price change and delete go through the approval gate', async () => {
+  const db = await boot();
+  const suffix = `${Date.now()}p`;
+  const editor: User = {
+    id: `usr_gate_editor_${suffix}`, username: `gate-editor-${suffix}`, fullName: 'Gate Editor',
+    role: 'MANAGER', isActive: true, createdAt: '', updatedAt: '',
+  };
+  const approver: User = {
+    id: `usr_gate_papprover_${suffix}`, username: `gate-papprover-${suffix}`, fullName: 'Gate Product Approver',
+    role: 'MANAGER', isActive: true, createdAt: '', updatedAt: '',
+  };
+  for (const user of [editor, approver]) {
+    db.run(`INSERT INTO users (id, username, password_hash, full_name, role, is_active) VALUES (?, ?, 'test', ?, ?, 1)`,
+      [user.id, user.username, user.fullName, user.role]);
+    db.run(`INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, 'br_main')`, [user.id]);
+    PermissionService.invalidate(user);
+  }
+  for (const perm of ['ui.products.catalog.update', 'ui.products.catalog.delete', 'approvals.create']) {
+    db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, ?, 'GRANT')`, [editor.id, perm]);
+  }
+  db.run(`INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect) VALUES (?, 'ui.approvals.inbox.approve', 'GRANT')`, [approver.id]);
+  PermissionService.invalidate(editor);
+  PermissionService.invalidate(approver);
+
+  const productId = `prod_gate_${suffix}`;
+  db.run('INSERT INTO categories (id, name) VALUES (?, ?)', [`cat_g_${suffix}`, 'Gate category']);
+  db.run('INSERT INTO brands (id, name) VALUES (?, ?)', [`brand_g_${suffix}`, 'Gate brand']);
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, product_type, base_unit, custom_unit,
+    grade, size, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+    wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active
+  ) VALUES (?, ?, ?, ?, ?, ?, 'GENERAL', 'BOX', '', 'GENERAL', '', 'BOX', 1, 1, 5, 10, 8, 7, 0, 1)`, [
+    productId, `SKU-G-${suffix}`, `BAR-G-${suffix}`, 'Gate product', `cat_g_${suffix}`, `brand_g_${suffix}`,
+  ]);
+
+  AuthService.setCurrentUser(admin);
+  PermissionService.invalidate(admin);
+  new ApprovalPolicyService().setPolicy({
+    operationCode: 'products.price.update', mode: 'DIRECT', executorRoles: [], approverRoles: [],
+    minApprovals: 1, allowSelfApproval: false, maxValue: 5, expiresAfterHours: null,
+  });
+
+  const { ProductService } = await import('../src/services/domains/products/ProductService.ts');
+  const products = new ProductService();
+  AuthService.setCurrentUser(editor);
+  PermissionService.invalidate(editor);
+
+  // Delta 10 > maxValue 5 → approval required.
+  assert.throws(() => products.updateProduct(productId, { sellingPriceM2: 20 }), /تتطلب موافقة/);
+  const priceRequest = db.query<{ id: string; payload: string }>(
+    `SELECT id, payload FROM approval_requests WHERE request_type = 'PRICE_CHANGE' AND status = 'PENDING' AND requested_by = ?`,
+    [editor.id]
+  )[0];
+  assert.ok(priceRequest);
+  assert.equal(JSON.parse(priceRequest.payload).operationCode, 'products.price.update');
+
+  // Small delta within threshold → direct.
+  products.updateProduct(productId, { minStockLevel: 3 });
+  assert.equal(Number(db.query<{ p: number }>('SELECT selling_price_m2 AS p FROM products WHERE id = ?', [productId])[0].p), 10);
+
+  AuthService.setCurrentUser(approver);
+  PermissionService.invalidate(approver);
+  new ApprovalService().decide(priceRequest.id, true);
+
+  AuthService.setCurrentUser(editor);
+  PermissionService.invalidate(editor);
+  products.updateProduct(productId, { sellingPriceM2: 20 }, 'usr_x', { approvalId: priceRequest.id });
+  assert.equal(Number(db.query<{ p: number }>('SELECT selling_price_m2 AS p FROM products WHERE id = ?', [productId])[0].p), 20);
+  assert.equal(db.query<{ t: string | null }>('SELECT reference_type AS t FROM approval_requests WHERE id = ?', [priceRequest.id])[0].t, 'PRICE_CHANGE');
+
+  // Delete always requires approval for non-admin + reason.
+  assert.throws(() => products.deleteProduct(productId), /سبب/);
+  const deleteRequest = (() => {
+    try {
+      products.deleteProduct(productId, 'usr_x', { reason: 'تنظيف كتالوج' });
+      return null;
+    } catch (error) {
+      assert.match(String(error), /موافقة/);
+      return db.query<{ id: string }>(
+        `SELECT id FROM approval_requests WHERE request_type = 'DATA_DELETE' AND status = 'PENDING' AND requested_by = ?`,
+        [editor.id]
+      )[0];
+    }
+  })();
+  assert.ok(deleteRequest);
+  AuthService.setCurrentUser(approver);
+  PermissionService.invalidate(approver);
+  new ApprovalService().decide(deleteRequest.id, true);
+  AuthService.setCurrentUser(editor);
+  PermissionService.invalidate(editor);
+  products.deleteProduct(productId, 'usr_x', { reason: 'تنظيف كتالوج', approvalId: deleteRequest.id });
+  assert.equal(db.query<{ c: number }>('SELECT COUNT(*) AS c FROM products WHERE id = ?', [productId])[0].c, 0);
+});
+
 test('admin posts inventory directly without creating an unnecessary approval request', async () => {
   const db = await boot();
   const suffix = `${Date.now()}x`;

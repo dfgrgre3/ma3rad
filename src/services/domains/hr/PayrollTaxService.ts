@@ -150,8 +150,8 @@ export class PayrollTaxService {
 
   private static getBrackets(ruleId: string): PayrollTaxBracket[] {
     return this.db.query<any>(
-      `SELECT id, rule_id AS ruleId, sequence, lower_limit AS lowerLimit,
-              upper_limit AS upperLimit, rate_percent AS ratePercent
+      `SELECT id, rule_id AS ruleId, sequence, lower_limit / 100.0 AS lowerLimit,
+              upper_limit / 100.0 AS upperLimit, rate_percent AS ratePercent
        FROM payroll_tax_brackets WHERE rule_id = ?
        ORDER BY lower_limit, sequence`,
       [ruleId]
@@ -171,7 +171,7 @@ export class PayrollTaxService {
     const rows = this.db.query<any>(
       `SELECT id, company_id AS companyId, name, jurisdiction, taxable_basis AS taxableBasis,
               effective_from AS effectiveFrom, effective_to AS effectiveTo,
-              dependent_allowance AS dependentAllowance, is_active AS isActive,
+              dependent_allowance / 100.0 AS dependentAllowance, is_active AS isActive,
               notes, created_at AS createdAt, updated_at AS updatedAt
        FROM payroll_tax_rules WHERE company_id = ?
        ORDER BY is_active DESC, effective_from DESC, name`,
@@ -184,7 +184,7 @@ export class PayrollTaxService {
     const row = this.db.query<any>(
       `SELECT id, company_id AS companyId, name, jurisdiction, taxable_basis AS taxableBasis,
               effective_from AS effectiveFrom, effective_to AS effectiveTo,
-              dependent_allowance AS dependentAllowance, is_active AS isActive,
+              dependent_allowance / 100.0 AS dependentAllowance, is_active AS isActive,
               notes, created_at AS createdAt, updated_at AS updatedAt
        FROM payroll_tax_rules
        WHERE company_id = ? AND is_active = 1
@@ -281,7 +281,7 @@ export class PayrollTaxService {
       if (id) {
         db.run(
           `UPDATE payroll_tax_rules SET name = ?, jurisdiction = ?, taxable_basis = ?,
-             effective_from = ?, effective_to = ?, dependent_allowance = ?, is_active = ?,
+             effective_from = ?, effective_to = ?, dependent_allowance = ROUND(?*100), is_active = ?,
              notes = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND company_id = ?`,
           [name, input.jurisdiction?.trim() || null, taxableBasis, input.effectiveFrom,
@@ -294,7 +294,7 @@ export class PayrollTaxService {
           `INSERT INTO payroll_tax_rules
              (id, company_id, name, jurisdiction, taxable_basis, effective_from, effective_to,
               dependent_allowance, is_active, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
           [ruleId, companyId, name, input.jurisdiction?.trim() || null, taxableBasis,
             input.effectiveFrom, input.effectiveTo || null, dependentAllowance, isActive ? 1 : 0,
             input.notes?.trim() || null, actor.id]
@@ -304,7 +304,7 @@ export class PayrollTaxService {
         db.run(
           `INSERT INTO payroll_tax_brackets
              (id, rule_id, sequence, lower_limit, upper_limit, rate_percent)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ROUND(?*100), ROUND(?*100), ?)`,
           [`ptb_${uuidv4().replace(/-/g, '').slice(0, 16)}`, ruleId, index + 1,
             bracket.lowerLimit, bracket.upperLimit, bracket.ratePercent]
         );
@@ -324,7 +324,7 @@ export class PayrollTaxService {
     const row = this.db.query<any>(
       `SELECT id, company_id AS companyId, name, jurisdiction, taxable_basis AS taxableBasis,
               effective_from AS effectiveFrom, effective_to AS effectiveTo,
-              dependent_allowance AS dependentAllowance, is_active AS isActive,
+              dependent_allowance / 100.0 AS dependentAllowance, is_active AS isActive,
               notes, created_at AS createdAt, updated_at AS updatedAt
        FROM payroll_tax_rules WHERE id = ? AND company_id = ?`,
       [id, companyId]
@@ -355,7 +355,7 @@ export class PayrollTaxService {
   private static getEmployeeTaxProfile(employeeId: string): EmployeeTaxProfileRow {
     return this.db.query<EmployeeTaxProfileRow>(
       `SELECT COALESCE(tax_exempt, 0) AS taxExempt,
-              COALESCE(tax_exemption_amount, 0) AS taxExemptionAmount,
+              COALESCE(tax_exemption_amount, 0) / 100.0 AS taxExemptionAmount,
               COALESCE(tax_dependents, 0) AS taxDependents
        FROM employees WHERE id = ?`,
       [employeeId]

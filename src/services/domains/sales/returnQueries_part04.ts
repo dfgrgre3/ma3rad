@@ -7,7 +7,8 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
   if (!ctx.getInvoiceById(invoiceId)) return [];
   const rows = ctx.db.query<any>(
     `SELECT sii.id AS invoiceItemId, sii.product_id, sii.product_name, sii.product_grade, sii.size, sii.quantity_m2,
-            sii.unit_price, sii.unit_cost, sii.boxes_count, sii.meters_per_box,
+            sii.unit_price / 100.0 AS unit_price, sii.unit_cost / 100.0 AS unit_cost,
+            sii.boxes_count, sii.meters_per_box,
             sii.special_stock_id,
             iss.special_number,
             p.pieces_per_box AS piecesPerBox,

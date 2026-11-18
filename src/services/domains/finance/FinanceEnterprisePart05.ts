@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import type {
   ExtendedChequeStatus,
@@ -21,7 +22,7 @@ public transitionChequeStatus(
     } = {}
   ): void {
     const actor = this.requireManage();
-    const chq = this.db.query<Cheque & { bankAccountId?: string; journalEntryId?: string }>('SELECT * FROM cheques WHERE id = ?', [chequeId])[0];
+    const chq = unscaleMoneyRow(this.db.query<Cheque & { bankAccountId?: string; journalEntryId?: string }>('SELECT * FROM cheques WHERE id = ?', [chequeId])[0], ['amount', 'bounce_fee']);
     if (!chq) throw new Error('الشيك غير موجود.');
 
     const fromStatus = chq.status;
@@ -86,7 +87,7 @@ public transitionChequeStatus(
 
         tx.run(`
           UPDATE cheques
-          SET status = ?, bounced_at = ?, bounce_reason = ?, bounce_fee = ?, bounce_entry_id = ?, updated_at = CURRENT_TIMESTAMP
+          SET status = ?, bounced_at = ?, bounce_reason = ?, bounce_fee = ROUND(?*100), bounce_entry_id = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `, [toStatus, actionDate, options.bounceReason || 'ارتداد بنكي', bounceFee, journalEntryId, chequeId]);
       } else if (toStatus === 'DEPOSITED') {

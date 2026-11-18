@@ -7,11 +7,13 @@ export function useRegisters() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    try {
-      setRegisters(new CashierService().getAllRegisters());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل الخزائن');
-    }
+    let cancelled = false;
+    new CashierService().getAllRegistersAsync()
+      .then((rows) => { if (!cancelled) setRegisters(rows); })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'تعذر تحميل الخزائن');
+      });
+    return () => { cancelled = true; };
   }, []);
 
   return { registers, error };

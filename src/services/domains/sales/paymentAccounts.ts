@@ -12,7 +12,7 @@ export function getActiveBankAccount(db: DatabaseManager, bankAccountId?: string
 }
 
 export function updateBankBalance(db: DatabaseManager, bankAccountId: string, amount: number): void {
-  db.run('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ? AND is_active = 1', [amount, bankAccountId]);
+  db.run('UPDATE bank_accounts SET current_balance = current_balance + ROUND(?*100) WHERE id = ? AND is_active = 1', [amount, bankAccountId]);
   if (Number((db.getDatabase() as any).getRowsModified?.() ?? 0) !== 1) {
     throw new Error('The selected bank account balance could not be updated.');
   }

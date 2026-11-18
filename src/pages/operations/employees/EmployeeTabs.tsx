@@ -5,12 +5,14 @@ import type { EmployeeTab } from '../../../types/hr/employeesPage';
 interface EmployeeTabsProps {
   activeTab: EmployeeTab;
   canManageEmployees: boolean;
+  canViewAttendance: boolean;
   onTabChange: (tab: EmployeeTab) => void;
 }
 
 export const EmployeeTabs: React.FC<EmployeeTabsProps> = ({
   activeTab,
   canManageEmployees,
+  canViewAttendance,
   onTabChange,
 }) => {
   return (
@@ -34,8 +36,9 @@ export const EmployeeTabs: React.FC<EmployeeTabsProps> = ({
       </button>
       <button
         onClick={() => onTabChange('attendance')}
+        disabled={!canViewAttendance}
         className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'attendance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
- }`}
+ } ${!canViewAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <UserCheck className="w-4 h-4" />
         سجل الحضور اليومي

@@ -15,6 +15,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { maskCostFields } from '../auth/sensitiveFields';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { InventoryReceiptService } from './InventoryReceiptService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
@@ -70,7 +71,7 @@ export class BatchService {
         pb.received_date       AS receivedDate,
         pb.supplier_id         AS supplierId,
         s.name                 AS supplierName,
-        COALESCE(pb.cost_price, 0)             AS costPrice,
+        COALESCE(pb.cost_price, 0) / 100.0 AS costPrice,
         pb.quantity_m2          AS quantityM2,
         COALESCE(pb.quantity_remaining_m2, 0)  AS quantityRemainingM2,
         pb.notes,
@@ -87,7 +88,10 @@ export class BatchService {
       params.push(warehouseId);
     }
     sql += ` ORDER BY pb.created_at ASC, pb.id ASC`;
-    return this.db.query<ProductBatch>(sql, params);
+    return this.db.query<ProductBatch>(sql, params).map((row) => {
+      maskCostFields(row as unknown as Record<string, any>, ['costPrice']);
+      return row;
+    });
   }
 
   /** دفعة واحدة بمعرفها */
@@ -107,7 +111,7 @@ export class BatchService {
          pb.received_date       AS receivedDate,
          pb.supplier_id         AS supplierId,
          s.name                 AS supplierName,
-         COALESCE(pb.cost_price, 0)            AS costPrice,
+         COALESCE(pb.cost_price, 0) / 100.0 AS costPrice,
          pb.quantity_m2         AS quantityM2,
          COALESCE(pb.quantity_remaining_m2, 0) AS quantityRemainingM2,
          pb.notes,
@@ -119,7 +123,9 @@ export class BatchService {
        WHERE pb.id = ? AND ${scope.clause}`,
       [id, ...scope.params]
     );
-    return rows[0] ?? null;
+    const batch = rows[0] ?? null;
+    if (batch) maskCostFields(batch as unknown as Record<string, any>, ['costPrice']);
+    return batch;
   }
 
   /** إجمالي الرصيد المتبقي من كل الدفعات (م²) */
@@ -180,7 +186,7 @@ export class BatchService {
         baseUnit: string;
         grade: string | null;
       }>(
-        `SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox,
+        `SELECT name, cost_price / 100.0 AS costPrice, meters_per_box AS metersPerBox,
                 product_type AS productType, base_unit AS baseUnit, grade
          FROM products WHERE id = ?`,
         [data.productId]
@@ -197,7 +203,7 @@ export class BatchService {
            (id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
             production_date, received_date, supplier_id, cost_price,
             quantity_m2, quantity_remaining_m2, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?)`,
         [
           id, data.productId, data.warehouseId, batchNumber, data.toneShade.trim(),
           data.caliber?.trim() || '0', grade, data.productionDate || null, receivedDate,
@@ -478,7 +484,7 @@ export class BatchService {
         INSERT INTO product_batches (
           id, product_id, warehouse_id, batch_number, tone_shade, caliber,
           cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
-        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ROUND(?*100), ?, ?, ?, ?)
       `, [
         pendingBatchId, input.productId, input.warehouseId,
         `RET-${input.returnItemId.slice(-8)}`, input.costPrice, remaining, remaining,
@@ -541,7 +547,7 @@ export class BatchService {
         INSERT INTO product_batches (
           id, product_id, warehouse_id, batch_number, tone_shade, caliber,
           cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
-        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ROUND(?*100), ?, ?, ?, ?)
       `, [
         pendingBatchId, input.productId, input.warehouseId,
         `VOID-${input.invoiceId.slice(-8)}`, input.costPrice, remaining, remaining,

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser, ChevronDown, ChevronLeft, Layers } from 'lucide-react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { AuthorizationAdminService, type AmountLimit } from '../../../services/domains/auth/permissions/authorizationAdminService';
+import type { User } from '../../../types';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import type { Role } from '../../../types';
@@ -23,6 +25,13 @@ export const AdminRolesTab: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState({ code: '', name: '', description: '' });
+
+  // حدود المبالغ (permission_amount_limits)
+  const [limits, setLimits] = useState<AmountLimit[]>([]);
+  const [limitScopeType, setLimitScopeType] = useState<'ROLE' | 'USER'>('ROLE');
+  const [limitScopeId, setLimitScopeId] = useState('');
+  const [limitForm, setLimitForm] = useState({ permissionCode: '', maxAmount: '', currency: 'EGP', onExceed: 'DENY' as 'DENY' | 'REQUIRE_APPROVAL' });
+  const [users, setUsers] = useState<User[]>([]);
 
   const catalog = useMemo(() => PermissionService.getCatalog(), []);
   const modules = useMemo(() => PermissionService.getModules(), []);
@@ -50,12 +59,64 @@ export const AdminRolesTab: React.FC = () => {
     setSelectedCodes(new Set(PermissionService.getRolePermissions(role.code)));
     setDirty(false);
     setExpanded({});
+    setLimitScopeType('ROLE');
+    setLimitScopeId(role.code);
+  };
+
+  const loadLimits = () => {
+    try {
+      setLimits(AuthorizationAdminService.listAmountLimits(limitScopeType, limitScopeId || undefined));
+    } catch {
+      setLimits([]);
+    }
   };
 
   useEffect(() => {
     load(false);
+    try {
+      setUsers(new AuthService().getAllUsers());
+    } catch {
+      setUsers([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (selected) loadLimits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, limitScopeType, limitScopeId]);
+
+  const saveLimit = () => {
+    if (!limitScopeId || !limitForm.permissionCode.trim()) {
+      toast.error('أكمل كود الصلاحية والنطاق.');
+      return;
+    }
+    try {
+      AuthorizationAdminService.upsertAmountLimit({
+        permissionCode: limitForm.permissionCode.trim(),
+        scopeType: limitScopeType,
+        scopeId: limitScopeId,
+        maxAmount: Number(limitForm.maxAmount),
+        currency: limitForm.currency.trim() || 'EGP',
+        onExceed: limitForm.onExceed,
+      });
+      setLimitForm({ permissionCode: '', maxAmount: '', currency: 'EGP', onExceed: 'DENY' });
+      loadLimits();
+      toast.success('تم حفظ حد المبلغ.');
+    } catch (error: any) {
+      toast.error('تعذر حفظ الحد', error?.message);
+    }
+  };
+
+  const removeLimit = (limit: AmountLimit) => {
+    try {
+      AuthorizationAdminService.deleteAmountLimit(limit.id);
+      loadLimits();
+      toast.success('تم حذف الحد.');
+    } catch (error: any) {
+      toast.error('تعذر الحذف', error?.message);
+    }
+  };
 
   const filteredGroups = (module: string) => {
     const term = search.trim().toLowerCase();
@@ -412,6 +473,127 @@ export const AdminRolesTab: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Amount limits */}
+      {selected && canManage && (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:col-span-2">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">حدود المبالغ</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                سقف مبلغ لكل عملية مالية — DENY يرفض مباشرة، REQUIRE_APPROVAL ينشئ طلب اعتماد.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={limitScopeType}
+                onChange={(e) => {
+                  const next = e.target.value as 'ROLE' | 'USER';
+                  setLimitScopeType(next);
+                  setLimitScopeId(next === 'ROLE' ? selected.code : '');
+                }}
+                className={inputCls}
+              >
+                <option value="ROLE">حسب الدور</option>
+                <option value="USER">حسب المستخدم</option>
+              </select>
+              {limitScopeType === 'USER' ? (
+                <select value={limitScopeId} onChange={(e) => setLimitScopeId(e.target.value)} className={inputCls}>
+                  <option value="">اختر مستخدمًا...</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.fullName} ({u.username})</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="rounded-lg bg-sky-50 px-2.5 py-1.5 font-mono text-[11px] font-bold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                  {selected.code}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {limitScopeId && (
+            <>
+              <div className="mb-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-right text-[10px] font-bold text-slate-400 dark:border-slate-700">
+                      <th className="p-2">الصلاحية</th>
+                      <th className="p-2">الحد الأقصى</th>
+                      <th className="p-2">العملة</th>
+                      <th className="p-2">عند التجاوز</th>
+                      <th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {limits.length === 0 && (
+                      <tr><td colSpan={5} className="p-3 text-center text-slate-400">لا حدود معرفة — المبالغ غير مقيّدة.</td></tr>
+                    )}
+                    {limits.map((limit) => (
+                      <tr key={limit.id} className="text-slate-700 dark:text-slate-200">
+                        <td className="p-2 font-mono font-bold">{limit.permissionCode}</td>
+                        <td className="p-2 font-bold">{limit.maxAmount.toLocaleString()}</td>
+                        <td className="p-2">{limit.currency}</td>
+                        <td className="p-2">
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${limit.onExceed === 'DENY' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'}`}>
+                            {limit.onExceed === 'DENY' ? 'رفض' : 'يتطلب اعتمادًا'}
+                          </span>
+                        </td>
+                        <td className="p-2">
+                          <button onClick={() => removeLimit(limit)} className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="حذف">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-200 p-3 dark:border-slate-700">
+                <input
+                  value={limitForm.permissionCode}
+                  onChange={(e) => setLimitForm((f) => ({ ...f, permissionCode: e.target.value }))}
+                  placeholder="كود العملية (مثل sales.create)"
+                  list="permission-codes"
+                  className={inputCls}
+                />
+                <datalist id="permission-codes">
+                  {catalog.map((p) => <option key={p.code} value={p.code} />)}
+                </datalist>
+                <input
+                  value={limitForm.maxAmount}
+                  onChange={(e) => setLimitForm((f) => ({ ...f, maxAmount: e.target.value }))}
+                  placeholder="الحد الأقصى"
+                  type="number"
+                  min="0"
+                  className={`${inputCls} w-32`}
+                />
+                <input
+                  value={limitForm.currency}
+                  onChange={(e) => setLimitForm((f) => ({ ...f, currency: e.target.value }))}
+                  placeholder="العملة"
+                  className={`${inputCls} w-20`}
+                />
+                <select
+                  value={limitForm.onExceed}
+                  onChange={(e) => setLimitForm((f) => ({ ...f, onExceed: e.target.value as 'DENY' | 'REQUIRE_APPROVAL' }))}
+                  className={inputCls}
+                >
+                  <option value="DENY">رفض</option>
+                  <option value="REQUIRE_APPROVAL">يتطلب اعتمادًا</option>
+                </select>
+                <button
+                  onClick={saveLimit}
+                  className="flex items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700"
+                >
+                  <Save className="h-3.5 w-3.5" /> حفظ الحد
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">

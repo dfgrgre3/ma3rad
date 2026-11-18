@@ -1,0 +1,102 @@
+src\pages\finance\debts-dashboard\DebtsDashboardPage.tsx:429: `SELECT COALESCE(SUM(CASE WHEN totals.subtotal>0 THEN totals.pending_value/totals.subtotal*po.total_amount ELSE 0 END),0) AS v FROM purchase
+src\pages\inventory\inventory-adjustments\InventoryAdjustmentsPage.tsx:155: SELECT id, name, sku, cost_price AS costPrice, meters_per_box AS metersPerBox,
+src\pages\products\product-detail\PriceListsForProduct.tsx:11: `SELECT pl.id, pl.name, pli.price_m2 AS priceM2, pl.currency
+src\pages\reports\sales-reports\SalesReportsPage.tsx:171: -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\pages\reports\sales-reports\SalesReportsPage.tsx:173: COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\pages\reports\sales-reports\SalesReportsPage.tsx:241: -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\pages\reports\sales-reports\SalesReportsPage.tsx:243: COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\services\domains\approvals\ApprovalDecisionService.ts:167: `SELECT id, selling_price_m2 FROM products WHERE id = ?`,
+src\services\domains\approvals\ApprovalDecisionService.ts:172: `UPDATE products SET selling_price_m2 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+src\services\domains\config\SettingsService.ts:274: ws.quantity_m2 AS quantity,p.cost_price AS unitCost FROM warehouse_stock ws
+src\services\domains\dashboard\DashboardQueryScopeService_part02.ts:51: `SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price),0) FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id JOIN warehouses w ON 
+src\services\domains\dashboard\ExecutiveCommandService.ts:493: COALESCE((SELECT SUM(icl.quantity_remaining * icl.unit_cost)
+src\services\domains\dashboard\ExecutiveCommandService.ts:498: WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
+src\services\domains\dashboard\ExecutiveCommandService.ts:501: COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2), 0) AS saleValue
+src\services\domains\dashboard\ExecutiveCommandService.ts:590: COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS stockValue,
+src\services\domains\finance\AccountingService.ts:135: THEN (SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0)
+src\services\domains\finance\AccountingService.ts:223: COALESCE((SELECT SUM(icl.quantity_remaining * icl.unit_cost)
+src\services\domains\finance\AccountingService.ts:228: WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
+src\services\domains\finance\AccountingService.ts:230: SUM(ws.quantity_m2 * p.selling_price_m2) as valuationSale,
+src\services\domains\finance\AccountingService.ts:336: -SUM(sr.total_amount) + SUM(COALESCE(return_cost.total_cost, 0)) AS profit
+src\services\domains\finance\AccountingService.ts:340: SELECT return_id, SUM(quantity_m2 * unit_cost) AS total_cost
+src\services\domains\finance\AccountingService.ts:717: SUM(ws.quantity_m2 * p.cost_price) as costValue,
+src\services\domains\finance\AccountingService.ts:718: SUM(ws.quantity_m2 * p.selling_price_m2) as saleValue,
+src\services\domains\finance\AccountingService.ts:730: SUM(ws.quantity_m2 * p.cost_price) as totalCost,
+src\services\domains\finance\AccountingService.ts:731: SUM(ws.quantity_m2 * p.selling_price_m2) as totalSale
+src\services\domains\finance\AccountingService.ts:783: SUM(CASE WHEN sr.date BETWEEN ? AND ? THEN sri.quantity_m2 * sri.unit_cost ELSE 0 END) / 100.0 AS currentCost,
+src\services\domains\finance\AccountingService.ts:784: SUM(CASE WHEN sr.date BETWEEN ? AND ? THEN sri.quantity_m2 * sri.unit_cost ELSE 0 END) / 100.0 AS previousCost
+src\services\domains\finance\AccountingService.ts:873: SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) / 100.0 AS v
+src\services\domains\finance\AccountingService.ts:924: SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) / 100.0 AS v
+src\services\domains\finance\AccountingService.ts:975: SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) / 100.0 AS v
+src\services\domains\finance\FinancePeriodCloseService.ts:396: SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS count
+src\services\domains\finance\FinancePeriodCloseService.ts:416: SELECT COALESCE(SUM(total_cost), 0) / 100.0 AS count FROM sales_invoices
+src\services\domains\finance\FinancePeriodCloseService.ts:1097: SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS count
+src\services\domains\inventory\BatchService.ts:183: `SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox,
+src\services\domains\inventory\InventoryCostingService.ts:60: const stock = db.query<{ quantity: number; costPrice: number }>(`SELECT ws.quantity_m2 AS quantity,p.cost_price AS costPrice
+src\services\domains\inventory\InventoryCostingService.ts:73: const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost AS unitCost
+src\services\domains\inventory\InventoryCostingService.ts:106: const allocs = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
+src\services\domains\inventory\InventoryCostingService.ts:127: const rows = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
+src\services\domains\inventory\InventoryCostingService.ts:180: const layers = db.query<CostLayer>(`SELECT id,quantity_remaining AS quantityRemaining,unit_cost AS unitCost
+src\services\domains\inventory\InventoryIntelligenceService.ts:585: COALESCE(SUM(sii.total_cost), 0) / 100.0   AS cost
+src\services\domains\inventory\InventoryIntelligenceService.ts:602: ORDER BY ((COALESCE(SUM(sii.total_price), 0) - COALESCE(SUM(sii.total_cost), 0)) * 1.0
+src\services\domains\inventory\InventoryServicePart04.ts:45: SELECT reference_id, product_id, warehouse_id, quantity_m2, unit_cost,
+src\services\domains\inventory\InventoryServicePart06.ts:34: const prod = txDb.query<any>(`SELECT cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS base
+src\services\domains\inventory\InventoryServicePart07.ts:128: SELECT selling_price_m2 AS sellingPrice FROM products WHERE id = ?
+src\services\domains\inventory\InventoryServicePart08.ts:121: const prod = txDb.query<any>(`SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit A
+src\services\domains\inventory\InventoryServicePart13.ts:27: SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS costPriceValue,
+src\services\domains\inventory\InventoryServicePart13.ts:40: SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS totalFifoCost,
+src\services\domains\inventory\InventoryServicePart14.ts:249: txDb.run(`UPDATE stock_adjustment_items SET boxes_count = ?, unit_cost = ?, total_value = ? WHERE id = ?`, [boxesCount, unitCost, itemValue,
+src\services\domains\inventory\InventoryServicePart14.ts:269: txDb.run(`UPDATE stock_adjustments SET status = 'POSTED', total_value = ?, posted_by = ?, posted_at = CURRENT_TIMESTAMP WHERE id = ? AND sta
+src\services\domains\inventory\InventoryServicePart14.ts:457: SELECT id, name, cost_price AS costPrice, product_type AS productType,
+src\services\domains\inventory\InventoryValuationService_part02.ts:11: SELECT product_id, warehouse_id, SUM(quantity_remaining * unit_cost) AS value
+src\services\domains\inventory\InventoryValuationService_part02.ts:46: COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2),0) AS retailValue
+src\services\domains\inventory-count\countSessionService_part02.ts:28: const canonical = txDb.query<{ systemQuantityM2: number; unitCost: number }>('SELECT system_quantity_m2 AS systemQuantityM2, unit_cost AS un
+src\services\domains\manufacturing\ManufacturingService.ts:697: `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost
+src\services\domains\manufacturing\ManufacturingService.ts:719: `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost
+src\services\domains\manufacturing\ManufacturingService.ts:1024: `SELECT m.planned_qty AS plannedQty, pr.cost_price AS costPrice
+src\services\domains\manufacturing\ManufacturingService.ts:1083: `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost
+src\services\domains\operations\OperationsService.ts:291: ? `(SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) FROM inventory_cost_layers icl WHERE icl.warehouse_id = w.id AND icl.qua
+src\services\domains\operations\OperationsService.ts:292: : `(SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id WHERE ws.warehous
+src\services\domains\procurement\ProcurementServicePart03.ts:144: `SELECT name, cost_price, meters_per_box, product_type, base_unit, grade FROM products WHERE id = ?`,
+src\services\domains\procurement\ProcurementServicePart04.ts:135: `SELECT product_id, unit_cost, quantity_m2 FROM purchase_order_items WHERE purchase_order_id = ?`,
+src\services\domains\procurement\ProcurementServicePart05.ts:152: INSERT INTO supplier_claim_items (id, claim_id, product_id, product_name, defect_type, quantity_m2, unit_cost, total_amount, notes)
+src\services\domains\procurement\ProcurementServicePart08.ts:21: AVG(pii.unit_cost) / 100.0 AS avgPrice,
+src\services\domains\procurement\ProcurementServicePart08.ts:34: SELECT pii.unit_cost / 100.0 AS lastPrice FROM purchase_invoice_items pii
+src\services\domains\procurement\ProcurementSupplierRfqService.ts:224: INSERT INTO supplier_quotation_items (id, quotation_id, rfq_item_id, product_id, quantity_m2, unit_cost, total_cost, notes)
+src\services\domains\products\ProductService.ts:212: COALESCE(SUM(CASE WHEN p.is_active = 1 THEN COALESCE(st.qty, 0) * p.cost_price ELSE 0 END), 0) as totalStockValue,
+src\services\domains\purchases\PurchaseService.ts:126: SELECT pii.*, pii.quantity_m2 AS quantityM2, pii.unit_cost AS unitCost,
+src\services\domains\purchases\PurchaseService.ts:146: const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price FROM products WHERE id 
+src\services\domains\purchases\PurchaseService.ts:259: sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [round2(item.effectiveUnitCost), item.produc
+src\services\domains\purchases\PurchaseService.ts:285: const prevCost = Number(sqliteDb.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
+src\services\domains\purchases\PurchaseService.ts:295: sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
+src\services\domains\purchases\PurchaseService.ts:360: SELECT id, quantity_received AS quantityReceived, unit_cost AS unitCost,
+src\services\domains\reports\FinancialStatementsService.ts:265: SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value,
+src\services\domains\reports\FinancialStatementsService.ts:281: SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
+src\services\domains\reports\InventoryReportService.ts:51: COALESCE(SUM(pii.unit_cost * pii.quantity_m2), 0) / 100.0 AS total,
+src\services\domains\reports\ReportCenterService.ts:559: ? this.db.query<any>('SELECT id, name, sku, cost_price AS costPrice, selling_price_m2 AS sellingPrice FROM products WHERE id = ?', [productI
+src\services\domains\reports\ReportCenterService.ts:776: SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\services\domains\reports\ReportCenterService.ts:1253: AVG(pii.unit_cost) / 100.0 AS avgPrice,
+src\services\domains\reports\ReportCenterService.ts:1254: (SELECT pii2.unit_cost / 100.0 FROM purchase_invoice_items pii2
+src\services\domains\reports\ReportCenterService.ts:1589: SELECT p.name, p.selling_price_m2 AS price, p.cost_price AS cost
+src\services\domains\reports\ReportCenterService.ts:1591: WHERE p.is_active = 1 AND p.selling_price_m2 > 0
+src\services\domains\reports\ReportCenterService.ts:1643: SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\services\domains\reports\ReportCenterService.ts:1660: SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+src\services\domains\reports\ReportCenterService.ts:1666: SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS value
+src\services\domains\sales\invoiceCreation.ts:542: `SELECT min_selling_price_m2 AS minPrice FROM products WHERE id = ?`, [item.productId]
+src\services\domains\sales\invoiceQueries_part02.ts:31: COALESCE(SUM(si.total_cost) / 100.0, 0) AS totalCost,
+src\services\domains\sales\PricingService.ts:185: `INSERT INTO price_list_items (id, price_list_id, product_id, price_m2, price_box, min_quantity_m2)
+src\services\domains\sales\PricingService.ts:287: `SELECT o.id, o.product_id AS productId, p.name AS productName, o.price_m2 AS priceM2,
+src\services\domains\sales\PricingService.ts:309: `INSERT INTO customer_price_overrides (id, customer_id, product_id, price_m2, valid_from, valid_to, approved_by, notes)
+src\services\domains\sales\PricingService.ts:311: ON CONFLICT(customer_id, product_id) DO UPDATE SET price_m2 = excluded.price_m2,
+src\services\domains\sales\PricingService.ts:343: const product = this.db.query<any>(`SELECT selling_price_m2 AS basePrice, category_id AS categoryId, brand_id AS brandId FROM products WHERE
+src\services\domains\sales\PricingService.ts:349: `SELECT price_m2 AS price FROM customer_price_overrides
+src\services\domains\sales\PricingService.ts:366: `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
+src\services\domains\sales\PricingService.ts:380: `SELECT i.price_m2 AS price, i.price_box AS priceBox, pl.name AS listName
+src\services\domains\sales\QuotationService.ts:262: COALESCE(SUM(q.total_amount), 0) AS total_value,
+src\services\domains\sales\ReservationService.ts:162: const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [currentReservation.productId])[0];
+src\services\domains\sales\returns.ts:371: COALESCE(SUM(sri.quantity_m2 * sri.unit_cost) / 100.0, 0) AS cost
+src\services\domains\sales\returns.ts:640: `SELECT unit_cost / 100.0 AS unit_cost FROM sales_invoice_items WHERE id = ? AND invoice_id = ?`,
+src\services\domains\sales\SalesFinancialReconciliationService.ts:133: SELECT (COALESCE(SUM(si.total_cost), 0)
+src\services\domains\sales\SalesFinancialReconciliationService.ts:135: SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+src\services\domains\sales\SalesFinancialReconciliationService.ts:180: SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+src\services\domains\sales\SalesFinancialReconciliationService.ts:191: SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value

@@ -13,6 +13,9 @@ console.log('🔒 Starting JavaScript Obfuscation on Frontend bundle...');
 const files = fs.readdirSync(distDir, { withFileTypes: true })
   .filter((entry) => entry.isFile()
     && entry.name.endsWith('.js')
+    // vendor-* chunks are public third-party libraries: obfuscating them only
+    // inflates parse/compile time (xlsx grew ~7x) without protecting any IP.
+    && !entry.name.startsWith('vendor-')
     && !entry.name.includes('vendor-sqlite')
     && !entry.name.includes('sql-wasm')
     && !entry.name.startsWith('pdf.worker-'));

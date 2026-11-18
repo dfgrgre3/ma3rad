@@ -63,18 +63,20 @@ export const SupplierQuotationsPage: React.FC = () => {
 
   const loadData = useCallback(() => {
     setLoading(true);
-    try {
-      const data = service.getAllRfqs(search, statusFilter);
-      setRfqs(data);
-      if (selectedRfq) {
-        const refreshed = service.getRfqById(selectedRfq.id);
-        setSelectedRfq(refreshed);
+    (async () => {
+      try {
+        const data = await service.getAllRfqsAsync(search, statusFilter);
+        setRfqs(data);
+        if (selectedRfq) {
+          const refreshed = await service.getRfqByIdAsync(selectedRfq.id);
+          setSelectedRfq(refreshed);
+        }
+      } catch (e: any) {
+        toast.error(e?.message || 'تعذر تحميل طلبات عروض الأسعار.');
+      } finally {
+        setLoading(false);
       }
-    } catch (e: any) {
-      toast.error(e?.message || 'تعذر تحميل طلبات عروض الأسعار.');
-    } finally {
-      setLoading(false);
-    }
+    })();
   }, [service, setLoading, setRfqs, setSelectedRfq, toast, search, statusFilter, selectedRfq]);
 
   useEffect(() => {
@@ -82,20 +84,21 @@ export const SupplierQuotationsPage: React.FC = () => {
   }, [loadData]);
 
   const openRfqDetails = (id: string) => {
-    const details = service.getRfqById(id);
-    setSelectedRfq(details);
+    service.getRfqByIdAsync(id).then((details) => setSelectedRfq(details));
   };
 
   const handleOpenNewRfq = () => {
-    try {
-      setProducts(new ProductService().getAllProducts());
-      setRfqDueDate('');
-      setRfqNotes('');
-      setRfqLines([{ productId: '', quantityM2: 100, notes: '' }]);
-      setNewRfqModal(true);
-    } catch (e: any) {
-      toast.error(e?.message);
-    }
+    (async () => {
+      try {
+        setProducts(await new ProductService().getAllProductsAsync());
+        setRfqDueDate('');
+        setRfqNotes('');
+        setRfqLines([{ productId: '', quantityM2: 100, notes: '' }]);
+        setNewRfqModal(true);
+      } catch (e: any) {
+        toast.error(e?.message);
+      }
+    })();
   };
 
   const handleCreateRfq = (e: React.FormEvent) => {
@@ -120,9 +123,10 @@ export const SupplierQuotationsPage: React.FC = () => {
 
   const handleOpenAddQuote = () => {
     if (!selectedRfq) return;
-    try {
-      const sups = new SupplierService().getAllSuppliers();
-      setSuppliers(sups);
+    (async () => {
+      try {
+        const sups = await new SupplierService().getAllSuppliersAsync();
+        setSuppliers(sups);
       setSelectedSupplierId(sups[0]?.id || '');
       setQuoteNumber(`BID-${Date.now().toString().slice(-5)}`);
       setValidUntil('');
@@ -142,10 +146,11 @@ export const SupplierQuotationsPage: React.FC = () => {
           customUnit: it.customUnit,
         }))
       );
-      setQuoteModal(true);
-    } catch (e: any) {
-      toast.error(e?.message);
-    }
+        setQuoteModal(true);
+      } catch (e: any) {
+        toast.error(e?.message);
+      }
+    })();
   };
 
   const handleSubmitQuote = (e: React.FormEvent) => {

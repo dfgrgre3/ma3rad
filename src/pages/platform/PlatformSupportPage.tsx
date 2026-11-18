@@ -24,6 +24,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformSupportTicket,
@@ -41,8 +43,68 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+interface CentralTicketRow {
+  id: string;
+  tenantId: string;
+  tenantName?: string | null;
+  tenantCode?: string | null;
+  subject: string;
+  category: string;
+  priority: string;
+  status: string;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+  requesterPhone?: string | null;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  messageCount?: number;
+  lastMessageAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages?: any[];
+}
+
+function mapPriorityToCentral(p: string): string {
+  return p === 'MEDIUM' ? 'NORMAL' : p;
+}
+function mapPriorityFromCentral(p: string): PlatformSupportTicket['priority'] {
+  return (p === 'NORMAL' ? 'MEDIUM' : p) as PlatformSupportTicket['priority'];
+}
+
+function mapCentralTicket(row: CentralTicketRow): PlatformSupportTicket {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    tenantName: row.tenantName ?? null,
+    subject: row.subject,
+    category: row.category,
+    priority: mapPriorityFromCentral(row.priority),
+    status: row.status as PlatformSupportTicket['status'],
+    assignedTo: row.assigneeName ?? null,
+    remoteAccessRequested: false,
+    remoteAccessApproved: false,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapCentralMessage(row: any) {
+  return {
+    id: row.id,
+    ticketId: row.ticketId,
+    authorId: row.authorId ?? '',
+    authorType: (row.authorType === 'STAFF' ? 'STAFF' : 'TENANT') as 'STAFF' | 'TENANT',
+    authorName: row.authorName ?? '—',
+    authorRole: (row.authorType === 'STAFF' ? 'SUPPORT' : 'CUSTOMER') as 'CUSTOMER' | 'SUPPORT' | 'SYSTEM',
+    body: row.body,
+    isInternal: row.internal,
+    createdAt: row.createdAt,
+  };
+}
+
 export const PlatformSupportPage: React.FC = () => {
   const canManageSupport = canPlatform('support', 'platform.support.update');
+  const centralActive = getCentralDataSourceState().active;
   const [tickets, setTickets] = useState<PlatformSupportTicket[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -87,6 +149,21 @@ export const PlatformSupportPage: React.FC = () => {
   // Load list of tickets & tenants
   const loadTickets = useCallback(() => {
     setLoading(true);
+    if (centralActive) {
+      Promise.all([
+        centralPlatformClient.listSupportTickets({ q: search || undefined, status: statusFilter || undefined }),
+        centralPlatformClient.listTenants('', '', ''),
+      ])
+        .then(([rows, tens]) => {
+          setTickets((rows as CentralTicketRow[]).map(mapCentralTicket));
+          setTenants(tens as PlatformTenant[]);
+          setCannedReplies([]);
+          setError(null);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل تذاكر الدعم.'))
+        .finally(() => setLoading(false));
+      return;
+    }
     try {
       setTickets(platformAdminService.listSupportTickets(search, statusFilter));
       setTenants(platformAdminService.listTenants());
@@ -97,7 +174,7 @@ export const PlatformSupportPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, centralActive]);
 
   useEffect(() => {
     loadTickets();
@@ -106,6 +183,29 @@ export const PlatformSupportPage: React.FC = () => {
   // Load ticket details when selected
   const loadTicketDetails = useCallback((id: string) => {
     setDetailsLoading(true);
+    if (centralActive) {
+      centralPlatformClient.getSupportTicket(id)
+        .then((data: any) => {
+          const ticket = mapCentralTicket({ ...(data.ticket ?? data), messages: data.messages });
+          setDetails({
+            ticket,
+            messages: (Array.isArray(data.messages) ? data.messages : []).map(mapCentralMessage),
+            remoteSessions: [],
+            tenant: data.tenantName ? {
+              id: data.tenantId ?? ticket.tenantId,
+              code: data.tenantCode ?? '',
+              name: data.tenantName,
+              email: data.requesterEmail ?? null,
+              phone: data.requesterPhone ?? null,
+              status: 'ACTIVE',
+            } : null,
+            assignedStaff: null,
+          });
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.'))
+        .finally(() => setDetailsLoading(false));
+      return;
+    }
     try {
       const data = platformAdminService.getSupportTicketDetails(id);
       setDetails(data);
@@ -114,7 +214,7 @@ export const PlatformSupportPage: React.FC = () => {
     } finally {
       setDetailsLoading(false);
     }
-  }, []);
+  }, [centralActive]);
 
   useEffect(() => {
     if (selectedTicketId) {
@@ -137,6 +237,22 @@ export const PlatformSupportPage: React.FC = () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId || !messageBody.trim()) return;
     setSendingMessage(true);
+    if (centralActive) {
+      const attachmentNote = [attachmentUrl.trim(), attachmentName.trim()].filter(Boolean).join(' — ');
+      const body = attachmentNote ? `${messageBody.trim()}\n\n[مرفق] ${attachmentNote}` : messageBody.trim();
+      centralPlatformClient.addSupportTicketMessage(selectedTicketId, body, isInternal)
+        .then(() => {
+          setMessageBody('');
+          setAttachmentUrl('');
+          setAttachmentName('');
+          setIsInternal(false);
+          loadTicketDetails(selectedTicketId);
+          loadTickets();
+        })
+        .catch((err) => alert(err instanceof Error ? err.message : 'فشل إرسال الرسالة.'))
+        .finally(() => setSendingMessage(false));
+      return;
+    }
     try {
       platformAdminService.addSupportMessage({
         ticketId: selectedTicketId,
@@ -164,6 +280,12 @@ export const PlatformSupportPage: React.FC = () => {
   const handleStatusChange = (newStatus: PlatformSupportTicket['status']) => {
     if (!canManageSupport) return;
     if (!selectedTicketId) return;
+    if (centralActive) {
+      centralPlatformClient.updateSupportTicket(selectedTicketId, { status: newStatus })
+        .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
+        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.'));
+      return;
+    }
     try {
       platformAdminService.setSupportTicketStatus(selectedTicketId, newStatus);
       loadTicketDetails(selectedTicketId);
@@ -177,6 +299,12 @@ export const PlatformSupportPage: React.FC = () => {
   const handlePriorityChange = (priority: PlatformSupportTicket['priority']) => {
     if (!canManageSupport) return;
     if (!selectedTicketId) return;
+    if (centralActive) {
+      centralPlatformClient.updateSupportTicket(selectedTicketId, { priority: mapPriorityToCentral(priority) })
+        .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
+        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.'));
+      return;
+    }
     try {
       platformAdminService.setSupportTicketPriority(selectedTicketId, priority);
       loadTicketDetails(selectedTicketId);
@@ -190,6 +318,12 @@ export const PlatformSupportPage: React.FC = () => {
   const handleAssignChange = (assignee: string) => {
     if (!canManageSupport) return;
     if (!selectedTicketId) return;
+    if (centralActive) {
+      centralPlatformClient.updateSupportTicket(selectedTicketId, { assigneeName: assignee || null })
+        .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
+        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.'));
+      return;
+    }
     try {
       platformAdminService.assignSupportTicket(selectedTicketId, assignee || null);
       loadTicketDetails(selectedTicketId);
@@ -200,8 +334,13 @@ export const PlatformSupportPage: React.FC = () => {
   };
 
   // Remote Access Toggle / Approve
+  const centralOnlyLocal = (feature: string) => {
+    alert(`${feature} غير متاح في الوضع المركزي بعد — متاح على المصدر المحلي فقط.`);
+  };
+
   const handleToggleRemoteRequest = (requested: boolean) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (centralActive) { centralOnlyLocal('الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.requestRemoteAccess(selectedTicketId, requested, 60);
@@ -214,6 +353,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   const handleApproveRemoteAccess = (approved: boolean) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (centralActive) { centralOnlyLocal('الموافقة على الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.approveRemoteAccess(selectedTicketId, approved);
@@ -227,6 +367,7 @@ export const PlatformSupportPage: React.FC = () => {
   // Start Remote Session
   const handleStartRemoteSession = () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (centralActive) { centralOnlyLocal('جلسات الوصول عن بُعد'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.startRemoteSession({
@@ -245,6 +386,7 @@ export const PlatformSupportPage: React.FC = () => {
   // End Remote Session
   const handleEndRemoteSession = (sessionId: string) => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (centralActive) { centralOnlyLocal('جلسات الوصول عن بُعد'); return; }
     const summary = prompt('أدخل ملخص إنهاء جلسة الوصول عن بُعد:');
     try {
       platformAdminService.endRemoteSession(sessionId, summary || undefined);
@@ -259,6 +401,25 @@ export const PlatformSupportPage: React.FC = () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
     if (!newTenantId || !newSubject.trim()) {
       alert('يرجى اختيار العميل وكتابة عنوان التذكرة.');
+      return;
+    }
+    if (centralActive) {
+      centralPlatformClient.createSupportTicket({
+        tenantId: newTenantId,
+        subject: newSubject.trim(),
+        category: 'GENERAL',
+        priority: mapPriorityToCentral(newPriority),
+        body: newDescription.trim() || undefined,
+        assigneeName: newAssignedTo.trim() || undefined,
+      })
+        .then((created: any) => {
+          setIsNewTicketOpen(false);
+          setNewSubject('');
+          setNewDescription('');
+          loadTickets();
+          setSelectedTicketId(created?.id ?? created?.data?.id ?? null);
+        })
+        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.'));
       return;
     }
     try {
@@ -282,6 +443,7 @@ export const PlatformSupportPage: React.FC = () => {
   // Rate Ticket
   const handleRateTicket = () => {
     if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (centralActive) { centralOnlyLocal('تقييم التذاكر'); return; }
     if (!selectedTicketId) return;
     try {
       platformAdminService.rateSupportTicket(selectedTicketId, ratingStars, ratingFeedback);

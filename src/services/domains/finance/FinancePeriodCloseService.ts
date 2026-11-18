@@ -285,7 +285,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 1. Sales: posted invoices and returns -------------------------
     const salesMissing = query(`
-      SELECT i.id AS documentId, i.invoice_number AS reference, i.total_amount AS amount
+      SELECT i.id AS documentId, i.invoice_number AS reference, i.total_amount / 100.0 AS amount
       FROM sales_invoices i
       WHERE i.date >= ? AND i.date <= ? AND i.invoice_status = 'COMPLETED'
         AND NOT EXISTS (SELECT 1 FROM journal_entries e
@@ -293,7 +293,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       ORDER BY i.invoice_number LIMIT 25
     `, params);
     const returnsMissing = query(`
-      SELECT r.id AS documentId, r.return_number AS reference, r.total_amount AS amount
+      SELECT r.id AS documentId, r.return_number AS reference, r.total_amount / 100.0 AS amount
       FROM sales_returns r
       WHERE r.date >= ? AND r.date <= ?
         AND NOT EXISTS (SELECT 1 FROM journal_entries e
@@ -317,7 +317,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       ORDER BY i.invoice_number LIMIT 25
     `, params);
     const purchaseReturnsMissing = query(`
-      SELECT r.id AS documentId, r.return_number AS reference, r.total_amount AS amount
+      SELECT r.id AS documentId, r.return_number AS reference, r.total_amount / 100.0 AS amount
       FROM purchase_returns r
       WHERE r.date >= ? AND r.date <= ?
         AND NOT EXISTS (SELECT 1 FROM journal_entries e
@@ -340,10 +340,10 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       ORDER BY cs.shift_number LIMIT 25
     `, [period.endDate, period.startDate]);
     const cashDifferences = query(`
-      SELECT cs.id AS documentId, cs.shift_number AS reference, cs.cash_difference AS amount
+      SELECT cs.id AS documentId, cs.shift_number AS reference, cs.cash_difference / 100.0 AS amount
       FROM cash_shifts cs
       WHERE date(cs.closed_at) >= date(?) AND date(cs.closed_at) <= date(?)
-        AND ABS(COALESCE(cs.cash_difference, 0)) > 0.009
+        AND ABS(COALESCE(cs.cash_difference, 0)) > 0
       ORDER BY ABS(cs.cash_difference) DESC LIMIT 25
     `, params);
     const treasuryIssues = [
@@ -393,11 +393,11 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 7. Inventory ---------------------------------------------------
     const stockValue = Number(query(`
-      SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS count
+      SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) / 100.0 AS count
       FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
     `)[0]?.count || 0);
     const inventoryGl = Number(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE a.code = '1104' AND e.is_posted = 1 AND e.date <= ?
@@ -413,11 +413,11 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 8. Cost of goods sold -----------------------------------------
     const invoiceCost = Number(query(`
-      SELECT COALESCE(SUM(total_cost), 0) AS count FROM sales_invoices
+      SELECT COALESCE(SUM(total_cost), 0) / 100.0 AS count FROM sales_invoices
       WHERE date >= ? AND date <= ? AND invoice_status = 'COMPLETED'
     `, params)[0]?.count || 0);
     const cogsGl = Number(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE a.code = '5101' AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
@@ -468,7 +468,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 11. Expenses ---------------------------------------------------
     const expenseIssues = query(`
-      SELECT x.id AS documentId, COALESCE(x.description, x.category) AS reference, x.amount AS amount
+      SELECT x.id AS documentId, COALESCE(x.description, x.category) AS reference, x.amount / 100.0 AS amount
       FROM expenses x
       WHERE x.date >= ? AND x.date <= ?
         AND NOT EXISTS (SELECT 1 FROM journal_entries j
@@ -486,15 +486,15 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 12. Taxes ------------------------------------------------------
     const outputTax = Number(query(`
-      SELECT COALESCE(SUM(tax_amount), 0) AS count FROM sales_invoices
+      SELECT COALESCE(SUM(tax_amount), 0) / 100.0 AS count FROM sales_invoices
       WHERE date >= ? AND date <= ? AND invoice_status = 'COMPLETED'
     `, params)[0]?.count || 0);
     const inputTax = Number(query(`
-      SELECT COALESCE(SUM(tax_amount), 0) AS count FROM purchase_invoices
+      SELECT COALESCE(SUM(tax_amount), 0) / 100.0 AS count FROM purchase_invoices
       WHERE date >= ? AND date <= ?
     `, params)[0]?.count || 0);
     const taxGl = Number(query(`
-      SELECT COALESCE(SUM(l.credit - l.debit), 0) AS count
+      SELECT COALESCE(SUM(l.credit - l.debit), 0) / 100.0 AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE a.code = '2102' AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
@@ -547,7 +547,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     // 14. Suspense / intermediate accounts --------------------------
     const suspense = query(`
-      SELECT a.code AS reference, a.name AS name, ROUND(SUM(l.debit - l.credit), 2) AS amount
+      SELECT a.code AS reference, a.name AS name, ROUND(SUM(l.debit - l.credit), 2) / 100.0 AS amount
       FROM chart_of_accounts a
       JOIN journal_entry_lines l ON l.account_id = a.id
       JOIN journal_entries e ON e.id = l.entry_id
@@ -634,8 +634,8 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
           ORDER BY period_number DESC LIMIT 1
         `, [period.fiscalYearId, period.endDate])[0]?.id;
         const manualMatch = query(`
-          SELECT verified_subledger_balance AS verifiedSubledgerBalance,
-                 control_balance AS controlBalance,
+          SELECT verified_subledger_balance / 100.0 AS verifiedSubledgerBalance,
+                 control_balance / 100.0 AS controlBalance,
                  evidence_reference AS evidenceReference,
                  created_at AS createdAt
           FROM finance_subledger_manual_reconciliations
@@ -643,7 +643,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
           ORDER BY created_at DESC LIMIT 1
         `, [manualPeriodId, companyId, definition.partyType])[0];
         const controlBalance = Number(query(`
-          SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+          SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS balance
           FROM journal_entry_lines l
           JOIN journal_entries e ON e.id = l.entry_id
           JOIN chart_of_accounts a ON a.id = l.account_id
@@ -678,11 +678,11 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
         }
       } else {
         const baseline = query(`
-          SELECT balance FROM finance_subledger_control_baselines
+          SELECT balance / 100.0 AS balance FROM finance_subledger_control_baselines
           WHERE company_id = ? AND account_code = ?
         `, [companyId, definition.accountCode])[0];
         const baselineControl = Number(query(`
-          SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+          SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS balance
           FROM journal_entry_lines l
           JOIN journal_entries e ON e.id = l.entry_id
           JOIN chart_of_accounts a ON a.id = l.account_id
@@ -712,10 +712,10 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
         const partyBalance = Number(query(`
           SELECT COALESCE((
-                   SELECT SUM(balance) FROM finance_subledger_party_baselines
+                   SELECT SUM(balance) / 100.0 FROM finance_subledger_party_baselines
                    WHERE company_id = ? AND party_type = ?
                  ), 0) + COALESCE((
-                   SELECT SUM(amount) FROM finance_subledger_events
+                   SELECT SUM(amount) / 100.0 FROM finance_subledger_events
                    WHERE company_id = ? AND party_type = ? AND account_code = ?
                      AND effective_date <= ?
                  ), 0) AS balance
@@ -724,7 +724,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
           definition.accountCode, period.endDate,
         ])[0]?.balance || 0);
         const controlBalance = Number(query(`
-          SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+          SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS balance
           FROM journal_entry_lines l
           JOIN journal_entries e ON e.id = l.entry_id
           JOIN chart_of_accounts a ON a.id = l.account_id
@@ -745,7 +745,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
         const unassigned = query(`
           SELECT e.id AS documentId, e.entry_number AS reference,
-                 ROUND(SUM(l.debit - l.credit), 2) AS amount
+                 ROUND(SUM(l.debit - l.credit), 2) / 100.0 AS amount
           FROM journal_entries e
           JOIN journal_entry_lines l ON l.entry_id = e.id
           JOIN chart_of_accounts a ON a.id = l.account_id
@@ -811,7 +811,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const accountCode = partyType === 'CUSTOMER' ? '1103' : '2101';
     const companyId = period.companyId || 'cmp_main';
     const rawControlBalance = Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -828,7 +828,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       INSERT INTO finance_subledger_manual_reconciliations
         (id, period_id, company_id, party_type, verified_subledger_balance, control_balance,
          evidence_reference, notes, created_by, created_by_name, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?)
     `, [
       `fsmr_${uuidv4().slice(0, 12)}`, periodId, companyId, partyType,
       verifiedBalance, controlBalance, evidenceReference.trim(), notes?.trim() || null,
@@ -1030,9 +1030,9 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
   protected buildFinancialSnapshot(period: PeriodRow, query: QueryFn): PeriodCloseReportPayload {
     const trialBalance = query(`
       SELECT a.code AS code, a.name AS name, a.type AS type,
-             ROUND(COALESCE(SUM(l.debit), 0), 2) AS debit,
-             ROUND(COALESCE(SUM(l.credit), 0), 2) AS credit,
-             ROUND(COALESCE(SUM(l.debit - l.credit), 0), 2) AS balance
+             ROUND(COALESCE(SUM(l.debit), 0), 2) / 100.0 AS debit,
+             ROUND(COALESCE(SUM(l.credit), 0), 2) / 100.0 AS credit,
+             ROUND(COALESCE(SUM(l.debit - l.credit), 0), 2) / 100.0 AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -1060,32 +1060,32 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       .reduce((sum, row) => sum + row.balance, 0));
 
     const assetBalance = round2(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date <= ? AND a.type = 'ASSET'
     `, [period.endDate])[0]?.count || 0);
     const liabilityBalance = round2(-Number(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date <= ? AND a.type = 'LIABILITY'
     `, [period.endDate])[0]?.count || 0));
     const equityBalance = round2(-Number(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date <= ? AND a.type = 'EQUITY'
     `, [period.endDate])[0]?.count || 0));
 
     const cashOpening = round2(query(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS count
+      SELECT COALESCE(SUM((l.debit - l.credit) / 100.0), 0) AS count
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date < ? AND a.code IN ('1101', '1102', '1105')
     `, [period.startDate])[0]?.count || 0);
     const cashMovement = query(`
-      SELECT COALESCE(SUM(l.debit), 0) AS inflow, COALESCE(SUM(l.credit), 0) AS outflow
+      SELECT COALESCE(SUM(l.debit), 0) / 100.0 AS inflow, COALESCE(SUM(l.credit), 0) / 100.0 AS outflow
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND a.code IN ('1101', '1102', '1105')
@@ -1094,7 +1094,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const outflow = round2(Number(cashMovement.outflow || 0));
 
     const inventoryValuation = round2(query(`
-      SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS count
+      SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) / 100.0 AS count
       FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
     `)[0]?.count || 0);
 
@@ -1106,9 +1106,9 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
                WHEN julianday(?) - julianday(COALESCE(due_date, date)) <= 90 THEN '61-90 يوم'
                ELSE 'أكثر من 90 يوم'
              END AS bucket,
-             ROUND(SUM(remaining_amount), 2) AS amount
+             SUM(remaining_amount) / 100.0 AS amount
       FROM sales_invoices
-      WHERE remaining_amount > 0.009 AND date <= ?
+      WHERE remaining_amount > 1 AND date <= ?
       GROUP BY bucket
     `, [period.endDate, period.endDate, period.endDate, period.endDate, period.endDate]).map((row) => ({
       bucket: row.bucket,
@@ -1153,8 +1153,8 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (coverageStartDate && period.startDate < coverageStartDate) {
       const manualRows = tx.query(`
         SELECT party_type AS partyType,
-               verified_subledger_balance AS verifiedSubledgerBalance,
-               control_balance AS controlBalance,
+               verified_subledger_balance / 100.0 AS verifiedSubledgerBalance,
+               control_balance / 100.0 AS controlBalance,
                evidence_reference AS evidenceReference,
                notes, created_by_name AS createdByName, created_at AS createdAt
         FROM finance_subledger_manual_reconciliations
@@ -1190,7 +1190,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       )
       SELECT p.party_type AS partyType, p.party_id AS partyId,
              CASE p.party_type WHEN 'CUSTOMER' THEN '1103' ELSE '2101' END AS controlAccountCode,
-             ROUND(COALESCE(b.balance, 0) + COALESCE(SUM(e.amount), 0), 2) AS balance
+             ROUND((COALESCE(b.balance, 0) + COALESCE(SUM(e.amount), 0)) / 100.0, 2) AS balance
       FROM parties p
       LEFT JOIN finance_subledger_party_baselines b
         ON b.company_id = ? AND b.party_type = p.party_type AND b.party_id = p.party_id
@@ -1218,7 +1218,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       `, [
         `psl_${uuidv4().slice(0, 12)}`, batchId, period.id, companyId,
         balance.partyType, balance.partyId, balance.controlAccountCode,
-        balance.balance, period.endDate, capturedAt,
+        Math.round(balance.balance * 100), period.endDate, capturedAt,
       ]);
     }
     return { balances, coverageStartDate, manualMatches: [] };
@@ -1447,7 +1447,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     this.requireView();
     return this.db.query<any>(`
       SELECT id, fiscal_period_id AS fiscalPeriodId, adjustment_type AS adjustmentType,
-             description, amount, debit_account_code AS debitAccountCode,
+             description, amount / 100.0 AS amount, debit_account_code AS debitAccountCode,
              credit_account_code AS creditAccountCode, status,
              journal_entry_id AS journalEntryId, created_by AS createdBy,
              created_at AS createdAt, approved_by AS approvedBy, approved_at AS approvedAt,
@@ -1474,7 +1474,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
         INSERT INTO period_adjustments
           (id, fiscal_period_id, adjustment_type, description, amount,
            debit_account_code, credit_account_code, status, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)
+        VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, 'DRAFT', ?, ?)
       `, [
         id, input.fiscalPeriodId, input.adjustmentType, input.description.trim(),
         round2(input.amount), input.debitAccountCode, input.creditAccountCode, actor.id,
@@ -1555,8 +1555,8 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
         referenceId: adjustmentId,
         createdBy: actor.id,
         lines: [
-          { accountCode: adjustment.debitAccountCode, debit: Number(adjustment.amount), credit: 0, description: adjustment.description },
-          { accountCode: adjustment.creditAccountCode, debit: 0, credit: Number(adjustment.amount), description: adjustment.description },
+          { accountCode: adjustment.debitAccountCode, debit: Number(adjustment.amount) / 100, credit: 0, description: adjustment.description },
+          { accountCode: adjustment.creditAccountCode, debit: 0, credit: Number(adjustment.amount) / 100, description: adjustment.description },
         ],
       });
       tx.run(`
@@ -1631,8 +1631,8 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       unbalanced.length ? 'FAIL' : 'PASS', unbalanced, '/finance/journal'));
 
     const trial = query(`
-      SELECT ROUND(COALESCE(SUM(l.debit), 0), 2) AS debit,
-             ROUND(COALESCE(SUM(l.credit), 0), 2) AS credit
+      SELECT ROUND(COALESCE(SUM(l.debit), 0), 2) / 100.0 AS debit,
+             ROUND(COALESCE(SUM(l.credit), 0), 2) / 100.0 AS credit
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
     `, params)[0] || { debit: 0, credit: 0 };
@@ -1662,7 +1662,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       bankIssues.length ? 'WARNING' : 'PASS', bankIssues, '/finance/bank-reconciliation'));
 
     const suspense = query(`
-      SELECT a.code AS reference, a.name AS name, ROUND(SUM(l.debit - l.credit), 2) AS amount
+      SELECT a.code AS reference, a.name AS name, ROUND(SUM(l.debit - l.credit), 2) / 100.0 AS amount
       FROM chart_of_accounts a
       JOIN journal_entry_lines l ON l.account_id = a.id
       JOIN journal_entries e ON e.id = l.entry_id
@@ -1690,7 +1690,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     return this.db.query<any>(`
       SELECT id, fiscal_year_id AS fiscalYearId, source_year_id AS sourceYearId,
              account_code AS accountCode, account_name AS accountName,
-             account_type AS accountType, debit, credit, balance
+             account_type AS accountType, debit / 100.0 AS debit, credit / 100.0 AS credit, balance / 100.0 AS balance
       FROM fiscal_year_openings
       WHERE fiscal_year_id = ?
       ORDER BY account_code
@@ -1729,9 +1729,9 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
 
     const rows = this.db.query<any>(`
       SELECT a.code AS accountCode, a.name AS accountName, a.type AS accountType,
-             ROUND(COALESCE(SUM(l.debit), 0), 2) AS debit,
-             ROUND(COALESCE(SUM(l.credit), 0), 2) AS credit,
-             ROUND(COALESCE(SUM(l.debit - l.credit), 0), 2) AS balance
+             ROUND(COALESCE(SUM(l.debit), 0), 2) / 100.0 AS debit,
+             ROUND(COALESCE(SUM(l.credit), 0), 2) / 100.0 AS credit,
+             ROUND(COALESCE(SUM(l.debit - l.credit), 0), 2) / 100.0 AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -1753,7 +1753,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
           INSERT INTO fiscal_year_openings
             (id, fiscal_year_id, source_year_id, company_id, account_code, account_name,
              account_type, debit, credit, balance, created_by, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?)
         `, [
           `fyo_${uuidv4().slice(0, 8)}`, fiscalYearId, source?.id || null,
           fy.companyId || 'cmp_main', row.accountCode, row.accountName, row.accountType,
@@ -1851,7 +1851,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       closingEntryId,
       trialBalance: tx.query(`
         SELECT a.code AS code, a.name AS name, a.type AS type,
-               ROUND(SUM(l.debit - l.credit), 2) AS balance
+               ROUND(SUM(l.debit - l.credit), 2) / 100.0 AS balance
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
@@ -1898,15 +1898,15 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     if (existing > 0) return;
     const rows = tx.query(`
       SELECT a.code AS accountCode, a.name AS accountName, a.type AS accountType,
-             ROUND(COALESCE(SUM(l.debit), 0), 2) AS debit,
-             ROUND(COALESCE(SUM(l.credit), 0), 2) AS credit,
-             ROUND(COALESCE(SUM(l.debit - l.credit), 0), 2) AS balance
+             ROUND(COALESCE(SUM(l.debit), 0) / 100.0, 2) AS debit,
+             ROUND(COALESCE(SUM(l.credit), 0) / 100.0, 2) AS credit,
+             ROUND(COALESCE(SUM(l.debit - l.credit), 0) / 100.0, 2) AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date <= ? AND a.type IN ('ASSET', 'LIABILITY', 'EQUITY')
       GROUP BY a.code, a.name, a.type
-      HAVING ABS(COALESCE(SUM(l.debit - l.credit), 0)) > 0.009
+      HAVING ABS(COALESCE(SUM(l.debit - l.credit), 0)) > 0
       ORDER BY a.code
     `, [fy.endDate]);
     const now = new Date().toISOString();
@@ -1915,7 +1915,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
         INSERT INTO fiscal_year_openings
           (id, fiscal_year_id, source_year_id, company_id, account_code, account_name,
            account_type, debit, credit, balance, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?)
       `, [
         `fyo_${uuidv4().slice(0, 8)}`, next.id, fy.id, next.companyId || fy.companyId || 'cmp_main',
         row.accountCode, row.accountName, row.accountType,

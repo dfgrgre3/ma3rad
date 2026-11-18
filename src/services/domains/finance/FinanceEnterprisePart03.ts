@@ -57,7 +57,7 @@ public saveBankAccount(input: Partial<BankAccount> & { accountName: string; bank
       const id = `bank_${uuidv4().substring(0, 8)}`;
       this.db.run(`
         INSERT INTO bank_accounts (id, account_name, bank_name, account_number, iban, swift_code, currency, opening_balance, current_balance, gl_account_id, branch_id, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)
       `, [
         id, input.accountName.trim(), input.bankName.trim(), input.accountNumber.trim(),
         input.iban?.trim() || null, input.swiftCode?.trim() || null, input.currency || 'EGP',
@@ -86,7 +86,7 @@ public getUnreconciledBankTransactions(bankAccountId: string, asOfDate: string):
     const rows = this.db.query<any>(`
       SELECT l.id as journalLineId, e.entry_number as reference, e.date,
              COALESCE(l.description, e.description) as description,
-             l.debit, l.credit
+             l.debit / 100.0 AS debit, l.credit / 100.0 AS credit
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date <= ?

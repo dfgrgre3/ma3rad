@@ -5,9 +5,10 @@ import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
+import { deletePlatformStaffTwoFactorRow, platformStaffTwoFactorAuth } from '../auth/twoFactorAuth';
 import { PlatformAuthorizationService, PLATFORM_ROLE_DEFINITIONS, PLATFORM_PERMISSION_SECTIONS_FOR_UI as PLATFORM_PERMISSION_SECTIONS } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformStaff,
   PlatformStaffInput,
   PlatformStaffRole,
@@ -183,11 +184,17 @@ export class PlatformStaffService {
 
     PlatformStaffService.assertOwnerRoleGrant(input.role, { creating: true });
 
-    const username = input.username?.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
+    let username = input.username?.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
+    if (!username && input.email) {
+      username = input.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
+    }
     if (!username) throw new Error('اسم المستخدم مطلوب.');
 
     if (this.db.query('SELECT 1 FROM platform_staff WHERE username = ?', [username]).length) {
-      throw new Error('اسم المستخدم مستخدم بالفعل.');
+      const base = username;
+      let index = 2;
+      while (this.db.query('SELECT 1 FROM platform_staff WHERE username = ?', [`${base}${index}`]).length) index++;
+      username = `${base}${index}`.slice(0, 24);
     }
 
     if (input.email && this.db.query('SELECT 1 FROM platform_staff WHERE email = ?', [input.email.trim()]).length) {
@@ -202,8 +209,8 @@ export class PlatformStaffService {
 
     this.db.run(
       `INSERT INTO platform_staff
-        (id, username, full_name, email, phone, role, password_hash, is_active, mfa_enabled, mfa_enforcement, totp_secret, backup_codes, data_scope, data_scope_tenant_ids, last_login_at, failed_login_attempts, locked_until, deleted_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 'optional', NULL, NULL, 'ALL', NULL, NULL, 0, NULL, NULL, ?, ?)`,
+        (id, username, full_name, email, phone, role, password_hash, is_active, must_change_password, mfa_enabled, mfa_enforcement, totp_secret, backup_codes, data_scope, data_scope_tenant_ids, last_login_at, failed_login_attempts, locked_until, deleted_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 'optional', NULL, NULL, 'ALL', NULL, NULL, 0, NULL, NULL, ?, ?)`,
       [id, username, input.fullName.trim(), input.email?.trim() ?? null, input.phone?.trim() ?? null, input.role, passwordHash, now, now]
     );
 
@@ -219,6 +226,11 @@ export class PlatformStaffService {
 
     const existing = this.getPlatformStaff(id);
     if (!existing) throw new Error('الموظف غير موجود.');
+
+    const actor = AuthService.getCurrentUser();
+    if (existing.role === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('حساب مالك المنصة لا يمكن تعديله إلا من قبل مالك المنصة.');
+    }
 
     PlatformStaffService.assertOwnerRoleGrant(input.role ?? existing.role, { creating: false });
 
@@ -285,7 +297,7 @@ export class PlatformStaffService {
     if (existing.role === 'SUPER_ADMIN') throw new Error('لا يمكن حذف حساب مالك المنصة.');
 
     const now = nowIso();
-    this.db.run('UPDATE platform_staff SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+    this.db.run('UPDATE platform_staff SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
 
     this.audit('حذف موظف منصة', 'STAFF', id, {});
   }
@@ -293,9 +305,8 @@ export class PlatformStaffService {
   // ─── Staff Invites ────────────────────────────────────────────────────────────
 
   public createStaffInvite(input: PlatformStaffInviteInput): PlatformStaffInviteCreated {
-    PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.invite');
-
     PlatformStaffService.assertOwnerRoleGrant(input.role, { creating: true });
+    PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.invite');
 
     const token = randomToken(32, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
     const expiresAt = addDays(new Date(), 7).toISOString();
@@ -305,9 +316,9 @@ export class PlatformStaffService {
 
     this.db.run(
       `INSERT INTO platform_staff_invites
-        (id, token, email, full_name, role, invited_by, status, expires_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
-      [id, token, input.email.trim().toLowerCase(), input.fullName.trim(), input.role, AuthService.getCurrentUser()!.id, expiresAt, now, now]
+        (id, token, token_hash, email, full_name, role, invited_by, status, expires_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+      [id, token, crypto.createHash('sha256').update(token).digest('hex'), input.email.trim().toLowerCase(), input.fullName.trim(), input.role, AuthService.getCurrentUser()!.id, expiresAt, now, now]
     );
 
     this.audit('إنشاء دعوة موظف', 'STAFF_INVITE', id, { email: input.email, role: input.role });
@@ -323,7 +334,7 @@ export class PlatformStaffService {
   public listStaffInvites(status: 'all' | PlatformStaffInviteStatus = 'all'): PlatformStaffInvite[] {
     PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.view');
 
-    const where = status !== 'all' ? 'WHERE status = ?' : '';
+    const where = status !== 'all' ? 'WHERE UPPER(status) = UPPER(?)' : '';
     const params = status !== 'all' ? [status] : [];
 
     const rows = this.db.query<any>(`SELECT * FROM platform_staff_invites ${where} ORDER BY created_at DESC`, params);
@@ -347,8 +358,13 @@ export class PlatformStaffService {
   }
 
   public acceptStaffInvite(token: string, fullName: string, password: string): PlatformStaff {
-    const invite = this.getStaffInviteByToken(token);
-    if (!invite) throw new Error('الدعوة غير موجودة.');
+    let invite: PlatformStaffInvite;
+    try {
+      invite = this.getStaffInviteByToken(token);
+    } catch {
+      throw new Error('رابط الدعوة غير صالح.');
+    }
+    if (invite.status === 'ACCEPTED') throw new Error('تم استخدام هذه الدعوة من قبل.');
     if (invite.status !== 'PENDING') throw new Error('الدعوة لم تعد صالحة.');
     if (new Date(invite.expiresAt) < new Date()) throw new Error('الدعوة منتهية الصلاحية.');
 
@@ -414,7 +430,7 @@ export class PlatformStaffService {
     if (!existing) throw new Error('الموظف غير موجود.');
 
     const now = nowIso();
-    this.db.run('UPDATE platform_staff SET force_password_change = ?, updated_at = ? WHERE id = ?', [flag ? 1 : 0, now, id]);
+    this.db.run('UPDATE platform_staff SET must_change_password = ?, updated_at = ? WHERE id = ?', [flag ? 1 : 0, now, id]);
 
     this.audit(flag ? 'إجبار تغيير كلمة المرور' : 'إلغاء إجبار تغيير كلمة المرور', 'STAFF', id, {});
   }
@@ -425,7 +441,8 @@ export class PlatformStaffService {
       throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
     }
 
-    const staff = this.getPlatformStaff(user.id);
+    const row = this.db.query<any>('SELECT * FROM platform_staff WHERE id = ?', [user.id])[0];
+    const staff = row ? this.mapStaff(row) : null;
     if (!staff) throw new Error('حساب الموظف غير موجود.');
 
     if (!bcrypt.compareSync(currentPassword, staff.passwordHash || '')) {
@@ -437,7 +454,7 @@ export class PlatformStaffService {
     const passwordHash = bcrypt.hashSync(newPassword, 10);
     const now = nowIso();
 
-    this.db.run('UPDATE platform_staff SET password_hash = ?, force_password_change = 0, updated_at = ? WHERE id = ?', [passwordHash, now, staff.id]);
+    this.db.run('UPDATE platform_staff SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?', [passwordHash, now, staff.id]);
 
     this.audit('تغيير كلمة مرور ذاتية', 'STAFF', staff.id, {});
   }
@@ -540,27 +557,15 @@ export class PlatformStaffService {
     return { total, enabled, requiredButDisabled, byRole };
   }
 
-  public startMfaEnrollmentForStaffSelf(): { secret: string; uri: string; backupCodes: string[] } {
+  public async startMfaEnrollmentForStaffSelf(): Promise<{ secret: string; uri: string; backupCodes: string[] }> {
     const user = AuthService.getCurrentUser();
     if (!user || !PLATFORM_ROLE_CODES_SET.has(String(user.role))) {
       throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
     }
 
-    const secret = randomToken(32, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
-    const backupCodes = Array.from({ length: 10 }, () => randomToken(8, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'));
-
-    const now = nowIso();
-    this.db.run(
-      'UPDATE platform_staff SET totp_secret = ?, backup_codes = ?, updated_at = ? WHERE id = ?',
-      [secret, JSON.stringify(backupCodes), now, user.id]
-    );
-
-    const issuer = 'Ceramisys Platform';
-    const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.username)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
-
+    const setup = await platformStaffTwoFactorAuth.setup2FA(user.id, 'TOTP');
     this.audit('بدء تسجيل MFA', 'STAFF_MFA', user.id, {});
-
-    return { secret, uri, backupCodes };
+    return { secret: setup.secret, uri: setup.qrCodeImage ?? '', backupCodes: setup.recoveryCodes };
   }
 
   public async confirmMfaForStaffSelf(code: string): Promise<void> {
@@ -569,16 +574,7 @@ export class PlatformStaffService {
       throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
     }
 
-    const staff = this.getPlatformStaff(user.id);
-    if (!staff || !staff.totpSecret) throw new Error('لا يوجد تسجيل MFA معلق.');
-
-    const expected = this.generateTotp(staff.totpSecret);
-    if (code !== expected) {
-      throw new Error('رمز التحقق غير صحيح.');
-    }
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_staff SET mfa_enabled = 1, updated_at = ? WHERE id = ?', [now, user.id]);
+    await platformStaffTwoFactorAuth.enable2FA(user.id, 'TOTP', code);
 
     this.audit('تأكيد MFA', 'STAFF_MFA', user.id, {});
   }
@@ -589,25 +585,9 @@ export class PlatformStaffService {
       throw new Error('هذه العملية متاحة لموظفي المنصة فقط.');
     }
 
-    const staff = this.getPlatformStaff(user.id);
-    if (!staff || !staff.mfaEnabled) throw new Error('MFA غير مفعل.')
+    if (!platformStaffTwoFactorAuth.isEnabled(user.id)) throw new Error('MFA غير مفعل.');
 
-    let valid = false;
-    if (staff.totpSecret) {
-      const expected = this.generateTotp(staff.totpSecret);
-      if (code === expected) valid = true;
-    }
-    if (!valid && staff.backupCodes) {
-      const codes = staff.backupCodes;
-      const index = codes.indexOf(code);
-      if (index !== -1) {
-        codes.splice(index, 1);
-        valid = true;
-        this.db.run('UPDATE platform_staff SET backup_codes = ? WHERE id = ?', [JSON.stringify(codes), user.id]);
-      }
-    }
-
-    if (!valid) throw new Error('رمز التحقق غير صحيح.');
+    await platformStaffTwoFactorAuth.disable2FA(user.id, code);
 
     const now = nowIso();
     this.db.run('UPDATE platform_staff SET mfa_enabled = 0, totp_secret = NULL, backup_codes = NULL, updated_at = ? WHERE id = ?', [now, user.id]);
@@ -622,6 +602,7 @@ export class PlatformStaffService {
     if (!staff) throw new Error('الموظف غير موجود.')
 
     const now = nowIso();
+    deletePlatformStaffTwoFactorRow(id);
     this.db.run('UPDATE platform_staff SET mfa_enabled = 0, totp_secret = NULL, backup_codes = NULL, updated_at = ? WHERE id = ?', [now, id]);
 
     this.audit('إعادة تعيين MFA موظف', 'STAFF_MFA', id, {});
@@ -691,12 +672,16 @@ export class PlatformStaffService {
   }): void {
     const id = `sl_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
+    const staffEmail = input.staffId
+      ? this.db.query<any>('SELECT email FROM platform_staff WHERE id = ?', [input.staffId])[0]?.email ?? null
+      : null;
 
     this.db.run(
       `INSERT INTO platform_staff_logins
-        (id, staff_id, username, ip_address, user_agent, success, failure_reason, mfa_used, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, input.staffId ?? null, input.username ?? null, input.ipAddress ?? null, input.userAgent ?? null, input.success ? 1 : 0, input.failureReason ?? null, input.mfaUsed ? 1 : 0, now]
+        (id, staff_id, email, username, ip_address, user_agent, status, success, mfa_used, failure_reason, attempted_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.staffId ?? null, staffEmail ?? input.username ?? '', input.username ?? null, input.ipAddress ?? null, input.userAgent ?? null,
+       input.success ? 'SUCCESS' : 'FAILED', input.success ? 1 : 0, input.mfaUsed ? 1 : 0, input.failureReason ?? null, now, now]
     );
 
     if (!input.success && input.staffId) {
@@ -883,17 +868,14 @@ export class PlatformStaffService {
   }
 
   public setRolePermissions(role: string, permissionCodes: string[]): void {
+    const actor = AuthService.getCurrentUser();
+    if (role === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('مصفوفة صلاحيات مالك المنصة لا يمكن تعديلها إلا من قبل مالك المنصة.');
+    }
+
     PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.permissions');
 
-    const now = nowIso();
-    const existing = this.db.query<any>('SELECT * FROM platform_role_permissions WHERE role = ?', [role])[0];
-
-    if (existing) {
-      this.db.run('UPDATE platform_role_permissions SET permission_codes = ?, updated_at = ? WHERE role = ?', [JSON.stringify(permissionCodes), now, role]);
-    } else {
-      const id = `rp_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-      this.db.run('INSERT INTO platform_role_permissions (id, role, permission_codes, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id, role, JSON.stringify(permissionCodes), now, now]);
-    }
+    PlatformAuthorizationService.setRolePermissions(role, permissionCodes);
 
     this.audit('تعيين صلاحيات دور', 'ROLE_PERMISSIONS', null, { role, count: permissionCodes.length });
   }
@@ -903,17 +885,27 @@ export class PlatformStaffService {
   public transferStaffPermissions(fromStaffId: string, toStaffId: string, note?: string): PlatformStaff {
     PlatformStaffService.requirePlatformAccess('staff', 'platform.staff.update');
 
+    if (String(fromStaffId) === String(toStaffId)) {
+      throw new Error('لا يمكن نقل الصلاحيات إلى نفس الموظف.');
+    }
+
     const fromStaff = this.getPlatformStaff(fromStaffId);
     if (!fromStaff) throw new Error('موظف المصدر غير موجود.')
 
     const toStaff = this.getPlatformStaff(toStaffId);
     if (!toStaff) throw new Error('موظف الهدف غير موجود.')
 
+    const actor = AuthService.getCurrentUser();
+    if (fromStaff.role === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
+      throw new Error('لا يمكن نقل صلاحيات حساب مالك المنصة إلا من قبل مالك المنصة.');
+    }
+
     const now = nowIso();
     this.db.run(
-      'UPDATE platform_staff SET data_scope = ?, data_scope_tenant_ids = ?, updated_at = ? WHERE id = ?',
-      [fromStaff.dataScope, fromStaff.dataScopeTenantIds, now, toStaffId]
+      'UPDATE platform_staff SET role = ?, data_scope = ?, data_scope_tenant_ids = ?, updated_at = ? WHERE id = ?',
+      [fromStaff.role, fromStaff.dataScope, fromStaff.dataScopeTenantIds ? JSON.stringify(fromStaff.dataScopeTenantIds) : null, now, toStaffId]
     );
+    this.db.run('DELETE FROM platform_staff_sessions WHERE staff_id = ?', [toStaffId]);
 
     this.audit('نقل صلاحيات موظف', 'STAFF', toStaffId, { fromStaffId, note });
 
@@ -977,6 +969,7 @@ export class PlatformStaffService {
       lastLoginAt: row.last_login_at ?? null,
       failedLoginAttempts: toNumber(row.failed_login_attempts, 0),
       lockedUntil: row.locked_until ?? null,
+      mustChangePassword: Boolean(row.must_change_password),
       deletedAt: row.deleted_at ?? null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
@@ -1038,7 +1031,7 @@ export class PlatformStaffService {
       email: row.email ?? null,
       ipAddress: row.ip_address ?? null,
       userAgent: row.user_agent ?? null,
-      status: row.success ? 'SUCCESS' : 'FAILED',
+      status: row.success !== undefined && row.success !== null ? (row.success ? 'SUCCESS' : 'FAILED') : (row.status ?? 'FAILED'),
       failureReason: row.failure_reason ?? null,
       mfaUsed: Boolean(row.mfa_used),
       attemptedAt: String(row.created_at),

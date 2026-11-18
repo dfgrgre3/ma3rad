@@ -320,11 +320,11 @@ export class ExecutiveCommandService {
 
     const invoiceRow = this.db.query<any>(
       `SELECT
-         COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS gross,
-         COALESCE(SUM(si.total_amount), 0) AS invoiceTotal,
-         COALESCE(SUM(si.gross_profit), 0) AS grossProfit,
-         COALESCE(SUM(si.paid_amount), 0) AS paid,
-         COALESCE(SUM(si.remaining_amount), 0) AS remaining,
+         COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS gross,
+         COALESCE(SUM(si.total_amount), 0) / 100.0 AS invoiceTotal,
+         COALESCE(SUM(si.gross_profit), 0) / 100.0 AS grossProfit,
+         COALESCE(SUM(si.paid_amount), 0) / 100.0 AS paid,
+         COALESCE(SUM(si.remaining_amount), 0) / 100.0 AS remaining,
          COUNT(*) AS invoiceCount
        FROM sales_invoices si
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
@@ -333,7 +333,7 @@ export class ExecutiveCommandService {
     )[0] ?? {};
 
     const returnsRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(sr.total_amount), 0) AS returns
+      `SELECT COALESCE(SUM(sr.total_amount), 0) / 100.0 AS returns
        FROM sales_returns sr
        JOIN sales_invoices si ON si.id = sr.original_invoice_id
        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
@@ -342,8 +342,8 @@ export class ExecutiveCommandService {
     )[0] ?? {};
 
     const purchaseRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(pi.total_amount), 0) AS purchases,
-              COALESCE(SUM(pi.paid_amount), 0) AS paid,
+      `SELECT COALESCE(SUM(pi.total_amount), 0) / 100.0 AS purchases,
+              COALESCE(SUM(pi.paid_amount), 0) / 100.0 AS paid,
               COUNT(*) AS purchaseCount
        FROM purchase_invoices pi
        WHERE pi.date BETWEEN ? AND ? AND ${purchase.branch.clause} AND ${purchase.company.clause}`,
@@ -369,7 +369,7 @@ export class ExecutiveCommandService {
   private getExpenseTotals(from: string, to: string) {
     const scope = this.expenseScopes();
     const row = this.db.query<any>(
-      `SELECT COALESCE(SUM(e.amount), 0) AS total, COUNT(*) AS expenseCount
+      `SELECT COALESCE(SUM(e.amount), 0) / 100.0 AS total, COUNT(*) AS expenseCount
        FROM expenses e
        WHERE e.date BETWEEN ? AND ? AND ${scope.branch.clause} AND ${scope.company.clause}`,
       [from, to, ...scope.branch.params, ...scope.company.params],
@@ -384,7 +384,7 @@ export class ExecutiveCommandService {
     const paymentCompany = this.branchAccess.companyScopeViaBranch('cp.branch_id', actor);
 
     const invoiceRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(si.paid_amount), 0) AS amount,
+      `SELECT COALESCE(SUM(si.paid_amount), 0) / 100.0 AS amount,
               COUNT(CASE WHEN si.paid_amount > 0 THEN 1 END) AS receipts
        FROM sales_invoices si
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
@@ -396,7 +396,7 @@ export class ExecutiveCommandService {
     // Payments on invoices created inside the period are already represented by
     // the invoice's paid_amount, so excluding them avoids double counting.
     const laterRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(cp.amount), 0) AS amount, COUNT(*) AS receipts
+      `SELECT COALESCE(SUM(cp.amount), 0) / 100.0 AS amount, COUNT(*) AS receipts
        FROM customer_payments cp
        JOIN sales_invoices si ON si.id = cp.invoice_id
        WHERE cp.date BETWEEN ? AND ? AND si.date < ?
@@ -418,9 +418,9 @@ export class ExecutiveCommandService {
   private getReceivables(today: string) {
     const sales = this.salesScopes();
     const row = this.db.query<any>(
-      `SELECT COALESCE(SUM(si.remaining_amount), 0) AS total, COUNT(*) AS invoiceCount
+      `SELECT COALESCE(SUM(si.remaining_amount), 0) / 100.0 AS total, COUNT(*) AS invoiceCount
        FROM sales_invoices si
-       WHERE si.remaining_amount > 0.009 AND si.invoice_status != 'VOID'
+       WHERE si.remaining_amount > 1 AND si.invoice_status != 'VOID'
          AND ${sales.branch.clause} AND ${sales.company.clause}`,
       [...sales.branch.params, ...sales.company.params],
     )[0] ?? {};
@@ -441,7 +441,7 @@ export class ExecutiveCommandService {
     const bankCompany = this.branchAccess.companyScopeViaBranch('ba.branch_id', actor);
 
     const cashRows = this.db.query<any>(
-      `SELECT cr.id, cr.name, COALESCE(cr.current_balance, 0) AS balance, b.name AS branchName
+      `SELECT cr.id, cr.name, COALESCE(cr.current_balance, 0) / 100.0 AS balance, b.name AS branchName
        FROM cash_registers cr
        LEFT JOIN branches b ON b.id = cr.branch_id
        WHERE cr.is_active = 1 AND ${cashScope.clause}
@@ -451,7 +451,7 @@ export class ExecutiveCommandService {
 
     const bankRows = this.db.query<any>(
       `SELECT ba.id, ba.account_name AS name, ba.bank_name AS bankName,
-              COALESCE(ba.current_balance, 0) AS balance, b.name AS branchName
+              COALESCE(ba.current_balance, 0) / 100.0 AS balance, b.name AS branchName
        FROM bank_accounts ba
        LEFT JOIN branches b ON b.id = ba.branch_id
        WHERE ba.is_active = 1 AND ${bankScope.clause} AND ${bankCompany.clause}
@@ -497,8 +497,8 @@ export class ExecutiveCommandService {
                     FROM inventory_cost_layers icl
                     WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
                 ELSE ws.quantity_m2 * p.cost_price END
-              ), 0) AS costValue,
-              COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2), 0) AS saleValue
+              ) / 100.0, 0) AS costValue,
+              COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2), 0) / 100.0 AS saleValue
        FROM warehouse_stock ws
        JOIN products p ON p.id = ws.product_id
        JOIN warehouses w ON w.id = ws.warehouse_id
@@ -555,8 +555,8 @@ export class ExecutiveCommandService {
     const rows = this.db.query<any>(
       `SELECT p.id, p.name, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
               COALESCE(SUM(sii.quantity_m2), 0) AS quantity,
-              COALESCE(SUM(sii.total_price), 0) AS revenue,
-              COALESCE(SUM(sii.profit), 0) AS profit
+              COALESCE(SUM(sii.total_price), 0) / 100.0 AS revenue,
+              COALESCE(SUM(sii.profit), 0) / 100.0 AS profit
        FROM sales_invoice_items sii
        JOIN products p ON p.id = sii.product_id
        JOIN sales_invoices si ON si.id = sii.invoice_id
@@ -587,7 +587,7 @@ export class ExecutiveCommandService {
 
     const rows = this.db.query<any>(
       `SELECT p.id, p.name, COALESCE(SUM(ws.quantity_m2), 0) AS quantity,
-              COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS stockValue,
+              COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 AS stockValue,
               p.base_unit AS baseUnit, p.custom_unit AS customUnit, last_sale.lastSale AS lastSaleDate
        FROM products p
        JOIN warehouse_stock ws ON ws.product_id = p.id
@@ -633,9 +633,9 @@ export class ExecutiveCommandService {
 
     const rows = this.db.query<any>(
       `SELECT b.id, b.name,
-              COALESCE(SUM(CASE WHEN si.invoice_status != 'VOID' THEN si.subtotal - si.discount_amount ELSE 0 END), 0) AS sales,
+              COALESCE(SUM(CASE WHEN si.invoice_status != 'VOID' THEN si.subtotal - si.discount_amount ELSE 0 END), 0) / 100.0 AS sales,
               COUNT(CASE WHEN si.invoice_status != 'VOID' THEN 1 END) AS invoices,
-              COALESCE(SUM(CASE WHEN si.invoice_status != 'VOID' THEN si.gross_profit ELSE 0 END), 0) AS grossProfit
+              COALESCE(SUM(CASE WHEN si.invoice_status != 'VOID' THEN si.gross_profit ELSE 0 END), 0) / 100.0 AS grossProfit
        FROM branches b
        LEFT JOIN sales_invoices si ON si.branch_id = b.id AND si.date BETWEEN ? AND ?
        WHERE b.is_active = 1 AND ${branchScope.clause} AND ${companyScope.clause}
@@ -658,9 +658,9 @@ export class ExecutiveCommandService {
     const rows = this.db.query<any>(
       `SELECT COALESCE(si.sales_rep_id, si.created_by, 'unknown') AS employeeKey,
               COALESCE(e.full_name, u.full_name, 'غير محدد') AS name,
-              COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales,
+              COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales,
               COUNT(*) AS invoices,
-              COALESCE(SUM(si.gross_profit), 0) AS grossProfit
+              COALESCE(SUM(si.gross_profit), 0) / 100.0 AS grossProfit
        FROM sales_invoices si
        LEFT JOIN employees e ON e.id = si.sales_rep_id
        LEFT JOIN users u ON u.id = si.created_by
@@ -694,7 +694,7 @@ export class ExecutiveCommandService {
   private getCashFlow(from: string, to: string, expenses: number, collections: number) {
     const purchase = this.purchaseScopes();
     const purchasePaidRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(pi.paid_amount), 0) AS amount
+      `SELECT COALESCE(SUM(pi.paid_amount), 0) / 100.0 AS amount
        FROM purchase_invoices pi
        WHERE pi.date BETWEEN ? AND ? AND ${purchase.branch.clause} AND ${purchase.company.clause}`,
       [from, to, ...purchase.branch.params, ...purchase.company.params],
@@ -704,7 +704,7 @@ export class ExecutiveCommandService {
     const paymentBranch = this.branchAccess.sqlScope('sp.branch_id', undefined, actor);
     const paymentCompany = this.branchAccess.companyScopeViaBranch('sp.branch_id', actor);
     const laterSupplierRow = this.db.query<any>(
-      `SELECT COALESCE(SUM(spa.amount), 0) AS amount
+      `SELECT COALESCE(SUM(spa.amount), 0) / 100.0 AS amount
        FROM supplier_payment_allocations spa
        JOIN supplier_payments sp ON sp.id = spa.payment_id
        JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id
@@ -729,7 +729,7 @@ export class ExecutiveCommandService {
   private getTrend(period: CommandPeriod): CommandTrendPoint[] {
     const sales = this.salesScopes();
     const currentRows = this.db.query<any>(
-      `SELECT si.date AS date, COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales
+      `SELECT si.date AS date, COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales
        FROM sales_invoices si
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
          AND ${sales.branch.clause} AND ${sales.company.clause}
@@ -737,7 +737,7 @@ export class ExecutiveCommandService {
       [period.from, period.to, ...sales.branch.params, ...sales.company.params],
     );
     const returnRows = this.db.query<any>(
-      `SELECT sr.date AS date, COALESCE(SUM(sr.total_amount), 0) AS returns
+      `SELECT sr.date AS date, COALESCE(SUM(sr.total_amount), 0) / 100.0 AS returns
        FROM sales_returns sr
        JOIN sales_invoices si ON si.id = sr.original_invoice_id
        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
@@ -746,7 +746,7 @@ export class ExecutiveCommandService {
       [period.from, period.to, ...sales.branch.params, ...sales.company.params],
     );
     const previousRows = this.db.query<any>(
-      `SELECT si.date AS date, COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS sales
+      `SELECT si.date AS date, COALESCE(SUM(si.subtotal - si.discount_amount), 0) / 100.0 AS sales
        FROM sales_invoices si
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
          AND ${sales.branch.clause} AND ${sales.company.clause}
@@ -754,7 +754,7 @@ export class ExecutiveCommandService {
       [period.previousFrom, period.previousTo, ...sales.branch.params, ...sales.company.params],
     );
     const previousReturnRows = this.db.query<any>(
-      `SELECT sr.date AS date, COALESCE(SUM(sr.total_amount), 0) AS returns
+      `SELECT sr.date AS date, COALESCE(SUM(sr.total_amount), 0) / 100.0 AS returns
        FROM sales_returns sr
        JOIN sales_invoices si ON si.id = sr.original_invoice_id
        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
@@ -815,8 +815,8 @@ export class ExecutiveCommandService {
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.due_date AS dueDate,
               c.name AS customer,
               COALESCE(e.full_name, u.full_name, '—') AS employee,
-              (si.subtotal - si.discount_amount) AS net,
-              si.total_amount AS total, si.paid_amount AS paid, si.remaining_amount AS remaining,
+              (si.subtotal - si.discount_amount) / 100.0 AS net,
+              si.total_amount / 100.0 AS total, si.paid_amount / 100.0 AS paid, si.remaining_amount / 100.0 AS remaining,
               si.payment_status AS paymentStatus
        FROM sales_invoices si
        JOIN customers c ON c.id = si.customer_id
@@ -867,7 +867,7 @@ export class ExecutiveCommandService {
   private expenseDrilldown(key: DrilldownKey, title: string, subtitle: string, from: string, to: string): DrilldownResult {
     const scope = this.expenseScopes();
     const rows = this.db.query<any>(
-      `SELECT e.id, e.date, COALESCE(ec.name, e.category) AS category, e.amount,
+      `SELECT e.id, e.date, COALESCE(ec.name, e.category) AS category, e.amount / 100.0 AS amount,
               e.recipient, e.description, COALESCE(cr.name, '—') AS registerName,
               COALESCE(u.full_name, '—') AS performedBy
        FROM expenses e
@@ -918,7 +918,7 @@ export class ExecutiveCommandService {
 
     const invoiceRows = this.db.query<any>(
       `SELECT si.id, si.invoice_number AS reference, si.date, c.name AS party,
-              si.paid_amount AS amount, si.payment_type AS method, 'تحصيل على فاتورة' AS kind
+              si.paid_amount / 100.0 AS amount, si.payment_type AS method, 'تحصيل على فاتورة' AS kind
        FROM sales_invoices si
        JOIN customers c ON c.id = si.customer_id
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND si.paid_amount > 0
@@ -930,7 +930,7 @@ export class ExecutiveCommandService {
 
     const paymentRows = this.db.query<any>(
       `SELECT cp.id, cp.receipt_number AS reference, cp.date, c.name AS party,
-              cp.amount, cp.payment_type AS method, 'سند قبض' AS kind
+              cp.amount / 100.0 AS amount, cp.payment_type AS method, 'سند قبض' AS kind
        FROM customer_payments cp
        JOIN sales_invoices si ON si.id = cp.invoice_id
        JOIN customers c ON c.id = cp.customer_id
@@ -1013,12 +1013,12 @@ export class ExecutiveCommandService {
     const sales = this.salesScopes();
     return this.db.query<any>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.due_date AS dueDate,
-              c.name AS customer, si.total_amount AS total, si.paid_amount AS paid,
-              si.remaining_amount AS remaining,
+              c.name AS customer, si.total_amount / 100.0 AS total, si.paid_amount / 100.0 AS paid,
+              si.remaining_amount / 100.0 AS remaining,
               CAST(julianday('now') - julianday(COALESCE(si.due_date, si.date)) AS INTEGER) AS daysOverdue
        FROM sales_invoices si
        JOIN customers c ON c.id = si.customer_id
-       WHERE si.remaining_amount > 0.009 AND si.invoice_status != 'VOID'
+       WHERE si.remaining_amount > 1 AND si.invoice_status != 'VOID'
          AND ${sales.branch.clause} AND ${sales.company.clause}
        ORDER BY si.remaining_amount DESC, si.date DESC
        LIMIT ?`,
@@ -1030,12 +1030,12 @@ export class ExecutiveCommandService {
     const sales = this.salesScopes();
     return this.db.query<any>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.due_date AS dueDate,
-              c.name AS customer, si.total_amount AS total, si.paid_amount AS paid,
-              si.remaining_amount AS remaining,
+              c.name AS customer, si.total_amount / 100.0 AS total, si.paid_amount / 100.0 AS paid,
+              si.remaining_amount / 100.0 AS remaining,
               CAST(julianday(?) - julianday(COALESCE(si.due_date, si.date)) AS INTEGER) AS daysOverdue
        FROM sales_invoices si
        JOIN customers c ON c.id = si.customer_id
-       WHERE si.remaining_amount > 0.009 AND si.invoice_status != 'VOID'
+       WHERE si.remaining_amount > 1 AND si.invoice_status != 'VOID'
          AND COALESCE(si.due_date, si.date) < ?
          AND ${sales.branch.clause} AND ${sales.company.clause}
        ORDER BY daysOverdue DESC, si.remaining_amount DESC
@@ -1202,7 +1202,7 @@ export class ExecutiveCommandService {
     const purchase = this.purchaseScopes();
     const rows = this.db.query<any>(
       `SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.date, s.name AS supplier,
-              pi.total_amount AS total, pi.paid_amount AS paid, pi.remaining_amount AS remaining,
+              pi.total_amount / 100.0 AS total, pi.paid_amount / 100.0 AS paid, pi.remaining_amount / 100.0 AS remaining,
               pi.payment_status AS paymentStatus
        FROM purchase_invoices pi
        JOIN suppliers s ON s.id = pi.supplier_id

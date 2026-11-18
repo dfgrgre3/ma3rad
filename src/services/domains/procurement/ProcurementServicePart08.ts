@@ -16,9 +16,9 @@ public compareSuppliersForProduct(productId: string): Array<{
       SELECT
         s.id AS supplierId,
         s.name AS supplierName,
-        MIN(pii.unit_cost) AS minPrice,
-        MAX(pii.unit_cost) AS maxPrice,
-        AVG(pii.unit_cost) AS avgPrice,
+        MIN(pii.unit_cost) / 100.0 AS minPrice,
+        MAX(pii.unit_cost) / 100.0 AS maxPrice,
+        AVG(pii.unit_cost) / 100.0 AS avgPrice,
         SUM(pii.quantity_m2) AS totalQuantityM2,
         MAX(pi.date) AS lastPurchaseDate
       FROM purchase_invoice_items pii
@@ -31,7 +31,7 @@ public compareSuppliersForProduct(productId: string): Array<{
 
     return rows.map((r) => {
       const lastRow = this.db.query<any>(`
-        SELECT pii.unit_cost AS lastPrice FROM purchase_invoice_items pii
+        SELECT pii.unit_cost / 100.0 AS lastPrice FROM purchase_invoice_items pii
         JOIN purchase_invoices pi ON pi.id = pii.purchase_id
         WHERE pii.product_id = ? AND pi.supplier_id = ?
         ORDER BY pi.date DESC, pi.created_at DESC LIMIT 1

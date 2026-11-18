@@ -8,6 +8,7 @@ const { app } = require('./app');
 const { initDatabase, getDb, bootstrapDefaults, seedPlatformRBAC } = require('./lib/db');
 const { initSigningKeys, signCertificate, verifyCertificate } = require('./lib/signing');
 const { recordAuditEvent } = require('./lib/audit');
+const { startOpsWorker } = require('./lib/opsWorker');
 
 const PORT = process.env.PORT || 3001;
 
@@ -192,6 +193,11 @@ function scheduleJobs() {
       console.error('Scheduled job failed:', err);
     }
   });
+
+  if (process.env.CENTRAL_OPS_WORKER !== '0') {
+    startOpsWorker({ intervalMs: Number(process.env.CENTRAL_OPS_WORKER_INTERVAL_MS) || 5000 });
+    console.log('[ops-worker] started — draining platform_ops_jobs');
+  }
 
   if (process.env.CENTRAL_DISABLE_STARTUP_CHECK !== '1') {
     setTimeout(async () => {

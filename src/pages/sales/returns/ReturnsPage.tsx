@@ -138,20 +138,26 @@ export const ReturnsPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      const currentReturns = service.getReturns(search, dateFrom || undefined, dateTo || undefined);
-      setOperationalFields(fieldService.getDefinitions('sales_returns'));
-      const fieldValues = fieldService.getRecordValuesForRecords('sales_returns', currentReturns.map((item) => item.id));
-      setValuesByReturn(fieldValues);
-      setReturns(currentReturns.filter((item) => matchesOperationalFieldFilters(item.id, fieldValues, fieldFilters)));
-      setStats(service.getReturnsStats());
-      setTopReasons(service.getTopReturnReasons(4));
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل المرتجعات.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const [currentReturns, statsResult, reasons] = await Promise.all([
+          service.getReturnsAsync(search, dateFrom || undefined, dateTo || undefined),
+          service.getReturnsStatsAsync(),
+          service.getTopReturnReasonsAsync(4),
+        ]);
+        setOperationalFields(fieldService.getDefinitions('sales_returns'));
+        const fieldValues = fieldService.getRecordValuesForRecords('sales_returns', currentReturns.map((item) => item.id));
+        setValuesByReturn(fieldValues);
+        setReturns(currentReturns.filter((item) => matchesOperationalFieldFilters(item.id, fieldValues, fieldFilters)));
+        setStats(statsResult);
+        setTopReasons(reasons);
+        setError(null);
+      } catch (e: any) {
+        setError(e?.message || 'تعذر تحميل المرتجعات.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [dateFrom, dateTo, search, service, fieldService, fieldFilters]);
 
   useEffect(() => { load(); }, [load]);

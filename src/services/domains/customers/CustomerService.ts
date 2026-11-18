@@ -9,6 +9,10 @@ import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
 import { getActiveBankAccount, updateBankBalance } from '../sales/paymentAccounts';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const CUSTOMER_MONEY_FIELDS = ['credit_limit','current_balance','total_purchases'] as const;
+const CUSTOMER_PAYMENT_MONEY_FIELDS = ['amount'] as const;
 
 export interface CustomerPageFilters {
   customerType?: Customer['customerType'];
@@ -65,8 +69,7 @@ export class CustomerService {
   private branchAccess = new BranchAccessService();
   private sync = new MasterDataSyncService(this.db);
 
-  public getAllCustomers(search?: string): Customer[] {
-    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+  private buildCustomerListQuery(search?: string): { sql: string; params: any[] } {
     const scope = this.branchAccess.companyScope('company_id');
     let sql = `SELECT * FROM customers WHERE ${scope.clause} AND id <> 'cust_cash'`;
     const params: any[] = [...scope.params];
@@ -78,17 +81,28 @@ export class CustomerService {
     }
 
     sql += ` ORDER BY name ASC`;
-    return this.db.query<Customer>(sql, params);
+    return { sql, params };
   }
 
-  public getCustomersPage(
-    search = '',
-    page = 1,
-    pageSize = 25,
-    fieldFilters: Record<string, string> = {},
-    filters: CustomerPageFilters = {},
-  ) {
+  public getAllCustomers(search?: string): Customer[] {
     PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const { sql, params } = this.buildCustomerListQuery(search);
+    return this.db.query<Customer>(sql, params)
+      .map((row) => unscaleMoneyRow(row, CUSTOMER_MONEY_FIELDS));
+  }
+
+  public async getAllCustomersAsync(search?: string): Promise<Customer[]> {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const { sql, params } = this.buildCustomerListQuery(search);
+    const rows = await this.db.queryAsync<Customer>(sql, params);
+    return rows.map((row) => unscaleMoneyRow(row, CUSTOMER_MONEY_FIELDS));
+  }
+
+  private buildCustomersPageWhere(
+    search: string,
+    fieldFilters: Record<string, string>,
+    filters: CustomerPageFilters,
+  ): { where: string; params: any[] } {
     const scope = this.branchAccess.companyScope('company_id');
     const params: any[] = [...scope.params];
     let where = ` WHERE ${scope.clause} AND id <> 'cust_cash'`;
@@ -117,16 +131,73 @@ export class CustomerService {
       )`;
       params.push(fieldId, `%${value}%`);
     });
-    return this.db.queryPage<Customer>(
+    return { where, params };
+  }
+
+  private async queryCustomersPageAsync(
+    where: string,
+    params: any[],
+    page: number,
+    pageSize: number,
+  ) {
+    const safePageSize = Math.min(Math.max(Math.floor(pageSize) || 25, 1), 100);
+    const countRows = await this.db.queryAsync<{ total_items: number }>(
+      `SELECT COUNT(*) as total_items FROM customers${where}`, params,
+    );
+    const totalItems = Number(countRows[0]?.total_items ?? (countRows[0] as any)?.totalItems ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+    const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), totalPages);
+    const items = await this.db.queryAsync<Customer>(
+      `SELECT * FROM customers${where} ORDER BY name ASC LIMIT ? OFFSET ?`,
+      [...params, safePageSize, (safePage - 1) * safePageSize],
+    );
+    return { items, page: safePage, pageSize: safePageSize, totalItems, totalPages };
+  }
+
+  public getCustomersPage(
+    search = '',
+    page = 1,
+    pageSize = 25,
+    fieldFilters: Record<string, string> = {},
+    filters: CustomerPageFilters = {},
+  ) {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const { where, params } = this.buildCustomersPageWhere(search, fieldFilters, filters);
+    const pageResult = this.db.queryPage<Customer>(
       `SELECT * FROM customers${where} ORDER BY name ASC`,
       `SELECT COUNT(*) as total_items FROM customers${where}`,
       params, page, pageSize,
     );
+    pageResult.items = pageResult.items.map((row) => unscaleMoneyRow(row, CUSTOMER_MONEY_FIELDS));
+    return pageResult;
+  }
+
+  public async getCustomersPageAsync(
+    search = '',
+    page = 1,
+    pageSize = 25,
+    fieldFilters: Record<string, string> = {},
+    filters: CustomerPageFilters = {},
+  ) {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const { where, params } = this.buildCustomersPageWhere(search, fieldFilters, filters);
+    const pageResult = await this.queryCustomersPageAsync(where, params, page, pageSize);
+    pageResult.items = pageResult.items.map((row) => unscaleMoneyRow(row, CUSTOMER_MONEY_FIELDS));
+    return pageResult;
   }
 
   public getCustomerById(id: string): Customer | null {
     PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     return this.findCustomerById(id);
+  }
+
+  public async getCustomerByIdAsync(id: string): Promise<Customer | null> {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const scope = this.branchAccess.companyScope('company_id');
+    const rows = await this.db.queryAsync<Customer>(
+      `SELECT * FROM customers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params],
+    );
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], CUSTOMER_MONEY_FIELDS) : null;
   }
 
   public getCustomerByPhone(phone: string): Customer | null {
@@ -140,13 +211,28 @@ export class CustomerService {
          AND (REPLACE(phone, ' ', '') = ? OR REPLACE(COALESCE(phone2, ''), ' ', '') = ?)
        LIMIT 1`,
       [...scope.params, normalizedPhone, normalizedPhone],
-    )[0] ?? null;
+    ).map((row) => unscaleMoneyRow(row, CUSTOMER_MONEY_FIELDS))[0] ?? null;
+  }
+
+  public async getCustomerByPhoneAsync(phone: string): Promise<Customer | null> {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const normalizedPhone = phone.trim().replace(/\s+/g, '');
+    if (!normalizedPhone) return null;
+    const scope = this.branchAccess.companyScope('company_id');
+    const rows = await this.db.queryAsync<Customer>(
+      `SELECT * FROM customers
+       WHERE ${scope.clause}
+         AND (REPLACE(phone, ' ', '') = ? OR REPLACE(COALESCE(phone2, ''), ' ', '') = ?)
+       LIMIT 1`,
+      [...scope.params, normalizedPhone, normalizedPhone],
+    );
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], CUSTOMER_MONEY_FIELDS) : null;
   }
 
   private findCustomerById(id: string): Customer | null {
     const scope = this.branchAccess.companyScope('company_id');
     const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params]);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], CUSTOMER_MONEY_FIELDS) : null;
   }
 
   public createCustomer(customer: Omit<Customer, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { code?: string; initialBalance?: number }, _performedBy = 'usr_admin'): Customer {
@@ -173,7 +259,7 @@ export class CustomerService {
         INSERT INTO customers (
           id, code, name, phone, phone2, national_id, address, city,
           customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes, company_id, branch_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ROUND(?*100), 0, ?, ?, ?)
       `, [
         id, code, customer.name, customer.phone, customer.phone2 || null,
         customer.nationalId || null, customer.address || null, customer.city || null,
@@ -244,7 +330,7 @@ export class CustomerService {
         city = COALESCE(?, city),
         customer_type = COALESCE(?, customer_type),
         is_active = COALESCE(?, is_active),
-        credit_limit = COALESCE(?, credit_limit),
+        credit_limit = COALESCE(ROUND(?*100), credit_limit),
         payment_terms_days = COALESCE(?, payment_terms_days),
         notes = COALESCE(?, notes),
         updated_at = CURRENT_TIMESTAMP
@@ -293,47 +379,56 @@ export class CustomerService {
       const shift = this.branchAccess.requireShiftAccess(shiftId, actor, register);
       if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
     }
-
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
     const today = paymentDate || localDateString();
 
     return this.db.executeFinancialTransaction((sqliteDb) => {
       const prior = idempotencyKey
         ? sqliteDb.query<CustomerPayment>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey])
+        .map((row) => unscaleMoneyRow(row, CUSTOMER_PAYMENT_MONEY_FIELDS))
         : [];
       const existingPayment = getExistingCustomerPayment(prior, customerId, amount, paymentType, register, shiftId, notes, branchId, bankAccountId);
       if (existingPayment) return existingPayment;
+
+      // بُعدا المبلغ والنطاق داخل المعاملة: استهلاك اعتماد المبلغ
+      // يكون ذرّيًا مع أثر السند — فشل العملية لا يحرق الاعتماد،
+      // وإعادة التشغيل idempotent تتجاوز الفحص بعد وجود السند.
+      PermissionService.require(actor, 'ui.customers.detail.payment', undefined, {
+        branchId,
+        amount,
+        operation: 'ui.customers.detail.payment',
+      });
 
       const receiptNumber = sqliteDb.nextNumber('REC');
       // 1. Record customer payment receipt
       sqliteDb.run(`
         INSERT INTO customer_payments (
           id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, branch_id, notes, performed_by, bank_account_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, branchId, notes, actor.id, bankAccountId || null]);
       let unapplied = round2(amount);
-      const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount,total_amount FROM sales_invoices WHERE customer_id=? AND branch_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [customerId, branchId, today]);
+      const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount / 100.0 AS paid_amount,remaining_amount / 100.0 AS remaining_amount,total_amount / 100.0 AS total_amount FROM sales_invoices WHERE customer_id=? AND branch_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>1 ORDER BY date,created_at,id`, [customerId, branchId, today]);
       for (const invoice of openInvoices) {
         if (unapplied <= 0.009) break;
         const allocated = round2(Math.min(unapplied, Number(invoice.remainingAmount)));
         if (allocated <= 0) continue;
-        sqliteDb.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+        sqliteDb.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
           [`cpa_${uuidv4().substring(0, 8)}`, paymentId, invoice.id, allocated]);
         const paidAmount = round2(Number(invoice.paidAmount) + allocated);
         const remainingAmount = round2(Math.max(0, Number(invoice.remainingAmount) - allocated));
-        sqliteDb.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        sqliteDb.run(`UPDATE sales_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
           [paidAmount, remainingAmount, remainingAmount <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
         unapplied = round2(unapplied - allocated);
       }
       // 2. Reduce customer debt balance
       sqliteDb.run(`
-        UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE customers SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?
       `, [amount, customerId]);
 
       // 3. Update cash register balance if cash
       if (paymentType === 'CASH') {
         sqliteDb.run(`
-          UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?
+          UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?
         `, [amount, register]);
       }
       const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(sqliteDb, bankAccountId) : null;
@@ -353,7 +448,7 @@ export class CustomerService {
       // 4. If active shift, update shift total
       if (shiftId) {
         sqliteDb.run(`
-          UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?
+          UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ROUND(?*100) WHERE id = ?
         `, [amount, shiftId]);
       }
 
@@ -378,7 +473,7 @@ export class CustomerService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.payment.reverse');
     const payment = this.db.query<any>(
-      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id, branch_id, bank_account_id AS bankAccountId
+      `SELECT id, receipt_number, customer_id, invoice_id, amount / 100.0 AS amount, payment_type, register_id, shift_id, branch_id, bank_account_id AS bankAccountId
        FROM customer_payments WHERE id = ?`,
       [paymentId]
     )[0];
@@ -407,20 +502,20 @@ export class CustomerService {
     const amount = round2(payment.amount);
     this.db.executeFinancialTransaction((db) => {
       db.run(
-        `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE customers SET current_balance = current_balance + ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [amount, payment.customerId]
       );
       if (payment.paymentType === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
       }
       const bank = payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId
         ? db.query<{ glAccountCode: string }>(`SELECT coa.code AS glAccountCode FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ?`, [payment.bankAccountId])[0]
         : null;
       if (payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, payment.bankAccountId]);
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [amount, payment.bankAccountId]);
       }
       if (payment.shiftId) {
-        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ROUND(?*100) WHERE id = ?`, [amount, payment.shiftId]);
       }
       postLedgerEntry(db.getDatabase(), {
         date: localDateString(),
@@ -433,13 +528,13 @@ export class CustomerService {
           { accountCode: bank?.glAccountCode || paymentAccountCode(payment.paymentType), debit: 0, credit: amount },
         ],
       });
-      const allocations = db.query<any>(`SELECT sales_invoice_id,amount FROM customer_payment_allocations WHERE payment_id=?`, [paymentId]);
+      const allocations = db.query<any>(`SELECT sales_invoice_id,amount / 100.0 AS amount FROM customer_payment_allocations WHERE payment_id=?`, [paymentId]);
       for (const allocation of allocations) {
-        const invoice = db.query<any>('SELECT id,paid_amount,total_amount,remaining_amount FROM sales_invoices WHERE id=?', [allocation.salesInvoiceId])[0];
+        const invoice = db.query<any>('SELECT id,paid_amount / 100.0 AS paid_amount,total_amount / 100.0 AS total_amount,remaining_amount / 100.0 AS remaining_amount FROM sales_invoices WHERE id=?', [allocation.salesInvoiceId])[0];
         if (!invoice) continue;
         const paid = round2(Math.max(0, Number(invoice.paidAmount) - Number(allocation.amount)));
         const remaining = round2(Math.min(Number(invoice.totalAmount), Number(invoice.remainingAmount) + Number(allocation.amount)));
-        db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        db.run(`UPDATE sales_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
           [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
       }
       db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
@@ -491,21 +586,21 @@ export class CustomerService {
     );
 
     const invoices = this.db.query<any>(`
-      SELECT si.id, si.date, si.invoice_number as docNumber, si.total_amount as debit, si.paid_amount, si.created_at
+      SELECT si.id, si.date, si.invoice_number as docNumber, si.total_amount / 100.0 as debit, si.paid_amount / 100.0 as paid_amount, si.created_at
       FROM sales_invoices si
       WHERE si.customer_id = ? AND si.invoice_status != 'VOID'
         AND ${invoiceScope.clause} AND ${invoiceCompanyScope.clause}
     `, [customerId, ...invoiceScope.params, ...invoiceCompanyScope.params]);
 
     const payments = this.db.query<any>(`
-      SELECT cp.id, cp.date, cp.receipt_number as docNumber, cp.amount as credit, cp.created_at, cp.notes
+      SELECT cp.id, cp.date, cp.receipt_number as docNumber, cp.amount / 100.0 as credit, cp.created_at, cp.notes
       FROM customer_payments cp
       WHERE cp.customer_id = ? AND ${paymentScope.clause}
     `, [customerId, ...paymentScope.params]);
 
     const returns = PermissionService.can(actor, 'returns.view') ? this.db.query<any>(`
       SELECT sr.id, sr.date, sr.return_number as docNumber,
-        sr.remaining_to_balance AS credit, sr.created_at, sr.reason
+        sr.remaining_to_balance / 100.0 AS credit, sr.created_at, sr.reason
       FROM sales_returns sr
       WHERE sr.customer_id = ? AND ${returnScope.clause}
     `, [customerId, ...returnScope.params]) : [];

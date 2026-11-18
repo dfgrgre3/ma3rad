@@ -216,9 +216,9 @@ export class DailyOperationsService {
       `SELECT si.id, si.branch_id AS branchId, si.invoice_number AS invoiceNumber, si.date, si.created_at AS createdAt,
               c.name AS customerName, c.phone AS customerPhone,
               (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
-              si.total_amount AS total, si.paid_amount AS paid, si.remaining_amount AS remaining,
-              si.tax_amount AS tax, si.discount_amount AS discount, si.gross_profit AS profit,
-              si.shipping_cost AS shippingCost, COALESCE(si.extra_fees, 0) AS extraFees,
+              si.total_amount / 100.0 AS total, si.paid_amount / 100.0 AS paid, si.remaining_amount / 100.0 AS remaining,
+              si.tax_amount / 100.0 AS tax, si.discount_amount / 100.0 AS discount, si.gross_profit / 100.0 AS profit,
+              si.shipping_cost / 100.0 AS shippingCost, COALESCE(si.extra_fees, 0) / 100.0 AS extraFees,
               si.payment_type AS paymentType, si.payment_status AS paymentStatus,
               si.invoice_status AS invoiceStatus, u.full_name AS createdByName
        FROM sales_invoices si
@@ -255,8 +255,8 @@ export class DailyOperationsService {
               pi.supplier_id AS supplierId, s.name AS supplierName, s.phone AS supplierPhone,
               w.name AS warehouseName,
               (SELECT COUNT(*) FROM purchase_invoice_items pii WHERE pii.purchase_id = pi.id) AS itemsCount,
-              pi.subtotal, pi.total_amount AS total, pi.paid_amount AS paid, pi.remaining_amount AS remaining,
-              pi.tax_amount AS tax, pi.discount_amount AS discount, pi.shipping_cost AS shippingCost,
+              pi.subtotal / 100.0 AS subtotal, pi.total_amount / 100.0 AS total, pi.paid_amount / 100.0 AS paid, pi.remaining_amount / 100.0 AS remaining,
+              pi.tax_amount / 100.0 AS tax, pi.discount_amount / 100.0 AS discount, pi.shipping_cost / 100.0 AS shippingCost,
               pi.payment_type AS paymentType, pi.payment_status AS paymentStatus, pi.notes,
               u.full_name AS createdByName
        FROM purchase_invoices pi
@@ -274,7 +274,7 @@ export class DailyOperationsService {
               pii.product_id AS productId, pii.product_name AS productName, p.sku AS sku,
               pii.grade, pii.quantity_m2 AS quantityM2, pii.boxes_count AS boxesCount,
               p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
-              pii.unit_cost AS unitCost, pii.total_cost AS totalCost
+              pii.unit_cost / 100.0 AS unitCost, pii.total_cost / 100.0 AS totalCost
        FROM purchase_invoice_items pii
        JOIN purchase_invoices pi ON pi.id = pii.purchase_id
        LEFT JOIN warehouses w ON w.id = pi.warehouse_id
@@ -288,7 +288,7 @@ export class DailyOperationsService {
     const paymentScope = this.branchAccess.sqlScope('sp.branch_id', 'cr.branch_id', actor);
     const payments = this.db.query<DailySupplierPaymentRow>(
       `SELECT sp.id, sp.receipt_number AS receiptNumber, sp.supplier_id AS supplierId,
-              s.name AS supplierName, sp.amount, sp.payment_type AS paymentType,
+              s.name AS supplierName, sp.amount / 100.0 AS amount, sp.payment_type AS paymentType,
               sp.notes, sp.created_at AS createdAt, u.full_name AS performedByName,
               (SELECT GROUP_CONCAT(pi.invoice_number, '، ')
                  FROM supplier_payment_allocations spa
@@ -324,10 +324,10 @@ export class DailyOperationsService {
     });
 
     const supplierOutstanding = this.db.query<{ total: number }>(
-      `SELECT COALESCE(SUM(pi.remaining_amount), 0) AS total
+      `SELECT COALESCE(SUM(pi.remaining_amount), 0) / 100.0 AS total
        FROM purchase_invoices pi
        LEFT JOIN warehouses w ON w.id = pi.warehouse_id
-       WHERE pi.remaining_amount > 0 AND ${scope.clause}`,
+       WHERE pi.remaining_amount > 1 AND ${scope.clause}`,
       scope.params
     )[0]?.total || 0;
 
@@ -373,7 +373,7 @@ export class DailyOperationsService {
     const day = dateOnly(date);
     const scope = this.branchAccess.sqlScope('e.branch_id', 'r.branch_id', actor);
     const rows = this.db.query<DailyExpenseRow>(
-      `SELECT e.id, e.category, e.description, e.amount, e.date, e.created_at AS createdAt,
+      `SELECT e.id, e.category, e.description, e.amount / 100.0 AS amount, e.date, e.created_at AS createdAt,
               e.payment_type AS paymentType, e.recipient,
               r.name AS registerName, u.full_name AS performedByName
        FROM expenses e
@@ -410,12 +410,12 @@ export class DailyOperationsService {
     const rows = this.db.query<DailyDebtRow>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date,
               c.name AS customerName, c.phone AS customerPhone,
-              si.total_amount AS total, si.paid_amount AS paid, si.remaining_amount AS remaining,
+              si.total_amount / 100.0 AS total, si.paid_amount / 100.0 AS paid, si.remaining_amount / 100.0 AS remaining,
               si.payment_status AS paymentStatus
        FROM sales_invoices si
        LEFT JOIN customers c ON c.id = si.customer_id
        LEFT JOIN warehouses w ON w.id = si.warehouse_id
-       WHERE si.date = ? AND si.invoice_status != 'VOID' AND si.remaining_amount > 0.009 AND ${salesScope.clause}
+       WHERE si.date = ? AND si.invoice_status != 'VOID' AND si.remaining_amount > 1 AND ${salesScope.clause}
        ORDER BY si.created_at DESC`,
       [day, ...salesScope.params]
     );
@@ -423,11 +423,11 @@ export class DailyOperationsService {
     const paymentScope = this.branchAccess.sqlScope('cp.branch_id', 'cr.branch_id', actor);
     const payments = this.db.query<DailyDebtPaymentRow>(
       `SELECT cp.id, cp.receipt_number AS receiptNumber, c.name AS customerName,
-              cp.amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName,
+              cp.amount / 100.0 AS amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName,
               CASE WHEN od.id IS NULL THEN 0 ELSE 1 END AS isOrderDeposit,
               CASE WHEN od.id IS NOT NULL AND COALESCE((
                 SELECT SUM(refund.amount) FROM order_deposit_refunds refund WHERE refund.order_deposit_id = od.id
-              ), 0) >= cp.amount - 0.009 THEN 1 ELSE 0 END AS isOrderDepositRefunded,
+              ) , 0) / 100.0 >= cp.amount / 100.0 - 0.009 THEN 1 ELSE 0 END AS isOrderDepositRefunded,
               'COLLECTION' AS movementType
        FROM customer_payments cp
        LEFT JOIN order_deposits od ON od.receipt_id = cp.id
@@ -441,7 +441,7 @@ export class DailyOperationsService {
     const refundScope = this.branchAccess.sqlScope('o.branch_id', undefined, actor);
     const depositRefunds = this.db.query<DailyDebtPaymentRow>(
       `SELECT odr.id, odr.refund_number AS receiptNumber, c.name AS customerName,
-              -odr.amount AS amount, odr.payment_method AS paymentType, odr.reason AS notes,
+              -odr.amount / 100.0 AS amount, odr.payment_method AS paymentType, odr.reason AS notes,
               u.full_name AS performedByName, 1 AS isOrderDeposit, 1 AS isOrderDepositRefunded,
               'ORDER_DEPOSIT_REFUND' AS movementType
        FROM order_deposit_refunds odr
@@ -458,7 +458,7 @@ export class DailyOperationsService {
     const dueInstallments = this.db.query<DailyDueInstallmentRow>(
       `SELECT i.id, p.plan_number AS planNumber, c.name AS customerName, c.phone AS customerPhone,
               i.sequence_number AS sequenceNumber, i.due_date AS dueDate,
-              i.amount, i.paid_amount AS paidAmount, i.remaining_amount AS remaining, i.status
+              i.amount / 100.0 AS amount, i.paid_amount / 100.0 AS paidAmount, i.remaining_amount / 100.0 AS remaining, i.status
        FROM installments i
        JOIN installment_plans p ON p.id = i.plan_id
        LEFT JOIN sales_invoices si ON si.id = p.invoice_id
@@ -469,10 +469,10 @@ export class DailyOperationsService {
     );
 
     const outstanding = this.db.query<{ total: number }>(
-      `SELECT COALESCE(SUM(si.remaining_amount), 0) AS total
+      `SELECT COALESCE(SUM(si.remaining_amount), 0) / 100.0 AS total
        FROM sales_invoices si
        LEFT JOIN warehouses w ON w.id = si.warehouse_id
-       WHERE si.invoice_status != 'VOID' AND si.remaining_amount > 0 AND ${salesScope.clause}`,
+       WHERE si.invoice_status != 'VOID' AND si.remaining_amount > 1 AND ${salesScope.clause}`,
       salesScope.params
     )[0]?.total || 0;
 

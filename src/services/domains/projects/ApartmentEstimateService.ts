@@ -36,7 +36,7 @@ export class ApartmentEstimateService {
       currentVersionStatus: EstimateVersionStatus | null;
     }>(
       `SELECT id, project_id AS projectId, name, area_m2 AS areaM2,
-              total_amount AS totalAmount, terms, contingency_percent AS contingencyPercent,
+              total_amount / 100.0 AS totalAmount, terms, contingency_percent AS contingencyPercent,
               tax_percent AS taxPercent, payments_json AS paymentsJson, rooms_json AS roomsJson,
               cost_lines_json AS costLinesJson, quotation_id AS quotationId,
               created_at AS createdAt, updated_at AS updatedAt,
@@ -143,7 +143,7 @@ export class ApartmentEstimateService {
       txDb.run(
         `INSERT INTO project_apartment_estimates
           (id, project_id, name, area_m2, total_amount, terms, contingency_percent, tax_percent, payments_json, rooms_json, cost_lines_json, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
            area_m2 = excluded.area_m2,

@@ -7,6 +7,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { BranchService } from '../../../services/domains/organization/BranchService';
 import { EmployeeDepartmentAccessService, type DepartmentScope } from '../../../services/domains/auth/EmployeeDepartmentAccessService';
+import { AuthorizationAdminService } from '../../../services/domains/auth/permissions/authorizationAdminService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 import { useToast } from '../../../components/ui/Toast';
@@ -45,7 +46,7 @@ export const AdminUsersTab: React.FC = () => {
   const [pinChangeRequests, setPinChangeRequests] = useState<ReturnType<AuthService['getPendingLoginPinChanges']>>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | 'department-scope' | null>(null);
+  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | 'department-scope' | 'warehouse-scope' | null>(null);
   const [active, setActive] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [newPassword, setNewPassword] = useState('');
@@ -55,6 +56,8 @@ export const AdminUsersTab: React.FC = () => {
   const [departmentScope, setDepartmentScope] = useState<DepartmentScope>('ALL');
   const [departmentOptions, setDepartmentOptions] = useState<Array<{ id: string; name: string; branchId: string | null }>>([]);
   const [assignedDepartmentIds, setAssignedDepartmentIds] = useState<string[]>([]);
+  const [warehouseOptions, setWarehouseOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [assignedWarehouseIds, setAssignedWarehouseIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const currentUserIsAdmin = AuthService.getCurrentUser()?.role === 'ADMIN';
 
@@ -166,6 +169,26 @@ export const AdminUsersTab: React.FC = () => {
     void run(
       () => new EmployeeDepartmentAccessService().updateAccess(active.id, departmentScope, assignedDepartmentIds),
       'تم تحديث نطاق أقسام الموارد البشرية.'
+    );
+  };
+
+  const openWarehouseScope = (user: User) => {
+    try {
+      setActive(user);
+      setAssignedWarehouseIds(AuthorizationAdminService.listWarehouseGrants(user.id).map((g) => g.warehouseId));
+      setWarehouseOptions(AuthorizationAdminService.listWarehouses());
+      setModal('warehouse-scope');
+    } catch (error: any) {
+      toast.error('تعذر تحميل نطاق المخازن', error?.message || String(error));
+    }
+  };
+
+  const submitWarehouseScope = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!active) return;
+    void run(
+      () => AuthorizationAdminService.setWarehouseGrants(active.id, assignedWarehouseIds),
+      'تم تحديث نطاق المخازن.'
     );
   };
 
@@ -365,6 +388,11 @@ export const AdminUsersTab: React.FC = () => {
                       {user.role !== 'ADMIN' && can('branches.manage_users') && (
                         <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800">
                           نطاق الأقسام
+                        </button>
+                      )}
+                      {user.role !== 'ADMIN' && can('branches.manage_users') && (
+                        <button onClick={() => openWarehouseScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-slate-800">
+                          نطاق المخازن
                         </button>
                       )}
                     </div>
@@ -586,6 +614,33 @@ export const AdminUsersTab: React.FC = () => {
             </div>
             <p className="text-[11px] leading-5 text-slate-500">تظل صلاحية الفرع مطبقة دائمًا. عند اختيار «الأقسام المسندة فقط» لن يرى المستخدم سجلات الموظفين غير المرتبطة بأحد الأقسام المسندة.</p>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الأقسام" />
+          </form>
+        </Modal>
+      )}
+
+      {modal === 'warehouse-scope' && active && (
+        <Modal title={`نطاق المخازن: ${active.fullName}`} onClose={() => setModal(null)}>
+          <form onSubmit={submitWarehouseScope} className="space-y-4">
+            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">المخازن المسموحة</p>
+              {warehouseOptions.map((warehouse) => (
+                <label key={warehouse.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={assignedWarehouseIds.includes(warehouse.id)}
+                    onChange={(event) => setAssignedWarehouseIds((current) =>
+                      event.target.checked
+                        ? [...new Set([...current, warehouse.id])]
+                        : current.filter((id) => id !== warehouse.id)
+                    )}
+                  />
+                  {warehouse.name}
+                </label>
+              ))}
+              {warehouseOptions.length === 0 && <p className="text-xs text-slate-500">لا توجد مخازن معرفة.</p>}
+            </div>
+            <p className="text-[11px] leading-5 text-slate-500">بدون تحديد أي مخزن يكون المستخدم غير مقيّد (كل المخازن). عند التحديد يرى فقط المخازن المختارة — والمخزن التابع لفرع مسموح يُقبل أيضًا.</p>
+            <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق المخازن" />
           </form>
         </Modal>
       )}

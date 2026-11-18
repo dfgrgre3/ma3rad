@@ -6,7 +6,7 @@ import type { CountItem } from '../../../types/inventory/countSessions';
 export function updateCountItem(txDb: DatabaseManager, item: CountItem, actorId: string, countId: string): void {
   txDb.run(`
     UPDATE stock_count_items
-    SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ?,
+    SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ROUND(?*100),
         discrepancy_reason = ?, notes = ?, counted_by = ?, counted_at = CURRENT_TIMESTAMP
     WHERE id = ? AND count_id = ?
   `, [

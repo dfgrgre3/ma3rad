@@ -141,10 +141,10 @@ export const SupplierDetailPage: React.FC = () => {
 
         if (canViewPurchases) {
           const paymentColumns = canViewFinancials
-            ? 'pi.paid_amount, pi.remaining_amount, pi.payment_status'
+            ? 'pi.paid_amount / 100.0 AS paid_amount, pi.remaining_amount / 100.0 AS remaining_amount, pi.payment_status'
             : '0 AS paid_amount, 0 AS remaining_amount, NULL AS payment_status';
           const invs = db.query<any>(
-          `SELECT pi.id, pi.invoice_number, pi.date, pi.total_amount, ${paymentColumns}, pi.notes, pi.created_at
+          `SELECT pi.id, pi.invoice_number, pi.date, pi.total_amount / 100.0 AS total_amount, ${paymentColumns}, pi.notes, pi.created_at
            FROM purchase_invoices pi
            WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
            ORDER BY pi.date DESC, pi.created_at DESC`,
@@ -154,7 +154,7 @@ export const SupplierDetailPage: React.FC = () => {
 
           const ords = db.query<any>(
             `SELECT po.id, po.order_number, po.date, po.expected_date AS expected_delivery_date,
-                    po.total_amount, po.status, po.created_at
+                    po.total_amount / 100.0 AS total_amount, po.status, po.created_at
              FROM purchase_orders po
              LEFT JOIN warehouses w ON w.id = po.warehouse_id
              WHERE po.supplier_id = ? AND ${orderScope.clause}
@@ -164,7 +164,7 @@ export const SupplierDetailPage: React.FC = () => {
           setOrders(ords);
 
           const rets = db.query<any>(
-            `SELECT pr.id, pr.return_number, pr.date, pr.total_amount, pr.reason, pr.created_at
+            `SELECT pr.id, pr.return_number, pr.date, pr.total_amount / 100.0 AS total_amount, pr.reason, pr.created_at
              FROM purchase_returns pr
              LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
              LEFT JOIN warehouses w ON w.id = pr.warehouse_id
@@ -189,8 +189,8 @@ export const SupplierDetailPage: React.FC = () => {
               pii.product_id AS productId,
               pii.product_name AS productName,
               pii.quantity_m2 AS quantityM2,
-              pii.unit_cost AS unitCost,
-              COALESCE(NULLIF(pii.effective_unit_cost, 0), pii.unit_cost) AS effectiveUnitCost,
+              pii.unit_cost / 100.0 AS unitCost,
+              COALESCE(NULLIF(pii.effective_unit_cost, 0) / 100.0, pii.unit_cost / 100.0) AS effectiveUnitCost,
               pi.matching_status AS matchingStatus
             FROM purchase_invoice_items pii
             JOIN purchase_invoices pi ON pi.id = pii.purchase_id
@@ -208,7 +208,7 @@ export const SupplierDetailPage: React.FC = () => {
 
         if (canViewFinancials) {
           const pays = db.query<any>(
-          `SELECT sp.id, sp.receipt_number, sp.date, sp.amount, sp.payment_type, sp.notes,
+          `SELECT sp.id, sp.receipt_number, sp.date, sp.amount / 100.0 AS amount, sp.payment_type, sp.notes,
                   sp.register_id, sp.created_at
            FROM supplier_payments sp
            WHERE sp.supplier_id = ? AND ${paymentScope.clause}

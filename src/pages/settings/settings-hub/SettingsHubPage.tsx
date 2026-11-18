@@ -8,6 +8,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { ApprovalSettingsPage } from '../approvals/ApprovalSettingsPage';
 import { Link } from 'react-router-dom';
+import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 
 const ADMIN_TABS = ['general', 'business', 'branding', 'customization', 'invoice', 'inventory', 'operations', 'security', 'backup'];
 
@@ -160,17 +161,30 @@ const UpdateSettings: React.FC = () => {
   );
 };
 
+// Query-param tabs mirror dedicated routes; each is gated by the same route
+// rule so /settings?tab=X can never show a section its route would deny.
+const TAB_ROUTES: Record<string, string> = {
+  appConfig: '/settings/app-configuration',
+  configStudio: '/settings/configuration-studio',
+  approvals: '/settings/approvals',
+};
+
 export const SettingsHubPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('tab');
+  const canAccess = useRouteAccess();
 
-  if (requested === 'appConfig') {
-    return <AppConfigurationPage />;
-  }
-  if (requested === 'configStudio') {
-    return <ConfigurationStudioPage />;
-  }
-  if (requested === 'approvals') {
+  const tabRoute = requested ? TAB_ROUTES[requested] : undefined;
+  if (tabRoute) {
+    if (!canAccess(tabRoute)) {
+      return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من الإعدادات.</div>;
+    }
+    if (requested === 'appConfig') {
+      return <AppConfigurationPage />;
+    }
+    if (requested === 'configStudio') {
+      return <ConfigurationStudioPage />;
+    }
     return <ApprovalSettingsPage />;
   }
 

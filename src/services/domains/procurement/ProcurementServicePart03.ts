@@ -141,7 +141,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     today: string,
   ): void {
     const product = db.query<GoodsReceiptProduct>(
-      `SELECT name, cost_price, meters_per_box, product_type, base_unit, grade FROM products WHERE id = ?`,
+      `SELECT name, cost_price / 100.0 AS cost_price, meters_per_box, product_type, base_unit, grade FROM products WHERE id = ?`,
       [item.productId],
     )[0];
     if (!product) throw new Error(`المنتج ${item.productId} غير موجود.`);
@@ -174,7 +174,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
         id, grn_id, purchase_order_item_id, product_id, product_name,
         ordered_quantity_m2, received_quantity_m2, accepted_quantity_m2, damaged_quantity_m2, shortage_quantity_m2,
         batch_number, tone_shade, caliber, grade, unit_cost, inspection_notes, quality_verdict
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?)
     `, [
       `grni_${uuidv4().substring(0, 8)}`, grnId, item.purchaseOrderItemId || null, item.productId, productName,
       Number(item.orderedQuantityM2 || 0), Number(item.receivedQuantityM2), Number(item.acceptedQuantityM2),
@@ -240,7 +240,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
       INSERT INTO product_batches (
         id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
         production_date, received_date, supplier_id, cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?)
     `, [
       batchId, item.productId, dto.warehouseId, batchNumber,
       item.toneShade || 'STD', item.caliber || '0', item.grade || product.grade || 'GRADE_1',

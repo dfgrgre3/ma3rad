@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { AttendanceTimeService } from '../hr/AttendanceTimeService';
 
 export type OperationsWorkMode = 'NORMAL' | 'TWO_SHIFTS' | 'THREE_SHIFTS' | 'CONTINUOUS';
@@ -1042,8 +1043,8 @@ export class OperationsShiftService {
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
               d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
-              h.status AS handoverStatus, h.expected_cash AS handoverExpected,
-              h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
+              h.status AS handoverStatus, h.expected_cash / 100.0 AS handoverExpected,
+              h.actual_cash / 100.0 AS handoverActual, h.cash_difference / 100.0 AS handoverDifference,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
@@ -1111,8 +1112,8 @@ export class OperationsShiftService {
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
               d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
-              h.status AS handoverStatus, h.expected_cash AS handoverExpected,
-              h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
+              h.status AS handoverStatus, h.expected_cash / 100.0 AS handoverExpected,
+              h.actual_cash / 100.0 AS handoverActual, h.cash_difference / 100.0 AS handoverDifference,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
@@ -1141,8 +1142,8 @@ export class OperationsShiftService {
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
               d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
-              h.status AS handoverStatus, h.expected_cash AS handoverExpected,
-              h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
+              h.status AS handoverStatus, h.expected_cash / 100.0 AS handoverExpected,
+              h.actual_cash / 100.0 AS handoverActual, h.cash_difference / 100.0 AS handoverDifference,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
@@ -1168,12 +1169,12 @@ export class OperationsShiftService {
 
   public getCashSummary(operationShiftId: string): OperationCashSummary {
     const rows = this.db.query<any>(
-      `SELECT status, expected_ending_cash AS expectedEndingCash, actual_ending_cash AS actualEndingCash,
-              cash_difference AS cashDifference, opening_balance AS openingBalance,
-              total_sales_cash AS totalSalesCash, total_customer_payments AS totalCustomerPayments,
-              total_supplier_payments AS totalSupplierPayments, total_expenses AS totalExpenses,
-              total_refunds AS totalRefunds, total_partner_inflows AS totalPartnerInflows,
-              total_partner_outflows AS totalPartnerOutflows
+      `SELECT status, expected_ending_cash / 100.0 AS expectedEndingCash, actual_ending_cash / 100.0 AS actualEndingCash,
+              cash_difference / 100.0 AS cashDifference, opening_balance / 100.0 AS openingBalance,
+              total_sales_cash / 100.0 AS totalSalesCash, total_customer_payments / 100.0 AS totalCustomerPayments,
+              total_supplier_payments / 100.0 AS totalSupplierPayments, total_expenses / 100.0 AS totalExpenses,
+              total_refunds / 100.0 AS totalRefunds, total_partner_inflows / 100.0 AS totalPartnerInflows,
+              total_partner_outflows / 100.0 AS totalPartnerOutflows
        FROM cash_shifts WHERE operation_shift_id = ?`,
       [operationShiftId]
     );
@@ -1197,7 +1198,7 @@ export class OperationsShiftService {
       }
     }
     const delivered = Number(this.db.query<{ value: number }>(
-      `SELECT COALESCE(SUM(cash_delivered), 0) AS value FROM operation_shift_handovers
+      `SELECT COALESCE(SUM(cash_delivered), 0) / 100.0 AS value FROM operation_shift_handovers
        WHERE operation_shift_id = ? AND status IN ('PENDING', 'RECEIVED')`,
       [operationShiftId]
     )[0]?.value || 0);
@@ -1219,14 +1220,14 @@ export class OperationsShiftService {
        WHERE st.operation_shift_id = ? ORDER BY st.role DESC, e.name`,
       [id]
     );
-    const handoverRow = this.db.query<any>(
+    const handoverRow = unscaleMoneyRow(this.db.query<any>(
       `SELECT h.*, u.full_name AS submittedByName, r.full_name AS receivedByName
        FROM operation_shift_handovers h
        LEFT JOIN users u ON u.id = h.submitted_by
        LEFT JOIN users r ON r.id = h.received_by
        WHERE h.operation_shift_id = ?`,
       [id]
-    )[0];
+    )[0], ['expected_cash', 'actual_cash', 'cash_difference', 'cash_delivered']);
     const incidents = this.db.query<OperationShiftIncident>(
       `SELECT i.id, i.operation_shift_id AS operationShiftId, i.type, i.severity, i.title,
               i.description, i.started_at AS startedAt, i.resolved_at AS resolvedAt,
@@ -1242,8 +1243,8 @@ export class OperationsShiftService {
       `SELECT cs.id, cs.shift_number AS shiftNumber, cs.user_id AS userId,
               u.full_name AS userName, cr.name AS registerName, cs.status,
               cs.opened_at AS openedAt, cs.closed_at AS closedAt,
-              cs.opening_balance AS openingBalance, cs.expected_ending_cash AS expectedEndingCash,
-              cs.actual_ending_cash AS actualEndingCash, cs.cash_difference AS cashDifference
+              cs.opening_balance / 100.0 AS openingBalance, cs.expected_ending_cash / 100.0 AS expectedEndingCash,
+              cs.actual_ending_cash / 100.0 AS actualEndingCash, cs.cash_difference / 100.0 AS cashDifference
        FROM cash_shifts cs
        JOIN users u ON u.id = cs.user_id
        JOIN cash_registers cr ON cr.id = cs.register_id
@@ -1659,7 +1660,7 @@ export class OperationsShiftService {
            (id, operation_shift_id, expected_cash, actual_cash, cash_difference, cash_delivered,
             pending_orders_json, inventory_status, equipment_status, notes, next_staff_json,
             status, submitted_by, submitted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+         VALUES (?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
         [handoverId, operationShiftId, expected, input.actualCash, difference, delivered,
           JSON.stringify(input.pendingOrders || []), input.inventoryStatus?.trim() || null,
           input.equipmentStatus?.trim() || null, input.notes?.trim() || null,
@@ -2011,7 +2012,7 @@ export class OperationsShiftService {
                      ELSE COALESCE(c.working_days_per_month, 26) * 8.0 END)
                      * p.overtime_minutes / 60.0 * (COALESCE(c.overtime_multiplier, 1.5) - 1)
                    ELSE 0 END
-               ), 0)
+               ), 0) / 100.0
                FROM employee_attendance_periods p
                JOIN employees e ON e.id = p.employee_id
                LEFT JOIN branches b ON b.id = e.branch_id
@@ -2027,8 +2028,8 @@ export class OperationsShiftService {
                WHERE p.operation_shift_id = os.id) AS downtimeMinutes,
               (SELECT COUNT(*) FROM operation_shift_incidents i
                WHERE i.operation_shift_id = os.id) AS incidents,
-              h.expected_cash AS handoverExpected, h.actual_cash AS handoverActual,
-              h.cash_difference AS handoverDifference, h.cash_delivered AS handoverDelivered
+              h.expected_cash / 100.0 AS handoverExpected, h.actual_cash / 100.0 AS handoverActual,
+              h.cash_difference / 100.0 AS handoverDifference, h.cash_delivered / 100.0 AS handoverDelivered
        FROM operation_shifts os
        JOIN attendance_shifts d ON d.id = os.definition_id
        LEFT JOIN employees sup ON sup.id = os.supervisor_id

@@ -26,7 +26,7 @@ export function postCountItems(
   const canonicalItems = txDb.query<CountItem>(`
     SELECT id, product_id AS productId, product_name AS productName,
       system_quantity_m2 AS systemQuantityM2, counted_quantity_m2 AS countedQuantityM2,
-      variance_m2 AS varianceM2, unit_cost AS unitCost, variance_value AS varianceValue,
+      variance_m2 AS varianceM2, unit_cost / 100.0 AS unitCost, variance_value / 100.0 AS varianceValue,
       COALESCE(discrepancy_reason, '') AS discrepancyReason, COALESCE(notes, '') AS notes,
       location_id AS locationId
     FROM stock_count_items WHERE count_id = ?`, [activeSession.id]);

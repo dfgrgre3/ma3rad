@@ -1,5 +1,6 @@
 import type { Database, SqlValue } from 'sql.js';
 import { v4 as uuidv4 } from 'uuid';
+import { toPiastres, roundMoney } from '../../utils/money';
 
 export interface LedgerPostingLine {
   accountCode: string;
@@ -34,13 +35,11 @@ export function queryLedgerRows<T extends Record<string, unknown>>(
 }
 
 function round2(value: number): number {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return 0;
-  return Math.round((amount + Number.EPSILON * Math.sign(amount)) * 100) / 100;
+  return roundMoney(value);
 }
 
 function cents(value: number): number {
-  return Math.round(value * 100);
+  return toPiastres(value);
 }
 
 function resolvePostingBranchId(db: Database, posting: LedgerPosting): string | null {
@@ -332,11 +331,12 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   const branchId = resolvePostingBranchId(db, posting);
   const companyId = resolvePostingCompanyId(db, branchId);
 
+  // Store money columns as INTEGER piastres.
   db.run(
     `INSERT INTO journal_entries (
        id, entry_number, date, description, reference_type, reference_id,
        total_debit, total_credit, is_posted, created_by, branch_id, company_id
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), 1, ?, ?, ?)`,
     [entryId, entryNumber, posting.date, posting.description.trim(), posting.referenceType,
       posting.referenceId, totalDebit, totalCredit, posting.createdBy, branchId, companyId]
   );
@@ -344,11 +344,12 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   for (const line of lines) {
     db.run(
       `INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description, cost_center_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ROUND(? * 100), ROUND(? * 100), ?, ?)`,
       [`jvl_${uuidv4().slice(0, 8)}`, entryId, line.accountId, line.debit, line.credit, line.description?.trim() || null, line.costCenterId || null]
     );
-    db.run('UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?', [
-      round2(line.debit - line.credit),
+    // Balance is stored as INTEGER piastres.
+    db.run('UPDATE chart_of_accounts SET balance = balance + ROUND(? * 100) WHERE id = ?', [
+      line.debit - line.credit,
       line.accountId,
     ]);
   }
@@ -381,7 +382,7 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
         WHERE ? >= ?
       `, [
         `sble_${uuidv4().slice(0, 12)}`, entryId, companyId, party.partyType, party.partyId, accountCode,
-        round2(movement), posting.date, posting.referenceType, posting.referenceId,
+        toPiastres(movement), posting.date, posting.referenceType, posting.referenceId,
         posting.date, coverage.coverageStartDate,
       ]);
     }
@@ -400,7 +401,7 @@ export function reverseLedgerEntry(
     'SELECT id FROM journal_entries WHERE id = ? AND is_posted = 1', [entryId])[0];
   if (!original) return null;
   const originalLines = queryLedgerRows<{ code: string; debit: number; credit: number; description: string | null }>(db, `
-    SELECT coa.code, jel.debit, jel.credit, jel.description
+    SELECT coa.code, jel.debit / 100.0 AS debit, jel.credit / 100.0 AS credit, jel.description
     FROM journal_entry_lines jel
     JOIN chart_of_accounts coa ON coa.id = jel.account_id
     WHERE jel.entry_id = ? ORDER BY jel.id

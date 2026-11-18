@@ -288,19 +288,22 @@ export const ProductsView: React.FC = () => {
     }
   }, [attributeService, brandService, categoryService, inventoryService, operationalFieldService]);
 
-  const loadStats = useCallback(() => {
+  const loadStats = useCallback(async () => {
     try {
-      setStats(productService.getProductStats());
+      setStats(await productService.getProductStatsAsync());
     } catch (e) {
       console.error(e);
     }
   }, [productService]);
 
-  const loadProducts = useCallback(() => {
+  const productsLoadSeq = useRef(0);
+
+  const loadProducts = useCallback(async () => {
+    const seq = ++productsLoadSeq.current;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const result = productService.getProductsPage(
+      const result = await productService.getProductsPageAsync(
         search,
         selectedCategory || undefined,
         selectedBrand || undefined,
@@ -317,6 +320,7 @@ export const ProductsView: React.FC = () => {
           status: productStatus,
         },
       );
+      if (seq !== productsLoadSeq.current) return;
       setProducts(result.items);
       setOperationalValuesByProduct(operationalFieldService.getRecordValuesForExport(
         'products', result.items.map((product) => product.id),
@@ -325,10 +329,11 @@ export const ProductsView: React.FC = () => {
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
     } catch (e: any) {
+      if (seq !== productsLoadSeq.current) return;
       console.error(e);
       setLoadError(e?.message || 'تعذر تحميل الأصناف');
     } finally {
-      setIsLoading(false);
+      if (seq === productsLoadSeq.current) setIsLoading(false);
     }
   }, [search, selectedCategory, selectedBrand, page, pageSize, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, operationalFieldService, productService]);
 

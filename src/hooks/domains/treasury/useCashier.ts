@@ -36,16 +36,18 @@ export function useCashier() {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const regs = cashierService.getAllRegisters();
-      const shift = cashierService.getActiveShift(currentUser?.id);
+      const [regs, shift, exps, cats] = await Promise.all([
+        cashierService.getAllRegistersAsync(),
+        cashierService.getActiveShiftAsync(currentUser?.id),
+        cashierService.getAllExpensesAsync(),
+        cashierService.getExpenseCategoriesAsync(),
+      ]);
       let currentOperationsShift: OperationShiftInstance | null = null;
       try {
         currentOperationsShift = operationsShiftService.getOpenShiftForBranch();
       } catch {
         currentOperationsShift = null;
       }
-      const exps = cashierService.getAllExpenses();
-      const cats = cashierService.getExpenseCategories();
       const defaultRegister = regs.find((register) => register.isDefault) || regs[0];
       const schedule = cashierService.getShiftAutoCloseSchedule();
 
@@ -54,7 +56,7 @@ export function useCashier() {
       setOperationsShift(currentOperationsShift);
       if (defaultRegister) {
         setShiftRegisterId((selected) => (regs.some((r) => r.id === selected) ? selected : defaultRegister.id));
-        setLastClosedShift(cashierService.getLastClosedShift(shift?.registerId || defaultRegister.id));
+        setLastClosedShift(await cashierService.getLastClosedShiftAsync(shift?.registerId || defaultRegister.id));
       }
       setAutoCloseEnabled(schedule.enabled);
       setAutoCloseTime(schedule.closeTime);

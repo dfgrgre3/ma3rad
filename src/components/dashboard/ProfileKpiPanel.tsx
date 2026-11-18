@@ -49,7 +49,7 @@ export const ProfileKpiPanel: React.FC = () => {
         const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
         
         // Get metrics from AccountingService
-        const metrics = accountingService.getDashboardMetrics();
+        const metrics = await accountingService.getDashboardMetricsAsync();
         
         // Get executive data for more KPIs
         const execData = await dashboardMetricsService.getExecutiveDashboardData(monthStart, today);

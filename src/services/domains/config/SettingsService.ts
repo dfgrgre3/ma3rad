@@ -271,12 +271,12 @@ export class SettingsService {
           throw new Error('لا يمكن تفعيل FIFO تلقائيًا مع وجود سجل تكلفة سابق. احتفظ بالسجلات الحالية ونفّذ تحويلًا مرحليًا قابلًا للتدقيق.');
         }
         const openingRows = tx.query<any>(`SELECT ws.product_id AS productId,ws.warehouse_id AS warehouseId,
-          ws.quantity_m2 AS quantity,p.cost_price AS unitCost FROM warehouse_stock ws
+          ws.quantity_m2 AS quantity,p.cost_price / 100.0 AS unitCost FROM warehouse_stock ws
           JOIN products p ON p.id=ws.product_id WHERE ws.quantity_m2>0`);
         for (const row of openingRows) {
           tx.run(`INSERT INTO inventory_cost_layers
             (id,product_id,warehouse_id,source_type,source_id,received_at,quantity_received,quantity_remaining,unit_cost,is_estimated)
-            VALUES (?,?,?,'FIFO_ACTIVATION',NULL,'0001-01-01',?,?,?,?,1)`, [
+            VALUES (?,?,?,'FIFO_ACTIVATION',NULL,'0001-01-01',?,?,?,ROUND(?*100),1)`, [
             `icl_${uuidv4().replace(/-/g, '').slice(0, 12)}`, row.productId,row.warehouseId,
             row.quantity,row.quantity,Math.max(0,Number(row.unitCost)||0),
           ]);

@@ -163,7 +163,7 @@ export const DebtsDashboardPage: React.FC = () => {
           paid: number;
           remaining: number;
         }>(
-          `SELECT id, invoice_number AS invoiceNumber, date, total_amount AS total, paid_amount AS paid, remaining_amount AS remaining FROM sales_invoices WHERE customer_id = ? AND invoice_status <> 'VOID' ORDER BY date DESC`,
+          `SELECT id, invoice_number AS invoiceNumber, date, total_amount / 100.0 AS total, paid_amount / 100.0 AS paid, remaining_amount / 100.0 AS remaining FROM sales_invoices WHERE customer_id = ? AND invoice_status <> 'VOID' ORDER BY date DESC`,
           [id],
         )
         .map((invoice) => ({
@@ -182,7 +182,7 @@ export const DebtsDashboardPage: React.FC = () => {
           }>(
             `SELECT i.product_name AS name,i.product_sku AS sku,i.product_grade AS grade,i.size,i.quantity_m2 AS quantity,
           COALESCE(p.base_unit, i.uom, i.sold_by, 'M2') AS unit,
-          i.unit_price AS unitPrice,i.discount_amount AS discount,i.total_price AS total,
+          i.unit_price / 100.0 AS unitPrice,i.discount_amount / 100.0 AS discount,i.total_price / 100.0 AS total,
           COALESCE((SELECT SUM(sri.quantity_m2) FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.original_invoice_id=i.invoice_id AND sri.product_id=i.product_id),0) AS returned
          FROM sales_invoice_items i
          LEFT JOIN products p ON p.id = i.product_id
@@ -200,11 +200,11 @@ export const DebtsDashboardPage: React.FC = () => {
         paymentType: string;
         notes: string | null;
       }>(
-        `SELECT id,invoice_id AS invoiceId,payment_group_id AS paymentGroupId,receipt_number AS receiptNumber,date,amount,payment_type AS paymentType,notes FROM customer_payments WHERE customer_id=? ORDER BY date`,
+        `SELECT id,invoice_id AS invoiceId,payment_group_id AS paymentGroupId,receipt_number AS receiptNumber,date,amount / 100.0 AS amount,payment_type AS paymentType,notes FROM customer_payments WHERE customer_id=? ORDER BY date`,
         [id],
       );
       const promises = db.query<PromiseRow>(
-        `SELECT id,promised_amount AS promisedAmount,promise_date AS promiseDate,followup_date AS followupDate,status,notes FROM customer_payment_promises WHERE customer_id=? ORDER BY created_at DESC`,
+        `SELECT id,promised_amount / 100.0 AS promisedAmount,promise_date AS promiseDate,followup_date AS followupDate,status,notes FROM customer_payment_promises WHERE customer_id=? ORDER BY created_at DESC`,
         [id],
       );
       setCustomerDetails((prev) => ({
@@ -236,7 +236,7 @@ export const DebtsDashboardPage: React.FC = () => {
       const db = DatabaseManager.getInstance();
       db.executeTransaction((tx) => {
         tx.run(
-          `INSERT INTO customer_payment_promises (id,customer_id,promised_amount,promise_date,followup_date,notes,created_by) VALUES (?,?,?,?,?,?,?)`,
+          `INSERT INTO customer_payment_promises (id,customer_id,promised_amount,promise_date,followup_date,notes,created_by) VALUES (?,?,ROUND(?*100),?,?,?,?,?)`,
           [
             promiseId,
             promiseCustomerId,
@@ -261,7 +261,7 @@ export const DebtsDashboardPage: React.FC = () => {
         );
       });
       const promises = db.query<PromiseRow>(
-        `SELECT id,promised_amount AS promisedAmount,promise_date AS promiseDate,followup_date AS followupDate,status,notes FROM customer_payment_promises WHERE customer_id=? ORDER BY created_at DESC`,
+        `SELECT id,promised_amount / 100.0 AS promisedAmount,promise_date AS promiseDate,followup_date AS followupDate,status,notes FROM customer_payment_promises WHERE customer_id=? ORDER BY created_at DESC`,
         [promiseCustomerId],
       );
       setCustomerDetails((prev) => ({
@@ -334,7 +334,7 @@ export const DebtsDashboardPage: React.FC = () => {
   };
   const exportOverdueReport = (format: "excel" | "pdf") => {
     const rows = DatabaseManager.getInstance().query(
-      `SELECT c.name AS customer,c.phone,si.invoice_number AS invoice,si.date,si.due_date AS dueDate,si.total_amount AS total,si.paid_amount AS paid,si.remaining_amount AS remaining,CAST(julianday(date('now','localtime'))-julianday(si.due_date) AS INTEGER) AS daysOverdue FROM sales_invoices si JOIN customers c ON c.id=si.customer_id WHERE si.invoice_status<>'VOID' AND si.due_date IS NOT NULL AND si.due_date<date('now','localtime') AND si.remaining_amount>0.009 ORDER BY si.due_date`,
+      `SELECT c.name AS customer,c.phone,si.invoice_number AS invoice,si.date,si.due_date AS dueDate,si.total_amount / 100.0 AS total,si.paid_amount / 100.0 AS paid,si.remaining_amount / 100.0 AS remaining,CAST(julianday(date('now','localtime'))-julianday(si.due_date) AS INTEGER) AS daysOverdue FROM sales_invoices si JOIN customers c ON c.id=si.customer_id WHERE si.invoice_status<>'VOID' AND si.due_date IS NOT NULL AND si.due_date<date('now','localtime') AND si.remaining_amount>1 ORDER BY si.due_date`,
     );
     const options = {
       title: "تقرير الفواتير المتأخرة",
@@ -387,12 +387,10 @@ export const DebtsDashboardPage: React.FC = () => {
     }
   };
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const db = DatabaseManager.getInstance();
-      setDebts(debtService.getDebts(search));
-      setTotals(debtService.getTotals());
       const actor = AuthService.requireAuth();
       const invoiceScope = branchAccess.warehouseBranchScope(
         "w",
@@ -405,38 +403,51 @@ export const DebtsDashboardPage: React.FC = () => {
         actor,
       );
       const companyScope = branchAccess.companyScope("r.company_id", actor);
-      const value = (sql: string, params: unknown[] = []) =>
-        Number(db.query<{ v: number }>(sql, params)[0]?.v || 0);
-      const scopedInvoiceWhere = `si.invoice_status <> 'VOID' AND si.remaining_amount > 0.009 AND ${invoiceScope.clause}`;
-      setSummary({
-        openCustomers: value(
+      const scopedInvoiceWhere = `si.invoice_status <> 'VOID' AND si.remaining_amount > 1 AND ${invoiceScope.clause}`;
+      const value = async (sql: string, params: any[] = []) =>
+        Number((await db.queryAsync<{ v: number }>(sql, params))[0]?.v || 0);
+      const [debts, totals, openCustomers, openInvoices, overdueInvoices, overdueInvoiceCount, pendingGoodsValue, overdueOrders, otherReceivables] = await Promise.all([
+        debtService.getDebtsAsync(search),
+        debtService.getTotalsAsync(),
+        value(
           `SELECT COUNT(DISTINCT si.customer_id) AS v FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE ${scopedInvoiceWhere}`,
           invoiceScope.params,
         ),
-        openInvoices: value(
+        value(
           `SELECT COUNT(*) AS v FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE ${scopedInvoiceWhere}`,
           invoiceScope.params,
         ),
-        overdueInvoices: value(
-          `SELECT COALESCE(SUM(si.remaining_amount),0) AS v FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE ${scopedInvoiceWhere} AND si.due_date IS NOT NULL AND si.due_date < date('now','localtime')`,
+        value(
+          `SELECT COALESCE(SUM(si.remaining_amount),0) / 100.0 AS v FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE ${scopedInvoiceWhere} AND si.due_date IS NOT NULL AND si.due_date < date('now','localtime')`,
           invoiceScope.params,
         ),
-        overdueInvoiceCount: value(
+        value(
           `SELECT COUNT(*) AS v FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE ${scopedInvoiceWhere} AND si.due_date IS NOT NULL AND si.due_date < date('now','localtime')`,
           invoiceScope.params,
         ),
-        pendingGoodsValue: value(
-          `SELECT COALESCE(SUM(CASE WHEN totals.subtotal>0 THEN totals.pending_value/totals.subtotal*po.total_amount ELSE 0 END),0) AS v FROM purchase_orders po JOIN warehouses w ON w.id=po.warehouse_id JOIN (SELECT purchase_order_id,SUM(quantity_m2*unit_cost) AS subtotal,SUM((quantity_m2-received_m2)*unit_cost) AS pending_value FROM purchase_order_items GROUP BY purchase_order_id) totals ON totals.purchase_order_id=po.id WHERE po.status IN ('SENT','CONFIRMED','PARTIAL') AND ${orderScope.clause}`,
+        value(
+          `SELECT COALESCE(SUM(CASE WHEN totals.subtotal>0 THEN totals.pending_value/totals.subtotal*po.total_amount ELSE 0 END),0) / 100.0 AS v FROM purchase_orders po JOIN warehouses w ON w.id=po.warehouse_id JOIN (SELECT purchase_order_id,SUM(quantity_m2*unit_cost) AS subtotal,SUM((quantity_m2-received_m2)*unit_cost) AS pending_value FROM purchase_order_items GROUP BY purchase_order_id) totals ON totals.purchase_order_id=po.id WHERE po.status IN ('SENT','CONFIRMED','PARTIAL') AND ${orderScope.clause}`,
           orderScope.params,
         ),
-        overdueOrders: value(
+        value(
           `SELECT COUNT(*) AS v FROM purchase_orders po JOIN warehouses w ON w.id=po.warehouse_id WHERE po.status IN ('SENT','CONFIRMED','PARTIAL') AND po.expected_date IS NOT NULL AND po.expected_date < date('now','localtime') AND ${orderScope.clause}`,
           orderScope.params,
         ),
-        otherReceivables: value(
+        value(
           `SELECT COUNT(*) AS v FROM receivables r WHERE r.status IN ('OPEN','IN_PROGRESS') AND ${companyScope.clause}`,
           companyScope.params,
         ),
+      ]);
+      setDebts(debts);
+      setTotals(totals);
+      setSummary({
+        openCustomers,
+        openInvoices,
+        overdueInvoices,
+        overdueInvoiceCount,
+        pendingGoodsValue,
+        overdueOrders,
+        otherReceivables,
       });
       setError(null);
     } catch (e: any) {
@@ -467,7 +478,7 @@ export const DebtsDashboardPage: React.FC = () => {
         invoiceNumber: string;
         remaining: number;
       }>(
-        `SELECT si.id, si.invoice_number AS invoiceNumber, si.remaining_amount AS remaining FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE si.customer_id=? AND si.invoice_status <> 'VOID' AND si.remaining_amount > 0.009 AND ${branchAccess.warehouseBranchScope("w", undefined, AuthService.requireAuth()).clause} ORDER BY si.date`,
+        `SELECT si.id, si.invoice_number AS invoiceNumber, si.remaining_amount / 100.0 AS remaining FROM sales_invoices si JOIN warehouses w ON w.id=si.warehouse_id WHERE si.customer_id=? AND si.invoice_status <> 'VOID' AND si.remaining_amount > 1 AND ${branchAccess.warehouseBranchScope("w", undefined, AuthService.requireAuth()).clause} ORDER BY si.date`,
         [
           d.id,
           ...branchAccess.warehouseBranchScope(

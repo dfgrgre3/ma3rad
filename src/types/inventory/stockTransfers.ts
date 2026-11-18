@@ -46,6 +46,8 @@ export interface StockTransfersTabsProps {
   historyCount: number;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  /** تبويب «ملخص حركة المخازن» يعرض أرصدة المخازن — يُخفى بدون inventory.view. */
+  canViewSummary?: boolean;
 }
 
 export interface WorkflowTransfersTableProps {

@@ -1,5 +1,26 @@
 export {};
 
+export interface CentralAppBackupInfo {
+  id: string;
+  tenantId?: string | null;
+  tenantName?: string | null;
+  deviceId?: string | null;
+  deviceName?: string | null;
+  name?: string | null;
+  type?: string;
+  status?: string;
+  sizeBytes?: number | null;
+  checksum?: string | null;
+  notes?: string | null;
+  restoreStatus?: 'NONE' | 'REQUESTED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  restoreRequestedBy?: string | null;
+  restoreRequestedAt?: string | null;
+  restoreError?: string | null;
+  restoreCompletedAt?: string | null;
+  createdAt?: string;
+  completedAt?: string | null;
+}
+
 declare global {
   type AppUpdateStatus = {
     status: 'idle' | 'unsupported' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -73,6 +94,15 @@ declare global {
           headers?: Record<string, string>;
           body?: string;
         }) => Promise<{ ok: boolean; status: number; body: unknown }>;
+      };
+      centralAppBackup?: {
+        status?: () => Promise<{ configured: boolean; activated: boolean }>;
+        list?: () => Promise<CentralAppBackupInfo[] | null>;
+        pending?: () => Promise<CentralAppBackupInfo | null>;
+        upload?: (payload: { fileName: string; name?: string; type?: string }) => Promise<CentralAppBackupInfo>;
+        fetchRestore?: (payload: { id: string }) => Promise<{ ok: boolean; bytes: Uint8Array; checksum: string | null }>;
+        reportResult?: (payload: { id: string; status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'; error?: string }) => Promise<CentralAppBackupInfo>;
+        onPendingRestore?: (callback: (pending: CentralAppBackupInfo | null) => void) => () => void;
       };
       sync?: {
         status?: () => Promise<{

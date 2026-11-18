@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ProjectService } from '../projects/ProjectService';
 
@@ -44,15 +45,13 @@ export class PurchaseRequestService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
 
-  public getRequests(search = '', status = 'ALL'): PurchaseRequest[] {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.purchases.requests.view');
+  private buildRequestsQuery(actor: ReturnType<typeof AuthService.requireAuth>, search: string, status: string): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     let sql = `
       SELECT pr.*, u.full_name AS requester_name, du.full_name AS decided_by_name,
         b.name AS branch_name, w.name AS warehouse_name,
         (SELECT COUNT(*) FROM purchase_request_items pri WHERE pri.request_id = pr.id) AS items_count,
-        (SELECT COALESCE(SUM(pri.quantity_m2 * pri.estimated_unit_cost), 0)
+        (SELECT COALESCE(SUM(pri.quantity_m2 * pri.estimated_unit_cost), 0) / 100.0
            FROM purchase_request_items pri WHERE pri.request_id = pr.id) AS estimated_total
       FROM purchase_requests pr
       LEFT JOIN users u ON u.id = pr.requested_by
@@ -68,7 +67,21 @@ export class PurchaseRequestService {
       params.push(term, term, term);
     }
     sql += ` ORDER BY pr.date DESC, pr.created_at DESC`;
+    return { sql, params };
+  }
+
+  public getRequests(search = '', status = 'ALL'): PurchaseRequest[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.requests.view');
+    const { sql, params } = this.buildRequestsQuery(actor, search, status);
     return this.db.query<PurchaseRequest>(sql, params);
+  }
+
+  public async getRequestsAsync(search = '', status = 'ALL'): Promise<PurchaseRequest[]> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.requests.view');
+    const { sql, params } = this.buildRequestsQuery(actor, search, status);
+    return this.db.queryAsync<PurchaseRequest>(sql, params);
   }
 
   public getProjectRequests(projectId: string): PurchaseRequest[] {
@@ -76,21 +89,40 @@ export class PurchaseRequestService {
     return this.getRequests().filter((request) => request.projectId === projectId);
   }
 
+  private buildRequestItemsQueries(requestId: string, actor: ReturnType<typeof AuthService.requireAuth>): { accessSql: string; accessParams: any[]; itemsSql: string; itemsParams: any[] } {
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
+    return {
+      accessSql: `SELECT pr.id FROM purchase_requests pr WHERE pr.id = ? AND ${scope.clause}`,
+      accessParams: [requestId, ...scope.params],
+      itemsSql: `SELECT pri.*, p.sku, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+       FROM purchase_request_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.request_id = ?`,
+      itemsParams: [requestId],
+    };
+  }
+
   public getItems(requestId: string): any[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.purchases.requests.view');
-    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
-    if (!this.db.query(
-      `SELECT pr.id FROM purchase_requests pr WHERE pr.id = ? AND ${scope.clause}`,
-      [requestId, ...scope.params]
-    ).length) {
+    const { accessSql, accessParams, itemsSql, itemsParams } = this.buildRequestItemsQueries(requestId, actor);
+    if (!this.db.query(accessSql, accessParams).length) {
       throw new Error('طلب الشراء غير موجود أو خارج نطاق الفروع المصرح به.');
     }
-    return this.db.query(
-      `SELECT pri.*, p.sku, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
-       FROM purchase_request_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.request_id = ?`,
-      [requestId]
-    );
+    return this.db.query(itemsSql, itemsParams)
+      .map((row) => unscaleMoneyRow(row, ['estimated_unit_cost']));
+  }
+
+  public async getItemsAsync(requestId: string): Promise<any[]> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.requests.view');
+    const { accessSql, accessParams, itemsSql, itemsParams } = this.buildRequestItemsQueries(requestId, actor);
+    const [accessRows, items] = await Promise.all([
+      this.db.queryAsync(accessSql, accessParams),
+      this.db.queryAsync(itemsSql, itemsParams),
+    ]);
+    if (!accessRows.length) {
+      throw new Error('طلب الشراء غير موجود أو خارج نطاق الفروع المصرح به.');
+    }
+    return items.map((row) => unscaleMoneyRow(row as Record<string, any>, ['estimated_unit_cost']));
   }
 
   public createRequest(input: {
@@ -140,7 +172,7 @@ export class PurchaseRequestService {
         db.run(
           `INSERT INTO purchase_request_items (id, request_id, product_id, product_name, quantity_m2,
             estimated_unit_cost, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?)`,
           [
             `pri_${uuidv4().substring(0, 8)}`, id, item.productId, p.name,
             item.quantityM2, round2(item.estimatedUnitCost || 0), item.notes || null,

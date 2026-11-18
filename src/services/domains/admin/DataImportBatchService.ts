@@ -69,7 +69,7 @@ export class DataImportBatchService {
     for (const { entityId } of records) {
       if (batch.entityType === 'customers') {
         const customer = db.query<{ currentBalance: number }>(
-          'SELECT current_balance FROM customers WHERE id=?',
+          'SELECT current_balance / 100.0 AS current_balance FROM customers WHERE id=?',
           [entityId],
         )[0];
         if (customer && Math.abs(Number(customer.currentBalance || 0)) > 1e-6) {

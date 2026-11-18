@@ -46,7 +46,7 @@ export function startCountSession(input: StartCountSessionInput): void {
     const productsSql = locationId
       ? `SELECT p.id as productId, p.name as productName,
                COALESCE(pls.quantity_m2, 0) as systemQuantityM2,
-               p.cost_price as costPrice, p.product_type as productType,
+               p.cost_price / 100.0 as costPrice, p.product_type as productType,
                p.base_unit as baseUnit, p.custom_unit as customUnit
          FROM product_location_stock pls
          JOIN products p ON p.id = pls.product_id
@@ -57,7 +57,7 @@ export function startCountSession(input: StartCountSessionInput): void {
          p.id as productId,
          p.name as productName,
          COALESCE(ws.quantity_m2, 0) as systemQuantityM2,
-         p.cost_price as costPrice,
+         p.cost_price / 100.0 as costPrice,
          p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit
        FROM products p
        LEFT JOIN warehouse_stock ws ON p.id = ws.product_id AND ws.warehouse_id = ?
@@ -102,7 +102,7 @@ export function startCountSession(input: StartCountSessionInput): void {
         INSERT INTO stock_count_items (
           id, count_id, product_id, product_name, system_quantity_m2,
           counted_quantity_m2, variance_m2, unit_cost, variance_value, location_id
-        ) VALUES (?, ?, ?, ?, ?, NULL, 0, ?, 0, ?)
+        ) VALUES (?, ?, ?, ?, ?, NULL, 0, ROUND(?*100), 0, ?)
       `, [
         itemId, countId, p.productId, p.productName, p.systemQuantityM2, p.costPrice, locationId || null
       ]);

@@ -45,6 +45,8 @@ interface PageSpec {
   route?: string;
   legacyView: string;
   legacyAliases?: string[];
+  /** عند true لا تُضاف صلاحية `module.view` العامة كبديل — للكود يتطلب منحه صراحة. */
+  strictView?: boolean;
   actions: string[];
   sections?: SectionSpec[];
 }
@@ -489,6 +491,9 @@ const PAGES: PageSpec[] = [
   { key: 'payroll', label: 'الرواتب والمسحوبات', module: 'EMPLOYEES', route: '/employees/payroll', legacyView: 'employees.payroll.view',
     actions: [...FINANCE, 'manage', 'approve', 'pay', 'print', 'export_excel'],
     sections: [section('payroll', 'الرواتب'), section('transactions', 'المسحوبات'), section('approvals', 'الموافقات')] },
+  { key: 'payroll_notifications', label: 'إعدادات إشعارات الرواتب', module: 'EMPLOYEES', route: '/employees/payroll/notification-settings',
+    legacyView: 'employees.payroll.manage', legacyAliases: ['employees.manage', 'employees.payroll.approve'],
+    actions: ['view', 'manage', 'settings', 'print'] },
   { key: 'commissions', label: 'عمولات المبيعات', module: 'EMPLOYEES', route: '/employees/commissions', legacyView: 'employees.commissions.view',
     actions: [...FINANCE, 'manage', 'approve', 'pay', 'print'] },
   { key: 'leave', label: 'الإجازات', module: 'HR', route: '/employees/leave', legacyView: 'hr.leave.view',
@@ -519,6 +524,21 @@ const PAGES: PageSpec[] = [
     actions: ['view', 'manage', 'print', 'export_excel'] },
   { key: 'self_service', label: 'بوابة الموظف الذاتية', module: 'HR', route: '/hr/self-service', legacyView: 'hr.selfservice.view',
     actions: ['view', 'request'] },
+  { key: 'hr_alerts', label: 'تنبيهات الموارد البشرية', module: 'HR', route: '/hr/alerts',
+    legacyView: 'employees.view', legacyAliases: ['hr.dashboard.view'],
+    actions: ['view', 'manage', 'print'] },
+  { key: 'hr_workforce_planning', label: 'تخطيط القوى العاملة', module: 'HR', route: '/hr/workforce-planning',
+    legacyView: 'employees.payroll.view', legacyAliases: ['employees.view', 'employees.payroll.manage'],
+    actions: ['view', 'manage', 'print', 'export_excel'] },
+  { key: 'hr_clearance', label: 'إخلاء الطرف', module: 'HR', route: '/hr/clearance',
+    legacyView: 'employees.payroll.view', legacyAliases: ['employees.view', 'employees.payroll.manage'],
+    actions: ['view', 'manage', 'print', 'export_excel'] },
+  { key: 'hr_social_insurance', label: 'التأمينات الاجتماعية', module: 'HR', route: '/hr/social-insurance',
+    legacyView: 'employees.payroll.view', legacyAliases: ['employees.view', 'employees.payroll.manage'],
+    actions: ['view', 'manage', 'print', 'export_excel'] },
+  { key: 'hr_attendance_devices', label: 'أجهزة الحضور والانصراف', module: 'HR', route: '/hr/attendance-devices',
+    legacyView: 'employees.payroll.view', legacyAliases: ['employees.view', 'employees.payroll.manage'],
+    actions: ['view', 'manage', 'print', 'export_excel'] },
   { key: 'deliveries', label: 'التوصيل', module: 'DELIVERIES', route: '/deliveries', legacyView: 'deliveries.view',
     actions: [...WRITE, 'manage', 'assign', 'start', 'complete', 'cancel', 'print', 'timeline'] },
   { key: 'drivers', label: 'السائقون', module: 'DRIVERS', route: '/drivers', legacyView: 'drivers.view',
@@ -566,7 +586,7 @@ const PAGES: PageSpec[] = [
   // التقارير
   { key: 'hub', label: 'مركز التقارير', module: 'REPORTS', route: '/reports', legacyView: 'reports.view',
     actions: [...ANALYTICS, 'print', 'export_excel', 'export_pdf', 'saved_views'] },
-  { key: 'financial', label: 'التقارير المالية', module: 'REPORTS', route: '/reports/category/finance', legacyView: 'reports.financial.view',
+  { key: 'financial', label: 'التقارير المالية', module: 'REPORTS', route: '/reports/category/finance', legacyView: 'reports.financial.view', strictView: true,
     actions: [...ANALYTICS, 'print'] },
   { key: 'sales', label: 'تقارير المبيعات', module: 'REPORTS', route: '/reports/category/sales', legacyView: 'reports.sales.view',
     actions: [...ANALYTICS, 'print'] },
@@ -574,16 +594,18 @@ const PAGES: PageSpec[] = [
     actions: [...ANALYTICS, 'print'] },
   { key: 'inventory', label: 'تقارير المخزون', module: 'REPORTS', route: '/reports/category/inventory', legacyView: 'reports.inventory.view',
     actions: [...ANALYTICS, 'print'] },
-  { key: 'tax', label: 'التقارير الضريبية', module: 'REPORTS', route: '/reports/tax', legacyView: 'reports.tax.view',
+  { key: 'tax', label: 'التقارير الضريبية', module: 'REPORTS', route: '/reports/tax', legacyView: 'reports.tax.view', strictView: true,
     actions: [...ANALYTICS, 'print', 'export_pdf'] },
   { key: 'pos', label: 'تقارير نقطة البيع', module: 'REPORTS', route: '/reports/pos', legacyView: 'reports.pos.view',
     actions: [...ANALYTICS, 'print'] },
-  { key: 'profit_loss', label: 'الأرباح والخسائر', module: 'REPORTS', route: '/reports/profit-loss', legacyView: 'reports.profit_loss.view',
+  { key: 'profit_loss', label: 'الأرباح والخسائر', module: 'REPORTS', route: '/reports/profit-loss', legacyView: 'reports.profit_loss.view', strictView: true,
     actions: [...ANALYTICS, 'print'] },
   { key: 'custom', label: 'التقارير المخصصة', module: 'REPORTS', route: '/reports/category/core', legacyView: 'reports.custom.view',
     actions: [...WRITE, 'manage', 'generate', 'apply', 'print'] },
-  { key: 'statements', label: 'كشوف الحسابات', module: 'REPORTS', route: '/reports/statements', legacyView: 'reports.view',
+  { key: 'statements', label: 'كشوف الحسابات', module: 'REPORTS', route: '/reports/statements', legacyView: 'reports.financial.view', strictView: true,
     actions: [...ANALYTICS, 'print', 'share'] },
+  { key: 'credit_reports', label: 'تقارير الائتمان', module: 'REPORTS', route: '/reports/category/credit', legacyView: 'reports.financial.view', strictView: true,
+    actions: [...ANALYTICS, 'print'] },
 
   // الموافقات والمستندات
   { key: 'inbox', label: 'صندوق الموافقات', module: 'APPROVALS', route: '/approvals', legacyView: 'approvals.view',
@@ -697,7 +719,7 @@ function buildPermissions(): GranularPermissionDef[] {
     // صلاحية الدخول إلى الصفحة
     const viewHead = page.legacyView.split('.')[0];
     const viewAliases = [
-      ...(viewHead && `${viewHead}.view` !== page.legacyView ? [`${viewHead}.view`] : []),
+      ...(viewHead && !page.strictView && `${viewHead}.view` !== page.legacyView ? [`${viewHead}.view`] : []),
       ...(page.legacyAliases ?? []),
     ];
     push({
@@ -802,5 +824,11 @@ export const PAGE_VIEW_PERMISSIONS: Readonly<Record<string, string>> = Object.fr
     '/inventory': 'ui.inventory.hub.view',
     '/inventory/reservations': 'ui.inventory.reservations.view',
     '/crm/hub': 'ui.crm.dashboard.view',
+    // مسارات التقارير القديمة_redirects — تطابق صلاحيات وجهتها في مركز التقارير.
+    '/reports/sales': 'ui.reports.sales.view',
+    '/reports/purchases': 'ui.reports.purchases.view',
+    // /finance/debts هو redirect إلى /finance/receivables?tab=debts — الحارس
+    // يتطلب نفس صلاحية الوجهة (finance.debts.view) بدل السقوط على /finance.
+    '/finance/debts': 'ui.finance.receivables.view',
   }
 );

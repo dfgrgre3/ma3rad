@@ -20,7 +20,7 @@ export function loadBranchCountSessions(): CountSession[] {
       COALESCE(u.full_name, 'النظام') as countedBy,
       sc.total_items as itemsCount,
       sc.items_with_variance as itemsWithVariance,
-      sc.total_variance_value as totalVarianceValue
+      sc.total_variance_value / 100.0 as totalVarianceValue
     FROM stock_counts sc
     JOIN warehouses w ON sc.warehouse_id = w.id
     LEFT JOIN users u ON sc.created_by = u.id
@@ -61,8 +61,8 @@ export function loadCountSessionItems(session: CountSession): CountItem[] {
       sci.system_quantity_m2 as systemQuantityM2,
       sci.counted_quantity_m2 as countedQuantityM2,
       sci.variance_m2 as varianceM2,
-      sci.unit_cost as unitCost,
-      sci.variance_value as varianceValue,
+      sci.unit_cost / 100.0 as unitCost,
+      sci.variance_value / 100.0 as varianceValue,
       COALESCE(sci.discrepancy_reason, '') as discrepancyReason,
       COALESCE(sci.notes, '') as notes,
       sci.location_id as locationId,

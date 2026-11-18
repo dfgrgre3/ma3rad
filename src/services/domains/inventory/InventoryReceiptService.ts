@@ -56,7 +56,7 @@ export class InventoryReceiptService {
         id, transaction_number, type, product_id, warehouse_id,
         quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
         reference_id, notes, performed_by
-      ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)
     `, [
       transactionId, db.nextNumber(input.transactionNumberPrefix), input.productId, input.warehouseId,
       input.quantityM2, input.boxesCount, input.unitCost, round2(input.quantityM2 * input.unitCost),

@@ -399,7 +399,7 @@ export class EmployeeOrganizationService {
     const actor = this.requireView();
     this.branchAccess.requireBranchAccess(branchId, actor);
     return this.db.query<any>(`
-      SELECT id, branch_id AS branchId, name, level, min_salary AS minSalary, max_salary AS maxSalary,
+      SELECT id, branch_id AS branchId, name, level, min_salary / 100.0 AS minSalary, max_salary / 100.0 AS maxSalary,
         description, is_active AS isActive
       FROM job_grades
       WHERE is_active = 1 AND (branch_id = ? OR branch_id IS NULL)
@@ -427,7 +427,7 @@ export class EmployeeOrganizationService {
     const id = `grade_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     this.db.run(
       `INSERT INTO job_grades (id, branch_id, company_id, name, level, min_salary, max_salary, description)
-       VALUES (?, ?, (SELECT company_id FROM branches WHERE id = ?), ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, (SELECT company_id FROM branches WHERE id = ?), ?, ?, ROUND(?*100), ROUND(?*100), ?)`,
       [id, branchId, branchId, name, Math.max(1, Number(input.level) || 1),
        Math.max(0, Number(input.minSalary) || 0), Math.max(0, Number(input.maxSalary) || 0),
        input.description?.trim() || null]
@@ -905,14 +905,14 @@ export class EmployeeOrganizationService {
   }): void {
     const actor = this.requireManage();
     const employee = this.db.query<{ branchId: string | null; role: string; jobGradeId: string | null; baseSalary: number }>(
-      `SELECT branch_id AS branchId, role, job_grade_id AS jobGradeId, base_salary AS baseSalary FROM employees WHERE id = ?`,
+      `SELECT branch_id AS branchId, role, job_grade_id AS jobGradeId, base_salary / 100.0 AS baseSalary FROM employees WHERE id = ?`,
       [input.employeeId]
     )[0];
     if (!employee) throw new Error('الموظف غير موجود.');
     this.db.executeTransaction((db) => {
       db.run(
         `UPDATE employees SET role = COALESCE(?, role), job_title = COALESCE(?, job_title),
-           job_grade_id = COALESCE(?, job_grade_id), base_salary = COALESCE(?, base_salary),
+           job_grade_id = COALESCE(?, job_grade_id), base_salary = COALESCE(ROUND(?*100), base_salary),
            updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         [input.newRole || null, input.newRole || null, input.newGradeId || null,
@@ -929,7 +929,7 @@ export class EmployeeOrganizationService {
       if (input.createBonus && (input.bonusAmount || 0) > 0) {
         db.run(
           `INSERT INTO payroll_transactions (id, employee_id, type, amount, date, notes, created_by, branch_id, payment_status)
-           VALUES (?, ?, 'BONUS', ?, ?, ?, ?, ?, 'PAID')`,
+           VALUES (?, ?, 'BONUS', ROUND(?*100), ?, ?, ?, ?, 'PAID')`,
           [`ptx_${uuidv4().substring(0, 8)}`, input.employeeId, input.bonusAmount, input.effectiveDate,
            `مكافأة ترقية: ${input.reason || ''}`, actor.id, employee.branchId]
         );

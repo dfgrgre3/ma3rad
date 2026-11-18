@@ -14,6 +14,10 @@ import { resolveSaleUnits } from './unitResolution';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { AppConfigService } from '../config/AppConfigService';
 import { SettingsService } from '../config/SettingsService';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const ORDER_MONEY_FIELDS = ['subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'total_amount', 'paid_amount', 'remaining_amount'] as const;
+const ORDER_ITEM_MONEY_FIELDS = ['unit_price', 'discount_amount', 'total_price'] as const;
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -199,7 +203,7 @@ export class OrderService {
       params.push(dateTo);
     }
     sql += ` ORDER BY o.date DESC, o.created_at DESC`;
-    return this.db.query<Order>(sql, params);
+    return this.db.query<Order>(sql, params).map((row) => unscaleMoneyRow(row, ORDER_MONEY_FIELDS));
   }
 
   public getOrder(id: string): Order | null {
@@ -215,7 +219,7 @@ export class OrderService {
       [id, ...this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').params]
     );
     if (rows.length === 0) return null;
-    return { ...rows[0], items: this.getOrderItems(id) };
+    return { ...unscaleMoneyRow(rows[0], ORDER_MONEY_FIELDS), items: this.getOrderItems(id) };
   }
 
   public getOrderDeposits(orderId: string): OrderDeposit[] {
@@ -223,9 +227,9 @@ export class OrderService {
     if (!this.getOrder(orderId)) return [];
     return this.db.query<OrderDeposit>(
       `SELECT od.id, od.order_id AS orderId, od.deposit_number AS depositNumber,
-              od.amount, od.payment_method AS paymentMethod, od.date, od.invoice_id AS invoiceId,
+              od.amount / 100.0 AS amount, od.payment_method AS paymentMethod, od.date, od.invoice_id AS invoiceId,
               odr.id AS refundId, odr.refund_number AS refundNumber,
-              CASE WHEN od.invoice_id IS NULL AND odr.id IS NULL THEN od.amount ELSE 0 END AS refundable
+              CASE WHEN od.invoice_id IS NULL AND odr.id IS NULL THEN od.amount / 100.0 ELSE 0 END AS refundable
        FROM order_deposits od
        LEFT JOIN order_deposit_refunds odr ON odr.order_deposit_id = od.id
        WHERE od.order_id = ? ORDER BY od.date, od.created_at, od.id`,
@@ -246,19 +250,19 @@ export class OrderService {
        )
        ORDER BY oi.rowid ASC`,
       [orderId, ...this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').params]
-    );
+    ).map((row) => unscaleMoneyRow(row, ORDER_ITEM_MONEY_FIELDS));
   }
 
   public getStats(): OrderStats {
     PermissionService.require(AuthService.requireAuth(), 'sales.view');
     const row = this.db.query<any>(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(total_amount), 0) AS totalValue,
+              COALESCE(SUM(total_amount) / 100.0, 0) AS totalValue,
               COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending,
-              COALESCE(SUM(CASE WHEN status = 'PENDING' THEN total_amount ELSE 0 END), 0) AS pendingValue,
+              COALESCE(SUM(CASE WHEN status = 'PENDING' THEN total_amount ELSE 0 END) / 100.0, 0) AS pendingValue,
               COALESCE(SUM(CASE WHEN status IN ('CONFIRMED','PROCESSING','PARTIAL') THEN 1 ELSE 0 END), 0) AS processing,
               COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed,
-              COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) AS completedValue,
+              COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END) / 100.0, 0) AS completedValue,
               COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled
        FROM orders o
        WHERE ${this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').clause}`,
@@ -297,7 +301,7 @@ export class OrderService {
         `INSERT INTO orders (id, order_number, date, customer_id, warehouse_id, branch_id, quotation_id,
           expected_delivery_date, subtotal, discount_amount, tax_amount, shipping_cost,
           total_amount, paid_amount, remaining_amount, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'PENDING', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, ROUND(?*100), 'PENDING', ?, ?)`,
         [
           id, orderNumber, localDateString(), input.customerId, warehouse, branchId,
           input.quotationId || null, input.expectedDeliveryDate || null,
@@ -310,7 +314,7 @@ export class OrderService {
         db.run(
           `INSERT INTO order_items (id, order_id, product_id, product_name, grade, quantity_m2,
             boxes_count, delivered_m2, unit_price, discount_amount, total_price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ROUND(?*100), ROUND(?*100), ROUND(?*100))`,
           [
             `oi_${uuidv4().substring(0, 8)}`, id, item.productId, item.productName, item.grade,
             item.quantityM2, item.boxesCount, item.unitPrice, item.discountAmount, item.totalPrice,
@@ -339,7 +343,7 @@ export class OrderService {
     }
     const existingDeposits = Number(this.db.query<{ amount: number }>(
       `SELECT COALESCE(SUM(od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
-         WHERE r.order_deposit_id = od.id), 0)), 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
+         WHERE r.order_deposit_id = od.id), 0)) / 100.0, 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
     )[0]?.amount || 0);
     if (existingDeposits > 0) {
       throw new Error('لا يمكن تعديل طلب عليه عربون قبل تسوية العربون أو رده.');
@@ -359,8 +363,8 @@ export class OrderService {
 
       db.run(
         `UPDATE orders SET customer_id = ?, warehouse_id = ?, branch_id = ?, quotation_id = ?,
-          expected_delivery_date = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
-          shipping_cost = ?, total_amount = ?, remaining_amount = ?, notes = ?,
+          expected_delivery_date = ?, subtotal = ROUND(?*100), discount_amount = ROUND(?*100), tax_amount = ROUND(?*100),
+          shipping_cost = ROUND(?*100), total_amount = ROUND(?*100), remaining_amount = ROUND(?*100), notes = ?,
           updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [
           input.customerId, warehouse, branchId, input.quotationId || null, input.expectedDeliveryDate || null,
@@ -374,7 +378,7 @@ export class OrderService {
         db.run(
           `INSERT INTO order_items (id, order_id, product_id, product_name, grade, quantity_m2,
             boxes_count, delivered_m2, unit_price, discount_amount, total_price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ROUND(?*100), ROUND(?*100), ROUND(?*100))`,
           [
             `oi_${uuidv4().substring(0, 8)}`, id, item.productId, item.productName, item.grade,
             item.quantityM2, item.boxesCount, item.unitPrice, item.discountAmount, item.totalPrice,
@@ -417,7 +421,7 @@ export class OrderService {
       if (status === 'CANCELLED') {
         const depositTotal = Number(db.query<{ amount: number }>(
           `SELECT COALESCE(SUM(od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
-             WHERE r.order_deposit_id = od.id), 0)), 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
+             WHERE r.order_deposit_id = od.id), 0)) / 100.0, 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
         )[0]?.amount || 0);
         if (depositTotal > 0) {
           throw new Error('لا يمكن إلغاء طلب عليه عربون قبل تسوية العربون أو رده.');
@@ -548,7 +552,7 @@ export class OrderService {
     return this.db.executeTransaction((db) => {
       if (idempotencyKey) {
         const prior = db.query<{ orderId: string; amount: number; paymentMethod: string; bankAccountId: string | null }>(
-          `SELECT od.order_id AS orderId, od.amount, od.payment_method AS paymentMethod,
+          `SELECT od.order_id AS orderId, od.amount / 100.0 AS amount, od.payment_method AS paymentMethod,
                   od.bank_account_id AS bankAccountId
            FROM order_deposits od JOIN customer_payments cp ON cp.id = od.receipt_id
            WHERE cp.idempotency_key = ?`, [idempotencyKey]
@@ -562,7 +566,7 @@ export class OrderService {
         }
       }
       const current = db.query<{ paidAmount: number; remainingAmount: number; totalAmount: number; status: OrderStatus; billingStatus: string; customerId: string; branchId: string | null }>(
-        `SELECT paid_amount AS paidAmount, remaining_amount AS remainingAmount, total_amount AS totalAmount,
+        `SELECT paid_amount / 100.0 AS paidAmount, remaining_amount / 100.0 AS remainingAmount, total_amount / 100.0 AS totalAmount,
                 status, billing_status AS billingStatus, customer_id AS customerId, branch_id AS branchId
          FROM orders WHERE id = ?`, [id]
       )[0];
@@ -575,9 +579,9 @@ export class OrderService {
         throw new Error('Deposit exceeds the order balance.');
       }
       db.run(
-        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, financial_status = ?, updated_at = CURRENT_TIMESTAMP
+        `UPDATE orders SET paid_amount = ROUND(?*100), remaining_amount = ROUND(?*100), financial_status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED') AND billing_status != 'INVOICED'
-           AND remaining_amount >= ?`,
+           AND remaining_amount >= ROUND(?*100)`,
         [newPaid, Math.max(0, newRemaining), newPaid >= Number(current.totalAmount) - 0.009 ? 'PAID' : 'PARTIAL', id, deposit]
       );
       if (Number((db.getDatabase() as any).getRowsModified?.() ?? 0) !== 1) {
@@ -586,19 +590,19 @@ export class OrderService {
       const receiptId = `cpay_${uuidv4().substring(0, 8)}`;
       const receiptNumber = db.nextNumber('REC');
       db.run(`INSERT INTO customer_payments (id, receipt_number, customer_id, invoice_id, amount, payment_type, date, register_id, shift_id, notes, performed_by, branch_id, idempotency_key)
-        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, current.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, current.branchId || null, idempotencyKey || null]);
+        VALUES (?, ?, ?, NULL, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, current.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, current.branchId || null, idempotencyKey || null]);
       postLedgerEntry(db.getDatabase(), {
         date, description: `Order deposit ${order.orderNumber} (${receiptNumber})`, referenceType: 'ORDER_DEPOSIT', referenceId: receiptId, createdBy: actor.id,
         branchId: current.branchId,
         lines: [{ accountCode: cashAccount, debit: deposit, credit: 0 }, { accountCode: '2106', debit: 0, credit: deposit }],
       });
-      if (paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [deposit, registerId]);
-      if (paymentType === 'BANK_TRANSFER' && bankAccountId) db.run('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?', [deposit, bankAccountId]);
+      if (paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [deposit, registerId]);
+      if (paymentType === 'BANK_TRANSFER' && bankAccountId) db.run('UPDATE bank_accounts SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [deposit, bankAccountId]);
       if (shift) {
-        if (paymentType === 'CASH') db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?', [deposit, shift.id]);
+        if (paymentType === 'CASH') db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ROUND(?*100) WHERE id = ?', [deposit, shift.id]);
       }
       db.run(`INSERT INTO order_deposits (id, deposit_number, order_id, customer_id, amount, payment_method, register_id, shift_id, receipt_id, bank_account_id, date, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, id, current.customerId, deposit, paymentType, registerId, shift?.id || null, receiptId, bankAccountId || null, date, actor.id]);
+        VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, id, current.customerId, deposit, paymentType, registerId, shift?.id || null, receiptId, bankAccountId || null, date, actor.id]);
       this.logStatus(
         db, id, order.status, order.status,
         `سند قبض ${receiptNumber} بقيمة ${deposit} ج (${paymentType}) ${notes || ''}`.trim(),
@@ -625,10 +629,10 @@ export class OrderService {
         paidAmount: number; totalAmount: number;
       }>(
         `SELECT od.id, od.order_id AS orderId, o.order_number AS orderNumber,
-                od.customer_id AS customerId, od.amount, od.payment_method AS paymentMethod,
+                od.customer_id AS customerId, od.amount / 100.0 AS amount, od.payment_method AS paymentMethod,
                 od.register_id AS registerId, od.shift_id AS shiftId, od.bank_account_id AS bankAccountId,
                 od.invoice_id AS invoiceId, o.branch_id AS branchId,
-                o.paid_amount AS paidAmount, o.total_amount AS totalAmount
+                o.paid_amount / 100.0 AS paidAmount, o.total_amount / 100.0 AS totalAmount
          FROM order_deposits od JOIN orders o ON o.id = od.order_id WHERE od.id = ?`,
         [depositId]
       )[0];
@@ -643,7 +647,7 @@ export class OrderService {
       }
       if (deposit.invoiceId) throw new Error('تمت تسوية هذا العربون على فاتورة؛ يجب معالجة رد الفاتورة من مسار المرتجعات.');
       const refundedBefore = Number(db.query<{ amount: number }>(
-        'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposit_refunds WHERE order_deposit_id = ?', [depositId]
+        'SELECT COALESCE(SUM(amount) / 100.0, 0) AS amount FROM order_deposit_refunds WHERE order_deposit_id = ?', [depositId]
       )[0]?.amount || 0);
       const amount = round2(Number(deposit.amount) - refundedBefore);
       const paidAmount = round2(Number(deposit.paidAmount));
@@ -672,7 +676,7 @@ export class OrderService {
         `INSERT INTO order_deposit_refunds
           (id, refund_number, order_deposit_id, order_id, customer_id, amount, payment_method,
            register_id, shift_id, bank_account_id, date, reason, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`,
         [refundId, refundNumber, deposit.id, deposit.orderId, deposit.customerId, amount,
           deposit.paymentMethod, refundRegisterId, refundShift?.id || null, deposit.bankAccountId, date, cleanReason, actor.id]
       );
@@ -680,7 +684,7 @@ export class OrderService {
       const normalizedPaid = Math.max(0, newPaid);
       const newRemaining = round2(Number(deposit.totalAmount) - normalizedPaid);
       db.run(
-        `UPDATE orders SET paid_amount = ?, remaining_amount = ?,
+        `UPDATE orders SET paid_amount = ROUND(?*100), remaining_amount = ROUND(?*100),
            financial_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [normalizedPaid, Math.max(0, newRemaining), normalizedPaid <= 0.009 ? 'UNPAID' : 'PARTIAL', deposit.orderId]
       );
@@ -691,10 +695,10 @@ export class OrderService {
       });
       if (deposit.paymentMethod === 'CASH') {
         if (!deposit.registerId) throw new Error('الصندوق المرتبط بالعربون غير محدد.');
-        db.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.registerId]);
-        if (refundShift) db.run('UPDATE cash_shifts SET total_refunds = total_refunds + ? WHERE id = ?', [amount, refundShift.id]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [amount, deposit.registerId]);
+        if (refundShift) db.run('UPDATE cash_shifts SET total_refunds = total_refunds + ROUND(?*100) WHERE id = ?', [amount, refundShift.id]);
       } else if (deposit.paymentMethod === 'BANK_TRANSFER' && deposit.bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.bankAccountId]);
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [amount, deposit.bankAccountId]);
       }
       this.logStatus(db, deposit.orderId, scopedOrder.status, scopedOrder.status,
         `رد عربون ${deposit.orderNumber} بمبلغ ${amount}؛ السبب: ${cleanReason}`, actor.id, actor.fullName);
@@ -768,15 +772,15 @@ export class OrderService {
       });
 
       const depositRows = this.db.query<{ id: string; amount: number; paymentMethod: string }>(
-        `SELECT od.id, od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
-           WHERE r.order_deposit_id = od.id), 0) AS amount, od.payment_method AS paymentMethod
+        `SELECT od.id, (od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
+           WHERE r.order_deposit_id = od.id), 0)) / 100.0 AS amount, od.payment_method AS paymentMethod
          FROM order_deposits od WHERE od.order_id = ? AND od.invoice_id IS NULL`, [id]
       );
       const depositTotal = round2(depositRows.reduce((sum, deposit) => sum + Math.max(0, Number(deposit.amount)), 0));
       if (Math.abs(depositTotal - existingDeposits) > 0.01) throw new Error('إجمالي العربون المسجل لا يطابق سندات القبض؛ راجع الطلب قبل الفوترة.');
       this.db.run(
-        `UPDATE orders SET status = 'COMPLETED', billing_status = 'INVOICED', financial_status = ?, invoice_id = ?, paid_amount = ?,
-         remaining_amount = ?,
+        `UPDATE orders SET status = 'COMPLETED', billing_status = 'INVOICED', financial_status = ?, invoice_id = ?, paid_amount = ROUND(?*100),
+         remaining_amount = ROUND(?*100),
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [paidAmount >= total - 0.009 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID', invoice.id, paidAmount, round2(total - paidAmount), id]
       );
@@ -785,8 +789,8 @@ export class OrderService {
         [id]
       );
       if (depositTotal > 0) {
-        this.db.run('UPDATE sales_invoices SET paid_amount = paid_amount + ?, remaining_amount = MAX(0, remaining_amount - ?), payment_status = CASE WHEN remaining_amount - ? <= 0.009 THEN \'PAID\' WHEN paid_amount + ? > 0 THEN \'PARTIAL\' ELSE \'UNPAID\' END WHERE id = ?', [depositTotal, depositTotal, depositTotal, depositTotal, invoice.id]);
-        this.db.run('UPDATE customers SET current_balance = current_balance - ? WHERE id = ?', [depositTotal, order.customerId]);
+        this.db.run('UPDATE sales_invoices SET paid_amount = paid_amount + ROUND(? * 100), remaining_amount = MAX(0, remaining_amount - ROUND(? * 100)), payment_status = CASE WHEN remaining_amount - ROUND(? * 100) <= 1 THEN \'PAID\' WHEN paid_amount + ROUND(? * 100) > 0 THEN \'PARTIAL\' ELSE \'UNPAID\' END WHERE id = ?', [depositTotal, depositTotal, depositTotal, depositTotal, invoice.id]);
+        this.db.run('UPDATE customers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [depositTotal, order.customerId]);
         postLedgerEntry(this.db.getDatabase(), {
           date: localDateString(), description: `Settle order deposits for invoice ${invoice.invoiceNumber}`,
           referenceType: 'ORDER_DEPOSIT_SETTLEMENT', referenceId: invoice.id, createdBy: actor.id,
@@ -856,7 +860,7 @@ export class OrderService {
       const product = this.db.query<any>(
         `SELECT id, name, grade, meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox, is_active,
                 product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit,
-                min_selling_price_m2 AS minSellingPriceM2
+                min_selling_price_m2 / 100.0 AS minSellingPriceM2
          FROM products WHERE id = ?`,
         [item.productId]
       )[0];

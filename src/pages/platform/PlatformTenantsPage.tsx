@@ -39,6 +39,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { platformAdminService, PLATFORM_TENANT_STATUS_LABELS } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformActivationDetails,
@@ -231,6 +233,9 @@ export const PlatformTenantsPage: React.FC = () => {
   const [userOpen, setUserOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<any>(null);
   const [userForm, setUserForm] = React.useState({ fullName: '', username: '', email: '', phone: '', role: 'USER', status: 'ACTIVE', notes: '' });
+  const [branches, setBranches] = React.useState<any[]>([]);
+  const [branchForm, setBranchForm] = React.useState({ code: '', name: '', city: '', phone: '', seatsLimit: 1, devicesLimit: 1, isMain: false });
+  const [branchOpen, setBranchOpen] = React.useState(false);
 
   // Bulk operations state
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -262,41 +267,78 @@ export const PlatformTenantsPage: React.FC = () => {
   const [selectedDeviceIds, setSelectedDeviceIds] = React.useState<string[]>([]);
   const [forceSyncWorking, setForceSyncWorking] = React.useState(false);
 
+  const centralState = React.useMemo(() => getCentralDataSourceState(), []);
+  const centralActive = centralState.active;
+
+
   const load = React.useCallback(() => {
     setLoading(true);
+    const finish = (err?: unknown) => {
+      if (err) setError(err instanceof Error ? err.message : 'تعذر تحميل العملاء.');
+      else setError(null);
+      setPage(1);
+      setLoading(false);
+    };
+    if (centralActive) {
+      Promise.all([centralPlatformClient.listTenants(search, status, planId), centralPlatformClient.listPlans()])
+        .then(([nextTenants, nextPlans]) => { setTenants(nextTenants); setPlans(nextPlans); finish(); })
+        .catch(finish);
+      return;
+    }
     try {
       setTenants(platformAdminService.listTenants(search, status, planId));
       setPlans(platformAdminService.listPlans());
-      setError(null);
-      setPage(1);
+      finish();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل العملاء.');
-    } finally {
-      setLoading(false);
+      finish(err);
     }
-  }, [search, status, planId]);
+  }, [search, status, planId, centralActive]);
 
   React.useEffect(() => { load(); }, [load]);
 
   const canManageTenants = canPlatform('tenants', 'platform.tenants.update');
 
   const loadProfile = React.useCallback((id: string) => {
-    try {
-      const next = platformAdminService.getTenantProfile(id);
+    const applyProfile = (next: PlatformTenantProfile) => {
       setProfile(next);
-      setOverrides(platformAdminService.listTenantOverrides(id));
-      setUsers(platformAdminService.listTenantUsers(id));
       setPlanForm((current) => ({
         planId: current.planId || next.tenant.planId || plans.find((plan) => plan.isDefault)?.id || '',
         months: current.months || 12,
         seats: current.seats || next.tenant.seatsLimit,
       }));
+    };
+    if (centralActive) {
+      Promise.all([
+        centralPlatformClient.getTenantProfile(id),
+        centralPlatformClient.listTenantOverrides(id),
+        centralPlatformClient.listTenantUsers(id),
+        centralPlatformClient.listTenantBranches(id),
+      ])
+        .then(([next, nextOverrides, nextUsers, nextBranches]) => {
+          applyProfile(next as PlatformTenantProfile);
+          setOverrides(nextOverrides as PlatformTenantOverride[]);
+          setUsers(nextUsers);
+          setBranches(nextBranches);
+        })
+        .catch((err) => {
+          toast.error('تعذر تحميل ملف العميل', err instanceof Error ? err.message : undefined);
+          setDetailId(null);
+          setProfile(null);
+        });
+      return;
+    }
+    try {
+      const next = platformAdminService.getTenantProfile(id);
+      applyProfile(next);
+      setOverrides(platformAdminService.listTenantOverrides(id));
+      setUsers(platformAdminService.listTenantUsers(id));
+      setBranches([]);
     } catch (err) {
       toast.error('تعذر تحميل ملف العميل', err instanceof Error ? err.message : undefined);
       setDetailId(null);
       setProfile(null);
     }
-  }, [plans, toast]);
+  }, [plans, toast, centralActive]);
 
   const refreshDetail = React.useCallback(() => {
     if (detailId) loadProfile(detailId);
@@ -333,6 +375,22 @@ export const PlatformTenantsPage: React.FC = () => {
 
   const save = () => {
     setSaving(true);
+    const done = () => {
+      setFormOpen(false);
+      if (detailId && editing?.id === detailId) loadProfile(detailId);
+      load();
+    };
+    const fail = (err: unknown) => toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
+    if (centralActive) {
+      const request = editing
+        ? centralPlatformClient.updateTenant(editing.id, form as Record<string, any>)
+        : centralPlatformClient.createTenant(form);
+      request
+        .then(() => { toast.success(editing ? 'تم تحديث بيانات العميل' : 'تمت إضافة العميل بنجاح'); done(); })
+        .catch(fail)
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
       if (editing) {
         platformAdminService.updateTenant(editing.id, form);
@@ -341,14 +399,52 @@ export const PlatformTenantsPage: React.FC = () => {
         platformAdminService.createTenant(form);
         toast.success('تمت إضافة العميل بنجاح');
       }
-      setFormOpen(false);
-      if (detailId && editing?.id === detailId) loadProfile(detailId);
-      load();
+      done();
     } catch (err) {
-      toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
+      fail(err);
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveBranch = () => {
+    if (!detailId || !branchForm.code.trim() || !branchForm.name.trim()) {
+      toast.error('كود الفرع واسمه مطلوبان');
+      return;
+    }
+    setWorking(true);
+    centralPlatformClient.createTenantBranch(detailId, {
+      code: branchForm.code.trim(),
+      name: branchForm.name.trim(),
+      city: branchForm.city.trim() || undefined,
+      phone: branchForm.phone.trim() || undefined,
+      seatsLimit: branchForm.seatsLimit,
+      devicesLimit: branchForm.devicesLimit,
+      isMain: branchForm.isMain,
+    })
+      .then(() => {
+        toast.success('تمت إضافة الفرع');
+        setBranchOpen(false);
+        setBranchForm({ code: '', name: '', city: '', phone: '', seatsLimit: 1, devicesLimit: 1, isMain: false });
+        if (detailId) centralPlatformClient.listTenantBranches(detailId).then(setBranches);
+        loadProfile(detailId);
+      })
+      .catch((err) => toast.error('تعذر إضافة الفرع', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
+  };
+
+  const closeBranch = (branchId: string) => {
+    if (!detailId) return;
+    if (!window.confirm('هل تريد إغلاق هذا الفرع؟')) return;
+    setWorking(true);
+    centralPlatformClient.closeTenantBranch(detailId, branchId)
+      .then(() => {
+        toast.success('تم إغلاق الفرع');
+        centralPlatformClient.listTenantBranches(detailId).then(setBranches);
+        loadProfile(detailId);
+      })
+      .catch((err) => toast.error('تعذر إغلاق الفرع', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   const openProfile = (tenant: PlatformTenant) => {
@@ -374,50 +470,65 @@ export const PlatformTenantsPage: React.FC = () => {
     }
   };
 
-  const run = (action: () => void, message: string) => {
+  const run = (action: () => unknown, message: string) => {
     setWorking(true);
-    try {
-      action();
-      toast.success(message);
-      refreshDetail();
-    } catch (err) {
-      toast.error('تعذر تنفيذ العملية', err instanceof Error ? err.message : undefined);
-    } finally {
-      setWorking(false);
-    }
+    Promise.resolve()
+      .then(action)
+      .then(() => {
+        toast.success(message);
+        refreshDetail();
+      })
+      .catch((err) => toast.error('تعذر تنفيذ العملية', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   const changeStatus = (tenant: PlatformTenant, next: PlatformTenantStatus) => {
-    run(() => platformAdminService.setTenantStatus(tenant.id, next), `تم تحديث الحالة إلى ${PLATFORM_TENANT_STATUS_LABELS[next]}`);
+    run(
+      () => (centralActive ? centralPlatformClient.setTenantStatus(tenant.id, next) : platformAdminService.setTenantStatus(tenant.id, next)),
+      `تم تحديث الحالة إلى ${PLATFORM_TENANT_STATUS_LABELS[next]}`
+    );
   };
 
   const archive = (tenant: PlatformTenant) => {
     if (!window.confirm(`أرشفة العميل "${tenant.name}" وإلغاء كل تراخيصه؟`)) return;
-    run(() => platformAdminService.archiveTenant(tenant.id), 'تمت أرشفة العميل');
+    run(
+      () => (centralActive ? centralPlatformClient.archiveTenant(tenant.id) : platformAdminService.archiveTenant(tenant.id)),
+      'تمت أرشفة العميل'
+    );
   };
 
   const createAccount = () => {
     if (!detailId) return;
     setWorking(true);
-    try {
-      const created = platformAdminService.createTenantAccount(detailId, {
-        username: accountForm.username,
-        email: accountForm.email,
-        fullName: accountForm.fullName,
-        password: accountForm.password || undefined,
-      });
-      const next = platformAdminService.getTenantProfile(detailId);
-      setProfile(next);
-      setAccountOpen(false);
-      setActivation(buildActivation(next, created.temporaryPassword ?? null));
-      setActivationOpen(true);
-      toast.success('تم إنشاء حساب العميل وتوليد بيانات التفعيل');
-      load();
-    } catch (err) {
-      toast.error('تعذر إنشاء الحساب', err instanceof Error ? err.message : undefined);
-    } finally {
-      setWorking(false);
-    }
+    const request = centralActive
+      ? centralPlatformClient.createTenantAccount(detailId, {
+          username: accountForm.username,
+          email: accountForm.email,
+          fullName: accountForm.fullName,
+          password: accountForm.password || undefined,
+        })
+      : Promise.resolve(platformAdminService.createTenantAccount(detailId, {
+          username: accountForm.username,
+          email: accountForm.email,
+          fullName: accountForm.fullName,
+          password: accountForm.password || undefined,
+        }));
+    request
+      .then((created: any) => {
+        const next = centralActive
+          ? centralPlatformClient.getTenantProfile(detailId)
+          : Promise.resolve(platformAdminService.getTenantProfile(detailId));
+        return next.then((profileNext: PlatformTenantProfile) => {
+          setProfile(profileNext);
+          setAccountOpen(false);
+          setActivation(buildActivation(profileNext, created.temporaryPassword ?? null));
+          setActivationOpen(true);
+          toast.success('تم إنشاء حساب العميل وتوليد بيانات التفعيل');
+          load();
+        });
+      })
+      .catch((err) => toast.error('تعذر إنشاء الحساب', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   const resetPassword = () => {
@@ -425,29 +536,37 @@ export const PlatformTenantsPage: React.FC = () => {
     if (!detailId || !profile) return;
     if (!window.confirm('إعادة تعيين كلمة مرور حساب العميل؟ سيتم إنشاء كلمة مرور مؤقتة جديدة.')) return;
     setWorking(true);
-    try {
-      const reset = platformAdminService.resetTenantAccountPassword(detailId);
-      const next = platformAdminService.getTenantProfile(detailId);
-      setProfile(next);
-      setActivation(buildActivation(next, reset.temporaryPassword ?? null));
-      setActivationOpen(true);
-      toast.success('تم إعادة تعيين كلمة المرور');
-    } catch (err) {
-      toast.error('تعذر إعادة تعيين كلمة المرور', err instanceof Error ? err.message : undefined);
-    } finally {
-      setWorking(false);
-    }
+    const request = centralActive
+      ? centralPlatformClient.resetTenantAccountPassword(detailId)
+      : Promise.resolve(platformAdminService.resetTenantAccountPassword(detailId));
+    request
+      .then((reset: any) => {
+        const next = centralActive
+          ? centralPlatformClient.getTenantProfile(detailId)
+          : Promise.resolve(platformAdminService.getTenantProfile(detailId));
+        return next.then((profileNext: PlatformTenantProfile) => {
+          setProfile(profileNext);
+          setActivation(buildActivation(profileNext, reset.temporaryPassword ?? null));
+          setActivationOpen(true);
+          toast.success('تم إعادة تعيين كلمة المرور');
+        });
+      })
+      .catch((err) => toast.error('تعذر إعادة تعيين كلمة المرور', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   const toggleAccount = (active: boolean) => {
     if (!detailId) return;
-    run(() => platformAdminService.setTenantAccountActive(detailId, active), active ? 'تم تفعيل حساب العميل' : 'تم تعليق حساب العميل');
+    run(
+      () => (centralActive ? centralPlatformClient.setTenantAccountActive(detailId, active) : platformAdminService.setTenantAccountActive(detailId, active)),
+      active ? 'تم تفعيل حساب العميل' : 'تم تعليق حساب العميل'
+    );
   };
 
   const renewSubscription = () => {
     if (!detailId) return;
     run(
-      () => platformAdminService.renewTenantSubscription(detailId, renewMonths),
+      () => (centralActive ? centralPlatformClient.renewSubscription(detailId, renewMonths) : platformAdminService.renewTenantSubscription(detailId, renewMonths)),
       `تم تجديد الاشتراك لمدة ${renewMonths} شهر`
     );
   };
@@ -455,10 +574,12 @@ export const PlatformTenantsPage: React.FC = () => {
   const changePlan = () => {
     if (!detailId || !planForm.planId) return;
     run(
-      () => platformAdminService.changeTenantPlan(detailId, planForm.planId, {
-        months: planForm.months,
-        seats: planForm.seats,
-      }),
+      () => (centralActive
+        ? centralPlatformClient.changeSubscriptionPlan(detailId, planForm.planId, { months: planForm.months, seats: planForm.seats })
+        : platformAdminService.changeTenantPlan(detailId, planForm.planId, {
+            months: planForm.months,
+            seats: planForm.seats,
+          })),
       'تم نقل العميل إلى الباقة الجديدة وإصدار ترخيص جديد'
     );
   };
@@ -466,7 +587,12 @@ export const PlatformTenantsPage: React.FC = () => {
   const cancelSubscription = () => {
     if (!detailId || !profile) return;
     if (!window.confirm(`إلغاء اشتراك العميل "${profile.tenant.name}"؟ سيتم إلغاء الاشتراك وإبطال التراخيص وحساب الدخول.`)) return;
-    run(() => platformAdminService.cancelTenantSubscription(detailId, 'إلغاء يدوي من لوحة المنصة'), 'تم إلغاء اشتراك العميل');
+    run(
+      () => (centralActive
+        ? centralPlatformClient.cancelSubscription(detailId, 'إلغاء يدوي من لوحة المنصة')
+        : platformAdminService.cancelTenantSubscription(detailId, 'إلغاء يدوي من لوحة المنصة')),
+      'تم إلغاء اشتراك العميل'
+    );
   };
 
   const addOverride = () => {
@@ -474,13 +600,23 @@ export const PlatformTenantsPage: React.FC = () => {
       toast.error('أدخل رمز الميزة أو الحد');
       return;
     }
-    run(() => platformAdminService.addTenantOverride(detailId, overrideForm), 'تم إضافة ميزة/حد خاص للعميل');
+    run(
+      () => (centralActive
+        ? centralPlatformClient.addTenantOverride(detailId, overrideForm)
+        : platformAdminService.addTenantOverride(detailId, overrideForm)),
+      'تم إضافة ميزة/حد خاص للعميل'
+    );
     setOverrideForm({ kind: 'MODULE', code: '', value: '', isEnabled: true });
   };
 
   const removeOverride = (id: string) => {
     if (!window.confirm('حذف هذا التجاوز الخاص؟')) return;
-    run(() => platformAdminService.removeTenantOverride(id), 'تم حذف التجاوز الخاص');
+    run(
+      () => (centralActive && detailId
+        ? centralPlatformClient.removeTenantOverride(detailId, id)
+        : platformAdminService.removeTenantOverride(id)),
+      'تم حذف التجاوز الخاص'
+    );
   };
 
   const openUserCreate = () => {
@@ -507,41 +643,63 @@ export const PlatformTenantsPage: React.FC = () => {
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     setWorking(true);
-    try {
-      if (editingUser) {
-        platformAdminService.updateTenantUser(editingUser.id, { ...userForm, status: userForm.status as any });
-        toast.success('تم تحديث بيانات المستخدم.');
-      } else {
-        const result = platformAdminService.createTenantUser(detailId, {
-          ...userForm,
-          status: userForm.status as any,
-          provisionIdentity: true,
-          provisioningMode: 'INVITE',
-        });
-        const details = [result.message];
-        if (result.inviteCode) details.push(`كود الدعوة: ${result.inviteCode}`);
-        if (result.temporaryPassword) details.push(`كلمة المرور المؤقتة: ${result.temporaryPassword}`);
-        if (result.user.identityUserId) details.push(`معرّف الهوية: ${result.user.identityUserId}`);
-        details.push(`الدور/النطاق: ${result.user.role}${result.user.scope ? ` / ${result.user.scope}` : ''}`);
-        toast.success('تم إنشاء/دعوة حساب هوية فعلي للعميل وربطه بالدور والنطاق', details.join('\n'));
-      }
-      setUserOpen(false);
-      refreshDetail();
-    } catch (err) {
-      toast.error('تعذر حفظ المستخدم', err instanceof Error ? err.message : undefined);
-    } finally {
-      setWorking(false);
-    }
+    const request = editingUser
+      ? (centralActive
+          ? centralPlatformClient.updateTenantUser(detailId, editingUser.id, { ...userForm, status: userForm.status })
+          : Promise.resolve(platformAdminService.updateTenantUser(editingUser.id, { ...userForm, status: userForm.status as any })))
+      : (centralActive
+          ? centralPlatformClient.createTenantUser(detailId, {
+              ...userForm,
+              status: userForm.status,
+              provisionIdentity: true,
+              provisioningMode: 'INVITE',
+            })
+          : Promise.resolve(platformAdminService.createTenantUser(detailId, {
+              ...userForm,
+              status: userForm.status as any,
+              provisionIdentity: true,
+              provisioningMode: 'INVITE',
+            })));
+    request
+      .then((result: any) => {
+        if (!editingUser) {
+          const details = [result.message || 'تم إنشاء المستخدم.'];
+          const inviteCode = result.inviteCode ?? result.user?.inviteCode;
+          const tempPassword = result.temporaryPassword;
+          if (inviteCode) details.push(`كود الدعوة: ${inviteCode}`);
+          if (tempPassword) details.push(`كلمة المرور المؤقتة: ${tempPassword}`);
+          const identityId = result.user?.identityUserId;
+          if (identityId) details.push(`معرّف الهوية: ${identityId}`);
+          details.push(`الدور/النطاق: ${result.user?.role ?? userForm.role}${result.user?.scope ? ` / ${result.user.scope}` : ''}`);
+          toast.success('تم إنشاء/دعوة حساب هوية فعلي للعميل وربطه بالدور والنطاق', details.join('\n'));
+        } else {
+          toast.success('تم تحديث بيانات المستخدم.');
+        }
+        setUserOpen(false);
+        refreshDetail();
+      })
+      .catch((err) => toast.error('تعذر حفظ المستخدم', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   const toggleUser = (user: any, active: boolean) => {
-    run(() => platformAdminService.setTenantUserActive(user.id, active), active ? 'تم تفعيل المستخدم' : 'تم تعليق المستخدم');
+    run(
+      () => (centralActive && detailId
+        ? centralPlatformClient.setTenantUserActive(detailId, user.id, active)
+        : platformAdminService.setTenantUserActive(user.id, active)),
+      active ? 'تم تفعيل المستخدم' : 'تم تعليق المستخدم'
+    );
   };
 
   const deleteUser = (user: any) => {
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!window.confirm(`حذف المستخدم "${user.fullName}"؟`)) return;
-    run(() => platformAdminService.deleteTenantUser(user.id), 'تم حذف المستخدم');
+    run(
+      () => (centralActive && detailId
+        ? centralPlatformClient.deleteTenantUser(detailId, user.id)
+        : platformAdminService.deleteTenantUser(user.id)),
+      'تم حذف المستخدم'
+    );
   };
 
   const resetDevices = () => {
@@ -549,30 +707,61 @@ export const PlatformTenantsPage: React.FC = () => {
     if (!detailId) return;
     if (!window.confirm('إعادة تعيين الأجهزة المرتبطة بهذا العميل؟ سيتم تحرير كل الأجهزة المربوطة بالتراخيص.')) return;
     setWorking(true);
-    try {
-      const count = platformAdminService.resetTenantDevices(detailId);
-      toast.success('تم إعادة تعيين الأجهزة', `تم تحرير ${formatNumber(count)} جهاز`);
-      refreshDetail();
-    } catch (err) {
-      toast.error('تعذر إعادة تعيين الأجهزة', err instanceof Error ? err.message : undefined);
-    } finally {
-      setWorking(false);
-    }
+    const request = centralActive
+      ? centralPlatformClient.getTenantRemoteControl(detailId).then((data: any) => {
+          const devices = Array.isArray(data?.devices) ? data.devices : [];
+          return devices.reduce((chain: Promise<number>, device: any) =>
+            chain.then((count) => centralPlatformClient.releaseDevice(device.id).then(() => count + 1)),
+          Promise.resolve(0));
+        })
+      : Promise.resolve(platformAdminService.resetTenantDevices(detailId));
+    request
+      .then((count: number) => {
+        toast.success('تم إعادة تعيين الأجهزة', `تم تحرير ${formatNumber(count)} جهاز`);
+        refreshDetail();
+      })
+      .catch((err) => toast.error('تعذر إعادة تعيين الأجهزة', err instanceof Error ? err.message : undefined))
+      .finally(() => setWorking(false));
   };
 
   // Remote Control functions
   const loadRemoteDevices = React.useCallback(() => {
-    if (!detailId) return;
+    if (!detailId) { setRemoteDevices([]); return; }
+    if (centralActive) {
+      centralPlatformClient.getTenantRemoteControl(detailId)
+        .then((data: any) => setRemoteDevices(Array.isArray(data?.devices) ? data.devices : []))
+        .catch(() => setRemoteDevices([]));
+      return;
+    }
     try {
       const devices = platformAdminService.listDevices().filter((d) => d.tenantId === detailId);
       setRemoteDevices(devices);
     } catch (err) {
       toast.error('تعذر تحميل الأجهزة', err instanceof Error ? err.message : undefined);
     }
-  }, [detailId, toast]);
+  }, [detailId, toast, centralActive]);
 
   const loadRemoteHistory = React.useCallback(() => {
-    if (!detailId) return;
+    if (!detailId) { setRemoteHistory([]); return; }
+    if (centralActive) {
+      centralPlatformClient.getTenantRemoteControl(detailId)
+        .then((data: any) => {
+          const history = Array.isArray(data?.configPushHistory) ? data.configPushHistory : [];
+          setRemoteHistory(history.map((entry: any) => ({
+            id: entry.id,
+            type: 'CONFIG_PUSH',
+            key: entry.key ?? entry.configKey ?? '—',
+            value: entry.value ?? entry.configValue ?? '—',
+            targetCount: Array.isArray(entry.targetDeviceIds) ? entry.targetDeviceIds.length : 0,
+            status: entry.status === 'FAILED' ? 'FAILED' : 'SUCCESS',
+            error: entry.error ?? null,
+            result: entry.status === 'APPLIED' ? 'تم التطبيق' : null,
+            createdAt: entry.createdAt ?? entry.appliedAt,
+          })));
+        })
+        .catch(() => setRemoteHistory([]));
+      return;
+    }
     try {
       // Get audit logs related to config pushes for this tenant
       const logs = platformAdminService.getTenantProfile(detailId).activityLog
@@ -592,9 +781,28 @@ export const PlatformTenantsPage: React.FC = () => {
     } catch (err) {
       toast.error('تعذر تحميل السجل', err instanceof Error ? err.message : undefined);
     }
-  }, [detailId, toast]);
+  }, [detailId, toast, centralActive]);
 
   const sendConfig = () => {
+    if (centralActive) {
+      if (!detailId || !configForm.key.trim()) return;
+      setConfigSending(true);
+      centralPlatformClient.pushTenantConfig(detailId, {
+        key: configForm.key,
+        value: configForm.value,
+        scope: configForm.scope,
+        targetDeviceIds: configForm.scope === 'DEVICE' ? selectedDeviceIds : undefined,
+      })
+        .then(() => {
+          toast.success('تم إرسال الإعداد', `المفتاح: ${configForm.key}`);
+          setConfigForm({ ...configForm, key: '', value: '' });
+          setSelectedDeviceIds([]);
+          loadRemoteControlData();
+        })
+        .catch((err) => toast.error('فشل إرسال الإعداد', err instanceof Error ? err.message : undefined))
+        .finally(() => setConfigSending(false));
+      return;
+    }
     if (!detailId || !configForm.key.trim()) return;
     if (configForm.scope === 'DEVICE' && selectedDeviceIds.length === 0) {
       toast.error('اختر جهازاً واحداً على الأقل');
@@ -680,6 +888,14 @@ export const PlatformTenantsPage: React.FC = () => {
   };
 
   const toggleDeviceStatus = (device: any) => {
+    if (centralActive) {
+      const newStatus = device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      run(
+        () => (newStatus === 'SUSPENDED' ? centralPlatformClient.suspendDevice(device.id) : centralPlatformClient.releaseDevice(device.id)),
+        `تم ${newStatus === 'ACTIVE' ? 'تفعيل' : 'إيقاف'} الجهاز`
+      );
+      return;
+    }
     if (!detailId) return;
     const newStatus = device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     run(() => {
@@ -694,25 +910,47 @@ export const PlatformTenantsPage: React.FC = () => {
       loadRemoteDevices();
       loadRemoteHistory();
       // Load existing overrides as applied config
-      try {
-        const overrides = platformAdminService.listTenantOverrides(detailId);
-        const configs = overrides.map((o) => ({
-          id: o.id,
-          key: o.code,
-          value: o.value || (o.isEnabled ? 'true' : 'false'),
-          scope: 'TENANT',
-          status: o.isEnabled ? 'APPLIED' : 'DISABLED',
-          appliedAt: o.updatedAt,
-          createdAt: o.createdAt,
-        }));
-        setRemoteConfig(configs);
-      } catch {
-        // Remote config fetch is best-effort; ignore failures.
-      }
+      const loadOverrides = centralActive
+        ? centralPlatformClient.listTenantOverrides(detailId)
+        : Promise.resolve(platformAdminService.listTenantOverrides(detailId));
+      loadOverrides
+        .then((overrideList: PlatformTenantOverride[]) => {
+          const configs = overrideList.map((o: any) => ({
+            id: o.id,
+            key: o.code,
+            value: o.value || (o.isEnabled ? 'true' : 'false'),
+            scope: 'TENANT',
+            status: o.isEnabled ? 'APPLIED' : 'DISABLED',
+            appliedAt: o.updatedAt,
+            createdAt: o.createdAt,
+          }));
+          setRemoteConfig(configs);
+        })
+        .catch(() => {
+          // Remote config fetch is best-effort; ignore failures.
+        });
     }
-  }, [detailId, loadRemoteDevices, loadRemoteHistory]);
+  }, [detailId, loadRemoteDevices, loadRemoteHistory, centralActive]);
 
   const sendActivation = () => {
+    if (centralActive) {
+      if (!detailId || !profile) return;
+      if (channels.length === 0) {
+        toast.error('اختر وسيلة إرسال واحدة على الأقل');
+        return;
+      }
+      setWorking(true);
+      centralPlatformClient.getTenantProfile(detailId)
+        .then((next: any) => {
+          setProfile(next as PlatformTenantProfile);
+          setActivation(buildActivation(next as PlatformTenantProfile, null));
+          setActivationOpen(true);
+          toast.success('تم تجهيز بيانات التفعيل', channels.join(' · '));
+        })
+        .catch((err) => toast.error('تعذر إرسال بيانات التفعيل', err instanceof Error ? err.message : undefined))
+        .finally(() => setWorking(false));
+      return;
+    }
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     if (channels.length === 0) {
@@ -769,6 +1007,72 @@ export const PlatformTenantsPage: React.FC = () => {
     setBulkWorking(true);
     try {
       const ids = Array.from(selectedIds);
+      if (centralActive) {
+        if (bulkActionType === 'status') {
+          let success = 0;
+          const failed: Array<{ tenantId: string; error: string }> = [];
+          for (const id of ids) {
+            try { await centralPlatformClient.setTenantStatus(id, bulkStatus); success += 1; }
+            catch (err) { failed.push({ tenantId: id, error: err instanceof Error ? err.message : 'فشل' }); }
+          }
+          toast.success('اكتمل تغيير الحالة', `نجح: ${success}، فشل: ${failed.length}`);
+          failed.forEach((f) => toast.error(`فشل ${f.tenantId}`, f.error));
+        } else if (bulkActionType === 'plan') {
+          if (!bulkPlanId) { toast.error('اختر باقة'); setBulkWorking(false); return; }
+          let success = 0;
+          const failed: Array<{ tenantId: string; error: string }> = [];
+          for (const id of ids) {
+            try {
+              await centralPlatformClient.changeSubscriptionPlan(id, bulkPlanId, { months: bulkMonths });
+              success += 1;
+            } catch (err) { failed.push({ tenantId: id, error: err instanceof Error ? err.message : 'فشل' }); }
+          }
+          toast.success('اكتمل تغيير الباقة', `نجح: ${success}، فشل: ${failed.length}`);
+          failed.forEach((f) => toast.error(`فشل ${f.tenantId}`, f.error));
+        } else if (bulkActionType === 'activation') {
+          const blocks: string[] = [];
+          const failed: Array<{ tenantId: string; error: string }> = [];
+          for (const id of ids) {
+            try {
+              const profileData: any = await centralPlatformClient.getTenantProfile(id);
+              blocks.push(activationText(buildActivation(profileData as PlatformTenantProfile, null)));
+            } catch (err) { failed.push({ tenantId: id, error: err instanceof Error ? err.message : 'فشل' }); }
+          }
+          if (blocks.length) {
+            const blob = new Blob([blocks.join('\n\n---\n\n')], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `platform-activations-${new Date().toISOString().slice(0, 10)}.txt`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+          }
+          toast.success('تم تجهيز بيانات التفعيل', `نجح: ${blocks.length}، فشل: ${failed.length}`);
+          failed.forEach((f) => toast.error(`فشل ${f.tenantId}`, f.error));
+        } else if (bulkActionType === 'export') {
+          const selected = tenants.filter((t) => selectedIds.has(t.id));
+          downloadCsv(`platform-customers-bulk-${new Date().toISOString().slice(0, 10)}.csv`, [
+            ['رقم العميل', 'Tenant ID', 'الشركة', 'النشاط', 'المسؤول', 'الهاتف', 'البريد', 'الدولة', 'المدينة', 'العنوان', 'تاريخ التسجيل', 'الباقة', 'الحالة', 'بداية الاشتراك', 'نهاية الاشتراك', 'الأجهزة المسموحة', 'الأجهزة المستخدمة', 'الفروع'],
+            ...selected.map((tenant) => [
+              tenant.code, tenant.id, tenant.name, tenant.businessType ?? '', tenant.contactName ?? '',
+              tenant.phone ?? '', tenant.email ?? '', tenant.country ?? '', tenant.city ?? '', tenant.address ?? '',
+              tenant.createdAt, tenant.planName ?? '', PLATFORM_TENANT_STATUS_LABELS[tenant.status],
+              tenant.subscriptionStartedAt ?? '', tenant.subscriptionExpiresAt ?? '',
+              tenant.devicesLimit, tenant.devicesUsed ?? 0, tenant.branchesLimit,
+            ]),
+          ]);
+          toast.success('تم تصدير البيانات', `${selected.length} عميل`);
+        } else {
+          // 'import' is handled by the CSV import modal.
+          toast.info('استخدم نافذة استيراد CSV لإضافة عملاء جدد');
+          setBulkWorking(false);
+          return;
+        }
+        setBulkActionOpen(false);
+        setSelectedIds(new Set());
+        load();
+        if (detailId) loadProfile(detailId);
+        return;
+      }
       switch (bulkActionType) {
         case 'status': {
           const result = platformAdminService.bulkChangeTenantStatus({ tenantIds: ids, status: bulkStatus });
@@ -859,10 +1163,80 @@ export const PlatformTenantsPage: React.FC = () => {
     setCsvImporting(true);
     try {
       const content = await csvFile.text();
-      const result = platformAdminService.importTenantsCsv(content, { skipHeader: true });
-      toast.success('اكتمل الاستيراد', `مُنشأ: ${result.created}، مُحدّث: ${result.updated}، أخطاء: ${result.errors.length}`);
-      if (result.errors.length > 0) {
-        result.errors.forEach(e => toast.error(`السطر ${e.row}`, e.error));
+      if (centralActive) {
+        const headerMap: Record<string, string> = {
+          name: 'name', 'الاسم': 'name', tenantname: 'name',
+          code: 'code', 'الكود': 'code', tenantcode: 'code',
+          contactname: 'contactName', 'جهة الاتصال': 'contactName', contact: 'contactName',
+          email: 'email', 'البريد': 'email', phone: 'phone', 'الهاتف': 'phone', mobile: 'phone',
+          country: 'country', 'الدولة': 'country', city: 'city', 'المدينة': 'city',
+          address: 'address', 'العنوان': 'address', businesstype: 'businessType', 'نوع النشاط': 'businessType',
+          status: 'status', 'الحالة': 'status', planid: 'planId', plan: 'planId', 'الباقة': 'planId',
+          seatslimit: 'seatsLimit', 'seats': 'seatsLimit', brancheslimit: 'branchesLimit', branches: 'branchesLimit',
+          deviceslimit: 'devicesLimit', devices: 'devicesLimit', notes: 'notes', 'ملاحظات': 'notes',
+        };
+        const parseLine = (line: string): string[] => {
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            if (char === '"') {
+              if (inQuotes && line[j + 1] === '"') { current += '"'; j++; } else inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; }
+            else current += char;
+          }
+          values.push(current.trim());
+          return values;
+        };
+        const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+        const resolvedHeaders = lines.length > 0 ? parseLine(lines[0]).map((h) => headerMap[h.trim().toLowerCase()] ?? null) : [];
+        let created = 0;
+        let updated = 0;
+        const errors: Array<{ row: number; error: string }> = [];
+        for (let i = 1; i < lines.length; i++) {
+          const rowNumber = i + 1;
+          try {
+            const values = parseLine(lines[i]);
+            const input: Record<string, any> = { name: '' };
+            values.forEach((value, index) => {
+              const field = resolvedHeaders[index];
+              if (!field || value === '') return;
+              if (field === 'planId') {
+                const plan = plans.find((p: any) => p.code === value || p.id === value || p.name === value);
+                input.planId = plan?.id ?? value;
+              } else if (field === 'status') {
+                input.status = value.toUpperCase();
+              } else if (field === 'seatsLimit' || field === 'branchesLimit' || field === 'devicesLimit') {
+                const num = Number(value);
+                if (!Number.isNaN(num)) input[field] = num;
+              } else {
+                input[field] = value;
+              }
+            });
+            if (!input.name) throw new Error('اسم العميل مطلوب');
+            const key = input.code || input.email || input.name;
+            const existing = (await centralPlatformClient.listTenants(key)).find((t: any) =>
+              (input.email && t.email === input.email) || (input.code && t.code === input.code) || t.name === input.name);
+            if (existing) {
+              await centralPlatformClient.updateTenant(existing.id, input);
+              updated += 1;
+            } else {
+              await centralPlatformClient.createTenant(input as any);
+              created += 1;
+            }
+          } catch (err) {
+            errors.push({ row: rowNumber, error: err instanceof Error ? err.message : 'فشل' });
+          }
+        }
+        toast.success('اكتمل الاستيراد', `مُنشأ: ${created}، مُحدّث: ${updated}، أخطاء: ${errors.length}`);
+        errors.forEach((e) => toast.error(`السطر ${e.row}`, e.error));
+      } else {
+        const result = platformAdminService.importTenantsCsv(content, { skipHeader: true });
+        toast.success('اكتمل الاستيراد', `مُنشأ: ${result.created}، مُحدّث: ${result.updated}، أخطاء: ${result.errors.length}`);
+        if (result.errors.length > 0) {
+          result.errors.forEach(e => toast.error(`السطر ${e.row}`, e.error));
+        }
       }
       setCsvImportOpen(false);
       setCsvFile(null);
@@ -909,7 +1283,26 @@ export const PlatformTenantsPage: React.FC = () => {
   // ─── Remote Control - New API ──────────────────────────────────────────────
 
   const loadRemoteControlData = React.useCallback(() => {
-    if (!detailId) return;
+    if (!detailId) { setRemoteControlData(null); return; }
+    if (centralActive) {
+      centralPlatformClient.getTenantRemoteControl(detailId)
+        .then((data: any) => {
+          setRemoteControlData(data);
+          setRemoteDevices(Array.isArray(data?.devices) ? data.devices : []);
+          setRemoteHistory(Array.isArray(data?.configPushHistory) ? data.configPushHistory : []);
+          setRemoteConfig(data?.appliedConfig ? [{
+            id: data.appliedConfig.id,
+            key: data.appliedConfig.key ?? 'applied_config',
+            value: data.appliedConfig.value ?? '',
+            scope: data.appliedConfig.scope ?? 'TENANT',
+            status: 'APPLIED',
+            appliedAt: data.appliedConfig.appliedAt,
+            createdAt: data.appliedConfig.createdAt,
+          }] : []);
+        })
+        .catch((err) => toast.error('تعذر تحميل بيانات التحكم عن بعد', err instanceof Error ? err.message : undefined));
+      return;
+    }
     try {
       const data = platformAdminService.getTenantRemoteControl(detailId);
       setRemoteControlData(data);
@@ -929,7 +1322,7 @@ export const PlatformTenantsPage: React.FC = () => {
     } catch (err) {
       toast.error('تعذر تحميل بيانات التحكم عن بعد', err instanceof Error ? err.message : undefined);
     }
-  }, [detailId, toast]);
+  }, [detailId, toast, centralActive]);
 
   const pushConfig = () => {
     if (!detailId || !configForm.key.trim()) return;
@@ -938,6 +1331,23 @@ export const PlatformTenantsPage: React.FC = () => {
       return;
     }
     setConfigSending(true);
+    if (centralActive) {
+      centralPlatformClient.pushTenantConfig(detailId, {
+        key: configForm.key,
+        value: configForm.value,
+        scope: configForm.scope,
+        targetDeviceIds: configForm.scope === 'DEVICE' ? selectedDeviceIds : undefined,
+      })
+        .then((result: any) => {
+          toast.success('تم دفع التكوين', `معرف العملية: ${result?.id ?? ''}`);
+          setConfigForm({ ...configForm, key: '', value: '' });
+          setSelectedDeviceIds([]);
+          loadRemoteControlData();
+        })
+        .catch((err) => toast.error('فشل دفع التكوين', err instanceof Error ? err.message : undefined))
+        .finally(() => setConfigSending(false));
+      return;
+    }
     try {
       const result = platformAdminService.pushTenantConfig(detailId, {
         [configForm.key]: configForm.value,
@@ -957,6 +1367,16 @@ export const PlatformTenantsPage: React.FC = () => {
   const forceSync = () => {
     if (!detailId) return;
     setForceSyncWorking(true);
+    if (centralActive) {
+      centralPlatformClient.forceTenantSync(detailId)
+        .then(() => {
+          toast.success('تم طلب مزامنة إجبارية', 'ستبدأ المزامنة خلال ثوانٍ');
+          loadRemoteControlData();
+        })
+        .catch((err) => toast.error('فشل طلب المزامنة', err instanceof Error ? err.message : undefined))
+        .finally(() => setForceSyncWorking(false));
+      return;
+    }
     try {
       platformAdminService.forceTenantSync(detailId);
       toast.success('تم طلب مزامنة إجبارية', 'ستبدأ المزامنة خلال ثوانٍ');
@@ -1521,6 +1941,46 @@ export const PlatformTenantsPage: React.FC = () => {
                     </div>
                   </SectionCard>
                 </div>
+
+                {centralActive && (
+                  <SectionCard
+                    title="فروع العميل"
+                    subtitle={`${formatNumber(branches.filter((b) => b.status !== 'CLOSED').length)} من ${formatNumber(profile.usage.branchesLimit)} فرعاً مسموحاً`}
+                    icon={<Layers3 className="h-4 w-4" />}
+                    action={canManageTenants && (
+                      <Button size="sm" variant="secondary" onClick={() => setBranchOpen(true)}>
+                        <Plus className="h-3.5 w-3.5" /> إضافة فرع
+                      </Button>
+                    )}
+                  >
+                    {branches.length === 0 ? (
+                      <p className="p-3 text-[11.5px] text-slate-500">لا توجد فروع مسجلة لهذا العميل.</p>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {branches.map((b) => (
+                          <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-bold text-slate-800">
+                                {b.name}
+                                {b.isMain && <span className="mr-1.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black text-indigo-700">رئيسي</span>}
+                                {b.status === 'SUSPENDED' && <span className="mr-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">موقوف</span>}
+                                {b.status === 'CLOSED' && <span className="mr-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-black text-slate-600">مغلق</span>}
+                              </p>
+                              <p className="text-[10.5px] text-slate-500 font-mono">
+                                {b.code}{b.city ? ` · ${b.city}` : ''} · {b.seatsLimit} مقعد / {b.devicesLimit} جهاز
+                              </p>
+                            </div>
+                            {canManageTenants && b.status !== 'CLOSED' && !b.isMain && (
+                              <Button size="sm" variant="ghost" onClick={() => closeBranch(b.id)}>
+                                إغلاق
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </SectionCard>
+                )}
 
                 <SectionCard title="صحة العميل" subtitle={`تقييم ${healthScore}% — ${healthChecks.filter((item) => item.ok).length} من ${healthChecks.length} فحوصات ناجحة`} icon={<ShieldCheck className="h-4 w-4" />}>
                   <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -2428,6 +2888,46 @@ export const PlatformTenantsPage: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={branchOpen}
+        onClose={() => setBranchOpen(false)}
+        title="إضافة فرع للعميل"
+        description="الفروع تُحتسب ضمن حد الفروع المسموح للباقة."
+        size="md"
+        busy={working}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setBranchOpen(false)} disabled={working}>إلغاء</Button>
+            <Button variant="primary" onClick={saveBranch} loading={working} disabled={!canManageTenants}>إضافة الفرع</Button>
+          </div>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="كود الفرع" required>
+            <input className={inputClass} dir="ltr" value={branchForm.code} onChange={(e) => setBranchForm({ ...branchForm, code: e.target.value })} />
+          </Field>
+          <Field label="اسم الفرع" required>
+            <input className={inputClass} value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} />
+          </Field>
+          <Field label="المدينة">
+            <input className={inputClass} value={branchForm.city} onChange={(e) => setBranchForm({ ...branchForm, city: e.target.value })} />
+          </Field>
+          <Field label="الهاتف">
+            <input className={inputClass} dir="ltr" value={branchForm.phone} onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })} />
+          </Field>
+          <Field label="حد المقاعد">
+            <input type="number" min={1} className={inputClass} value={branchForm.seatsLimit} onChange={(e) => setBranchForm({ ...branchForm, seatsLimit: Number(e.target.value) })} />
+          </Field>
+          <Field label="حد الأجهزة">
+            <input type="number" min={1} className={inputClass} value={branchForm.devicesLimit} onChange={(e) => setBranchForm({ ...branchForm, devicesLimit: Number(e.target.value) })} />
+          </Field>
+          <label className="flex items-center gap-2 text-[12px] font-semibold text-slate-700 sm:col-span-2">
+            <input type="checkbox" checked={branchForm.isMain} onChange={(e) => setBranchForm({ ...branchForm, isMain: e.target.checked })} />
+            الفرع الرئيسي للعميل
+          </label>
         </div>
       </Modal>
 

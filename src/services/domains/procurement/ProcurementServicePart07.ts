@@ -1,4 +1,5 @@
 import { round2 } from '../finance/financials';
+import { unscaleMoneyRow } from '../../../utils/money';
 import type { SupplierScorecard, ProductPriceHistoryEntry } from '../../../types/procurement';
 import { ProcurementServicePart06 } from './ProcurementServicePart06';
 import { BranchAccessService } from '../auth/BranchAccessService';
@@ -33,7 +34,8 @@ function getSupplierRatingLabel(score: number): SupplierScorecard['ratingLabel']
 
 export abstract class ProcurementServicePart07 extends ProcurementServicePart06 {
 public getSupplierScorecard(supplierId: string): SupplierScorecard {
-    const sup = this.db.query<any>(`SELECT * FROM suppliers WHERE id = ?`, [supplierId])[0];
+    const sup = this.db.query<any>(`SELECT * FROM suppliers WHERE id = ?`, [supplierId])
+      .map((row) => unscaleMoneyRow(row, ['current_balance','total_purchases']))[0];
     if (!sup) throw new Error('المورد غير موجود.');
 
     // Supplier master data is shared, but every transactional row behind the
@@ -82,8 +84,8 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
       SELECT
         COUNT(*) AS totalCount,
         SUM(CASE WHEN status = 'SETTLED' THEN 1 ELSE 0 END) AS settledCount,
-        COALESCE(SUM(claimed_amount), 0) AS totalClaimed,
-        COALESCE(SUM(agreed_amount), 0) AS totalAgreed
+        COALESCE(SUM(claimed_amount), 0) / 100.0 AS totalClaimed,
+        COALESCE(SUM(agreed_amount), 0) / 100.0 AS totalAgreed
       FROM supplier_claims WHERE supplier_id = ? AND ${claimScope.clause}
     `, [supplierId, ...claimScope.params])[0];
 
@@ -136,8 +138,8 @@ public getProductPriceHistory(productId: string): ProductPriceHistoryEntry[] {
         pi.supplier_id AS supplierId,
         s.name AS supplierName,
         pii.quantity_m2 AS quantityM2,
-        pii.unit_cost AS unitCost,
-        COALESCE(NULLIF(pii.effective_unit_cost, 0), pii.unit_cost) AS effectiveUnitCost,
+        pii.unit_cost / 100.0 AS unitCost,
+        COALESCE(NULLIF(pii.effective_unit_cost, 0), pii.unit_cost) / 100.0 AS effectiveUnitCost,
         (SELECT pb.batch_number FROM product_batches pb WHERE pb.product_id = pii.product_id AND pb.supplier_id = pi.supplier_id ORDER BY pb.created_at DESC LIMIT 1) AS batchNumber
       FROM purchase_invoice_items pii
       JOIN purchase_invoices pi ON pi.id = pii.purchase_id

@@ -31,7 +31,7 @@ public recordSpecialStock(input: {
         throw new Error(`الرصيد المتاح بالمخزن (${stock?.availableM2 || 0} ${unitLabel}) غير كافٍ لعزل ${input.quantityM2} ${unitLabel}`);
       }
 
-      const prod = txDb.query<any>(`SELECT cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [input.productId])[0];
+      const prod = txDb.query<any>(`SELECT cost_price / 100.0 AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [input.productId])[0];
       const metersPerBox = prod?.metersPerBox ?? 1.44;
       const boxes = prod?.productType === 'GENERAL'
         ? prod.baseUnit === 'BOX' ? input.quantityM2 : 0
@@ -72,7 +72,7 @@ public recordSpecialStock(input: {
           id, transaction_number, type, product_id, warehouse_id,
           quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
           notes, performed_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SPECIAL_STOCK', ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'SPECIAL_STOCK', ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         txId, txNum, txType, input.productId, input.warehouseId,
         -input.quantityM2, -boxes, unitCost, totalCost, specialId,
@@ -87,7 +87,7 @@ public recordSpecialStock(input: {
           id, special_number, warehouse_id, product_id, category,
           quantity_m2, boxes_count, unit_cost, total_cost, status,
           source_type, source_id, inspection_notes, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECORDED', ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'RECORDED', ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         specialId, specialNum, input.warehouseId, input.productId, input.category,
         input.quantityM2, boxes, unitCost, totalCost,

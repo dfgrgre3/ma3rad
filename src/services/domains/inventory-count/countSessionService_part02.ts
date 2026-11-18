@@ -25,11 +25,11 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
     for (const item of sessionItems) {
       if (!members.has(item.id)) throw new Error('A product does not belong to this count session.');
       if (item.countedQuantityM2 !== null && (!Number.isFinite(item.countedQuantityM2) || item.countedQuantityM2 < 0)) throw new Error(`Invalid counted quantity for ${item.productName}.`);
-      const canonical = txDb.query<{ systemQuantityM2: number; unitCost: number }>('SELECT system_quantity_m2 AS systemQuantityM2, unit_cost AS unitCost FROM stock_count_items WHERE id = ? AND count_id = ?', [item.id, activeSession.id])[0];
+      const canonical = txDb.query<{ systemQuantityM2: number; unitCost: number }>('SELECT system_quantity_m2 AS systemQuantityM2, unit_cost / 100.0 AS unitCost FROM stock_count_items WHERE id = ? AND count_id = ?', [item.id, activeSession.id])[0];
       const variance = item.countedQuantityM2 === null ? 0 : Number((item.countedQuantityM2 - canonical.systemQuantityM2).toFixed(3));
       txDb.run(`
         UPDATE stock_count_items
-        SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ?,
+        SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ROUND(?*100),
             discrepancy_reason = ?, notes = ?, counted_by = ?,
             counted_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END
         WHERE id = ? AND count_id = ?

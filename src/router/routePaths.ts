@@ -85,6 +85,7 @@ export const APP_ROUTE_PATHS = [
   "finance/cheques",
   "finance/fiscal-closing",
   "finance/bank-reconciliation",
+  "finance/consistency-audit",
   "finance/budgets-cost-centers",
   "finance/cash-forecast",
   "finance/epayment-settlements",

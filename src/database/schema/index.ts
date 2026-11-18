@@ -1,21 +1,27 @@
 /**
  * DATABASE SCHEMA SECURITY NOTICE
  *
- * Financial amounts in this schema use REAL type which can have floating-point
- * precision errors. This is a known limitation that requires a future migration.
+ * General-ledger financial columns now use INTEGER type storing piastres
+ * (1 EGP = 100 piastres). This provides exact arithmetic without floating-point
+ * errors.
  *
- * Recommended fix: Change financial columns to INTEGER (storing amounts in
- * smallest currency unit, e.g., cents/piastres) or TEXT with decimal arithmetic.
+ * Affected tables (migration 213_money_minor_units):
+ *   - chart_of_accounts: balance (INTEGER piastres)
+ *   - journal_entries: total_debit, total_credit (INTEGER piastres)
+ *   - journal_entry_lines: debit, credit (INTEGER piastres)
+ *   - fiscal_year_openings: debit, credit, balance (INTEGER piastres)
+ *   - finance_subledger_events: amount (INTEGER piastres)
+ *   - fiscal_period_subledger_snapshots: balance (INTEGER piastres)
  *
- * Reference: https://sqlite.org/quirks.html#floating_point_arithmetic
+ * Application code must:
+ *   - SELECT: wrap money expressions with `/ 100.0` to convert to major units
+ *   - INSERT/UPDATE: wrap parameters with `ROUND(? * 100)` to convert to piastres
+ *   - See src/utils/money.ts for helper functions
  *
- * Affected columns include: cost_price, selling_price_m2, total_cost, amount,
- * credit_limit, current_balance, quantity_m2, and many other financial fields.
- *
- * Until migration is complete, application code should:
- * 1. Round calculations to 2 decimal places for display
- * 2. Use integer arithmetic where possible
- * 3. Validate that accumulated errors stay within acceptable bounds
+ * Sales tables (migration 215_sales_money_minor_units) also use INTEGER
+ * piastres for invoice/return money columns; purchases, parties, expenses and
+ * inventory cost columns still use REAL with CHECK constraints (migration
+ * 212_precision_check_constraints) until their domain migrations activate.
  */
 
 import { SCHEMA_PART_01 } from './part-01';

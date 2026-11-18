@@ -26,10 +26,21 @@ export const SUPPORTED_SYNC_ENTITIES = [
   { entityType: 'sales_quotation', label: 'عروض أسعار البيع (نسخ تقارير)' },
   { entityType: 'held_order', label: 'أوامر الانتظار (نسخ تقارير)' },
   { entityType: 'purchase_order', label: 'طلبات الشراء (نسخ تقارير)' },
-  { entityType: 'stock_transfer', label: 'تحويلات المخزون (نسخ تقارير)' },
   { entityType: 'inventory_transaction', label: 'حركة مخزون (نسخ تقارير)' },
   { entityType: 'stock_adjustment', label: 'تعديل رصيد مخزون (نسخ تقارير)' },
 ] as const;
+
+/**
+ * Coverage boundary — intentionally NOT synchronized:
+ *  - HR/payroll (employees, attendance, payroll, leave, contracts, recruitment)
+ *  - General ledger & finance internals (journal entries, fiscal periods,
+ *    budgets, assets) — financial truth stays branch-local; only business
+ *    documents (invoices, payments, expenses, stock docs) replicate.
+ *  - Platform-admin/licensing entities (tenants, plans, licenses).
+ * Adding a new entity type requires a producer in MasterDataSyncService /
+ * BusinessRecordSyncService / the domain sync services AND an entry above;
+ * `assertSupported` fails fast for anything else.
+ */
 
 export type SupportedSyncEntity = typeof SUPPORTED_SYNC_ENTITIES[number]['entityType'];
 

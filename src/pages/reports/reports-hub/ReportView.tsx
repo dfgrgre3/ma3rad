@@ -313,22 +313,29 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   }, [definition, products, filters]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const params: ReportParams = {
-        from: definition.dateMode === 'range' ? from : asOf,
-        to: definition.dateMode === 'range' ? to : asOf,
-        ...filters,
-      };
-      setResult(runReport(definition.id, params));
-      setLastUpdatedAt(new Date());
-    } catch (caught: any) {
-      setResult(null);
-      setError(caught?.message || 'تعذر تحميل التقرير.');
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      try {
+        const params: ReportParams = {
+          from: definition.dateMode === 'range' ? from : asOf,
+          to: definition.dateMode === 'range' ? to : asOf,
+          ...filters,
+        };
+        const next = await runReport(definition.id, params);
+        if (cancelled) return;
+        setResult(next);
+        setLastUpdatedAt(new Date());
+      } catch (caught: any) {
+        if (cancelled) return;
+        setResult(null);
+        setError(caught?.message || 'تعذر تحميل التقرير.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [definition, from, to, asOf, filters, refreshToken]);
 
   const columns = useMemo(() => result?.columns || [], [result]);

@@ -42,103 +42,6 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
       : { favorites: [], recent: [] });
   }, [accessiblePaths, currentUser?.id]);
 
-  const { results, error } = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    const pageResults: SearchResult[] = accessibleGroups.flatMap((group) =>
-      group.items
-        .map((item) => ({
-          label: item.label,
-          meta: group.label,
-          path: item.to,
-          kind: 'page' as const,
-        }))
-    );
-    const matchingPages = q
-      ? pageResults.filter((item) => `${item.label} ${item.meta}`.toLowerCase().includes(q))
-      : pageResults;
-    if (!q) return { results: matchingPages, error: false };
-
-    try {
-      const db = DatabaseManager.getInstance();
-      const term = `%${deferredQuery.trim()}%`;
-      const productResults = PermissionService.can(currentUser, 'ui.products.catalog.view')
-        ? db.query<{ id: string; name: string; sku: string; barcode: string }>(
-          'SELECT id, name, sku, barcode FROM products WHERE name LIKE ? OR sku LIKE ? OR barcode LIKE ? LIMIT 5',
-          [term, term, term],
-        ).map((product) => ({
-          label: product.name,
-          meta: `${productsLabel} · ${product.sku || product.barcode || ''}`,
-          path: `/products/${product.id}`,
-          kind: 'product' as const,
-        }))
-        : [];
-      const customerResults = PermissionService.can(currentUser, 'ui.customers.list.view')
-        ? db.query<{ id: string; name: string; phone: string; code: string }>(
-          'SELECT id, name, phone, code FROM customers WHERE name LIKE ? OR phone LIKE ? OR code LIKE ? LIMIT 5',
-          [term, term, term],
-        ).map((customer) => ({
-          label: customer.name,
-          meta: `${customersLabel} · ${customer.phone || customer.code || ''}`,
-          path: `/customers/${customer.id}`,
-          kind: 'customer' as const,
-        }))
-        : [];
-      const supplierResults = PermissionService.can(currentUser, 'ui.suppliers.suppliers.view')
-        ? db.query<{ id: string; name: string; phone: string; code: string }>(
-          'SELECT id, name, phone, code FROM suppliers WHERE name LIKE ? OR company_name LIKE ? OR phone LIKE ? OR code LIKE ? LIMIT 5',
-          [term, term, term, term],
-        ).map((supplier) => ({
-          label: supplier.name,
-          meta: `${suppliersLabel} · ${supplier.phone || supplier.code || ''}`,
-          path: `/suppliers/${supplier.id}`,
-          kind: 'supplier' as const,
-        }))
-        : [];
-      const salesInvoiceResults = PermissionService.can(currentUser, 'ui.sales.invoices.view')
-        ? db.query<{ invoice_number: string; total_amount: number; customer_name: string }>(
-          `SELECT si.invoice_number, si.total_amount, c.name AS customer_name
-           FROM sales_invoices si
-           JOIN customers c ON c.id = si.customer_id
-           WHERE si.invoice_number LIKE ? OR c.name LIKE ? LIMIT 5`,
-          [term, term],
-        ).map((invoice) => ({
-          label: invoice.invoice_number,
-          meta: `${salesInvoicesLabel} · ${invoice.customer_name} · ${invoice.total_amount}`,
-          path: '/sales',
-          kind: 'invoice' as const,
-        }))
-        : [];
-      const purchaseInvoiceResults = PermissionService.can(currentUser, 'ui.purchases.invoices.view')
-        ? db.query<{ invoice_number: string; supplier_invoice_number: string | null; supplier_name: string }>(
-          `SELECT pi.invoice_number, pi.supplier_invoice_number, s.name AS supplier_name
-           FROM purchase_invoices pi
-           JOIN suppliers s ON s.id = pi.supplier_id
-           WHERE pi.invoice_number LIKE ? OR pi.supplier_invoice_number LIKE ? OR s.name LIKE ? LIMIT 5`,
-          [term, term, term],
-        ).map((invoice) => ({
-          label: invoice.invoice_number,
-          meta: `فاتورة مشتريات · ${invoice.supplier_name}`,
-          path: '/purchases',
-          kind: 'invoice' as const,
-        }))
-        : [];
-      return {
-        results: [
-          ...matchingPages,
-          ...productResults,
-          ...customerResults,
-          ...supplierResults,
-          ...salesInvoiceResults,
-          ...purchaseInvoiceResults,
-        ],
-        error: false,
-      };
-    } catch (cause) {
-      console.error('Global search failed:', cause);
-      return { results: matchingPages, error: true };
-    }
-  }, [accessibleGroups, deferredQuery, currentUser, customersLabel, productsLabel, salesInvoicesLabel, suppliersLabel]);
-
   const pageResults = useMemo(
     () => accessibleGroups.flatMap((group) => group.items.map((item) => ({
       label: item.label,
@@ -148,6 +51,114 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
     }))),
     [accessibleGroups]
   );
+  const matchingPages = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    return q ? pageResults.filter((item) => `${item.label} ${item.meta}`.toLowerCase().includes(q)) : pageResults;
+  }, [pageResults, deferredQuery]);
+
+  // Database-backed results run in the Web Worker so typing never blocks the UI thread.
+  const [dbResults, setDbResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState(false);
+
+  useEffect(() => {
+    const q = deferredQuery.trim();
+    if (!q) {
+      setDbResults([]);
+      setSearchError(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const db = DatabaseManager.getInstance();
+          const term = `%${q}%`;
+          const jobs: Array<Promise<SearchResult[]>> = [];
+          if (PermissionService.can(currentUser, 'ui.products.catalog.view')) {
+            jobs.push(db.queryAsync<{ id: string; name: string; sku: string; barcode: string }>(
+              'SELECT id, name, sku, barcode FROM products WHERE name LIKE ? OR sku LIKE ? OR barcode LIKE ? LIMIT 5',
+              [term, term, term],
+            ).then((rows) => rows.map((product) => ({
+              label: product.name,
+              meta: `${productsLabel} · ${product.sku || product.barcode || ''}`,
+              path: `/products/${product.id}`,
+              kind: 'product' as const,
+            }))));
+          }
+          if (PermissionService.can(currentUser, 'ui.customers.list.view')) {
+            jobs.push(db.queryAsync<{ id: string; name: string; phone: string; code: string }>(
+              'SELECT id, name, phone, code FROM customers WHERE name LIKE ? OR phone LIKE ? OR code LIKE ? LIMIT 5',
+              [term, term, term],
+            ).then((rows) => rows.map((customer) => ({
+              label: customer.name,
+              meta: `${customersLabel} · ${customer.phone || customer.code || ''}`,
+              path: `/customers/${customer.id}`,
+              kind: 'customer' as const,
+            }))));
+          }
+          if (PermissionService.can(currentUser, 'ui.suppliers.suppliers.view')) {
+            jobs.push(db.queryAsync<{ id: string; name: string; phone: string; code: string }>(
+              'SELECT id, name, phone, code FROM suppliers WHERE name LIKE ? OR company_name LIKE ? OR phone LIKE ? OR code LIKE ? LIMIT 5',
+              [term, term, term, term],
+            ).then((rows) => rows.map((supplier) => ({
+              label: supplier.name,
+              meta: `${suppliersLabel} · ${supplier.phone || supplier.code || ''}`,
+              path: `/suppliers/${supplier.id}`,
+              kind: 'supplier' as const,
+            }))));
+          }
+          if (PermissionService.can(currentUser, 'ui.sales.invoices.view')) {
+            jobs.push(db.queryAsync<{ invoice_number: string; total_amount: number; customer_name: string }>(
+              `SELECT si.invoice_number, si.total_amount, c.name AS customer_name
+               FROM sales_invoices si
+               JOIN customers c ON c.id = si.customer_id
+               WHERE si.invoice_number LIKE ? OR c.name LIKE ? LIMIT 5`,
+              [term, term],
+            ).then((rows) => rows.map((invoice) => ({
+              label: invoice.invoice_number,
+              meta: `${salesInvoicesLabel} · ${invoice.customer_name} · ${invoice.total_amount}`,
+              path: '/sales',
+              kind: 'invoice' as const,
+            }))));
+          }
+          if (PermissionService.can(currentUser, 'ui.purchases.invoices.view')) {
+            jobs.push(db.queryAsync<{ invoice_number: string; supplier_invoice_number: string | null; supplier_name: string }>(
+              `SELECT pi.invoice_number, pi.supplier_invoice_number, s.name AS supplier_name
+               FROM purchase_invoices pi
+               JOIN suppliers s ON s.id = pi.supplier_id
+               WHERE pi.invoice_number LIKE ? OR pi.supplier_invoice_number LIKE ? OR s.name LIKE ? LIMIT 5`,
+              [term, term, term],
+            ).then((rows) => rows.map((invoice) => ({
+              label: invoice.invoice_number,
+              meta: `فاتورة مشتريات · ${invoice.supplier_name}`,
+              path: '/purchases',
+              kind: 'invoice' as const,
+            }))));
+          }
+          const settled = await Promise.all(jobs.map((job) => job.catch(() => [] as SearchResult[])));
+          if (cancelled) return;
+          setDbResults(settled.flat());
+          setSearchError(false);
+        } catch (cause) {
+          console.error('Global search failed:', cause);
+          if (!cancelled) {
+            setDbResults([]);
+            setSearchError(true);
+          }
+        }
+      })();
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [deferredQuery, currentUser, customersLabel, productsLabel, salesInvoicesLabel, suppliersLabel]);
+
+  const results = useMemo(
+    () => [...matchingPages, ...dbResults],
+    [matchingPages, dbResults]
+  );
+  const error = searchError;
   const shortcutMatches = (item: SearchResult) =>
     !deferredQuery.trim() || `${item.label} ${item.meta}`.toLowerCase().includes(deferredQuery.trim().toLowerCase());
   const favoriteResults = shortcuts.favorites.flatMap((path) => {

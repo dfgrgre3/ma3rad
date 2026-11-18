@@ -209,9 +209,9 @@ export class ConsistencyAuditService {
     const params = branchId ? [branchId] : [];
     const rows = this.db.query<Record<string, unknown>>(
       `SELECT je.id, je.entry_number AS entryNumber, je.date, je.branch_id AS branchId,
-              je.total_debit AS totalDebit, je.total_credit AS totalCredit,
-              COALESCE((SELECT SUM(l.debit) FROM journal_entry_lines l WHERE l.entry_id = je.id), 0) AS linesDebit,
-              COALESCE((SELECT SUM(l.credit) FROM journal_entry_lines l WHERE l.entry_id = je.id), 0) AS linesCredit
+              je.total_debit / 100.0 AS totalDebit, je.total_credit / 100.0 AS totalCredit,
+              COALESCE((SELECT SUM(l.debit) FROM journal_entry_lines l WHERE l.entry_id = je.id), 0) / 100.0 AS linesDebit,
+              COALESCE((SELECT SUM(l.credit) FROM journal_entry_lines l WHERE l.entry_id = je.id), 0) / 100.0 AS linesCredit
        FROM journal_entries je
        WHERE je.is_posted = 1 ${branchFilter}`,
       params,
@@ -252,9 +252,9 @@ export class ConsistencyAuditService {
    *  lines (same definition migration 042 used to rebuild balances). */
   private checkGlVsJournal(_branchId: string | null): CheckResult {
     const rows = this.db.query<Record<string, unknown>>(
-      `SELECT coa.id, coa.code, coa.name, coa.type, coa.balance,
+      `SELECT coa.id, coa.code, coa.name, coa.type, coa.balance / 100.0 AS balance,
               COALESCE((
-                SELECT SUM(l.debit - l.credit)
+                SELECT SUM((l.debit - l.credit) / 100.0)
                 FROM journal_entry_lines l
                 JOIN journal_entries e ON e.id = l.entry_id
                 WHERE l.account_id = coa.id AND e.is_posted = 1

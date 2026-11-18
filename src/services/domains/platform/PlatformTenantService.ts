@@ -5,7 +5,9 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import { provisioningQueueService } from './ProvisioningQueueService';
+import { provisioningExecutorService } from './ProvisioningExecutorService';
+import type {
   PlatformTenant,
   PlatformTenantInput,
   PlatformTenantStatus,
@@ -66,6 +68,14 @@ export class PlatformTenantService {
     return user;
   }
 
+  private static staffTenantScope(user: any): string[] | null {
+    if (!user || String(user.role) === 'SUPER_ADMIN') return null;
+    const db = DatabaseManager.getInstance();
+    const row = db.query<any>('SELECT data_scope, data_scope_tenant_ids FROM platform_staff WHERE id = ?', [String(user.id)])[0];
+    if (!row || String(row.data_scope ?? 'ALL') !== 'LIMITED') return null;
+    return safeJsonArray(row.data_scope_tenant_ids);
+  }
+
   private audit(
     action: string,
     entityType: string,
@@ -120,10 +130,17 @@ export class PlatformTenantService {
   // ─── Tenant CRUD ──────────────────────────────────────────────────────────────
 
   public listTenants(search = '', status = '', planId = ''): PlatformTenant[] {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
+    const user = PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
+    const scopeIds = PlatformTenantService.staffTenantScope(user);
 
     const where: string[] = [];
     const params: (string | number)[] = [];
+
+    if (scopeIds !== null) {
+      if (!scopeIds.length) return [];
+      where.push(`t.id IN (${scopeIds.map(() => '?').join(',')})`);
+      params.push(...scopeIds);
+    }
 
     if (search) {
       where.push('(t.name LIKE ? OR t.code LIKE ? OR COALESCE(t.email,\'\') LIKE ? OR COALESCE(t.phone,\'\') LIKE ?)');
@@ -143,14 +160,14 @@ export class PlatformTenantService {
 
     const rows = this.db.query<any>(
       `SELECT t.*,
-              p.name AS planName, p.price AS planPrice,
+              p.name AS planName, p.price / 100.0 AS planPrice,
               (SELECT COUNT(*) FROM platform_subscriptions s WHERE s.tenant_id = t.id AND s.status IN ('ACTIVE','TRIAL')) AS activeLicenses,
               (SELECT COUNT(*) FROM platform_licenses l WHERE l.tenant_id = t.id) AS licensesTotal,
               (SELECT COUNT(*) FROM platform_devices d
                JOIN platform_licenses l ON l.id = d.license_id
                WHERE l.tenant_id = t.id AND d.status = 'ACTIVE') AS devicesUsed,
               COALESCE((
-                SELECT SUM(total - COALESCE(paid, 0))
+                SELECT SUM(total - COALESCE(paid_amount, 0)) / 100.0
                 FROM platform_invoices i
                 WHERE i.tenant_id = t.id AND i.status IN ('SENT','PARTIAL','OVERDUE')
               ), 0) AS outstanding
@@ -187,14 +204,18 @@ export class PlatformTenantService {
       devicesUsed: toNumber(row.devicesUsed, 0),
       outstanding: toNumber(row.outstanding, 0),
       subscriptionId: row.subscription_id ?? null,
-      price: row.price ?? null,
+      price: row.price != null ? Number(row.price) / 100 : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     }));
   }
 
   public getTenant(id: string): PlatformTenant | null {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
+    const user = PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
+    const scopeIds = PlatformTenantService.staffTenantScope(user);
+    if (scopeIds !== null && !scopeIds.includes(String(id))) {
+      throw new Error('هذا العميل خارج نطاق البيانات المخصص لك.');
+    }
     const row = this.db.query<any>('SELECT * FROM platform_tenants WHERE id = ?', [id])[0];
     if (!row) return null;
     return {
@@ -223,7 +244,7 @@ export class PlatformTenantService {
       devicesUsed: 0,
       outstanding: 0,
       subscriptionId: row.subscription_id ?? null,
-      price: row.price ?? null,
+      price: row.price != null ? Number(row.price) / 100 : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
@@ -251,7 +272,7 @@ export class PlatformTenantService {
          status, plan_id, seats_limit, branches_limit, devices_limit, notes,
          subscription_started_at, subscription_expires_at, subscription_id, price,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?)`,
       [
         id, code, input.name.trim(), input.contactName?.trim() ?? null, input.email?.trim() ?? null,
         input.phone?.trim() ?? null, input.country?.trim() ?? null, input.city?.trim() ?? null,
@@ -273,7 +294,7 @@ export class PlatformTenantService {
       this.db.run(
         `INSERT INTO platform_subscriptions
           (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, 1, ?)`,
+         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
         [
           `sub_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, plan.id,
           now, addMonths(new Date(), plan.trialDays).toISOString(),
@@ -383,8 +404,14 @@ export class PlatformTenantService {
     const changeLog = this.db.query<any>('SELECT * FROM platform_audit WHERE entity_type IN (\'SUBSCRIPTION\',\'LICENSE\',\'INVOICE\',\'PAYMENT\') AND (details LIKE ? OR details LIKE ?) ORDER BY created_at DESC LIMIT 100', [`%${id}%`, `%"tenantId":"${id}"%`]);
     const activityLog = this.db.query<any>('SELECT * FROM platform_audit WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200', [id]);
 
-    const seatsUsed = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_staff WHERE tenant_id = ? AND is_active = 1', [id])[0]?.c ?? 0;
+    const seatsUsed = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_tenant_users WHERE tenant_id = ? AND is_active = 1', [id])[0]?.c ?? 0;
     const branchesUsed = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_branches WHERE tenant_id = ?', [id])[0]?.c ?? 0;
+    const devicesUsed = this.db.query<any>(
+      `SELECT COUNT(*) AS c FROM platform_devices d
+       JOIN platform_licenses l ON l.id = d.license_id
+       WHERE l.tenant_id = ? AND d.status = 'ACTIVE'`,
+      [id]
+    )[0]?.c ?? 0;
     const modulesCount = this.db.query<any>('SELECT COUNT(DISTINCT json_each.value) AS c FROM platform_licenses, json_each(modules) WHERE tenant_id = ? AND status IN (\'ACTIVE\',\'ISSUED\')', [id])[0]?.c ?? 0;
 
     return {
@@ -401,7 +428,7 @@ export class PlatformTenantService {
       usage: {
         seatsLimit: tenant.seatsLimit,
         devicesLimit: tenant.devicesLimit,
-        devicesUsed: toNumber(tenant.devicesUsed, 0),
+        devicesUsed: toNumber(devicesUsed, 0),
         branchesLimit: tenant.branchesLimit,
         branchesUsed: toNumber(branchesUsed, 0),
         modulesCount: toNumber(modulesCount, 0),
@@ -450,7 +477,7 @@ export class PlatformTenantService {
       temporaryPassword,
       activationCode,
       planName: tenant.planName ?? null,
-      licenseKey: null,
+      licenseKey: this.getActiveLicenseKey(tenantId),
       licenseExpiresAt: tenant.subscriptionExpiresAt ?? null,
       modules: tenant.planId ? this.getPlanModules(tenant.planId) : [],
       loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
@@ -488,7 +515,7 @@ export class PlatformTenantService {
       temporaryPassword: pwd,
       activationCode,
       planName: tenant.planName ?? null,
-      licenseKey: null,
+      licenseKey: this.getActiveLicenseKey(tenantId),
       licenseExpiresAt: tenant.subscriptionExpiresAt ?? null,
       modules: tenant.planId ? this.getPlanModules(tenant.planId) : [],
       loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
@@ -545,27 +572,53 @@ export class PlatformTenantService {
 
     const id = `tu_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
-    const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
-    const activationCode = generateActivationCode();
+    const provisionIdentity = input.provisionIdentity !== false;
+    const mode: 'INVITE' | 'DIRECT_CREATE' = input.provisioningMode === 'INVITE' ? 'INVITE' : 'DIRECT_CREATE';
+    const inviteCode = generateActivationCode();
+    const temporaryPassword = input.password || generateTemporaryPassword();
+    const inviteCodeHash = bcrypt.hashSync(inviteCode, 10);
+    const tempPasswordHash = bcrypt.hashSync(temporaryPassword, 10);
+    const inviteExpiresAt = addDays(new Date(), 7).toISOString();
+    const provisioningStatus = !provisionIdentity ? 'DIRECTORY_ONLY' : mode === 'INVITE' ? 'INVITED' : 'PENDING';
+    const status = provisionIdentity && mode === 'INVITE' ? 'INVITED' : 'ACTIVE';
 
     this.db.run(
       `INSERT INTO platform_tenant_users
-        (id, tenant_id, username, full_name, email, phone, role, password_hash, activation_code, is_active, provisioned, identity_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
+        (id, tenant_id, username, full_name, email, phone, role, status, notes, provisioning_status, provisioning_mode, scope,
+         invite_code, temporary_password, invite_expires_at, password_hash, is_active, provisioned, identity_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NULL, ?, ?)`,
       [id, tenantId, username, fullName, input.email?.trim() ?? null, input.phone?.trim() ?? null,
-       input.role ?? 'USER', passwordHash, activationCode, null, now, now]
+       input.role ?? 'USER', status, input.notes ?? null, provisioningStatus, provisionIdentity ? mode : null,
+       input.scope ?? null, provisionIdentity ? inviteCodeHash : null, provisionIdentity ? tempPasswordHash : null,
+       provisionIdentity ? inviteExpiresAt : null, tempPasswordHash, now, now]
     );
 
-    this.audit('إنشاء مستخدم عميل', 'TENANT_USER', id, { tenantId, username, role: input.role ?? 'USER' });
+    if (provisionIdentity) {
+      provisioningQueueService.enqueue(tenantId, id, 'TENANT_USER_PROVISION', {
+        tenantId,
+        tenantUserId: id,
+        username,
+        fullName,
+        email: input.email?.trim() ?? null,
+        phone: input.phone?.trim() ?? null,
+        role: input.role ?? 'USER',
+        scope: input.scope ?? null,
+        mode,
+      }, inviteExpiresAt);
+      provisioningExecutorService.requestDrain();
+    }
+
+    this.audit('إنشاء مستخدم عميل', 'TENANT_USER', id, { tenantId, username, role: input.role ?? 'USER', provisioningStatus });
 
     return {
       user: this.getTenantUser(id)!,
+      inviteCode: provisionIdentity ? inviteCode : null,
       temporaryPassword,
-      activationCode,
       loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
       provisioned: false,
-      message: 'تم إنشاء المستخدم بنجاح',
+      message: provisionIdentity
+        ? (mode === 'INVITE' ? 'تم إنشاء الدعوة بنجاح' : 'تم إنشاء طلب التوفير بنجاح')
+        : 'تم إنشاء المستخدم في الدليل فقط',
     };
   }
 
@@ -634,22 +687,43 @@ export class PlatformTenantService {
     const existing = this.getTenantUser(id);
     if (!existing) throw new Error('المستخدم غير موجود.');
 
+    const raw = this.db.query<any>('SELECT * FROM platform_tenant_users WHERE id = ?', [id])[0];
+    if (!raw) throw new Error('المستخدم غير موجود.');
+
+    const inviteCode = generateActivationCode();
     const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
-    const activationCode = generateActivationCode();
+    const inviteCodeHash = bcrypt.hashSync(inviteCode, 10);
+    const tempPasswordHash = bcrypt.hashSync(temporaryPassword, 10);
+    const inviteExpiresAt = addDays(new Date(), 7).toISOString();
     const now = nowIso();
 
     this.db.run(
-      'UPDATE platform_tenant_users SET password_hash = ?, activation_code = ?, updated_at = ? WHERE id = ?',
-      [passwordHash, activationCode, now, id]
+      `UPDATE platform_tenant_users
+         SET invite_code = ?, temporary_password = ?, password_hash = ?, invite_expires_at = ?,
+             provisioning_status = 'INVITED', status = 'INVITED', last_error = NULL, updated_at = ?
+       WHERE id = ?`,
+      [inviteCodeHash, tempPasswordHash, tempPasswordHash, inviteExpiresAt, now, id]
     );
+
+    provisioningQueueService.enqueue(String(raw.tenant_id ?? raw.tenantId), id, 'TENANT_USER_PROVISION', {
+      tenantId: String(raw.tenant_id ?? raw.tenantId),
+      tenantUserId: id,
+      username: raw.username ?? null,
+      fullName: raw.full_name ?? raw.fullName ?? null,
+      email: raw.email ?? null,
+      phone: raw.phone ?? null,
+      role: raw.role ?? null,
+      scope: raw.scope ?? null,
+      mode: 'INVITE',
+    }, inviteExpiresAt);
+    provisioningExecutorService.requestDrain();
 
     this.audit('إعادة إرسال دعوة مستخدم عميل', 'TENANT_USER', id, { tenantId: existing.tenantId });
 
     return {
       user: this.getTenantUser(id)!,
+      inviteCode,
       temporaryPassword,
-      activationCode,
       loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
       provisioned: false,
       message: 'تم إعادة إرسال الدعوة بنجاح',
@@ -664,8 +738,10 @@ export class PlatformTenantService {
 
     const now = nowIso();
     this.db.run(
-      'UPDATE platform_tenant_users SET provisioned = 1, identity_user_id = ?, updated_at = ? WHERE id = ?',
-      [identityUserId ?? null, now, id]
+      `UPDATE platform_tenant_users
+         SET provisioned = 1, provisioning_status = 'PROVISIONED', provisioned_at = ?, identity_user_id = COALESCE(?, identity_user_id), updated_at = ?
+       WHERE id = ?`,
+      [now, identityUserId ?? null, now, id]
     );
 
     this.audit('وضع علامة مستخدم عميل كمُجهز', 'TENANT_USER', id, { tenantId: existing.tenantId, identityUserId });
@@ -758,6 +834,16 @@ export class PlatformTenantService {
     return candidate;
   }
 
+  private getActiveLicenseKey(tenantId: string): string | null {
+    const row = this.db.query<any>(
+      `SELECT license_key FROM platform_licenses
+       WHERE tenant_id = ? AND status IN ('ACTIVE','ISSUED')
+       ORDER BY created_at DESC LIMIT 1`,
+      [tenantId]
+    )[0];
+    return row?.license_key ?? row?.licenseKey ?? null;
+  }
+
   private getPlanModules(planId: string): string[] {
     const plan = this.db.query<any>('SELECT included_modules FROM platform_plans WHERE id = ?', [planId])[0];
     return plan ? safeJsonArray(plan.included_modules) : [];
@@ -780,8 +866,13 @@ export class PlatformTenantService {
       status: row.status as 'ACTIVE' | 'SUSPENDED' | 'INVITED',
       isActive: row.status === 'ACTIVE',
       provisioningStatus: row.provisioning_status as any ?? 'NOT_REQUESTED',
-      provisionedAt: row.provisioned_at ?? null,
+      provisioningMode: row.provisioning_mode ?? null,
       identityUserId: row.identity_user_id ?? null,
+      scope: row.scope ?? null,
+      inviteExpiresAt: row.invite_expires_at ?? null,
+      lastError: row.last_error ?? null,
+      notes: row.notes ?? null,
+      provisionedAt: row.provisioned_at ?? null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
@@ -794,9 +885,9 @@ export class PlatformTenantService {
       name: String(row.name),
       description: row.description ?? null,
       billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0),
-      monthlyPrice: toNumber(row.monthly_price, 0),
-      yearlyPrice: toNumber(row.yearly_price, 0),
+      price: toNumber(row.price, 0) / 100,
+      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
+      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
       currency: row.currency ?? 'EGP',
       seatsLimit: toNumber(row.seats_limit, 1),
       branchesLimit: toNumber(row.branches_limit, 1),
@@ -827,7 +918,7 @@ export class PlatformTenantService {
       startDate: String(row.start_date),
       endDate: row.end_date ?? null,
       seats: toNumber(row.seats, 1),
-      price: toNumber(row.price, 0),
+      price: toNumber(row.price, 0) / 100,
       billingCycle: row.billing_cycle,
       autoRenew: Boolean(row.auto_renew),
       branchesLimit: toNumber(row.branches_limit, 1),
@@ -869,16 +960,16 @@ export class PlatformTenantService {
       tenantId: String(row.tenant_id),
       subscriptionId: row.subscription_id ?? null,
       status: row.status,
-      total: toNumber(row.total, 0),
-      paidAmount: toNumber(row.paid, 0),
+      total: toNumber(row.total, 0) / 100,
+      paidAmount: toNumber(row.paid_amount ?? row.paidAmount ?? row.paid, 0) / 100,
       currency: row.currency ?? 'EGP',
       dueDate: row.due_date ?? null,
       issueDate: String(row.issued_at),
       notes: row.notes ?? null,
       createdAt: String(row.created_at),
-      subtotal: toNumber(row.subtotal, 0),
-      discount: toNumber(row.discount, 0),
-      tax: toNumber(row.tax, 0),
+      subtotal: toNumber(row.subtotal, 0) / 100,
+      discount: toNumber(row.discount, 0) / 100,
+      tax: toNumber(row.tax, 0) / 100,
     };
   }
 
@@ -887,7 +978,7 @@ export class PlatformTenantService {
       id: String(row.id),
       tenantId: String(row.tenant_id),
       invoiceId: row.invoice_id ?? null,
-      amount: toNumber(row.amount, 0),
+      amount: toNumber(row.amount, 0) / 100,
       method: row.method,
       reference: row.reference ?? null,
       paidAt: String(row.received_at),

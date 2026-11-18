@@ -101,8 +101,8 @@ export class FinancialCalendarEventsService {
       branchName: row.branchName,
       title: row.title,
       eventType: row.eventType,
-      amount: Number(row.amount),
-      paidAmount: Number(row.paidAmount),
+      amount: Number(row.amount) / 100,
+      paidAmount: Number(row.paidAmount) / 100,
       currency: row.currency,
       dueDate: row.dueDate,
       reminderAt: row.reminderAt || '',
@@ -130,7 +130,7 @@ export class FinancialCalendarEventsService {
       if (!event) throw new Error('الفاتورة غير موجودة أو خارج نطاق الفرع الحالي.');
       const payments = source.type === 'SALES_INVOICE'
         ? this.db.query<any>(`
-          SELECT p.id, p.amount, p.date AS paymentDate, p.receipt_number AS reference,
+          SELECT p.id, p.amount / 100.0 AS amount, p.date AS paymentDate, p.receipt_number AS reference,
             p.notes, p.created_at AS createdAt, u.full_name AS performedBy
           FROM customer_payments p
           JOIN users u ON u.id = p.performed_by
@@ -138,7 +138,7 @@ export class FinancialCalendarEventsService {
         `, [source.id])
         : source.type === 'PURCHASE_INVOICE'
           ? this.db.query<any>(`
-          SELECT sp.id, spa.amount, sp.date AS paymentDate, sp.receipt_number AS reference,
+          SELECT sp.id, spa.amount / 100.0 AS amount, sp.date AS paymentDate, sp.receipt_number AS reference,
             sp.notes, sp.created_at AS createdAt, u.full_name AS performedBy
           FROM supplier_payment_allocations spa
           JOIN supplier_payments sp ON sp.id = spa.payment_id
@@ -146,7 +146,7 @@ export class FinancialCalendarEventsService {
           WHERE spa.purchase_invoice_id = ? ORDER BY sp.date DESC, sp.created_at DESC
           `, [source.id])
           : this.db.query<any>(`
-            SELECT p.id, p.amount, p.date AS paymentDate, p.receipt_number AS reference,
+            SELECT p.id, p.amount / 100.0 AS amount, p.date AS paymentDate, p.receipt_number AS reference,
               p.notes, p.created_at AS createdAt, u.full_name AS performedBy
             FROM installments i JOIN installment_plans ip ON ip.id = i.plan_id
             JOIN customer_payments p ON p.notes LIKE ('Installment payment ' || i.sequence_number || '/% for plan ' || ip.plan_number || '%')
@@ -171,7 +171,7 @@ export class FinancialCalendarEventsService {
     return {
       event: this.getEvents(event.dueDate, event.dueDate).find((item) => item.id === eventId)!,
       payments: this.db.query<any>(`
-        SELECT p.id, p.amount, p.payment_date AS paymentDate, p.reference, p.notes,
+        SELECT p.id, p.amount / 100.0 AS amount, p.payment_date AS paymentDate, p.reference, p.notes,
           p.created_at AS createdAt, u.full_name AS performedBy
         FROM financial_calendar_payments p
         JOIN users u ON u.id = p.created_by
@@ -234,7 +234,7 @@ export class FinancialCalendarEventsService {
     const id = eventId || `fce_${uuidv4()}`;
     const existing = eventId
       ? this.db.query<any>(
-        `SELECT id, amount, paid_amount AS paidAmount, status
+        `SELECT id, amount / 100.0 AS amount, paid_amount / 100.0 AS paidAmount, status
          FROM financial_calendar_events WHERE id = ? AND branch_id = ? AND company_id = ?`,
         [eventId, branchId, companyId]
       )[0]
@@ -249,7 +249,7 @@ export class FinancialCalendarEventsService {
       if (existing) {
         tx.run(`
           UPDATE financial_calendar_events
-          SET title = ?, event_type = ?, amount = ?, currency = ?, due_date = ?,
+          SET title = ?, event_type = ?, amount = ROUND(?*100), currency = ?, due_date = ?,
             reminder_at = ?, reminder_days = ?, party_type = ?, party_id = ?, party_name = ?,
             financial_account = ?, reference = ?, description = ?, updated_at = ?
           WHERE id = ? AND branch_id = ? AND company_id = ?
@@ -266,7 +266,7 @@ export class FinancialCalendarEventsService {
             id, company_id, branch_id, title, event_type, amount, currency, due_date,
             reminder_at, reminder_days, party_type, party_id, party_name, financial_account,
             reference, description, created_by
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           id, companyId, branchId, input.title.trim(), input.eventType, round2(input.amount),
           input.currency.trim().toUpperCase(), input.dueDate, input.reminderAt || null,
@@ -300,7 +300,7 @@ export class FinancialCalendarEventsService {
     const { branchId, companyId } = this.context(true);
     const reference = input.reference?.trim() || null;
     const event = this.db.query<any>(`
-      SELECT id, event_type AS eventType, amount, paid_amount AS paidAmount, status
+      SELECT id, event_type AS eventType, amount / 100.0 AS amount, paid_amount / 100.0 AS paidAmount, status
       FROM financial_calendar_events
       WHERE id = ? AND branch_id = ? AND company_id = ?
     `, [input.eventId, branchId, companyId])[0];
@@ -323,13 +323,13 @@ export class FinancialCalendarEventsService {
       tx.run(`
         INSERT INTO financial_calendar_payments
           (id, event_id, company_id, amount, payment_date, reference, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?)
       `, [
         paymentId, input.eventId, companyId, round2(input.amount), input.paymentDate,
         reference, input.notes?.trim() || null, actor.id,
       ]);
       tx.run(`
-        UPDATE financial_calendar_events SET paid_amount = ?, status = ?, updated_at = ?
+        UPDATE financial_calendar_events SET paid_amount = ROUND(?*100), status = ?, updated_at = ?
         WHERE id = ? AND branch_id = ? AND company_id = ?
       `, [paidAmount, eventStatus, new Date().toISOString(), input.eventId, branchId, companyId]);
       this.writeAudit(tx, input.eventId, 'PAYMENT', JSON.stringify({
@@ -428,7 +428,7 @@ export class FinancialCalendarEventsService {
   private getInvoiceEvents(branchId: string, startDate: string, endDate: string): FinancialCalendarEvent[] {
     const sales = this.db.query<any>(`
       SELECT si.id, si.branch_id AS branchId, b.name AS branchName,
-        si.invoice_number AS reference, si.total_amount AS amount, si.paid_amount AS paidAmount,
+        si.invoice_number AS reference, si.total_amount / 100.0 AS amount, si.paid_amount / 100.0 AS paidAmount,
         COALESCE(si.due_date, date(si.date, '+' || COALESCE(c.payment_terms_days, 0) || ' days')) AS dueDate,
         c.id AS partyId, c.name AS partyName, si.created_at AS createdAt, si.updated_at AS updatedAt
       FROM sales_invoices si
@@ -436,7 +436,7 @@ export class FinancialCalendarEventsService {
       JOIN branches b ON b.id = COALESCE(si.branch_id, w.branch_id)
       JOIN customers c ON c.id = si.customer_id
       WHERE COALESCE(si.branch_id, w.branch_id) = ?
-        AND si.invoice_status <> 'VOID' AND si.remaining_amount > 0.009
+        AND si.invoice_status <> 'VOID' AND si.remaining_amount > 1
         AND NOT EXISTS (
           SELECT 1 FROM installment_plans ip
           WHERE ip.invoice_id = si.id AND ip.status IN ('ACTIVE', 'DEFAULTED')
@@ -447,7 +447,7 @@ export class FinancialCalendarEventsService {
 
     const purchases = this.db.query<any>(`
       SELECT pi.id, COALESCE(pi.branch_id, w.branch_id) AS branchId, b.name AS branchName,
-        pi.invoice_number AS reference, pi.total_amount AS amount, pi.paid_amount AS paidAmount,
+        pi.invoice_number AS reference, pi.total_amount / 100.0 AS amount, pi.paid_amount / 100.0 AS paidAmount,
         COALESCE(pi.due_date, date(pi.date, '+' || COALESCE(s.payment_terms_days, 30) || ' days')) AS dueDate,
         s.id AS partyId, s.name AS partyName, pi.created_at AS createdAt, pi.created_at AS updatedAt
       FROM purchase_invoices pi
@@ -455,7 +455,7 @@ export class FinancialCalendarEventsService {
       JOIN branches b ON b.id = COALESCE(pi.branch_id, w.branch_id)
       JOIN suppliers s ON s.id = pi.supplier_id
       WHERE COALESCE(pi.branch_id, w.branch_id) = ?
-        AND pi.remaining_amount > 0.009
+        AND pi.remaining_amount > 1
         AND COALESCE(pi.due_date, date(pi.date, '+' || COALESCE(s.payment_terms_days, 30) || ' days')) BETWEEN ? AND ?
       ORDER BY dueDate, pi.created_at
     `, [branchId, startDate, endDate]).map((row) => this.mapInvoiceEvent(row, 'PURCHASE_INVOICE'));
@@ -463,7 +463,7 @@ export class FinancialCalendarEventsService {
     const installments = this.db.query<any>(`
       SELECT i.id, ip.branch_id AS branchId, b.name AS branchName,
         printf('%s/%s', ip.plan_number, i.sequence_number) AS reference,
-        i.amount AS amount, i.paid_amount AS paidAmount, i.due_date AS dueDate,
+        i.amount / 100.0 AS amount, i.paid_amount / 100.0 AS paidAmount, i.due_date AS dueDate,
         c.id AS partyId, c.name AS partyName, ip.created_at AS createdAt,
         COALESCE(i.paid_at, ip.created_at) AS updatedAt
       FROM installments i
@@ -471,7 +471,7 @@ export class FinancialCalendarEventsService {
       JOIN branches b ON b.id = ip.branch_id
       JOIN customers c ON c.id = ip.customer_id
       WHERE ip.branch_id = ? AND ip.status IN ('ACTIVE', 'DEFAULTED')
-        AND i.status NOT IN ('PAID', 'WAIVED') AND i.remaining_amount > 0.009
+        AND i.status NOT IN ('PAID', 'WAIVED') AND i.remaining_amount > 0
         AND i.due_date BETWEEN ? AND ?
       ORDER BY i.due_date, ip.plan_number, i.sequence_number
     `, [branchId, startDate, endDate]).map((row) => this.mapInstallmentEvent(row));
@@ -599,7 +599,7 @@ export class FinancialCalendarEventsService {
     if (source.type === 'INSTALLMENT') {
       PermissionService.require(AuthService.getCurrentUser(), 'ui.finance.installments.manage');
       const row = this.db.query<{ remainingAmount: number; branchId: string }>(`
-        SELECT i.remaining_amount AS remainingAmount, ip.branch_id AS branchId
+        SELECT i.remaining_amount / 100.0 AS remainingAmount, ip.branch_id AS branchId
         FROM installments i JOIN installment_plans ip ON ip.id = i.plan_id
         WHERE i.id = ? AND ip.status IN ('ACTIVE', 'DEFAULTED')
       `, [source.id])[0];
@@ -612,7 +612,7 @@ export class FinancialCalendarEventsService {
     if (source.type === 'SALES_INVOICE') {
       PermissionService.require(AuthService.getCurrentUser(), 'ui.customers.detail.payment');
       const invoice = this.db.query<{ remainingAmount: number }>(`
-        SELECT si.remaining_amount AS remainingAmount
+        SELECT si.remaining_amount / 100.0 AS remainingAmount
         FROM sales_invoices si JOIN warehouses w ON w.id = si.warehouse_id
         WHERE si.id = ? AND COALESCE(si.branch_id, w.branch_id) = ?
           AND si.invoice_status <> 'VOID'
@@ -629,7 +629,7 @@ export class FinancialCalendarEventsService {
     }
     PermissionService.require(AuthService.getCurrentUser(), 'ui.suppliers.suppliers.payment');
     const invoice = this.db.query<any>(`
-      SELECT pi.id, pi.supplier_id AS supplierId, pi.remaining_amount AS remainingAmount
+      SELECT pi.id, pi.supplier_id AS supplierId, pi.remaining_amount / 100.0 AS remainingAmount
       FROM purchase_invoices pi JOIN warehouses w ON w.id = pi.warehouse_id
       WHERE pi.id = ? AND COALESCE(pi.branch_id, w.branch_id) = ?
     `, [source.id, this.branchAccess.getCurrentBranchId()])[0];

@@ -1,7 +1,7 @@
 import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Receipt, BarChart3, Workflow, UserRound, BookmarkPlus, ShieldCheck, FileText, Package2, RotateCcw, FileWarning } from 'lucide-react';
-import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -29,19 +29,6 @@ const TABS: WorkspaceHubTab[] = [
   { id: 'electronic-invoicing', label: 'الفاتورة الإلكترونية', path: '/sales/e-invoicing', icon: FileWarning },
 ];
 
-const REQUIRED_PERMISSION: Record<string, string> = {
-  invoices: 'sales.view',
-  analytics: 'sales.analytics.view',
-  cycle: 'sales.cycle.view',
-  statement: 'sales.statement.view',
-  'orders-deposits': 'sales.orders_deposits.view',
-  'after-sales': 'sales.after_sales.view',
-  quotations: 'quotations.view',
-  orders: 'orders.view',
-  returns: 'returns.view',
-  'electronic-invoicing': 'electronic_invoices.view',
-};
-
 const PAGE_BY_TAB = {
   invoices: SalesView,
   analytics: SalesAnalyticsPage,
@@ -57,12 +44,23 @@ const PAGE_BY_TAB = {
 
 export const SalesHubPage: React.FC = () => {
   const { pathname } = useLocation();
-  const can = usePermission();
-  const tabs = TABS.filter((tab) => can(REQUIRED_PERMISSION[tab.id]));
-  const activeTab = tabs.find((tab) => tab.path === pathname)?.id ?? tabs[0]?.id;
+  const canAccess = useRouteAccess();
+  // Tabs follow the exact same route rules as the MainLayout guard — no
+  // per-tab permission map that can drift from ROUTE_PERMISSIONS.
+  const tabs = TABS.filter((tab) => canAccess(tab.path));
+  const matchedTab = TABS.find((tab) => tab.path === pathname);
+  const matchedAllowed = matchedTab ? tabs.some((tab) => tab.id === matchedTab.id) : false;
+  // Hub base paths without a dedicated tab (none today) land on the first
+  // permitted tab; a matched-but-denied tab shows an explicit denial instead
+  // of silently rendering a different section.
+  const activeTab = matchedTab ? (matchedAllowed ? matchedTab.id : null) : tabs[0]?.id ?? null;
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
-  if (!tabs.length || !ActivePage) {
+  if (matchedTab && !matchedAllowed) {
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من مركز المبيعات.</div>;
+  }
+
+  if (!activeTab || !ActivePage) {
     return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا توجد صلاحيات للوصول إلى مركز المبيعات.</div>;
   }
 

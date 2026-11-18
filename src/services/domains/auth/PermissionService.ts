@@ -11,6 +11,7 @@ import { PermissionSeeder } from './permissions/permissionSeeder';
 import { RolePermissionService } from './permissions/rolePermissionService';
 import { UserPermissionService } from './permissions/userPermissionService';
 import { PermissionChecker } from './permissions/permissionChecker';
+import type { AuthContext } from './authorization/AuthorizationService';
 
 // Re-export types and constants for backwards compatibility
 export type { PermissionDef, PermissionEffect };
@@ -203,16 +204,16 @@ export class PermissionService {
     return PermissionChecker.getEffectiveCodes(user);
   }
 
-  public static can(user: User | null, required: string, scope?: string): boolean {
-    return PermissionChecker.can(user, required, scope);
+  public static can(user: User | null, required: string, scope?: string, ctx?: AuthContext): boolean {
+    return PermissionChecker.can(user, required, scope, ctx);
   }
 
   public static hasRoleGrant(user: User | null, required: string): boolean {
     return PermissionChecker.hasRoleGrant(user, required);
   }
 
-  public static canAny(user: User | null, required: string[], scope?: string): boolean {
-    return PermissionChecker.canAny(user, required, scope);
+  public static canAny(user: User | null, required: string[], scope?: string, ctx?: AuthContext): boolean {
+    return PermissionChecker.canAny(user, required, scope, ctx);
   }
 
   public static getPagePermission(pathname: string): string | null {
@@ -227,12 +228,12 @@ export class PermissionService {
     PermissionChecker.requirePage(user, pathname);
   }
 
-  public static require(user: User | null, required: string, scope?: string): void {
-    PermissionChecker.require(user, required, scope);
+  public static require(user: User | null, required: string, scope?: string, ctx?: AuthContext): void {
+    PermissionChecker.require(user, required, scope, ctx);
   }
 
-  public static requireAny(user: User | null, required: string[], scope?: string): void {
-    PermissionChecker.requireAny(user, required, scope);
+  public static requireAny(user: User | null, required: string[], scope?: string, ctx?: AuthContext): void {
+    PermissionChecker.requireAny(user, required, scope, ctx);
   }
 
   public static invalidate(user?: User): void {

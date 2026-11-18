@@ -5,6 +5,12 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const PROJECT_MONEY_FIELDS = ['contract_value', 'total_sold', 'total_paid', 'outstanding_amount'] as const;
+const PROJECT_PRODUCT_MONEY_FIELDS = ['agreed_price_m2'] as const;
+const PROJECT_BUDGET_MONEY_FIELDS = ['planned_amount', 'actual_amount'] as const;
+const CHANGE_REQUEST_MONEY_FIELDS = ['cost_impact'] as const;
 
 export type ProjectStatus = 'PLANNED' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
 export type ProjectType = 'BUILDING' | 'VILLA' | 'APARTMENT' | 'COMPOUND' | 'COMMERCIAL' | 'OTHER';
@@ -223,13 +229,14 @@ export class ProjectService {
       `SELECT p.*, c.name AS customer_name, c.phone AS customer_phone,
         (SELECT COUNT(*) FROM project_units u WHERE u.project_id = p.id) AS units_count,
         (SELECT COUNT(*) FROM project_units u WHERE u.project_id = p.id AND u.status = 'DELIVERED') AS delivered_units,
-        (SELECT COALESCE(SUM(si.total_amount), 0) FROM sales_invoices si WHERE si.project_id = p.id AND si.invoice_status != 'VOID') AS invoiced_amount
+        (SELECT COALESCE(SUM(si.total_amount), 0) / 100.0 FROM sales_invoices si WHERE si.project_id = p.id AND si.invoice_status != 'VOID') AS invoiced_amount
        FROM projects p JOIN customers c ON c.id = p.customer_id
        WHERE p.id = ? AND ${scope.clause}`,
       [id, ...scope.params]
     );
     if (rows.length === 0) return null;
-    return { ...rows[0], progress: this.computeProgress(rows[0]) };
+    const project = unscaleMoneyRow(rows[0], PROJECT_MONEY_FIELDS);
+    return { ...project, progress: this.computeProgress(project) };
   }
 
   private requireProject(id: string): Project {
@@ -252,7 +259,7 @@ export class ProjectService {
       SELECT p.*, c.name AS customer_name, c.phone AS customer_phone,
         (SELECT COUNT(*) FROM project_units u WHERE u.project_id = p.id) AS units_count,
         (SELECT COUNT(*) FROM project_units u WHERE u.project_id = p.id AND u.status = 'DELIVERED') AS delivered_units,
-        (SELECT COALESCE(SUM(si.total_amount), 0) FROM sales_invoices si WHERE si.project_id = p.id AND si.invoice_status != 'VOID') AS invoiced_amount
+        (SELECT COALESCE(SUM(si.total_amount), 0) / 100.0 FROM sales_invoices si WHERE si.project_id = p.id AND si.invoice_status != 'VOID') AS invoiced_amount
       FROM projects p
       JOIN customers c ON c.id = p.customer_id
       WHERE ${scope.clause}`;
@@ -268,10 +275,12 @@ export class ProjectService {
     }
     sql += ` ORDER BY p.created_at DESC`;
 
-    return this.db.query<Project>(sql, params).map((p) => ({
-      ...p,
-      progress: this.computeProgress(p),
-    }));
+    return this.db.query<Project>(sql, params)
+      .map((p) => unscaleMoneyRow(p, PROJECT_MONEY_FIELDS))
+      .map((p) => ({
+        ...p,
+        progress: this.computeProgress(p),
+      }));
   }
 
   private computeProgress(p: Project): number {
@@ -314,7 +323,7 @@ export class ProjectService {
           id, code, name, customer_id, branch_id, project_type, contractor_name, contractor_phone,
           engineer_name, engineer_phone, address, city, start_date, expected_end_date,
           contract_value, outstanding_amount, status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?)`,
         [
           id, code, input.name.trim(), input.customerId, branchId, input.projectType || 'BUILDING',
           input.contractorName || null, input.contractorPhone || null,
@@ -347,8 +356,8 @@ export class ProjectService {
         engineer_name = COALESCE(?, engineer_name), engineer_phone = COALESCE(?, engineer_phone),
         address = COALESCE(?, address), city = COALESCE(?, city),
         start_date = COALESCE(?, start_date), expected_end_date = COALESCE(?, expected_end_date),
-        actual_end_date = ?, contract_value = COALESCE(?, contract_value),
-        total_paid = COALESCE(?, total_paid), outstanding_amount = COALESCE(?, outstanding_amount),
+        actual_end_date = ?, contract_value = COALESCE(ROUND(?*100), contract_value),
+        total_paid = COALESCE(ROUND(?*100), total_paid), outstanding_amount = COALESCE(ROUND(?*100), outstanding_amount),
         status = COALESCE(?, status), notes = COALESCE(?, notes), updated_at = ?
       WHERE id = ?`,
       [
@@ -464,7 +473,7 @@ export class ProjectService {
        LEFT JOIN project_units u ON u.id = pp.unit_id
        WHERE pp.project_id = ? ORDER BY pp.created_at`,
       [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, PROJECT_PRODUCT_MONEY_FIELDS));
   }
 
   public addProjectProduct(input: {
@@ -489,7 +498,7 @@ export class ProjectService {
     const id = `pp_${uuidv4().substring(0, 8)}`;
     this.db.run(
       `INSERT INTO project_products (id, project_id, unit_id, product_id, product_name, planned_quantity_m2, agreed_price_m2, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?)`,
       [
         id, input.projectId, input.unitId || null, input.productId, product.name,
         input.plannedQuantityM2, input.agreedPriceM2 || 0, input.notes || null,
@@ -501,18 +510,18 @@ export class ProjectService {
       ), updated_at = ? WHERE id = ?`,
       [input.projectId, new Date().toISOString(), input.projectId]
     );
-    return this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0];
+    return unscaleMoneyRow(this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0], PROJECT_PRODUCT_MONEY_FIELDS);
   }
 
   public updateProjectProduct(id: string, patch: { deliveredQuantityM2?: number; agreedPriceM2?: number; notes?: string }): void {
     this.requireWrite('ui.projects.list.update');
-    const existing = this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0];
+    const existing = unscaleMoneyRow(this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0], PROJECT_PRODUCT_MONEY_FIELDS);
     if (!existing) throw new Error('بند المشروع غير موجود.');
     this.requireProject(existing.projectId);
     this.db.run(
       `UPDATE project_products SET
         delivered_quantity_m2 = COALESCE(?, delivered_quantity_m2),
-        agreed_price_m2 = COALESCE(?, agreed_price_m2),
+        agreed_price_m2 = COALESCE(ROUND(?*100), agreed_price_m2),
         notes = COALESCE(?, notes) WHERE id = ?`,
       [patch.deliveredQuantityM2 ?? null, patch.agreedPriceM2 ?? null, patch.notes ?? null, id]
     );
@@ -526,7 +535,7 @@ export class ProjectService {
 
   public deleteProjectProduct(id: string): void {
     this.requireWrite('ui.projects.list.update');
-    const existing = this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0];
+    const existing = unscaleMoneyRow(this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0], PROJECT_PRODUCT_MONEY_FIELDS);
     if (!existing) return;
     this.requireProject(existing.projectId);
     this.db.run(`DELETE FROM project_products WHERE id = ?`, [id]);
@@ -851,7 +860,7 @@ export class ProjectService {
     return this.db.query<ProjectBudgetLine>(
       `SELECT * FROM project_budget_lines WHERE project_id = ? ORDER BY category, created_at`,
       [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, PROJECT_BUDGET_MONEY_FIELDS));
   }
 
   public addBudgetLine(input: {
@@ -869,24 +878,24 @@ export class ProjectService {
     this.db.run(
       `INSERT INTO project_budget_lines (
          id, project_id, category, description, planned_amount, actual_amount, notes, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?)`,
       [
         id, input.projectId, input.category.trim(), input.description?.trim() || null,
         input.plannedAmount, input.actualAmount ?? 0, input.notes?.trim() || null, now, now,
       ]
     );
     this.audit('إضافة بند ميزانية مشروع', id, { projectId: input.projectId, category: input.category.trim() });
-    return this.db.query<ProjectBudgetLine>(`SELECT * FROM project_budget_lines WHERE id = ?`, [id])[0];
+    return unscaleMoneyRow(this.db.query<ProjectBudgetLine>(`SELECT * FROM project_budget_lines WHERE id = ?`, [id])[0], PROJECT_BUDGET_MONEY_FIELDS);
   }
 
   public updateBudgetLine(id: string, patch: {
     category?: string; description?: string; plannedAmount?: number; actualAmount?: number; notes?: string;
   }): ProjectBudgetLine {
     this.requireWrite('ui.projects.list.update');
-    const existing = this.db.query<ProjectBudgetLine>(
+    const existing = unscaleMoneyRow(this.db.query<ProjectBudgetLine>(
       `SELECT * FROM project_budget_lines WHERE id = ?`,
       [id]
-    )[0];
+    )[0], PROJECT_BUDGET_MONEY_FIELDS);
     if (!existing) throw new Error('بند الميزانية غير موجود.');
     this.requireProject(existing.projectId);
     if (patch.category !== undefined && !patch.category.trim()) throw new Error('بند الميزانية مطلوب.');
@@ -896,7 +905,7 @@ export class ProjectService {
     this.db.run(
       `UPDATE project_budget_lines SET
          category = COALESCE(?, category), description = COALESCE(?, description),
-         planned_amount = COALESCE(?, planned_amount), actual_amount = COALESCE(?, actual_amount),
+         planned_amount = COALESCE(ROUND(?*100), planned_amount), actual_amount = COALESCE(ROUND(?*100), actual_amount),
          notes = COALESCE(?, notes), updated_at = ?
        WHERE id = ?`,
       [
@@ -906,7 +915,7 @@ export class ProjectService {
       ]
     );
     this.audit('تعديل بند ميزانية مشروع', id, patch);
-    return this.db.query<ProjectBudgetLine>(`SELECT * FROM project_budget_lines WHERE id = ?`, [id])[0];
+    return unscaleMoneyRow(this.db.query<ProjectBudgetLine>(`SELECT * FROM project_budget_lines WHERE id = ?`, [id])[0], PROJECT_BUDGET_MONEY_FIELDS);
   }
 
   public deleteBudgetLine(id: string): void {
@@ -1050,7 +1059,7 @@ export class ProjectService {
        WHERE c.project_id = ?
        ORDER BY CASE c.status WHEN 'PENDING' THEN 0 ELSE 1 END, c.created_at DESC`,
       [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, CHANGE_REQUEST_MONEY_FIELDS));
   }
 
   public createChangeRequest(input: {
@@ -1072,7 +1081,7 @@ export class ProjectService {
       `INSERT INTO project_change_requests (
          id, project_id, title, description, cost_impact, time_impact_days, status,
          requested_by, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ROUND(?*100), ?, 'PENDING', ?, ?, ?)`,
       [
         id, input.projectId, input.title.trim(), input.description?.trim() || null,
         costImpact, timeImpactDays, actor.id, now, now,

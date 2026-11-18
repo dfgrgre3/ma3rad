@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { financialFieldVisibility, maskSensitiveFields } from '../auth/sensitiveFields';
 import { localDateString } from '../../../utils/shared/date';
 import { InventoryCostingService } from './InventoryCostingService';
 import { InventoryServicePart12 } from './InventoryServicePart12';
@@ -24,7 +25,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
     }
 
     const physical = this.db.query<any>(`
-      SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS costPriceValue,
+      SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 AS costPriceValue,
              COALESCE(SUM(ws.quantity_m2), 0) AS totalQty
       FROM warehouse_stock ws
       JOIN products p ON ws.product_id = p.id
@@ -37,7 +38,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
     const fifoParams: any[] = [...warehouseScope.params, ...companyScope.params];
     if (warehouseId) fifoParams.push(warehouseId);
     const fifo = this.db.query<any>(`
-      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS totalFifoCost,
+      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) / 100.0 AS totalFifoCost,
              COALESCE(SUM(icl.quantity_remaining), 0) AS totalFifoQty
       FROM inventory_cost_layers icl
       JOIN warehouses w ON w.id = icl.warehouse_id
@@ -53,7 +54,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
     const ledgerBranchScope = this.branchAccess.sqlScope('je.branch_id', undefined, actor);
     const ledgerCompanyScope = this.branchAccess.companyScope('je.company_id', actor);
     const ledger = this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(jel.debit - jel.credit), 0) AS balance
+      SELECT COALESCE(SUM(jel.debit - jel.credit), 0) / 100.0 AS balance
       FROM journal_entry_lines jel
       JOIN journal_entries je ON je.id = jel.entry_id
       JOIN chart_of_accounts coa ON coa.id = jel.account_id
@@ -138,6 +139,8 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
   public reconcileInventoryWithGL(warehouseId?: string): any {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.view');
+    // التقرير كله تقييم نقدي + رصيد أستاذ — لا معنى له بلا رؤية التكلفة.
+    PermissionService.require(actor, 'finance.cost.view');
     return this.calculateInventoryReconciliation(warehouseId, actor);
   }
 
@@ -157,7 +160,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
         total_fifo_layer_cost, total_gl_inventory_cost, variance_physical_vs_fifo,
         variance_fifo_vs_gl, variance_physical_vs_fifo_qty, ledger_comparable,
         status, notes, performed_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       `rec_${uuidv4().substring(0, 8)}`, reconciliation.reconciliationDate, branchId, input.warehouseId || null,
       reconciliation.totalPhysicalCost, reconciliation.totalFifoLayerCost, reconciliation.totalGlInventoryCost,
@@ -171,16 +174,21 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.view');
     const scope = this.branchAccess.sqlScope('irl.branch_id', undefined, actor);
+    const canSeeCost = financialFieldVisibility().cost;
+    const moneyFields = [
+      'totalPhysicalCost', 'totalFifoLayerCost', 'totalGlInventoryCost',
+      'variancePhysicalVsFifo', 'varianceFifoVsGl',
+    ];
     return this.db.query<any>(`
       SELECT
         irl.id, irl.reconciliation_date as reconciliationDate,
         irl.branch_id as branchId, irl.warehouse_id as warehouseId, w.name as warehouseName,
-        irl.total_physical_cost as totalPhysicalCost,
-        irl.total_fifo_layer_cost as totalFifoLayerCost,
-        irl.total_gl_inventory_cost as totalGlInventoryCost,
-        irl.variance_physical_vs_fifo as variancePhysicalVsFifo,
+        irl.total_physical_cost / 100.0 as totalPhysicalCost,
+        irl.total_fifo_layer_cost / 100.0 as totalFifoLayerCost,
+        irl.total_gl_inventory_cost / 100.0 as totalGlInventoryCost,
+        irl.variance_physical_vs_fifo / 100.0 as variancePhysicalVsFifo,
         irl.variance_physical_vs_fifo_qty as variancePhysicalVsFifoQty,
-        irl.variance_fifo_vs_gl as varianceFifoVsGl,
+        irl.variance_fifo_vs_gl / 100.0 as varianceFifoVsGl,
         irl.ledger_comparable as ledgerComparable,
         irl.status, irl.notes,
         u.full_name as performedByName, irl.created_at as createdAt
@@ -190,6 +198,9 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       WHERE ${scope.clause}
       ORDER BY irl.created_at DESC
       LIMIT 100
-    `, scope.params);
+    `, scope.params).map((row) => {
+      maskSensitiveFields(row, moneyFields, canSeeCost);
+      return row;
+    });
   }
 }

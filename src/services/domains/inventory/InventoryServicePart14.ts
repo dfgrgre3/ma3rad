@@ -14,6 +14,7 @@ import { ApprovalPolicyService } from '../approvals/ApprovalPolicyService';
 import { ApprovalRequestService } from '../approvals/ApprovalRequestService';
 import { registerApprovalEffect, registerApprovalRejectionEffect } from '../approvals/ApprovalEffectRegistry';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { AppConfigService } from '../config/AppConfigService';
 
 type AdjustmentType = 'ADD' | 'SUBTRACT' | 'DAMAGE' | 'OPENING_BALANCE';
 type AdjustmentSign = 1 | -1;
@@ -109,13 +110,15 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
   }): string {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'inventory.adjust', undefined, { warehouseId: input.warehouseId });
     this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
     const policy = new ApprovalPolicyService().assertCanExecute('inventory.adjustment.create', actor);
     if (actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN' && policy.mode === 'APPROVAL') ModuleRegistryService.assertModuleEnabled('approvals');
     if (policy.mode === 'DISABLED') throw new Error('تم تعطيل إنشاء تسويات المخزون بواسطة سياسة الموافقات.');
     const requiresApproval = actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN' && (
       policy.mode === 'APPROVAL' || (policy.maxValue != null && input.quantity > policy.maxValue)
+      // إعدام البضاعة (DAMAGE) يتطلب موافقة إدارية دائماً.
+      || input.type === 'DAMAGE'
     );
 
     if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
@@ -151,8 +154,22 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         `adji_${uuidv4().substring(0, 8)}`, adjustmentId, currentProduct.id,
         currentProduct.name, input.quantity, input.notes?.trim() || null,
       ]);
+      // تسوية تتجاوز نسبة مئوية محددة من رصيد المخزن تتطلب موافقة أيضاً.
+      let effectiveRequiresApproval = requiresApproval;
+      if (!effectiveRequiresApproval) {
+        const percentThreshold = AppConfigService.getPolicyNumber('inventory.adjustmentApprovalPercent', 0);
+        if (percentThreshold > 0) {
+          const stockQty = Number(txDb.query<{ quantityM2: number }>(
+            `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+            [input.productId, input.warehouseId]
+          )[0]?.quantityM2 || 0);
+          if (stockQty > 0 && (input.quantity / stockQty) * 100 > percentThreshold) {
+            effectiveRequiresApproval = true;
+          }
+        }
+      }
       const adjustmentNumberForApproval = adjustmentNumber;
-      if (requiresApproval) {
+      if (effectiveRequiresApproval) {
         const existing = txDb.query<{ id: string }>(
           `SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND request_type = 'STOCK_ADJUSTMENT'`,
           [adjustmentId]
@@ -178,7 +195,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         quantity: input.quantity,
         warehouseId: input.warehouseId,
       });
-      if (!requiresApproval) this.approveAndPostAdjustmentInTransaction(txDb, adjustmentId, actor, true, true);
+      if (!effectiveRequiresApproval) this.approveAndPostAdjustmentInTransaction(txDb, adjustmentId, actor, true, true);
     });
 
     return adjustmentId;
@@ -224,12 +241,12 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
       txDb.run(`INSERT INTO inventory_transactions (
         id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
         unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, ?, CURRENT_TIMESTAMP)`, [
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'ADJUSTMENT', ?, ?, ?, CURRENT_TIMESTAMP)`, [
         transactionId, transactionNumber, transactionType, item.productId, current.warehouseId,
         item.quantity * sign, boxesCount * sign, unitCost, itemValue, adjustmentId,
         `تسوية مخزنية (${current.reason})`, actor.id,
       ]);
-      txDb.run(`UPDATE stock_adjustment_items SET boxes_count = ?, unit_cost = ?, total_value = ? WHERE id = ?`, [boxesCount, unitCost, itemValue, item.id]);
+      txDb.run(`UPDATE stock_adjustment_items SET boxes_count = ?, unit_cost = ROUND(?*100), total_value = ROUND(?*100) WHERE id = ?`, [boxesCount, unitCost, itemValue, item.id]);
       if (fifoPlan) InventoryCostingService.consumeFifo(txDb, transactionId, fifoPlan);
       else if (fifoEnabled && sign > 0) InventoryCostingService.addLayer(txDb, {
         productId: item.productId, warehouseId: current.warehouseId, sourceTransactionId: transactionId,
@@ -249,7 +266,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
       });
       totalValue += itemValue;
     }
-    txDb.run(`UPDATE stock_adjustments SET status = 'POSTED', total_value = ?, posted_by = ?, posted_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING_APPROVAL' AND approval_status = 'APPROVED'`, [Math.round(totalValue * 100) / 100, actor.id, adjustmentId]);
+    txDb.run(`UPDATE stock_adjustments SET status = 'POSTED', total_value = ROUND(?*100), posted_by = ?, posted_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING_APPROVAL' AND approval_status = 'APPROVED'`, [Math.round(totalValue * 100) / 100, actor.id, adjustmentId]);
     this.recordPostedAdjustmentAudit(txDb, actor.id, actor.fullName, adjustmentId, 'POST', { status: 'PENDING_APPROVAL', approvalStatus: 'APPROVED' }, { status: 'POSTED', totalValue: Math.round(totalValue * 100) / 100, postedBy: actor.id });
   }
 
@@ -342,7 +359,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
             reference_id, notes, performed_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, ?, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'ADJUSTMENT', ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
           transactionId, transactionNumber, transactionType, item.productId, current.warehouseId,
           item.quantity * sign, boxesCount * sign, unitCost, itemValue, adjustmentId,
@@ -350,7 +367,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         ]);
         txDb.run(`
           UPDATE stock_adjustment_items
-          SET boxes_count = ?, unit_cost = ?, total_value = ?
+          SET boxes_count = ?, unit_cost = ROUND(?*100), total_value = ROUND(?*100)
           WHERE id = ?
         `, [boxesCount, unitCost, itemValue, item.id]);
 
@@ -394,7 +411,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
 
       txDb.run(`
         UPDATE stock_adjustments
-        SET status = 'POSTED', total_value = ?, posted_by = ?, posted_at = CURRENT_TIMESTAMP
+        SET status = 'POSTED', total_value = ROUND(?*100), posted_by = ?, posted_at = CURRENT_TIMESTAMP
         WHERE id = ? AND status = 'PENDING_APPROVAL' AND approval_status = 'APPROVED'
       `, [Math.round(totalValue * 100) / 100, actor.id, adjustmentId]);
       this.recordPostedAdjustmentAudit(txDb, actor.id, actor.fullName, adjustmentId, 'POST', {
@@ -437,7 +454,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
 
   private getAdjustmentProduct(db: DatabaseManager, productId: string): AdjustmentProduct | undefined {
     return db.query<AdjustmentProduct>(`
-      SELECT id, name, cost_price AS costPrice, product_type AS productType,
+      SELECT id, name, cost_price / 100.0 AS costPrice, product_type AS productType,
         base_unit AS baseUnit, custom_unit AS customUnit, sell_unit AS sellUnit,
         meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox
       FROM products WHERE id = ?

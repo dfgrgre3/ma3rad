@@ -21,6 +21,8 @@ import {
   Check,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformComprehensiveHealth,
@@ -35,13 +37,36 @@ type HealthViewMode = 'cloud_server' | 'local_client';
 
 export const PlatformSystemHealthPage: React.FC = () => {
   const canManageSystemHealth = canPlatform('system-health', 'platform.system-health.update');
+  const centralActive = getCentralDataSourceState().active;
   const [viewMode, setViewMode] = useState<HealthViewMode>('cloud_server');
   const [health, setHealth] = useState<PlatformComprehensiveHealth | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [triggeringBackup, setTriggeringBackup] = useState<boolean>(false);
   const [backupSuccess, setBackupSuccess] = useState<boolean>(false);
 
+  // Central-mode state
+  const [centralBackups, setCentralBackups] = useState<any[]>([]);
+  const [centralJobs, setCentralJobs] = useState<any[]>([]);
+  const [centralErrors, setCentralErrors] = useState<any[]>([]);
+
+  const loadCentral = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      centralPlatformClient.listBackups(),
+      centralPlatformClient.listOpsJobs(),
+      centralPlatformClient.listErrorReports({ status: 'OPEN' }),
+    ])
+      .then(([backups, jobs, errors]) => {
+        setCentralBackups(backups);
+        setCentralJobs(jobs);
+        setCentralErrors(errors);
+      })
+      .catch((e) => console.error('Failed to load central health data:', e))
+      .finally(() => setLoading(false));
+  }, []);
+
   const loadHealth = useCallback(() => {
+    if (centralActive) { loadCentral(); return; }
     setLoading(true);
     try {
       const data = platformAdminService.getPlatformComprehensiveHealth();
@@ -51,7 +76,23 @@ export const PlatformSystemHealthPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [centralActive, loadCentral]);
+
+  const handleTriggerCentralBackup = async () => {
+    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
+    setTriggeringBackup(true);
+    setBackupSuccess(false);
+    try {
+      await centralPlatformClient.createBackup({ triggerSource: 'MANUAL', type: 'FULL' });
+      setBackupSuccess(true);
+      setTimeout(() => setBackupSuccess(false), 3000);
+      loadCentral();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setTriggeringBackup(false);
+    }
+  };
 
   useEffect(() => {
     loadHealth();
@@ -61,6 +102,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
   }, [loadHealth]);
 
   const handleTriggerBackup = async () => {
+    if (centralActive) { await handleTriggerCentralBackup(); return; }
     if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
     setTriggeringBackup(true);
     setBackupSuccess(false);
@@ -99,6 +141,173 @@ export const PlatformSystemHealthPage: React.FC = () => {
 
   const vitals = health?.serverVitals;
   const components = health?.components;
+
+  if (centralActive) {
+    const backupStatusLabel: Record<string, string> = {
+      REQUESTED: 'مطلوبة', IN_PROGRESS: 'قيد التنفيذ', COMPLETED: 'مكتملة', FAILED: 'فاشلة', EXPIRED: 'منتهية',
+    };
+    const jobStatusLabel: Record<string, string> = {
+      PENDING: 'معلقة', RUNNING: 'قيد التنفيذ', COMPLETED: 'مكتملة', FAILED: 'فاشلة', CANCELLED: 'ملغاة',
+    };
+    const failedJobs = centralJobs.filter((j) => j.status === 'FAILED').length;
+    const runningJobs = centralJobs.filter((j) => j.status === 'RUNNING' || j.status === 'PENDING').length;
+    const lastBackup = centralBackups[0];
+
+    return (
+      <div className="space-y-6" dir="rtl">
+        <PageHeader
+          title="صحة النظام — الخادم المركزي (System Health)"
+          description="مراقبة حية للنسخ الاحتياطية المركزية، مهام التشغيل، والأخطاء المفتوحة على خادم المنصة."
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={loadHealth}>
+                <RefreshCw className="w-4 h-4 ml-2" />
+                تحديث القياسات
+              </Button>
+              <Button variant="primary" onClick={handleTriggerBackup} disabled={triggeringBackup}>
+                <Archive className="w-4 h-4 ml-2" />
+                {triggeringBackup ? 'جاري النسخ...' : 'نسخة احتياطية مركزية الآن'}
+              </Button>
+            </div>
+          }
+        />
+
+        {backupSuccess && (
+          <div className="flex items-center gap-1.5 text-emerald-400 font-semibold bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-800/40 text-xs w-fit">
+            <CheckCircle2 className="w-4 h-4" />
+            تم إنشاء طلب النسخة الاحتياطية المركزية بنجاح
+          </div>
+        )}
+
+        {/* Summary strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
+            <span className="text-[11px] text-zinc-400 block">آخر نسخة احتياطية</span>
+            <span className="text-sm font-bold text-zinc-200 mt-1 block">
+              {lastBackup ? backupStatusLabel[lastBackup.status] ?? lastBackup.status : 'لا توجد نسخ'}
+            </span>
+            {lastBackup && <span className="text-[10px] text-zinc-500">{formatDateTime(lastBackup.createdAt)}</span>}
+          </div>
+          <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
+            <span className="text-[11px] text-zinc-400 block">مهام تشغيل نشطة</span>
+            <span className="text-sm font-bold text-blue-400 mt-1 block">{runningJobs}</span>
+          </div>
+          <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
+            <span className="text-[11px] text-zinc-400 block">مهام فاشلة</span>
+            <span className={`text-sm font-bold mt-1 block ${failedJobs ? 'text-rose-400' : 'text-emerald-400'}`}>{failedJobs}</span>
+          </div>
+          <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
+            <span className="text-[11px] text-zinc-400 block">أخطاء مفتوحة</span>
+            <span className={`text-sm font-bold mt-1 block ${centralErrors.length ? 'text-amber-400' : 'text-emerald-400'}`}>{centralErrors.length}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Backups */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <Archive className="w-4 h-4 text-emerald-400" />
+              النسخ الاحتياطية المركزية
+            </h3>
+            {centralBackups.length === 0 ? (
+              <EmptyState title="لا توجد نسخ احتياطية" description="أنشئ أول نسخة من زر «نسخة احتياطية مركزية الآن»." />
+            ) : (
+              <div className="overflow-x-auto bg-zinc-900/40 rounded-xl border border-zinc-800">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
+                    <tr>
+                      <th className="py-3 px-4">الاسم</th>
+                      <th className="py-3 px-4">النوع</th>
+                      <th className="py-3 px-4">الحالة</th>
+                      <th className="py-3 px-4">التاريخ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {centralBackups.slice(0, 20).map((bk) => (
+                      <tr key={bk.id} className="hover:bg-zinc-800/20 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-zinc-200">{bk.name ?? bk.id}</td>
+                        <td className="py-3 px-4 text-zinc-400">{bk.type}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            bk.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : bk.status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {backupStatusLabel[bk.status] ?? bk.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-[11px] text-zinc-500">{formatDateTime(bk.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Ops jobs + open errors */}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-blue-400" />
+                مهام التشغيل الحديثة
+              </h3>
+              {centralJobs.length === 0 ? (
+                <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-6 text-center text-xs text-zinc-400">
+                  لا توجد مهام تشغيل مسجلة.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {centralJobs.slice(0, 10).map((j) => (
+                    <li key={j.id} className="bg-zinc-900/70 p-3 rounded-xl border border-zinc-800 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-zinc-200">{j.type}</span>
+                        <span className="text-[10px] text-zinc-500 block">{formatDateTime(j.createdAt)}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        j.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : j.status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      }`}>
+                        {jobStatusLabel[j.status] ?? j.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                الأخطاء المفتوحة
+              </h3>
+              {centralErrors.length === 0 ? (
+                <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-6 text-center text-xs text-zinc-400 space-y-1">
+                  <ShieldCheck className="w-7 h-7 text-emerald-400 mx-auto" />
+                  <div className="font-semibold text-zinc-200">لا أخطاء مفتوحة</div>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {centralErrors.slice(0, 8).map((e) => (
+                    <li key={e.id} className="bg-zinc-900/70 p-3 rounded-xl border border-zinc-800 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-zinc-100 truncate">{e.title}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono shrink-0">
+                          {e.severity}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1">{e.tenantName ?? 'منصة'} · ×{e.occurrences} · {formatDateTime(e.lastSeenAt)}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" dir="rtl">

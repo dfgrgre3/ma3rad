@@ -4,17 +4,8 @@ import { initializeDatabaseAsync } from '../database/useDatabaseAsync';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
-import { scheduleAutomaticBackupChecks } from '../../../services/infrastructure/backup/BackupScheduler';
-import { ConsistencyAuditService } from '../../../services/domains/finance/ConsistencyAuditService';
-import { NotificationService } from '../../../services/domains/notifications/NotificationService';
-import { LicenseNotificationService } from '../../../services/domains/notifications/LicenseNotificationService';
-import { ReservationService } from '../../../services/domains/sales/ReservationService';
 import { toAppError } from '../../../errors/appError';
-import { ElectronSyncTransport } from '../../../sync/ElectronSyncTransport';
-import { SyncEngine } from '../../../sync/SyncEngine';
-import { SyncWorker } from '../../../sync/SyncWorker';
-import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
-import { SyncPolicyService } from '../../../sync/SyncPolicyService';
+import type { SyncWorker } from '../../../sync/SyncWorker';
 import type { User } from '../../../types';
 
 const RUNTIME_SESSION_KEY = 'ceramisys_runtime_initialized';
@@ -61,28 +52,40 @@ export function useAppStartup() {
         });
         startupMaintenanceTimer.current = setTimeout(() => {
           startupMaintenanceTimer.current = null;
-          scheduleAutomaticBackupChecks(backupTimer);
-          try {
-            new NotificationService().runScheduledChecks();
-          } catch (error) {
-            console.error('Scheduled notifications could not be refreshed:', error);
-          }
-          // Run the financial/inventory consistency audit once per day
-          try {
-            new ConsistencyAuditService().runDailyCheck();
-          } catch (error) {
-            console.error('Daily consistency audit could not run:', error);
-          }
+          // Heavy maintenance services are loaded on demand so they stay out
+          // of the startup bundle and don't compete with first paint.
+          void import('../../../services/infrastructure/backup/BackupScheduler')
+            .then(({ scheduleAutomaticBackupChecks }) => scheduleAutomaticBackupChecks(backupTimer))
+            .catch((error) => console.error('Automatic backup scheduling could not start:', error));
+          void Promise.all([
+            import('../../../services/domains/notifications/NotificationService'),
+            import('../../../services/domains/finance/ConsistencyAuditService'),
+            import('../../../services/domains/notifications/LicenseNotificationService'),
+          ]).then(([{ NotificationService }, { ConsistencyAuditService }, { LicenseNotificationService }]) => {
+            try {
+              new NotificationService().runScheduledChecks();
+            } catch (error) {
+              console.error('Scheduled notifications could not be refreshed:', error);
+            }
+            // Run the financial/inventory consistency audit once per day
+            try {
+              new ConsistencyAuditService().runDailyCheck();
+            } catch (error) {
+              console.error('Daily consistency audit could not run:', error);
+            }
 
-          // Run license/subscription expiry check daily
-          try {
-            const licenseNotificationService = LicenseNotificationService.getInstance();
-            licenseNotificationService.runDailyExpiryCheck().catch(err => {
-              console.error('Daily license expiry check failed:', err);
-            });
-          } catch (error) {
-            console.error('License notification service could not start:', error);
-          }
+            // Run license/subscription expiry check daily
+            try {
+              const licenseNotificationService = LicenseNotificationService.getInstance();
+              licenseNotificationService.runDailyExpiryCheck().catch(err => {
+                console.error('Daily license expiry check failed:', err);
+              });
+            } catch (error) {
+              console.error('License notification service could not start:', error);
+            }
+          }).catch((error) => {
+            console.error('Startup maintenance services could not be loaded:', error);
+          });
         }, 1000);
       })
       .catch((err) => {
@@ -120,7 +123,6 @@ export function useAppStartup() {
 
   useEffect(() => {
     if (!dbReady) return;
-    MasterDataSyncService.configure(null);
     const bridge = window.ceramisys?.sync;
     const getStatus = bridge?.status;
     const pushEvents = bridge?.pushEvents;
@@ -128,48 +130,63 @@ export function useAppStartup() {
     if (!getStatus || !pushEvents || !pullEvents) return;
 
     let cancelled = false;
-    void getStatus()
-      .then((configuration) => {
-        if (cancelled || !configuration.clientConfigured || !configuration.clientIdentity) {
-          if (configuration.error) console.error('Branch synchronization configuration error:', configuration.error);
-          return;
-        }
-        MasterDataSyncService.configure(configuration.clientIdentity);
-        const engine = new SyncEngine({
-          scope: configuration.clientIdentity.tenantId,
-          transport: new ElectronSyncTransport({
-            pushEvents: (events) => pushEvents(events),
-            pullEvents: (scope, cursor, limit) => pullEvents(scope, cursor, limit),
-          }),
+    // Sync engine modules are heavy; load them only when the bridge exists.
+    void Promise.all([
+      import('../../../sync/ElectronSyncTransport'),
+      import('../../../sync/SyncEngine'),
+      import('../../../sync/SyncWorker'),
+      import('../../../sync/MasterDataSyncService'),
+      import('../../../sync/SyncPolicyService'),
+    ]).then(([{ ElectronSyncTransport }, { SyncEngine }, { SyncWorker }, { MasterDataSyncService }, { SyncPolicyService }]) => {
+      if (cancelled) return;
+      MasterDataSyncService.configure(null);
+      void getStatus()
+        .then((configuration) => {
+          if (cancelled || !configuration.clientConfigured || !configuration.clientIdentity) {
+            if (configuration.error) console.error('Branch synchronization configuration error:', configuration.error);
+            return;
+          }
+          MasterDataSyncService.configure(configuration.clientIdentity);
+          const engine = new SyncEngine({
+            scope: configuration.clientIdentity.tenantId,
+            transport: new ElectronSyncTransport({
+              pushEvents: (events) => pushEvents(events),
+              pullEvents: (scope, cursor, limit) => pullEvents(scope, cursor, limit),
+            }),
+          });
+          const syncData = new MasterDataSyncService();
+          syncData.registerHandlers(engine.dispatcher);
+          new SyncPolicyService().publishUnmanagedPolicies();
+          const worker = new SyncWorker(engine, 5000);
+          syncWorker.current = worker;
+          if (window.ceramisys) {
+            window.ceramisys.sync = {
+              ...(window.ceramisys.sync ?? {}),
+              runSyncNow: async () => {
+                await worker.tick();
+              },
+            };
+          }
+          worker.start();
+          void worker.tick().then(() => {
+            const status = engine.status();
+            if (status.lastError) console.error('Automatic branch synchronization failed:', status.lastError);
+          });
+        })
+        .catch((error) => {
+          console.error('Could not initialize automatic branch synchronization:', error);
         });
-        const syncData = new MasterDataSyncService();
-        syncData.registerHandlers(engine.dispatcher);
-        new SyncPolicyService().publishUnmanagedPolicies();
-        const worker = new SyncWorker(engine, 5000);
-        syncWorker.current = worker;
-        if (window.ceramisys) {
-          window.ceramisys.sync = {
-            ...(window.ceramisys.sync ?? {}),
-            runSyncNow: async () => {
-              await worker.tick();
-            },
-          };
-        }
-        worker.start();
-        void worker.tick().then(() => {
-          const status = engine.status();
-          if (status.lastError) console.error('Automatic branch synchronization failed:', status.lastError);
-        });
-      })
-      .catch((error) => {
-        console.error('Could not initialize automatic branch synchronization:', error);
-      });
+    }).catch((error) => {
+      console.error('Could not load branch synchronization modules:', error);
+    });
 
     return () => {
       cancelled = true;
       void syncWorker.current?.stopAndWait();
       syncWorker.current = null;
-      MasterDataSyncService.configure(null);
+      void import('../../../sync/MasterDataSyncService')
+        .then(({ MasterDataSyncService }) => MasterDataSyncService.configure(null))
+        .catch(() => { /* module unavailable during teardown */ });
     };
   }, [dbReady]);
 
@@ -199,11 +216,12 @@ export function useAppStartup() {
 
   useEffect(() => {
     if (!dbReady) return;
-    const reservations = new ReservationService();
+    let reservations: import('../../../services/domains/sales/ReservationService').ReservationService | null = null;
+    let cancelled = false;
     const releaseExpired = () => {
       try {
-        const result = reservations.expireOverdue();
-        if (result.failed > 0) {
+        const result = reservations?.expireOverdue();
+        if (result && result.failed > 0) {
           console.warn(`Automatic reservation expiry failed for ${result.failed} reservation(s).`);
         }
       } catch (error) {
@@ -211,19 +229,32 @@ export function useAppStartup() {
       }
     };
 
+    // Load the service lazily, then run the expiry on idle/interval.
+    void import('../../../services/domains/sales/ReservationService')
+      .then(({ ReservationService }) => {
+        if (cancelled) return;
+        reservations = new ReservationService();
+        releaseExpired();
+      })
+      .catch((error) => console.error('Reservation service could not be loaded:', error));
+
     // Use requestIdleCallback for non-urgent reservation expiry if available
     const idleCallback = typeof window.requestIdleCallback !== 'undefined'
       ? window.requestIdleCallback
       : null;
+    let idleTimer: number | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
 
     if (idleCallback) {
-      const idleTimer = idleCallback(releaseExpired, { timeout: 60000 }); // 60 seconds
-      return () => window.cancelIdleCallback(idleTimer);
+      idleTimer = idleCallback(releaseExpired, { timeout: 60000 }); // 60 seconds
     } else {
-      releaseExpired();
-      const timer = setInterval(releaseExpired, 60_000);
-      return () => clearInterval(timer);
+      timer = setInterval(releaseExpired, 60_000);
     }
+    return () => {
+      cancelled = true;
+      if (idleTimer !== undefined) window.cancelIdleCallback(idleTimer);
+      if (timer !== undefined) clearInterval(timer);
+    };
   }, [dbReady]);
 
   return {

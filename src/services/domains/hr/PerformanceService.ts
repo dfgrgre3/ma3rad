@@ -426,7 +426,7 @@ export class PerformanceService {
     const id = `rew_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     this.db.run(
       `INSERT INTO performance_rewards (id, employee_id, evaluation_id, reward_type, amount, status, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
       [id, input.employeeId, input.evaluationId || null, input.rewardType, Math.max(0, Number(input.amount) || 0),
        input.status || 'PENDING', input.notes?.trim() || null, actor.id]
     );

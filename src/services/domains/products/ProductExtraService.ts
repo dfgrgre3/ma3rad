@@ -3,9 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import {
+
   normalizeDynamicAttributeValue,
   type DynamicAttributeDefinition,
 } from './dynamicAttributes';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const VARIANT_MONEY_FIELDS = ['costPrice','cost_price','sellingPriceM2','selling_price_m2'] as const;
 
 export interface ProductVariant {
   id: string;
@@ -50,7 +54,7 @@ export class ProductExtraService {
   }
 
   public getVariantById(id: string): ProductVariant | null {
-    const rows = this.db.query<ProductVariant>(`SELECT * FROM product_variants WHERE id = ?`, [id]);
+    const rows = this.db.query<ProductVariant>(`SELECT * FROM product_variants WHERE id = ?`, [id]).map((r) => unscaleMoneyRow(r, VARIANT_MONEY_FIELDS));
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -58,7 +62,7 @@ export class ProductExtraService {
     return this.db.query<ProductVariant>(
       `SELECT * FROM product_variants WHERE parent_product_id = ? ORDER BY created_at DESC`,
       [productId]
-    );
+    ).map((r) => unscaleMoneyRow(r, VARIANT_MONEY_FIELDS));
   }
 
   public createVariant(productId: string, data: Omit<ProductVariant, 'id' | 'parentProductId' | 'createdAt' | 'costPrice' | 'sellingPriceM2'> & {
@@ -83,7 +87,7 @@ export class ProductExtraService {
     this.db.run(
       `INSERT INTO product_variants
        (id, parent_product_id, sku, barcode, variant_name, color, size, grade, cost_price, selling_price_m2, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?)`,
       [
         id, productId, data.sku, data.barcode || null, data.variantName,
         data.color || null, data.size || null, data.grade || null,
@@ -108,8 +112,8 @@ export class ProductExtraService {
         color = COALESCE(?, color),
         size = COALESCE(?, size),
         grade = COALESCE(?, grade),
-        cost_price = COALESCE(?, cost_price),
-        selling_price_m2 = COALESCE(?, selling_price_m2),
+        cost_price = COALESCE(ROUND(?*100), cost_price),
+        selling_price_m2 = COALESCE(ROUND(?*100), selling_price_m2),
         is_active = COALESCE(?, is_active)
       WHERE id = ?`,
       [

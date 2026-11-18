@@ -481,15 +481,20 @@ const BASE_PERMISSIONS: PermissionDef[] = [
 
   // Report center
   { code: 'reports.hub.view', name: 'عرض مركز التقارير', module: 'REPORTS' },
-  { code: 'reports.financial.view', name: 'عرض التقارير المالية', module: 'REPORTS' },
+  { code: 'reports.financial.view', name: 'عرض التقارير المالية', module: 'REPORTS', sensitivity: 'COST_PROFIT' },
   { code: 'reports.sales.view', name: 'عرض تقارير المبيعات', module: 'REPORTS' },
   { code: 'reports.purchases.view', name: 'عرض تقارير المشتريات', module: 'REPORTS' },
   { code: 'reports.inventory.view', name: 'عرض تقارير المخزون', module: 'REPORTS' },
   { code: 'reports.tax.view', name: 'عرض التقارير الضريبية', module: 'REPORTS' },
   { code: 'reports.pos.view', name: 'عرض تقارير نقطة البيع', module: 'REPORTS' },
-  { code: 'reports.profit_loss.view', name: 'عرض تقرير الأرباح والخسائر', module: 'REPORTS' },
+  { code: 'reports.profit_loss.view', name: 'عرض تقرير الأرباح والخسائر', module: 'REPORTS', sensitivity: 'PROFIT' },
   { code: 'reports.custom.view', name: 'عرض التقارير المخصصة', module: 'REPORTS' },
   { code: 'reports.print', name: 'طباعة التقارير', module: 'REPORTS' },
+
+  // رؤية البيانات المالية الحساسة — تُزرع لأدوار الإدارة/المالية فقط.
+  // أي صلاحية موسومة sensitivity=COST/PROFIT تتطلب الكود المقابل هنا.
+  { code: 'finance.cost.view', name: 'عرض تكاليف الشراء والتقييم', module: 'FINANCE', sensitivity: 'NONE' },
+  { code: 'finance.profit.view', name: 'عرض هوامش الربح', module: 'FINANCE', sensitivity: 'NONE' },
 
   // CRM pages and sections
   { code: 'crm.dashboard.view', name: 'عرض لوحة علاقات العملاء', module: 'CRM' },
@@ -676,6 +681,8 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export',
     'finance.installments.view', 'finance.installments.manage',
     'reports.view', 'reports.export',
+    'reports.financial.view', 'reports.profit_loss.view', 'reports.tax.view',
+    'finance.cost.view', 'finance.profit.view',
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
     'manufacturing.view',
     'operations.view', 'operations.update', 'branches.view', 'warehouses.view',
@@ -898,13 +905,10 @@ const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
   'finance.receivables.collect': ['finance.receivables.update'],
   'finance.print': ['finance.view'],
   'reports.hub.view': ['reports.view'],
-  'reports.financial.view': ['reports.view'],
   'reports.sales.view': ['reports.view'],
   'reports.purchases.view': ['reports.view'],
   'reports.inventory.view': ['reports.view'],
-  'reports.tax.view': ['reports.view'],
   'reports.pos.view': ['reports.view'],
-  'reports.profit_loss.view': ['reports.view'],
   'reports.custom.view': ['reports.view'],
   'reports.print': ['reports.export'],
   'crm.dashboard.view': ['crm.view'],
@@ -1001,6 +1005,10 @@ const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
   'hr.contracts.export': ['hr.contracts.view'],
   'hr.documents.export': ['hr.documents.view'],
   'hr.dashboard.view': ['employees.view'],
+  // أكواد رؤية التكلفة/الربح: تُشتق لمن يملك صلاحية مالية فعلية — لا تُفتح
+  // generalized عبر reports.view حتى لا يرثها دور المبيعات.
+  'finance.cost.view': ['finance.view', 'reports.financial.view', 'inventory.valuation.view'],
+  'finance.profit.view': ['finance.view', 'reports.financial.view', 'reports.profit_loss.view'],
 };
 
 const ROLE_NAMES: Record<string, string> = {  ADMIN: 'مدير النظام',

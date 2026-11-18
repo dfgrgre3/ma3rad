@@ -1,0 +1,3646 @@
+{
+  "generatedAt": "2026-11-18T01:54:20.836Z",
+  "summary": {
+    "totalPathsCompared": 158,
+    "declaredRoutes": 150,
+    "pageViewEntries": 145,
+    "routePermissionRules": 132,
+    "navItems": 133,
+    "granularPermissions": 4050,
+    "sectionPermissions": 511,
+    "pagesWithTabs": 70,
+    "tabbedPagesGuarded": 52,
+    "tabbedPagesUnguarded": 18,
+    "pathsGuardVsRulesDiverge": 0,
+    "pathsNoGuardPermission": 0,
+    "pathsNoRouteRule": 0,
+    "pathsUncoveredByAnything": 0
+  },
+  "divergences": [],
+  "noGuardPermission": [],
+  "noRouteRule": [],
+  "uncoveredPaths": [],
+  "tabbedPages": {
+    "guarded": [
+      {
+        "file": "src/pages/admin/admin/AdminPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/admin/admin/AdminSettingsTab.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/admin/sync/SyncStatusPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/admin/sync-conflicts/SyncConflictsPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/common/workspace-hub/WorkspaceHub.tsx",
+        "mechanisms": [
+          "WorkspaceHub",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/crm/crm-hub/CRMHubPage.tsx",
+        "mechanisms": [
+          "useRouteAccess",
+          "WorkspaceHub",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/crm/dashboard",
+          "/customers",
+          "/crm/leads",
+          "/crm/pipeline",
+          "/crm/activities",
+          "/crm/campaigns"
+        ]
+      },
+      {
+        "file": "src/pages/customers/customer-detail/CustomerDetailPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/customers/partners/PartnersPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/daily/today-purchases/TodayPurchasesPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/dashboard/dashboard/DashboardPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/finance",
+          "/sales",
+          "/purchases",
+          "/crm/leads",
+          "/deliveries",
+          "/employees"
+        ]
+      },
+      {
+        "file": "src/pages/documents/documents/DocumentsPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/budgets-cost-centers/BudgetsCostCentersPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/e-payment-settlement/EPaymentSettlementPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/fiscal-closing/FiscalClosingPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/installments/InstallmentsPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/journal-entries/JournalEntriesPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/finance/receivables-hub/ReceivablesHubPage.tsx",
+        "mechanisms": [
+          "useRouteAccess",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/finance/receivables",
+          "/finance/other-receivables",
+          "/finance/installments"
+        ]
+      },
+      {
+        "file": "src/pages/hr/recruitment/RecruitmentPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/inventory/inventory-hub/InventoryHubPage.tsx",
+        "mechanisms": [
+          "useRouteAccess",
+          "WorkspaceHub",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/inventory",
+          "/inventory/warehouse-stock",
+          "/inventory/showroom-stock",
+          "/inventory/alerts",
+          "/inventory/ledger",
+          "/inventory/transfers",
+          "/inventory/counts",
+          "/inventory/valuation",
+          "/inventory/adjustments",
+          "/inventory/stock-reservations",
+          "/inventory/reorder-planning",
+          "/inventory/locations",
+          "/inventory/damage-quarantine",
+          "/inventory/reconciliation"
+        ]
+      },
+      {
+        "file": "src/pages/inventory/stock-transfers/StockTransfersPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/manufacturing/manufacturing/ManufacturingPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/attendance/AttendancePage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/employees/EmployeesPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/facility-management/FacilityManagementPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/shifts/OperationsShiftsPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformActivitySettingsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformAdminControlPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformAppConfigurationPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformBillingPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformBrandingSettingsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformCustomizationSettingsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/sales",
+          "/pos-fast-checkout",
+          "/customers",
+          "/inventory",
+          "/purchases",
+          "/finance",
+          "/installments",
+          "/manufacturing",
+          "/projects",
+          "/hr",
+          "/restaurant-tables",
+          "/kitchen-display",
+          "/warranty-claims",
+          "/reports"
+        ]
+      },
+      {
+        "file": "src/pages/platform/PlatformIntegrationsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformOperationsSettingsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformPoliciesPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformProductPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformSecurityCenterPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformSettingsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformStaffPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/platform/PlatformTenantsPage.tsx",
+        "mechanisms": [
+          "platform-rbac"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/products/product-catalog-hub/ProductCatalogHubPage.tsx",
+        "mechanisms": [
+          "useRouteAccess",
+          "WorkspaceHub",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/products",
+          "/categories",
+          "/brands",
+          "/products/attributes",
+          "/products/barcodes"
+        ]
+      },
+      {
+        "file": "src/pages/products/product-detail/ProductDetailHeader.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/products/product-detail/ProductDetailPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/projects/project-detail/ProjectDetailPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/purchasing/supplier-detail/SupplierDetailPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/reports/purchase-inventory/PurchaseInventoryReportPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/reports/reports-hub/ReportsHubPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/restaurant/restaurant/RestaurantPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/sales/after-sales/AfterSalesPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/sales/reservations/ReservationsDepositPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/sales/sales-hub/SalesHubPage.tsx",
+        "mechanisms": [
+          "useRouteAccess",
+          "WorkspaceHub",
+          "route-rules-only"
+        ],
+        "guarded": true,
+        "tabPaths": [
+          "/sales",
+          "/sales/analytics",
+          "/sales/cycle",
+          "/sales/statement",
+          "/sales/orders-deposits",
+          "/sales/after-sales",
+          "/quotations",
+          "/orders",
+          "/returns",
+          "/sales/e-invoicing"
+        ]
+      },
+      {
+        "file": "src/pages/settings/app-configuration/AppConfigurationPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/settings/configuration-studio/ConfigurationStudioPage.tsx",
+        "mechanisms": [
+          "permission-checks"
+        ],
+        "guarded": true,
+        "tabPaths": []
+      }
+    ],
+    "unguarded": [
+      {
+        "file": "src/pages/daily/today-purchases/PurchasesTabsBar.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/attendance-devices/AttendanceDevicesPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/benefits/HrBenefitsPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/clearance/EmployeeClearancePage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/discipline/HrDisciplinePage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/organization/HrOrganizationPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/performance/PerformancePage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/self-service/HrSelfServicePage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/social-insurance/PayrollSocialInsurancePage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/training/TrainingPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/hr/workforce-planning/WorkforcePlanningPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/inventory/stock-transfers/components/StockTransfersTabs.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/employees/EmployeeFilters.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/operations/employees/EmployeeTabs.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/purchasing/supplier-detail/SupplierHeader.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/reports/financial-statements/FinancialStatementsPage.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/sales/reservations/ReservationsToolbar_part01.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      },
+      {
+        "file": "src/pages/sales/reservations/ReservationsToolbar_part02.tsx",
+        "mechanisms": [],
+        "guarded": false,
+        "tabPaths": []
+      }
+    ]
+  },
+  "allRows": [
+    {
+      "path": "/admin",
+      "guard": "ui.admin.control_center.view",
+      "guardLegacy": "admin.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "admin.view",
+          "users.view",
+          "roles.view",
+          "roles.manage",
+          "admin.navigation",
+          "admin.data",
+          "audit.view",
+          "settings.view"
+        ],
+        "source": "routePermissions",
+        "path": "/admin"
+      },
+      "navPerms": [
+        "admin.view",
+        "users.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/admin/data-deletion",
+      "guard": "ui.admin.data_deletion.view",
+      "guardLegacy": "admin.data.delete",
+      "rule": {
+        "all": [
+          "admin.data.delete"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/admin/data-deletion"
+      },
+      "navPerms": [
+        "admin.data.delete"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/admin/sync",
+      "guard": "ui.admin.sync_center.view",
+      "guardLegacy": "admin.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "admin.view",
+          "ui.admin.sync_center.view"
+        ],
+        "source": "routePermissions",
+        "path": "/admin/sync"
+      },
+      "navPerms": [
+        "admin.view",
+        "ui.admin.sync_center.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/admin/sync-conflicts",
+      "guard": "ui.admin.sync_conflicts.view",
+      "guardLegacy": "admin.view",
+      "rule": {
+        "all": [
+          "admin.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/admin/sync-conflicts"
+      },
+      "navPerms": [
+        "admin.view",
+        "ui.admin.sync_conflicts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/approvals",
+      "guard": "ui.approvals.inbox.view",
+      "guardLegacy": "approvals.view",
+      "rule": {
+        "all": [
+          "approvals.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/approvals"
+      },
+      "navPerms": [
+        "approvals.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/audit",
+      "guard": "ui.audit.log.view",
+      "guardLegacy": "audit.view",
+      "rule": {
+        "all": [
+          "audit.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/audit"
+      },
+      "navPerms": [
+        "audit.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/backup",
+      "guard": "ui.settings.backup.view",
+      "guardLegacy": "settings.backup",
+      "rule": {
+        "all": [
+          "settings.backup"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/backup"
+      },
+      "navPerms": [
+        "settings.backup"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/branches",
+      "guard": "ui.branches.branches.view",
+      "guardLegacy": "branches.view",
+      "rule": {
+        "all": [
+          "branches.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/branches"
+      },
+      "navPerms": [
+        "branches.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/brands",
+      "guard": "ui.brands.brands.view",
+      "guardLegacy": "brands.view",
+      "rule": {
+        "all": [
+          "brands.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/brands"
+      },
+      "navPerms": [
+        "brands.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/cashboxes",
+      "guard": "ui.cashier.cashier.view",
+      "guardLegacy": "cashier.view",
+      "rule": {
+        "all": [
+          "cashier.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/cashboxes"
+      },
+      "navPerms": [
+        "cashier.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/categories",
+      "guard": "ui.categories.categories.view",
+      "guardLegacy": "categories.view",
+      "rule": {
+        "all": [
+          "categories.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/categories"
+      },
+      "navPerms": [
+        "categories.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/central-activation",
+      "guard": "ui.admin.license.view",
+      "guardLegacy": "admin.license.manage",
+      "rule": {
+        "all": [
+          "admin.license.manage"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/central-activation"
+      },
+      "navPerms": null,
+      "declared": false,
+      "flags": [
+        "NOT_IN_NAV",
+        "NOT_A_DECLARED_ROUTE"
+      ]
+    },
+    {
+      "path": "/construction-estimate",
+      "guard": "ui.quotations.construction_estimate.view",
+      "guardLegacy": "quotations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "quotations.view",
+          "quotations.create",
+          "projects.view"
+        ],
+        "source": "routePermissions",
+        "path": "/construction-estimate"
+      },
+      "navPerms": [
+        "quotations.view",
+        "projects.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/contracts",
+      "guard": "ui.contracts.contracts.view",
+      "guardLegacy": "contracts.view",
+      "rule": {
+        "all": [
+          "contracts.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/contracts"
+      },
+      "navPerms": [
+        "contracts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/crm/activities",
+      "guard": "ui.crm.activities.view",
+      "guardLegacy": "crm.activities.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.activities.view",
+          "crm.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/activities"
+      },
+      "navPerms": [
+        "crm.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/crm/campaigns",
+      "guard": "ui.crm.campaigns.view",
+      "guardLegacy": "crm.campaigns.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.campaigns.view",
+          "crm.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/campaigns"
+      },
+      "navPerms": [
+        "crm.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/crm/dashboard",
+      "guard": "ui.crm.dashboard.view",
+      "guardLegacy": "crm.dashboard.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.dashboard.view",
+          "crm.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/dashboard"
+      },
+      "navPerms": [
+        "crm.view",
+        "customers.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/crm/hub",
+      "guard": "ui.crm.dashboard.view",
+      "guardLegacy": "crm.dashboard.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.view",
+          "crm.dashboard.view",
+          "customers.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/hub"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/crm/leads",
+      "guard": "ui.crm.leads.view",
+      "guardLegacy": "crm.leads.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.leads.view",
+          "crm.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/leads"
+      },
+      "navPerms": [
+        "crm.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/crm/pipeline",
+      "guard": "ui.crm.pipeline.view",
+      "guardLegacy": "crm.pipeline.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "crm.pipeline.view",
+          "crm.view"
+        ],
+        "source": "routePermissions",
+        "path": "/crm/pipeline"
+      },
+      "navPerms": [
+        "crm.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/customers",
+      "guard": "ui.customers.list.view",
+      "guardLegacy": "customers.view",
+      "rule": {
+        "all": [
+          "customers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/customers"
+      },
+      "navPerms": [
+        "customers.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/customers/:id",
+      "guard": "ui.customers.detail.view",
+      "guardLegacy": "customers.view",
+      "rule": {
+        "all": [
+          "customers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/customers"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/customers/:id/imported-products",
+      "guard": "ui.customers.list.view",
+      "guardLegacy": "customers.view",
+      "rule": {
+        "all": [
+          "customers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/customers"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/customers/imported-products",
+      "guard": "ui.customers.imported_products.view",
+      "guardLegacy": "sales.view",
+      "rule": {
+        "all": [
+          "sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/customers/imported-products"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/customers/ready-deliveries",
+      "guard": "ui.customers.ready_deliveries.view",
+      "guardLegacy": "sales.view",
+      "rule": {
+        "all": [
+          "sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/customers/ready-deliveries"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/daily/debts",
+      "guard": "ui.finance.daily_debts.view",
+      "guardLegacy": "finance.debts.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.debts.view",
+          "finance.receivables.view"
+        ],
+        "source": "routePermissions",
+        "path": "/daily/debts"
+      },
+      "navPerms": [
+        "finance.debts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/daily/expenses",
+      "guard": "ui.cashier.daily_expenses.view",
+      "guardLegacy": "cashier.expense",
+      "rule": {
+        "all": [],
+        "any": [
+          "cashier.expense",
+          "finance.expenses.view"
+        ],
+        "source": "routePermissions",
+        "path": "/daily/expenses"
+      },
+      "navPerms": [
+        "cashier.expense"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/daily/purchases",
+      "guard": "ui.purchases.daily_purchases.view",
+      "guardLegacy": "purchases.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.view",
+          "purchases.create"
+        ],
+        "source": "routePermissions",
+        "path": "/daily/purchases"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/daily/sales",
+      "guard": "ui.sales.daily_sales.view",
+      "guardLegacy": "sales.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.view",
+          "sales.create"
+        ],
+        "source": "routePermissions",
+        "path": "/daily/sales"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/dashboard",
+      "guard": "ui.dashboard.overview.view",
+      "guardLegacy": "dashboard.view",
+      "rule": {
+        "all": [
+          "dashboard.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/dashboard"
+      },
+      "navPerms": [
+        "dashboard.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/dashboard/executive",
+      "guard": "ui.dashboard.executive.view",
+      "guardLegacy": "dashboard.executive.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "dashboard.executive.view",
+          "dashboard.view"
+        ],
+        "source": "routePermissions",
+        "path": "/dashboard/executive"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/data-import",
+      "guard": "ui.settings.data_import.view",
+      "guardLegacy": "settings.import.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "settings.import.view",
+          "settings.import.execute",
+          "admin.data.import",
+          "admin.data",
+          "customers.create",
+          "suppliers.create",
+          "categories.create",
+          "brands.create",
+          "products.create",
+          "employees.manage",
+          "warehouses.manage"
+        ],
+        "source": "routePermissions",
+        "path": "/data-import"
+      },
+      "navPerms": [
+        "settings.import.view",
+        "settings.import.execute",
+        "admin.data.import",
+        "admin.data",
+        "customers.create",
+        "suppliers.create",
+        "categories.create",
+        "brands.create",
+        "products.create",
+        "employees.manage",
+        "warehouses.manage"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/data-import/types",
+      "guard": "ui.settings.dynamic_data.view",
+      "guardLegacy": "settings.dynamic_data.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "settings.dynamic_data.view",
+          "settings.view"
+        ],
+        "source": "routePermissions",
+        "path": "/data-import/types"
+      },
+      "navPerms": [
+        "settings.dynamic_data.view",
+        "settings.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/deliveries",
+      "guard": "ui.deliveries.deliveries.view",
+      "guardLegacy": "deliveries.view",
+      "rule": {
+        "all": [
+          "deliveries.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/deliveries"
+      },
+      "navPerms": [
+        "deliveries.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/documents",
+      "guard": "ui.documents.documents.view",
+      "guardLegacy": "documents.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "documents.view",
+          "contracts.view"
+        ],
+        "source": "routePermissions",
+        "path": "/documents"
+      },
+      "navPerms": [
+        "documents.view",
+        "contracts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/drivers",
+      "guard": "ui.drivers.drivers.view",
+      "guardLegacy": "drivers.view",
+      "rule": {
+        "all": [
+          "drivers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/drivers"
+      },
+      "navPerms": [
+        "drivers.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees",
+      "guard": "ui.employees.employees.view",
+      "guardLegacy": "employees.view",
+      "rule": {
+        "all": [
+          "employees.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees"
+      },
+      "navPerms": [
+        "employees.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/attendance",
+      "guard": "ui.employees.attendance.view",
+      "guardLegacy": "employees.attendance.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "employees.attendance.view",
+          "employees.view"
+        ],
+        "source": "routePermissions",
+        "path": "/employees/attendance"
+      },
+      "navPerms": [
+        "employees.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/commissions",
+      "guard": "ui.employees.commissions.view",
+      "guardLegacy": "employees.commissions.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "employees.commissions.view",
+          "employees.payroll.view"
+        ],
+        "source": "routePermissions",
+        "path": "/employees/commissions"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/contracts",
+      "guard": "ui.hr.contracts.view",
+      "guardLegacy": "hr.contracts.view",
+      "rule": {
+        "all": [
+          "hr.contracts.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees/contracts"
+      },
+      "navPerms": [
+        "hr.contracts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/documents",
+      "guard": "ui.hr.documents.view",
+      "guardLegacy": "hr.documents.view",
+      "rule": {
+        "all": [
+          "hr.documents.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees/documents"
+      },
+      "navPerms": [
+        "hr.documents.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/leave",
+      "guard": "ui.hr.leave.view",
+      "guardLegacy": "hr.leave.view",
+      "rule": {
+        "all": [
+          "hr.leave.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees/leave"
+      },
+      "navPerms": [
+        "hr.leave.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/payroll",
+      "guard": "ui.employees.payroll.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees/payroll"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/payroll/calendar",
+      "guard": "ui.employees.payroll.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/employees/payroll/calendar"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/employees/payroll/notification-settings",
+      "guard": "ui.employees.payroll_notifications.view",
+      "guardLegacy": "employees.payroll.manage",
+      "rule": {
+        "all": [
+          "employees.payroll.manage"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/employees/payroll/notification-settings"
+      },
+      "navPerms": [
+        "employees.payroll.manage"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/employees/payroll/payslips",
+      "guard": "ui.employees.payroll.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/employees/payroll/payslips"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/employees/recruitment",
+      "guard": "ui.hr.recruitment.view",
+      "guardLegacy": "hr.recruitment.view",
+      "rule": {
+        "all": [
+          "hr.recruitment.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/employees/recruitment"
+      },
+      "navPerms": [
+        "hr.recruitment.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/facility-management",
+      "guard": "ui.operations.facility_management.view",
+      "guardLegacy": "operations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "operations.view"
+        ],
+        "source": "routePermissions",
+        "path": "/facility-management"
+      },
+      "navPerms": [
+        "operations.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance",
+      "guard": "ui.finance.overview.view",
+      "guardLegacy": "finance.view",
+      "rule": {
+        "all": [
+          "finance.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/finance"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/accounts",
+      "guard": "ui.finance.accounts.view",
+      "guardLegacy": "finance.accounts.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.accounts.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/accounts"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/assets",
+      "guard": "ui.finance.assets.view",
+      "guardLegacy": "finance.assets.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.assets.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/assets"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/bank-reconciliation",
+      "guard": "ui.finance.bank_reconciliation.view",
+      "guardLegacy": "finance.bank_reconciliation.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.bank_reconciliation.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/bank-reconciliation"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/budgets-cost-centers",
+      "guard": "ui.finance.budgets.view",
+      "guardLegacy": "finance.budgets.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.budgets.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/budgets-cost-centers"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/calendar",
+      "guard": "ui.finance.calendar.view",
+      "guardLegacy": "finance.view",
+      "rule": {
+        "all": [
+          "finance.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/finance/calendar"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/cash-forecast",
+      "guard": "ui.finance.cash_forecast.view",
+      "guardLegacy": "finance.cash_forecast.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.cash_forecast.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/cash-forecast"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/cheques",
+      "guard": "ui.finance.cheques.view",
+      "guardLegacy": "finance.cheques.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.cheques.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/cheques"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/consistency-audit",
+      "guard": "ui.finance.overview.view",
+      "guardLegacy": "finance.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/consistency-audit"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/finance/debts",
+      "guard": "ui.finance.receivables.view",
+      "guardLegacy": "finance.debts.view",
+      "rule": {
+        "all": [
+          "finance.debts.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/finance/debts"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/finance/epayment-settlements",
+      "guard": "ui.finance.epayments.view",
+      "guardLegacy": "finance.epayments.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.epayments.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/epayment-settlements"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/expenses",
+      "guard": "ui.cashier.expenses.view",
+      "guardLegacy": "cashier.expense",
+      "rule": {
+        "all": [
+          "cashier.expense"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/finance/expenses"
+      },
+      "navPerms": [
+        "cashier.expense"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/fiscal-closing",
+      "guard": "ui.finance.fiscal_closing.view",
+      "guardLegacy": "finance.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.view",
+          "finance.close"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/fiscal-closing"
+      },
+      "navPerms": [
+        "finance.view",
+        "finance.close"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/installments",
+      "guard": "ui.finance.installments.view",
+      "guardLegacy": "finance.installments.view",
+      "rule": {
+        "all": [
+          "finance.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/finance/installments"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/journal",
+      "guard": "ui.finance.journal.view",
+      "guardLegacy": "finance.journal.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.journal.view",
+          "finance.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/journal"
+      },
+      "navPerms": [
+        "finance.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/other-receivables",
+      "guard": "ui.finance.other_receivables.view",
+      "guardLegacy": "finance.receivables.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.view",
+          "finance.receivables.view"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/other-receivables"
+      },
+      "navPerms": [
+        "finance.view",
+        "finance.receivables.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/finance/receivables",
+      "guard": "ui.finance.receivables.view",
+      "guardLegacy": "finance.debts.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "finance.debts.view",
+          "finance.receivables.view",
+          "finance.installments.view",
+          "finance.installments.manage"
+        ],
+        "source": "routePermissions",
+        "path": "/finance/receivables"
+      },
+      "navPerms": [
+        "finance.view",
+        "finance.debts.view",
+        "finance.receivables.view",
+        "finance.installments.view",
+        "finance.installments.manage"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/fleet/dashboard",
+      "guard": "ui.operations.fleet.view",
+      "guardLegacy": "operations.fleet.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "operations.fleet.view",
+          "deliveries.view"
+        ],
+        "source": "routePermissions",
+        "path": "/fleet/dashboard"
+      },
+      "navPerms": [
+        "deliveries.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/alerts",
+      "guard": "ui.hr.hr_alerts.view",
+      "guardLegacy": "employees.view",
+      "rule": {
+        "all": [
+          "employees.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/alerts"
+      },
+      "navPerms": [
+        "employees.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/attendance-devices",
+      "guard": "ui.hr.hr_attendance_devices.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/attendance-devices"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/benefits",
+      "guard": "ui.hr.benefits.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/benefits"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/clearance",
+      "guard": "ui.hr.hr_clearance.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/clearance"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/dashboard",
+      "guard": "ui.hr.hr_dashboard.view",
+      "guardLegacy": "hr.dashboard.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "hr.dashboard.view",
+          "employees.view"
+        ],
+        "source": "routePermissions",
+        "path": "/hr/dashboard"
+      },
+      "navPerms": [
+        "employees.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/discipline",
+      "guard": "ui.hr.discipline.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/discipline"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/organization",
+      "guard": "ui.hr.organization.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/organization"
+      },
+      "navPerms": [
+        "employees.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/performance",
+      "guard": "ui.hr.performance.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/performance"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/self-service",
+      "guard": "ui.hr.self_service.view",
+      "guardLegacy": "hr.selfservice.view",
+      "rule": {
+        "all": [
+          "hr.selfservice.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/self-service"
+      },
+      "navPerms": [
+        "hr.selfservice.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/social-insurance",
+      "guard": "ui.hr.hr_social_insurance.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/social-insurance"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/training",
+      "guard": "ui.hr.training.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/training"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/hr/workforce-planning",
+      "guard": "ui.hr.hr_workforce_planning.view",
+      "guardLegacy": "employees.payroll.view",
+      "rule": {
+        "all": [
+          "employees.payroll.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/hr/workforce-planning"
+      },
+      "navPerms": [
+        "employees.payroll.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory",
+      "guard": "ui.inventory.hub.view",
+      "guardLegacy": "inventory.view",
+      "rule": {
+        "all": [
+          "inventory.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/inventory"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/inventory/adjustments",
+      "guard": "ui.inventory.adjustments.view",
+      "guardLegacy": "inventory.adjust",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.view",
+          "inventory.adjust",
+          "inventory.adjustment.approve",
+          "inventory.adjustment.post"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/adjustments"
+      },
+      "navPerms": [
+        "inventory.view",
+        "inventory.adjust",
+        "inventory.adjustment.approve",
+        "inventory.adjustment.post"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/alerts",
+      "guard": "ui.inventory.hub.view",
+      "guardLegacy": "inventory.view",
+      "rule": {
+        "all": [
+          "inventory.view"
+        ],
+        "any": [
+          "inventory.view",
+          "inventory.transfer",
+          "inventory.transfer.workflow.approve",
+          "inventory.transfer.execute",
+          "inventory.transfer.receive",
+          "inventory.count",
+          "inventory.adjust",
+          "inventory.adjustment.approve",
+          "inventory.adjustment.post"
+        ],
+        "source": "nav",
+        "path": "/inventory/alerts"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/inventory/counts",
+      "guard": "ui.inventory.counts.view",
+      "guardLegacy": "inventory.count",
+      "rule": {
+        "all": [
+          "inventory.count"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/inventory/counts"
+      },
+      "navPerms": [
+        "inventory.count"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/damage-quarantine",
+      "guard": "ui.inventory.damage.view",
+      "guardLegacy": "inventory.damage.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.damage.view",
+          "inventory.adjust"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/damage-quarantine"
+      },
+      "navPerms": [
+        "inventory.adjust"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/hub",
+      "guard": "ui.inventory.hub.view",
+      "guardLegacy": "inventory.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.view",
+          "inventory.transfer",
+          "inventory.count",
+          "inventory.adjust"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/hub"
+      },
+      "navPerms": [
+        "inventory.view",
+        "inventory.transfer",
+        "inventory.count",
+        "inventory.adjust"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/ledger",
+      "guard": "ui.inventory.ledger.view",
+      "guardLegacy": "inventory.ledger.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.ledger.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/ledger"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/locations",
+      "guard": "ui.inventory.locations.view",
+      "guardLegacy": "inventory.locations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.locations.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/locations"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/reconciliation",
+      "guard": "ui.inventory.reconciliation.view",
+      "guardLegacy": "inventory.reconciliation.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.reconciliation.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/reconciliation"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/reorder-planning",
+      "guard": "ui.inventory.reorder.view",
+      "guardLegacy": "inventory.reorder.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.reorder.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/reorder-planning"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/reservations",
+      "guard": "ui.inventory.reservations.view",
+      "guardLegacy": "inventory.reservations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.reservations.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/reservations"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/inventory/showroom-stock",
+      "guard": "ui.inventory.showroom_stock.view",
+      "guardLegacy": "inventory.showroom_stock.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.showroom_stock.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/showroom-stock"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/stock-reservations",
+      "guard": "ui.inventory.reservations.view",
+      "guardLegacy": "inventory.reservations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.reservations.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/stock-reservations"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/transfers",
+      "guard": "ui.inventory.transfers.view",
+      "guardLegacy": "inventory.transfer",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.transfer",
+          "inventory.transfer.workflow.approve",
+          "inventory.transfer.execute",
+          "inventory.transfer.receive"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/transfers"
+      },
+      "navPerms": [
+        "inventory.transfer",
+        "inventory.transfer.workflow.approve",
+        "inventory.transfer.execute",
+        "inventory.transfer.receive"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/valuation",
+      "guard": "ui.inventory.valuation.view",
+      "guardLegacy": "inventory.valuation.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.valuation.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/valuation"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/inventory/warehouse-stock",
+      "guard": "ui.inventory.warehouse_stock.view",
+      "guardLegacy": "inventory.warehouse_stock.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "inventory.warehouse_stock.view",
+          "inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/inventory/warehouse-stock"
+      },
+      "navPerms": [
+        "inventory.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/manufacturing",
+      "guard": "ui.manufacturing.overview.view",
+      "guardLegacy": "manufacturing.view",
+      "rule": {
+        "all": [
+          "manufacturing.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/manufacturing"
+      },
+      "navPerms": [
+        "manufacturing.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/notifications",
+      "guard": "ui.notifications.list.view",
+      "guardLegacy": "notifications.view",
+      "rule": {
+        "all": [
+          "notifications.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/notifications"
+      },
+      "navPerms": [
+        "notifications.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/operations/shifts",
+      "guard": "ui.operations.operations_shifts.view",
+      "guardLegacy": "operations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "operations.view",
+          "cashier.view",
+          "employees.attendance.view",
+          "manufacturing.view"
+        ],
+        "source": "routePermissions",
+        "path": "/operations/shifts"
+      },
+      "navPerms": [
+        "operations.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/orders",
+      "guard": "ui.orders.orders.view",
+      "guardLegacy": "orders.view",
+      "rule": {
+        "all": [
+          "orders.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/orders"
+      },
+      "navPerms": [
+        "orders.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/partners",
+      "guard": "ui.partners.partners.view",
+      "guardLegacy": "partners.view",
+      "rule": {
+        "all": [
+          "partners.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/partners"
+      },
+      "navPerms": [
+        "partners.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/pos",
+      "guard": "ui.sales.pos.view",
+      "guardLegacy": "sales.pos.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.pos.view",
+          "sales.create"
+        ],
+        "source": "routePermissions",
+        "path": "/pos"
+      },
+      "navPerms": [
+        "sales.create"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/pricing",
+      "guard": "ui.pricing.pricing.view",
+      "guardLegacy": "pricing.view",
+      "rule": {
+        "all": [
+          "pricing.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/pricing"
+      },
+      "navPerms": [
+        "pricing.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/products",
+      "guard": "ui.products.catalog.view",
+      "guardLegacy": "products.view",
+      "rule": {
+        "all": [
+          "products.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/products"
+      },
+      "navPerms": [
+        "products.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/products/:id",
+      "guard": "ui.products.detail.view",
+      "guardLegacy": "products.view",
+      "rule": {
+        "all": [
+          "products.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/products"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/products/attributes",
+      "guard": "ui.products.attributes.view",
+      "guardLegacy": "products.attributes.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "products.attributes.view",
+          "products.view"
+        ],
+        "source": "routePermissions",
+        "path": "/products/attributes"
+      },
+      "navPerms": [
+        "products.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/products/barcodes",
+      "guard": "ui.products.barcodes.view",
+      "guardLegacy": "products.barcodes.print",
+      "rule": {
+        "all": [],
+        "any": [
+          "products.barcodes.print",
+          "products.view"
+        ],
+        "source": "routePermissions",
+        "path": "/products/barcodes"
+      },
+      "navPerms": [
+        "products.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/products/catalog",
+      "guard": "ui.products.detail.view",
+      "guardLegacy": "products.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "products.view",
+          "categories.view",
+          "brands.view"
+        ],
+        "source": "routePermissions",
+        "path": "/products/catalog"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/projects",
+      "guard": "ui.projects.list.view",
+      "guardLegacy": "projects.view",
+      "rule": {
+        "all": [
+          "projects.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/projects"
+      },
+      "navPerms": [
+        "projects.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/projects/:id",
+      "guard": "ui.projects.detail.view",
+      "guardLegacy": "projects.view",
+      "rule": {
+        "all": [
+          "projects.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/projects"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/promotions",
+      "guard": "ui.promotions.promotions.view",
+      "guardLegacy": "promotions.view",
+      "rule": {
+        "all": [
+          "promotions.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/promotions"
+      },
+      "navPerms": [
+        "promotions.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases",
+      "guard": "ui.purchases.invoices.view",
+      "guardLegacy": "purchases.view",
+      "rule": {
+        "all": [
+          "purchases.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/purchases"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/claims",
+      "guard": "ui.purchases.claims.view",
+      "guardLegacy": "purchases.claims.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.claims.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/claims"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/incoming",
+      "guard": "ui.purchases.incoming.view",
+      "guardLegacy": "purchases.incoming.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.incoming.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/incoming"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/orders",
+      "guard": "ui.purchases.orders.view",
+      "guardLegacy": "purchases.orders.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.orders.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/orders"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/quotations",
+      "guard": "ui.purchases.quotations.view",
+      "guardLegacy": "purchases.quotations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.quotations.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/quotations"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/receipts",
+      "guard": "ui.purchases.receipts.view",
+      "guardLegacy": "purchases.receipts.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.receipts.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/receipts"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/requests",
+      "guard": "ui.purchases.requests.view",
+      "guardLegacy": "purchases.requests.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.requests.view",
+          "purchases.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/requests"
+      },
+      "navPerms": [
+        "purchases.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/returns",
+      "guard": "ui.purchases.returns.view",
+      "guardLegacy": "purchases.return",
+      "rule": {
+        "all": [
+          "purchases.return"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/purchases/returns"
+      },
+      "navPerms": [
+        "purchases.return"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/purchases/statement",
+      "guard": "ui.purchases.statement.view",
+      "guardLegacy": "purchases.statement.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "purchases.statement.view",
+          "finance.debts.view"
+        ],
+        "source": "routePermissions",
+        "path": "/purchases/statement"
+      },
+      "navPerms": [
+        "finance.debts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/quotations",
+      "guard": "ui.quotations.quotations.view",
+      "guardLegacy": "quotations.view",
+      "rule": {
+        "all": [
+          "quotations.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/quotations"
+      },
+      "navPerms": [
+        "quotations.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/:reportId",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/category",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/category"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/category/:categoryId",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/category"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/category/core",
+      "guard": "ui.reports.custom.view",
+      "guardLegacy": "reports.custom.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/reports/category/core"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/category/credit",
+      "guard": "ui.reports.credit_reports.view",
+      "guardLegacy": "reports.financial.view",
+      "rule": {
+        "all": [
+          "reports.financial.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/category/credit"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/category/finance",
+      "guard": "ui.reports.financial.view",
+      "guardLegacy": "reports.financial.view",
+      "rule": {
+        "all": [
+          "reports.financial.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/category/finance"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/category/forecast",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/reports/category/forecast"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/reports/category/inventory",
+      "guard": "ui.reports.purchases.view",
+      "guardLegacy": "reports.purchases.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "reports.purchases.view",
+          "reports.inventory.view"
+        ],
+        "source": "routePermissions",
+        "path": "/reports/category/inventory"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/category/operations",
+      "guard": "ui.reports.hub.view",
+      "guardLegacy": "reports.view",
+      "rule": {
+        "all": [
+          "reports.view"
+        ],
+        "any": [],
+        "source": "nav",
+        "path": "/reports/category/operations"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY"
+      ]
+    },
+    {
+      "path": "/reports/category/sales",
+      "guard": "ui.reports.sales.view",
+      "guardLegacy": "reports.sales.view",
+      "rule": {
+        "all": [
+          "reports.sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/category/sales"
+      },
+      "navPerms": [
+        "reports.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/reports/pos",
+      "guard": "ui.reports.pos.view",
+      "guardLegacy": "reports.pos.view",
+      "rule": {
+        "all": [
+          "reports.pos.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/pos"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/profit-loss",
+      "guard": "ui.reports.profit_loss.view",
+      "guardLegacy": "reports.profit_loss.view",
+      "rule": {
+        "all": [
+          "reports.profit_loss.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/profit-loss"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/purchases",
+      "guard": "ui.reports.purchases.view",
+      "guardLegacy": "reports.purchases.view",
+      "rule": {
+        "all": [
+          "reports.purchases.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/purchases"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/sales",
+      "guard": "ui.reports.sales.view",
+      "guardLegacy": "reports.sales.view",
+      "rule": {
+        "all": [
+          "reports.sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/sales"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/statements",
+      "guard": "ui.reports.statements.view",
+      "guardLegacy": "reports.financial.view",
+      "rule": {
+        "all": [
+          "reports.financial.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/statements"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/reports/tax",
+      "guard": "ui.reports.tax.view",
+      "guardLegacy": "reports.tax.view",
+      "rule": {
+        "all": [
+          "reports.tax.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/reports/tax"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/restaurant",
+      "guard": "ui.sales.restaurant.view",
+      "guardLegacy": "restaurant.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "restaurant.view",
+          "orders.view"
+        ],
+        "source": "routePermissions",
+        "path": "/restaurant"
+      },
+      "navPerms": [
+        "orders.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/returns",
+      "guard": "ui.returns.returns.view",
+      "guardLegacy": "returns.view",
+      "rule": {
+        "all": [
+          "returns.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/returns"
+      },
+      "navPerms": [
+        "returns.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales",
+      "guard": "ui.sales.invoices.view",
+      "guardLegacy": "sales.view",
+      "rule": {
+        "all": [
+          "sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/sales"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales/after-sales",
+      "guard": "ui.sales.after_sales.view",
+      "guardLegacy": "sales.after_sales.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.after_sales.view",
+          "sales.view"
+        ],
+        "source": "routePermissions",
+        "path": "/sales/after-sales"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales/analytics",
+      "guard": "ui.sales.analytics.view",
+      "guardLegacy": "sales.analytics.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.analytics.view",
+          "sales.view"
+        ],
+        "source": "routePermissions",
+        "path": "/sales/analytics"
+      },
+      "navPerms": [
+        "sales.analytics.view",
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales/cycle",
+      "guard": "ui.sales.cycle.view",
+      "guardLegacy": "sales.cycle.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.cycle.view",
+          "sales.view"
+        ],
+        "source": "routePermissions",
+        "path": "/sales/cycle"
+      },
+      "navPerms": [
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales/e-invoicing",
+      "guard": "ui.sales.invoices.view",
+      "guardLegacy": "sales.view",
+      "rule": {
+        "all": [
+          "sales.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/sales"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/sales/orders-deposits",
+      "guard": "ui.sales.orders_deposits.view",
+      "guardLegacy": "sales.orders_deposits.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.orders_deposits.view",
+          "sales.reservations.view",
+          "sales.view"
+        ],
+        "source": "routePermissions",
+        "path": "/sales/orders-deposits"
+      },
+      "navPerms": [
+        "sales.orders_deposits.view",
+        "sales.reservations.view",
+        "sales.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/sales/reservations",
+      "guard": "ui.sales.reservations.view",
+      "guardLegacy": "sales.reservations.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "sales.reservations.view",
+          "sales.view"
+        ],
+        "source": "routePermissions",
+        "path": "/sales/reservations"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/sales/statement",
+      "guard": "ui.sales.statement.view",
+      "guardLegacy": "sales.statement.view",
+      "rule": {
+        "all": [
+          "customers.view",
+          "sales.view",
+          "finance.debts.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/sales/statement"
+      },
+      "navPerms": [
+        "customers.view",
+        "sales.view",
+        "finance.debts.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/security",
+      "guard": "ui.security.center.view",
+      "guardLegacy": "security.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "security.view",
+          "sessions.view"
+        ],
+        "source": "routePermissions",
+        "path": "/security"
+      },
+      "navPerms": [
+        "sessions.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/settings",
+      "guard": "ui.settings.hub.view",
+      "guardLegacy": "settings.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "settings.view",
+          "settings.backup",
+          "settings.app_config.view",
+          "settings.config_studio.view"
+        ],
+        "source": "routePermissions",
+        "path": "/settings"
+      },
+      "navPerms": [
+        "settings.view",
+        "settings.backup"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/settings/app-configuration",
+      "guard": "ui.settings.app_configuration.view",
+      "guardLegacy": "settings.app_config.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "settings.app_config.view",
+          "settings.view"
+        ],
+        "source": "routePermissions",
+        "path": "/settings/app-configuration"
+      },
+      "navPerms": [
+        "settings.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/settings/approvals",
+      "guard": "ui.settings.hub.view",
+      "guardLegacy": "settings.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "approvals.view",
+          "approvals.settings.manage",
+          "settings.view",
+          "settings.backup"
+        ],
+        "source": "routePermissions",
+        "path": "/settings/approvals"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "GUARD_VIA_PATTERN_ONLY",
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/settings/configuration-studio",
+      "guard": "ui.settings.configuration_studio.view",
+      "guardLegacy": "settings.config_studio.view",
+      "rule": {
+        "all": [],
+        "any": [
+          "settings.config_studio.view",
+          "settings.view"
+        ],
+        "source": "routePermissions",
+        "path": "/settings/configuration-studio"
+      },
+      "navPerms": [
+        "settings.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/suppliers",
+      "guard": "ui.suppliers.suppliers.view",
+      "guardLegacy": "suppliers.view",
+      "rule": {
+        "all": [
+          "suppliers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/suppliers"
+      },
+      "navPerms": [
+        "suppliers.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/suppliers/:id",
+      "guard": "ui.suppliers.supplier_detail.view",
+      "guardLegacy": "suppliers.view",
+      "rule": {
+        "all": [
+          "suppliers.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/suppliers"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/system-health",
+      "guard": "ui.settings.system_health.view",
+      "guardLegacy": "settings.health.view",
+      "rule": {
+        "all": [
+          "settings.health.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/system-health"
+      },
+      "navPerms": [
+        "settings.health.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/tools",
+      "guard": "ui.dashboard.overview.view",
+      "guardLegacy": "dashboard.view",
+      "rule": {
+        "all": [
+          "dashboard.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/tools"
+      },
+      "navPerms": null,
+      "declared": true,
+      "flags": [
+        "NOT_IN_NAV"
+      ]
+    },
+    {
+      "path": "/users",
+      "guard": "ui.users.users.view",
+      "guardLegacy": "users.view",
+      "rule": {
+        "all": [
+          "users.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/users"
+      },
+      "navPerms": [
+        "users.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/vehicles",
+      "guard": "ui.vehicles.vehicles.view",
+      "guardLegacy": "vehicles.view",
+      "rule": {
+        "all": [
+          "vehicles.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/vehicles"
+      },
+      "navPerms": [
+        "vehicles.view"
+      ],
+      "declared": true,
+      "flags": []
+    },
+    {
+      "path": "/warehouses",
+      "guard": "ui.warehouses.warehouses.view",
+      "guardLegacy": "warehouses.view",
+      "rule": {
+        "all": [
+          "warehouses.view"
+        ],
+        "any": [],
+        "source": "routePermissions",
+        "path": "/warehouses"
+      },
+      "navPerms": [
+        "warehouses.view"
+      ],
+      "declared": true,
+      "flags": []
+    }
+  ]
+}

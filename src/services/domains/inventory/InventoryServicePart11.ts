@@ -52,7 +52,7 @@ public rejectTransfer(transferId: string, reason: string): void {
           const shippedM2 = Number(item.shippedM2 ?? item.shipped_m2 ?? item.quantityM2 ?? item.quantity_m2 ?? 0);
           if (shippedM2 <= 0) continue;
           const boxesCount = Number(item.boxesCount ?? item.boxes_count ?? 0);
-          const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0);
+          const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0) / 100;
 
           let revertUnitCost = itemUnitCost;
           const revertPlan = fifoEnabled && transitWarehouseId
@@ -85,7 +85,7 @@ public rejectTransfer(transferId: string, reason: string): void {
               id, transaction_number, type, product_id, warehouse_id,
               quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
               notes, performed_by, created_at
-            ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER_REVERT', ?, ?, ?, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'TRANSFER_REVERT', ?, ?, ?, CURRENT_TIMESTAMP)
           `, [
             txId, txNum, productId, fromWarehouseId,
             shippedM2, boxesCount, revertUnitCost, Number((shippedM2 * revertUnitCost).toFixed(2)),

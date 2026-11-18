@@ -6,6 +6,8 @@ import {
 import { BackupService } from '../../../services/infrastructure/backup/BackupService';
 import { BackupHistoryTable } from './BackupHistoryTable';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { CentralAppBackupService } from '../../../services/domains/platform/CentralAppBackupService';
+import type { CentralAppBackupInfo } from '../../../types/electron';
 
 export const BackupPage: React.FC = () => {
   const canManage = usePermission()('settings.backup');
@@ -38,7 +40,23 @@ export const BackupPage: React.FC = () => {
   const [showRestorePassword, setShowRestorePassword] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
+  // Central platform app-backup channel state
+  const [centralStatus, setCentralStatus] = useState<{ configured: boolean; activated: boolean } | null>(null);
+  const [centralPending, setCentralPending] = useState<CentralAppBackupInfo | null>(null);
+  const [centralBackups, setCentralBackups] = useState<CentralAppBackupInfo[]>([]);
+  const [isCentralBusy, setIsCentralBusy] = useState(false);
+
   const backupService = useMemo(() => new BackupService(), []);
+  const centralAppBackupService = useMemo(() => new CentralAppBackupService(), []);
+
+  const refreshCentralState = useCallback(async () => {
+    const [pending, backups] = await Promise.all([
+      centralAppBackupService.pendingRestore().catch(() => null),
+      centralAppBackupService.listBackups().catch(() => [] as CentralAppBackupInfo[]),
+    ]);
+    setCentralPending(pending);
+    setCentralBackups(backups.slice(0, 10));
+  }, [centralAppBackupService]);
 
   const loadHistory = useCallback(() => {
     try {
@@ -58,7 +76,24 @@ export const BackupPage: React.FC = () => {
       .catch((error) => {
         setMessage({ text: error instanceof Error ? error.message : String(error), isError: true });
       });
-  }, [loadHistory]);
+    void centralAppBackupService.status()
+      .then(async (status) => {
+        setCentralStatus(status);
+        if (!status.configured || !status.activated) return;
+        const [pending, backups] = await Promise.all([
+          centralAppBackupService.pendingRestore().catch(() => null),
+          centralAppBackupService.listBackups().catch(() => [] as CentralAppBackupInfo[]),
+        ]);
+        setCentralPending(pending);
+        setCentralBackups(backups.slice(0, 10));
+      })
+      .catch(() => setCentralStatus(null));
+    // Live updates: the main process polls pending restores and pushes events.
+    const unsubscribe = window.ceramisys?.centralAppBackup?.onPendingRestore?.(() => {
+      void refreshCentralState();
+    });
+    return () => { unsubscribe?.(); };
+  }, [loadHistory, centralAppBackupService, refreshCentralState]);
 
   const handleSaveOffsiteBackupDir = async () => {
     if (!canManage) return;
@@ -241,8 +276,51 @@ export const BackupPage: React.FC = () => {
     }
   };
 
+  const handleCentralUpload = async () => {
+    if (!canManage) return;
+    setIsCentralBusy(true);
+    setMessage(null);
+    try {
+      const uploaded = await centralAppBackupService.createAndUploadBackup('MANUAL');
+      setMessage({ text: `تم إنشاء نسخة محلية مشفرة ورفعها إلى المنصة (${formatSize(uploaded.sizeBytes ?? 0)}).` });
+      await refreshCentralState();
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : String(error), isError: true });
+    } finally {
+      setIsCentralBusy(false);
+    }
+  };
+
+  const handleCentralApplyRestore = async () => {
+    if (!canRestore || !centralPending) return;
+    const confirmed = window.confirm(
+      'طلبت منصة الإدارة استعادة نسخة احتياطية لقاعدة بيانات هذا الجهاز.\n' +
+      'سيتم تنزيل النسخة المشفرة والتحقق منها واستبدال البيانات الحالية (مع إنشاء نسخة احتياطية قبل الاستعادة). هل تريد المتابعة؟'
+    );
+    if (!confirmed) return;
+    setIsCentralBusy(true);
+    setMessage(null);
+    try {
+      const result = await centralAppBackupService.applyPendingRestore();
+      if (result.applied) {
+        setMessage({ text: 'تم تطبيق الاستعادة من المنصة بنجاح! سيتم تحديث الصفحة...' });
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setMessage({ text: 'لا توجد استعادة معلقة من المنصة حاليًا.' });
+      }
+      await refreshCentralState();
+    } catch (error) {
+      setMessage({ text: `فشلت الاستعادة من المنصة: ${error instanceof Error ? error.message : String(error)}`, isError: true });
+      await refreshCentralState();
+    } finally {
+      setIsCentralBusy(false);
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (!bytes) return '0 ك.ب';
+    if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' ج.ب';
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' م.ب';
     return (bytes / 1024).toFixed(1) + ' ك.ب';
   };
 
@@ -381,6 +459,88 @@ export const BackupPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {centralStatus?.configured && centralStatus.activated && (
+        <section className="mx-6 mb-6 rounded-2xl border border-indigo-200 bg-white p-6">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">نسخ قاعدة بيانات هذا الجهاز على المنصة المركزية</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                تُخزَّن النسخة مشفرة على الخادم دون أن تتمكن المنصة من قراءتها. عند طلب الاستعادة من
+                إدارة المنصة، ينزّل هذا الجهاز النسخة ويتحقق منها ويطبقها عبر مسار الاستعادة المعتمد.
+              </p>
+            </div>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => void handleCentralUpload()}
+                disabled={isCentralBusy}
+                className="mt-3 shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50 sm:mt-0"
+              >
+                {isCentralBusy ? 'جاري المعالجة...' : 'إنشاء نسخة ورفعها للمنصة'}
+              </button>
+            )}
+          </div>
+
+          {centralPending && (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-amber-900">
+                <span className="font-bold">استعادة مطلوبة من المنصة</span>
+                <span className="mr-2 text-amber-700">
+                  — {centralPending.name || centralPending.id} ({formatSize(centralPending.sizeBytes ?? 0)}) — الحالة: {centralPending.restoreStatus}
+                  {centralPending.restoreError ? ` — ${centralPending.restoreError}` : ''}
+                </span>
+              </div>
+              {canRestore && (
+                <button
+                  type="button"
+                  onClick={() => void handleCentralApplyRestore()}
+                  disabled={isCentralBusy}
+                  className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {isCentralBusy ? 'جاري التطبيق...' : 'تنزيل وتطبيق الاستعادة'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {centralBackups.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-right text-slate-500">
+                    <th className="px-2 py-2 font-bold">الاسم</th>
+                    <th className="px-2 py-2 font-bold">الجهاز</th>
+                    <th className="px-2 py-2 font-bold">الحجم</th>
+                    <th className="px-2 py-2 font-bold">تاريخ الرفع</th>
+                    <th className="px-2 py-2 font-bold">حالة الاستعادة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {centralBackups.map((backup) => (
+                    <tr key={backup.id} className="border-b border-slate-100">
+                      <td className="px-2 py-2 font-medium text-slate-800">{backup.name || backup.id}</td>
+                      <td className="px-2 py-2 text-slate-600">{backup.deviceName || backup.deviceId || '—'}</td>
+                      <td className="px-2 py-2 text-slate-600">{formatSize(backup.sizeBytes ?? 0)}</td>
+                      <td className="px-2 py-2 text-slate-600" dir="ltr">{backup.createdAt ? new Date(backup.createdAt).toLocaleString('ar') : '—'}</td>
+                      <td className="px-2 py-2">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          backup.restoreStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
+                          : backup.restoreStatus === 'FAILED' ? 'bg-rose-100 text-rose-700'
+                          : backup.restoreStatus === 'NONE' ? 'bg-slate-100 text-slate-600'
+                          : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {backup.restoreStatus || 'NONE'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {canManage && (
         <section className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-white p-6">

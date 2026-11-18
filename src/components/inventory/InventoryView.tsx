@@ -56,13 +56,15 @@ export const InventoryView: React.FC = () => {
   const canAdjust = PermissionService.can(currentUser, 'inventory.adjust');
   const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.overview.view');
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     try {
-      const whs = inventoryService.getAllWarehouses();
-      const stks = inventoryService.getWarehouseStock(selectedWarehouseId || undefined, search);
-      const inactiveStks = inventoryService.getInactiveWarehouseStock(selectedWarehouseId || undefined, search);
-      const txs = inventoryService.getTransactions(100);
-      const prods = productService.getAllProducts();
+      const [whs, stks, inactiveStks, txs, prods] = await Promise.all([
+        inventoryService.getAllWarehousesAsync(),
+        inventoryService.getWarehouseStockAsync(selectedWarehouseId || undefined, search),
+        inventoryService.getInactiveWarehouseStockAsync(selectedWarehouseId || undefined, search),
+        inventoryService.getTransactionsAsync(100),
+        productService.getAllProductsAsync(),
+      ]);
 
       setWarehouses(whs);
       setStockList(stks);

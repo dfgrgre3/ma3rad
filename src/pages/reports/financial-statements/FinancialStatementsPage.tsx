@@ -78,9 +78,9 @@ const FinancialStatementsContent: React.FC<FinancialStatementsContentProps> = ({
           accounts={accounts}
           accountId={accountId}
           ledger={ledger}
-          onAccountChange={(nextAccountId) => {
+          onAccountChange={async (nextAccountId) => {
             setAccountId(nextAccountId);
-            setLedger(nextAccountId ? service.getGeneralLedger(nextAccountId, from, to) : null);
+            setLedger(nextAccountId ? await service.getGeneralLedger(nextAccountId, from, to) : null);
           }}
         />
       );
@@ -125,41 +125,41 @@ export const FinancialStatementsPage: React.FC = () => {
   const [partyId, setPartyId] = useState('');
   const [partyStatement, setPartyStatement] = useState<PartyStatement | null>(null);
 
-  const loadLedger = useCallback(() => {
-    const list = accounts.length ? accounts : service.getAccountsForLedger();
+  const loadLedger = useCallback(async () => {
+    const list = accounts.length ? accounts : await service.getAccountsForLedger();
     if (!accounts.length) setAccounts(list);
     const selected = accountId || list[0]?.id || '';
     if (!selected) return;
     if (!accountId) setAccountId(selected);
-    setLedger(service.getGeneralLedger(selected, from, to));
+    setLedger(await service.getGeneralLedger(selected, from, to));
   }, [accountId, accounts, from, service, to]);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setScopeWarning(service.getBranchScopeWarning());
       switch (tab) {
         case 'income':
-          setIncome(accounting.getProfitAndLossReport(from, to));
+          setIncome(await accounting.getProfitAndLossReport(from, to));
           break;
         case 'balance':
-          setBalance(service.getBalanceSheet(asOf));
+          setBalance(await service.getBalanceSheet(asOf));
           break;
         case 'cash':
-          setCash(service.getCashFlow(from, to));
+          setCash(await service.getCashFlow(from, to));
           break;
         case 'aging':
-          setAging(agingType === 'customer' ? service.getCustomerAging(asOf) : service.getSupplierAging(asOf));
+          setAging(agingType === 'customer' ? await service.getCustomerAging(asOf) : await service.getSupplierAging(asOf));
           break;
         case 'reconciliation':
-          setReconciliation(service.getReconciliation());
+          setReconciliation(await service.getReconciliation());
           break;
         case 'subledger': {
-          const list = service.getSubledgerParties(partyType);
+          const list = await service.getSubledgerParties(partyType);
           setParties(list);
           const selected = list.some((party) => party.id === partyId) ? partyId : (list[0]?.id || '');
           if (selected !== partyId) setPartyId(selected);
-          setPartyStatement(selected ? service.getPartyStatement(partyType, selected, from, to) : null);
+          setPartyStatement(selected ? await service.getPartyStatement(partyType, selected, from, to) : null);
           break;
         }
         case 'ledger':
@@ -182,10 +182,10 @@ export const FinancialStatementsPage: React.FC = () => {
     setParties([]);
   };
 
-  const changeParty = (nextPartyId: string) => {
+  const changeParty = async (nextPartyId: string) => {
     setPartyId(nextPartyId);
     try {
-      setPartyStatement(nextPartyId ? service.getPartyStatement(partyType, nextPartyId, from, to) : null);
+      setPartyStatement(nextPartyId ? await service.getPartyStatement(partyType, nextPartyId, from, to) : null);
     } catch (e: any) {
       setPartyStatement(null);
       toast.error(e?.message || 'تعذر تحميل كشف الطرف.');

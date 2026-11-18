@@ -25,6 +25,8 @@ import {
   Terminal,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformOpsJob,
@@ -39,12 +41,42 @@ import type {
 } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
+import { EmptyState, formatDateTime, formatNumber, inputClass } from './components/PlatformUI';
 
-type OperationsTab = 'jobs' | 'scheduled' | 'sync' | 'approvals' | 'maintenance' | 'errors';
+type OperationsTab = 'jobs' | 'scheduled' | 'sync' | 'approvals' | 'maintenance' | 'errors' | 'usage';
+
+const CENTRAL_JOB_TYPE_MAP: Record<string, string> = {
+  SCHEMA_MIGRATE: 'MIGRATION',
+  BACKUP: 'BACKUP_CREATE',
+  RESTORE: 'BACKUP_RESTORE',
+  DEVICE_SYNC: 'REMOTE_SYNC',
+  DATA_EXPORT: 'CUSTOM',
+  BILLING_CHARGE: 'CUSTOM',
+  NOTIFICATION_BLAST: 'CUSTOM',
+};
+
+function mapCentralJob(row: any): PlatformOpsJob {
+  return {
+    id: row.id,
+    type: row.type,
+    tenantId: row.tenantId ?? undefined,
+    payload: row.payload ?? {},
+    status: row.status === 'COMPLETED' ? 'DONE' : row.status,
+    priority: row.payload?.priority ?? 5,
+    retries: row.attempts ?? 0,
+    maxRetries: 3,
+    errorMessage: row.error ?? undefined,
+    scheduledAt: row.runAt ?? undefined,
+    startedAt: row.startedAt ?? undefined,
+    completedAt: row.finishedAt ?? undefined,
+    createdBy: '',
+    createdAt: row.createdAt,
+  };
+}
 
 export const PlatformOperationsSettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<OperationsTab>('jobs');
+  const centralActive = getCentralDataSourceState().active;
   const canManageOperations = canPlatform('operations');
   const [loading, setLoading] = useState<boolean>(true);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
@@ -77,8 +109,17 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   const [syncLogs, setSyncLogs] = useState<PlatformSyncLogEntry[]>([]);
   const [syncStatusFilter, setSyncStatusFilter] = useState<string>('');
 
+  // Central usage state
+  const [usageRows, setUsageRows] = useState<any[]>([]);
+
   // Load Tenants
   const loadTenants = useCallback(() => {
+    if (centralActive) {
+      centralPlatformClient.listTenants('', '', '')
+        .then((list) => setTenants(list as PlatformTenant[]))
+        .catch(() => setTenants([]));
+      return;
+    }
     try {
       const list = platformAdminService.listTenants();
       setTenants(list);
@@ -86,11 +127,37 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       // Fallback
       setTenants([]);
     }
-  }, []);
+  }, [centralActive]);
 
   // Load Data based on active tab
   const loadData = useCallback(() => {
     setLoading(true);
+    if (centralActive) {
+      if (activeTab === 'usage') {
+        centralPlatformClient.listTenantUsage()
+          .then((rows) => setUsageRows(rows))
+          .catch((e) => console.error('Failed to load usage:', e))
+          .finally(() => setLoading(false));
+        return;
+      }
+      if (activeTab === 'jobs' || activeTab === 'scheduled' || activeTab === 'errors') {
+        const status = activeTab === 'errors' ? 'FAILED' : jobStatusFilter === 'DONE' ? 'COMPLETED' : (jobStatusFilter || undefined);
+        centralPlatformClient.listOpsJobs({
+          status,
+          type: undefined,
+          tenantId: jobTenantFilter || undefined,
+        })
+          .then((rows) => setJobs(rows.map(mapCentralJob)))
+          .catch((e) => console.error('Failed to load central jobs:', e))
+          .finally(() => setLoading(false));
+        return;
+      }
+      setMaintenanceWindows([]);
+      setApprovals([]);
+      setSyncLogs([]);
+      setLoading(false);
+      return;
+    }
     try {
       if (activeTab === 'jobs' || activeTab === 'scheduled' || activeTab === 'errors') {
         const res = platformAdminService.listOpsJobs({
@@ -118,7 +185,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, jobStatusFilter, jobTenantFilter, syncStatusFilter]);
+  }, [activeTab, jobStatusFilter, jobTenantFilter, syncStatusFilter, centralActive]);
 
   useEffect(() => {
     loadTenants();
@@ -132,6 +199,12 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   const handleRetryJob = (id: string) => {
     if (!canManageOperations) {
       alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
+    if (centralActive) {
+      centralPlatformClient.retryOpsJob(id)
+        .then(loadData)
+        .catch((e) => alert((e as Error).message));
       return;
     }
     try {
@@ -148,6 +221,12 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       return;
     }
     if (!confirm('هل أنت متأكد من إلغاء هذه العملية؟')) return;
+    if (centralActive) {
+      centralPlatformClient.cancelOpsJob(id)
+        .then(loadData)
+        .catch((e) => alert((e as Error).message));
+      return;
+    }
     try {
       platformAdminService.cancelOpsJob(id);
       loadData();
@@ -160,6 +239,16 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
     e.preventDefault();
     if (!canManageOperations) {
       alert('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
+    if (centralActive) {
+      centralPlatformClient.createOpsJob({
+        type: CENTRAL_JOB_TYPE_MAP[newJobType] ?? 'CUSTOM',
+        tenantId: newJobTenantId || null,
+        payload: { originalType: newJobType, priority: Number(newJobPriority) },
+      })
+        .then(() => { setNewJobModalOpen(false); loadData(); })
+        .catch((e) => alert((e as Error).message));
       return;
     }
     try {
@@ -385,7 +474,24 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           <AlertTriangle className="w-4 h-4" />
           سجل الأخطاء والمعالجات
         </button>
+        <button
+          onClick={() => setActiveTab('usage')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'usage'
+              ? 'border-emerald-500 text-emerald-400'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          مراقبة استهلاك المنشآت
+        </button>
       </div>
+
+      {centralActive && (activeTab === 'sync' || activeTab === 'approvals' || activeTab === 'maintenance') && (
+        <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-4 py-3 text-xs font-semibold text-amber-300">
+          هذا القسم غير متاح في الوضع المركزي بعد — بياناته تُدار على المصدر المحلي فقط.
+        </div>
+      )}
 
       {/* Main Tab Views */}
       {/* ─── TAB 1 & 2 & 6: Jobs, Scheduled, Errors ───────────────────────────────── */}
@@ -908,6 +1014,63 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── TAB: Usage monitoring (central) ─────────────────────────────────── */}
+      {activeTab === 'usage' && (
+        <div className="space-y-4">
+          {!centralActive ? (
+            <EmptyState
+              icon={<Layers className="w-6 h-6" />}
+              title="مراقبة الاستهلاك متاحة في الوضع المركزي"
+              description="فعّل مصدر البيانات المركزي من إعدادات المنصة لعرض استهلاك كل منشأة."
+            />
+          ) : usageRows.length === 0 ? (
+            <EmptyState
+              icon={<Layers className="w-6 h-6" />}
+              title="لا توجد بيانات استهلاك"
+              description="ستظهر هنا أجهزة المستخدمين والفواتير والمدفوعات والتذاكر المفتوحة لكل منشأة."
+            />
+          ) : (
+            <div className="overflow-x-auto bg-zinc-900/40 rounded-xl border border-zinc-800">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
+                  <tr>
+                    <th className="py-3 px-4">المنشأة</th>
+                    <th className="py-3 px-4">الخطة</th>
+                    <th className="py-3 px-4">الأجهزة</th>
+                    <th className="py-3 px-4">المستخدمون</th>
+                    <th className="py-3 px-4">الفواتير</th>
+                    <th className="py-3 px-4">المدفوعات</th>
+                    <th className="py-3 px-4">تذاكر مفتوحة</th>
+                    <th className="py-3 px-4">آخر نشاط</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {usageRows.map((u) => (
+                    <tr key={u.id} className="hover:bg-zinc-800/20 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-zinc-200">{u.name}</div>
+                        <div className="text-[10px] text-zinc-500 font-mono">{u.code}</div>
+                      </td>
+                      <td className="py-3 px-4 text-zinc-300">{u.plan_name ?? '—'}</td>
+                      <td className="py-3 px-4 text-zinc-300">{u.devices_active}/{u.devices_total}</td>
+                      <td className="py-3 px-4 text-zinc-300">{u.users_active}/{u.users_total}</td>
+                      <td className="py-3 px-4 text-zinc-300">{u.invoices_count}</td>
+                      <td className="py-3 px-4 text-zinc-300">{formatNumber(u.payments_total ?? 0)}</td>
+                      <td className="py-3 px-4">
+                        <span className={u.open_tickets > 0 ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
+                          {u.open_tickets}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-[11px] text-zinc-500">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

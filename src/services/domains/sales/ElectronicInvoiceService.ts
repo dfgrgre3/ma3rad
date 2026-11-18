@@ -5,6 +5,15 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const INVOICE_MONEY_FIELDS = [
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'extra_fees',
+  'total_amount', 'paid_amount', 'remaining_amount', 'total_cost', 'gross_profit', 'returned_amount',
+] as const;
+const INVOICE_ITEM_MONEY_FIELDS = [
+  'unit_price', 'original_unit_price', 'unit_cost', 'discount_amount', 'total_price', 'total_cost', 'profit',
+] as const;
 
 type InvoiceRow = {
   id: string;
@@ -204,7 +213,7 @@ export class ElectronicInvoiceService {
       LEFT JOIN users u ON ei.created_by = u.id
       WHERE ei.id = ? AND ${branch.clause} AND ${company.clause}
     `, [id, ...branch.params, ...company.params]);
-    return rows[0] || null;
+    return rows[0] ? unscaleMoneyRow(rows[0], ['total_tax','total_amount']) : null;
   }
 
   public getElectronicInvoiceBySalesInvoice(salesInvoiceId: string): ElectronicInvoice | null {
@@ -216,7 +225,7 @@ export class ElectronicInvoiceService {
       JOIN sales_invoices si ON si.id = ei.sales_invoice_id
       LEFT JOIN warehouses w ON w.id = si.warehouse_id
       WHERE ei.sales_invoice_id = ? AND ${branch.clause} AND ${company.clause}
-    `, [salesInvoiceId, ...branch.params, ...company.params])[0] || null;
+    `, [salesInvoiceId, ...branch.params, ...company.params]).map((row) => unscaleMoneyRow(row, ['total_tax','total_amount']))[0] || null;
   }
 
   public createElectronicInvoice(dto: CreateElectronicInvoiceDTO): ElectronicInvoice {
@@ -226,10 +235,11 @@ export class ElectronicInvoiceService {
     const salesInvoice = this.db.query<InvoiceRow>(`${this.invoiceSelect()}
       WHERE si.id = ? AND ${branch.clause} AND ${company.clause}`,
     [dto.salesInvoiceId, ...branch.params, ...company.params])[0];
-    if (!salesInvoice) throw new Error('الفاتورة التجارية غير موجودة أو خارج نطاق الفرع أو الشركة.');
-    if (salesInvoice.invoice_status !== 'COMPLETED') throw new Error('لا يمكن إنشاء فاتورة إلكترونية إلا لفاتورة تجارية مكتملة وغير ملغاة.');
-    if (salesInvoice.customer_id !== dto.customerId) throw new Error('العميل المحدد لا يطابق العميل المسجل على الفاتورة التجارية.');
-    if (!salesInvoice.company_tax_number || !salesInvoice.customer_tax_number) {
+    const unscaledInvoice = salesInvoice ? unscaleMoneyRow(salesInvoice, INVOICE_MONEY_FIELDS) : salesInvoice;
+    if (!unscaledInvoice) throw new Error('الفاتورة التجارية غير موجودة أو خارج نطاق الفرع أو الشركة.');
+    if (unscaledInvoice.invoice_status !== 'COMPLETED') throw new Error('لا يمكن إنشاء فاتورة إلكترونية إلا لفاتورة تجارية مكتملة وغير ملغاة.');
+    if (unscaledInvoice.customer_id !== dto.customerId) throw new Error('العميل المحدد لا يطابق العميل المسجل على الفاتورة التجارية.');
+    if (!unscaledInvoice.company_tax_number || !unscaledInvoice.customer_tax_number) {
       throw new Error('بيانات التسجيل الضريبي للشركة والعميل مطلوبة قبل إنشاء مسودة ETA.');
     }
     const duplicate = this.db.query<{ id: string }>(`
@@ -247,9 +257,9 @@ export class ElectronicInvoiceService {
       sqliteDb.run(`INSERT INTO electronic_invoices (
         id, invoice_number, sales_invoice_id, customer_id, status, total_tax, total_amount,
         created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?)`, [
+      ) VALUES (?, ?, ?, ?, 'DRAFT', ROUND(?*100), ROUND(?*100), ?, ?, ?)`, [
         id, invoiceNumber, dto.salesInvoiceId, dto.customerId,
-        Number(salesInvoice.tax_amount || 0), Number(salesInvoice.total_amount || 0), actor.id, now, now,
+        Number(unscaledInvoice.tax_amount || 0), Number(unscaledInvoice.total_amount || 0), actor.id, now, now,
       ]);
     });
     return this.queryElectronicInvoiceById(id, actor)!;
@@ -265,10 +275,12 @@ export class ElectronicInvoiceService {
     const source = this.db.query<any>(`${this.invoiceSelect()} WHERE si.id = ?`, [invoice.salesInvoiceId])[0];
     if (!source || source.invoice_status !== 'COMPLETED' || source.customer_id !== invoice.customerId) throw new Error('بيانات الفاتورة التجارية غير صالحة للإرسال.');
     if (!this.documentBuilder) throw new Error('محوّل مستند ETA غير مهيأ. يلزم استكمال بيانات الشركة والعميل وتصنيف الضرائب والوحدات وفق مخطط ETA قبل الإرسال.');
-    const items = this.db.query<any>(`SELECT * FROM sales_invoice_items WHERE invoice_id = ? ORDER BY id`, [invoice.salesInvoiceId]);
+    const items = this.db.query<any>(`SELECT * FROM sales_invoice_items WHERE invoice_id = ? ORDER BY id`, [invoice.salesInvoiceId])
+      .map((row) => unscaleMoneyRow(row, INVOICE_ITEM_MONEY_FIELDS));
     if (!items.length) throw new Error('لا يمكن إرسال فاتورة دون بنود.');
-    const customer = this.db.query<any>('SELECT * FROM customers WHERE id = ?', [invoice.customerId])[0];
-    const payload = await this.documentBuilder.build({ invoice: source, customer, items });
+    const customer = this.db.query<any>('SELECT * FROM customers WHERE id = ?', [invoice.customerId])
+      .map((row) => unscaleMoneyRow(row, ['credit_limit','current_balance','total_purchases']))[0];
+    const payload = await this.documentBuilder.build({ invoice: unscaleMoneyRow(source, INVOICE_MONEY_FIELDS), customer, items });
     const serializedPayload = JSON.stringify(payload);
     const previousAttempt = this.db.query<{ request_fingerprint: string | null; request_payload: string | null }>(
       'SELECT request_fingerprint, request_payload FROM electronic_invoices WHERE id = ?', [id],

@@ -44,21 +44,21 @@ export function PosReportsPage() {
       // Payment mix
       const pm = db.query<any>(
         `SELECT method, COUNT(*) AS count, COALESCE(SUM(amount),0) AS amount FROM (
-           SELECT sip.method, sip.amount
+           SELECT sip.method, sip.amount / 100.0 AS amount
            FROM sales_invoice_payments sip
            JOIN sales_invoices si ON si.id = sip.invoice_id
            WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND sip.amount > 0 AND ${scope.clause}
            UNION ALL
-           SELECT si.payment_type AS method, si.paid_amount AS amount
+           SELECT si.payment_type AS method, si.paid_amount / 100.0 AS amount
            FROM sales_invoices si
            WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND si.paid_amount > 0
              AND NOT EXISTS (SELECT 1 FROM sales_invoice_payments sip WHERE sip.invoice_id = si.id)
              AND ${scope.clause}
            UNION ALL
-           SELECT cp.payment_type AS method, cp.amount
+           SELECT cp.payment_type AS method, cp.amount / 100.0 AS amount
            FROM customer_payments cp
            JOIN sales_invoices si ON si.id = cp.invoice_id
-           WHERE cp.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND cp.amount > 0 AND ${scope.clause}
+           WHERE cp.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND cp.amount > 1 AND ${scope.clause}
          ) payments
          GROUP BY method ORDER BY amount DESC`,
         [from, to, ...sp, from, to, ...sp, from, to, ...sp]
@@ -67,7 +67,7 @@ export function PosReportsPage() {
 
       // Hourly distribution
       const hr = db.query<any>(
-        `SELECT substr(si.created_at,12,2) AS hour, COUNT(*) AS count, COALESCE(SUM(total_amount),0) AS amount
+        `SELECT substr(si.created_at,12,2) AS hour, COUNT(*) AS count, COALESCE(SUM(total_amount),0) / 100.0 AS amount
          FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
          GROUP BY hour ORDER BY hour`,
         [from, to, ...sp]
@@ -76,7 +76,7 @@ export function PosReportsPage() {
 
       // Top items
       const ti = db.query<any>(
-        `SELECT sii.product_name AS name, COALESCE(SUM(sii.quantity_m2),0) AS qty, COALESCE(SUM(sii.total_price),0) AS amount
+        `SELECT sii.product_name AS name, COALESCE(SUM(sii.quantity_m2),0) AS qty, COALESCE(SUM(sii.total_price),0) / 100.0 AS amount
          FROM sales_invoice_items sii JOIN sales_invoices si ON si.id = sii.invoice_id
          WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
          GROUP BY sii.product_name ORDER BY amount DESC LIMIT 15`,
@@ -86,12 +86,12 @@ export function PosReportsPage() {
 
       // Cashier performance
       const ca = db.query<any>(
-        `SELECT u.full_name AS name, COUNT(*) AS invoices, COALESCE(SUM(si.total_amount),0) AS amount,
+        `SELECT u.full_name AS name, COUNT(*) AS invoices, COALESCE(SUM(si.total_amount),0) / 100.0 AS amount,
                 COALESCE(SUM(CASE
                   WHEN pay.invoiceId IS NOT NULL THEN pay.cash
                   WHEN si.payment_type = 'CASH' THEN si.paid_amount
                   ELSE 0
-                END),0) AS cash
+                END),0) / 100.0 AS cash
          FROM sales_invoices si LEFT JOIN users u ON u.id = si.created_by
          LEFT JOIN (
            SELECT invoice_id AS invoiceId,
@@ -106,18 +106,18 @@ export function PosReportsPage() {
 
       // Totals
       const t = db.query<any>(
-        `SELECT COUNT(*) AS invoices, COALESCE(SUM(total_amount),0) AS amount,
-                COALESCE(SUM(discount_amount),0) AS discounts
+        `SELECT COUNT(*) AS invoices, COALESCE(SUM(total_amount),0) / 100.0 AS amount,
+                COALESCE(SUM(discount_amount),0) / 100.0 AS discounts
          FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}`,
         [from, to, ...sp]
       )[0];
       const v = db.query<any>(
-        `SELECT COUNT(*) AS c, COALESCE(SUM(total_amount),0) AS amount FROM sales_invoices si
+        `SELECT COUNT(*) AS c, COALESCE(SUM(total_amount),0) / 100.0 AS amount FROM sales_invoices si
          WHERE si.date BETWEEN ? AND ? AND si.invoice_status = 'VOID' AND ${scope.clause}`,
         [from, to, ...sp]
       )[0];
       const refunds = db.query<any>(
-        `SELECT COALESCE(SUM(sr.refunded_amount),0) AS amount FROM sales_returns sr
+        `SELECT COALESCE(SUM(sr.refunded_amount),0) / 100.0 AS amount FROM sales_returns sr
          JOIN sales_invoices si ON si.id = sr.original_invoice_id
          WHERE sr.date BETWEEN ? AND ? AND ${scope.clause}`,
         [from, to, ...sp]

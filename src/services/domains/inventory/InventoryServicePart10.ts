@@ -48,6 +48,10 @@ public receiveTransfer(transferId: string, receipts: Array<{
 
       const fromWarehouseId = transfer.fromWarehouseId ?? transfer.from_warehouse_id;
       const toWarehouseId = transfer.toWarehouseId ?? transfer.to_warehouse_id;
+      // بُعد نطاق المخازن يُقيَّم هنا لأن معرفات المخازن تُعرف بعد جلب التحويل.
+      PermissionService.require(actor, 'inventory.transfer.receive', undefined, {
+        warehouseIds: [fromWarehouseId, toWarehouseId].filter(Boolean) as string[],
+      });
       const transitWarehouseId: string | null = transfer.transitWarehouseId ?? transfer.transit_warehouse_id ?? null;
       const transferNumber = transfer.transferNumber ?? transfer.transfer_number ?? transfer.id;
       const totalShippedM2 = Number(txDb.query<{ total: number }>(
@@ -183,7 +187,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
   ): number {
     const productId = item.productId ?? item.product_id;
     const productName = item.productName ?? item.product_name;
-    const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0);
+    const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0) / 100;
     const itemNotes = item.itemNotes ?? item.item_notes ?? null;
     const received = Math.max(0, Number(receipt.receivedM2 || 0));
     const lost = Math.max(0, Number(receipt.lostM2 || 0));
@@ -254,7 +258,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
           id, transaction_number, type, product_id, warehouse_id,
           quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
           notes, performed_by, created_at
-        ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, 0, ?, ?, 'TRANSFER_TRANSIT_OUT', ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, 0, ROUND(?*100), ROUND(?*100), 'TRANSFER_TRANSIT_OUT', ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         transitOutTransactionId, txDb.nextNumber('TX-TRF-TRANSIT-OUT'), productId, transitWarehouseId,
         -received, receiptUnitCost, Number((received * receiptUnitCost).toFixed(2)),
@@ -313,7 +317,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
         id, transaction_number, type, product_id, warehouse_id,
         quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
         notes, performed_by, created_at
-      ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       txId, txNum, productId, toWarehouseId,
       received, boxes, receiptUnitCost, Number((received * receiptUnitCost).toFixed(2)),
@@ -367,7 +371,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
         id, transaction_number, type, product_id, warehouse_id, quantity_m2,
         boxes_count, unit_cost, total_cost, reference_type, reference_id,
         notes, performed_by, created_at
-      ) VALUES (?, ?, 'DAMAGE', ?, ?, ?, 0, ?, ?, 'TRANSFER_LOSS', ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, 'DAMAGE', ?, ?, ?, 0, ROUND(?*100), ROUND(?*100), 'TRANSFER_LOSS', ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       lossTransactionId, txDb.nextNumber('TX-TRF-LOSS'), productId,
       lossWarehouseId, -lossQuantity,

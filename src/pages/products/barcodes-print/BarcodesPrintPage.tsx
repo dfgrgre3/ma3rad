@@ -37,17 +37,22 @@ export const BarcodesPrintPage: React.FC = () => {
   const productService = useMemo(() => new ProductService(), []);
 
   useEffect(() => {
-    try {
-      const all = productService.getAllProducts();
-      const grades = new OperationalFieldService().getProductGradeOptions(true);
-      setConfiguredGradeLabels(grades);
-      setProducts(all);
-      if (all.length > 0) {
-        setSelectedProductId(all[0].id);
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await productService.getAllProductsAsync();
+        const grades = new OperationalFieldService().getProductGradeOptions(true);
+        if (cancelled) return;
+        setConfiguredGradeLabels(grades);
+        setProducts(all);
+        if (all.length > 0) {
+          setSelectedProductId(all[0].id);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    })();
+    return () => { cancelled = true; };
   }, [productService]);
 
   const selectedProduct = products.find(p => p.id === selectedProductId) || products[0];

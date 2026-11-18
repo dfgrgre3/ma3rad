@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS platform_tenant_users (
   invite_expires_at TEXT,
   provisioned_at TEXT,
   last_error TEXT,
+  password_hash TEXT,
+  activation_code TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+  provisioned INTEGER NOT NULL DEFAULT 0 CHECK(provisioned IN (0,1)),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE

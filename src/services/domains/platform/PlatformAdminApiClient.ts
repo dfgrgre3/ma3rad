@@ -1,5 +1,14 @@
 // Adapter connecting Super Admin operations to the central server via the Electron bridge (electron/centralApi.js).
-import type { PlatformTenant, PlatformPlan, PlatformTenantInput, CentralLicenseIssueRequest, CentralLicenseIssueResponse } from './platformTypes';
+import type {
+  PlatformTenant,
+  PlatformPlan,
+  PlatformTenantInput,
+  CentralLicenseIssueRequest,
+  CentralLicenseIssueResponse,
+  PlatformLicense,
+  PlatformDevice,
+  PlatformSubscription,
+} from './platformTypes';
 
 export type CentralRequest = {
   path: string;
@@ -67,6 +76,7 @@ export interface PlatformAuditEvent {
 export interface PlatformAuditQuery {
   action?: string;
   actorId?: string;
+  actorType?: string;
   tenantId?: string;
   resourceType?: string;
   from?: string;
@@ -115,6 +125,64 @@ function safeJsonArray(value: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/** Map a central `platform_licenses` row (+ joined tenant/plan names) to the UI type. */
+export function mapCentralLicense(row: any): PlatformLicense {
+  return {
+    id: String(row.id),
+    tenantId: String(row.tenant_id ?? row.tenantId ?? ''),
+    tenantName: row.tenantName ?? row.tenant_name ?? undefined,
+    subscriptionId: row.subscription_id ?? row.subscriptionId ?? null,
+    planId: row.plan_id ?? row.planId ?? null,
+    planName: row.planName ?? row.plan_name ?? null,
+    licenseKey: String(row.license_key ?? row.licenseKey ?? ''),
+    status: String(row.status ?? 'ACTIVE') as PlatformLicense['status'],
+    issuedAt: String(row.issued_at ?? row.issuedAt ?? ''),
+    startsAt: row.starts_at ?? row.startsAt ?? null,
+    activatedAt: row.activated_at ?? row.activatedAt ?? null,
+    expiresAt: row.expires_at ?? row.expiresAt ?? null,
+    seats: toNumber(row.seats, 1),
+    deviceLimit: toNumber(row.device_limit ?? row.deviceLimit, 1),
+    branchesLimit: toNumber(row.branches_limit ?? row.branchesLimit, 1),
+    hardwareId: row.hardware_id ?? row.hardwareId ?? null,
+    activationCode: row.activation_code ?? row.activationCode ?? null,
+    certificate: row.certificate ?? null,
+    transferCount: toNumber(row.transfer_count ?? row.transferCount, 0),
+    modules: safeJsonArray(row.modules),
+    features: safeJsonArray(row.features),
+    offlineGracePeriodDays: row.offline_grace_period_days ?? row.offlineGracePeriodDays ?? null,
+    couplingMode: (row.coupling_mode ?? row.couplingMode ?? 'FULL') as PlatformLicense['couplingMode'],
+    notes: row.notes ?? null,
+    createdAt: String(row.created_at ?? row.createdAt ?? ''),
+    updatedAt: String(row.updated_at ?? row.updatedAt ?? ''),
+  };
+}
+
+/** Map a central `platform_devices` row to the UI type. */
+export function mapCentralDevice(row: any): PlatformDevice {
+  return {
+    id: String(row.id),
+    tenantId: String(row.tenant_id ?? row.tenantId ?? ''),
+    licenseId: row.license_id ?? row.licenseId ?? null,
+    hardwareId: String(row.hardware_id ?? row.hardwareId ?? ''),
+    name: row.name ?? null,
+    os: row.os ?? null,
+    appVersion: row.app_version ?? row.appVersion ?? null,
+    ipAddress: row.ip_address ?? row.ipAddress ?? null,
+    status: String(row.status ?? 'ACTIVE') as PlatformDevice['status'],
+    firstActivatedAt: String(row.first_activated_at ?? row.firstActivatedAt ?? ''),
+    lastSeenAt: row.last_seen_at ?? row.lastSeenAt ?? null,
+    cloneSuspected: Boolean(row.clone_suspected ?? row.cloneSuspected),
+    notes: row.notes ?? null,
+    createdAt: String(row.created_at ?? row.createdAt ?? ''),
+    updatedAt: String(row.updated_at ?? row.updatedAt ?? ''),
+  };
 }
 
 export class PlatformAdminApiClient {
@@ -569,6 +637,565 @@ export class PlatformAdminApiClient {
       throw new CentralApiError({ status: 0, envelope });
     }
     return (envelope.data as any[]) || [];
+  }
+
+  // ── Roles & permissions ────────────────────────────────────────────────────
+
+  /** Replace a role's granted permission codes (SUPER_ADMIN is immutable server-side). */
+  async updateRolePermissions(roleCode: string, permissions: string[]): Promise<{ roleCode: string; permissions: string[] }> {
+    const envelope = await this.requestEnvelope<{ roleCode: string; permissions: string[] }>({
+      path: `/api/v1/admin/roles/${encodeURIComponent(roleCode)}/permissions`,
+      method: 'PUT',
+      body: { permissions },
+    });
+    if (envelope.success === false) {
+      throw new CentralApiError({ status: 0, envelope });
+    }
+    return (envelope.data as { roleCode: string; permissions: string[] }) || { roleCode, permissions };
+  }
+
+  // ── Licenses ───────────────────────────────────────────────────────────────
+
+  async listLicenses(search = '', status = ''): Promise<PlatformLicense[]> {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (status) params.status = status;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/licenses${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return (Array.isArray(rows) ? rows : []).map(mapCentralLicense);
+  }
+
+  async reactivateLicense(licenseId: string, reason?: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/licenses/${encodeURIComponent(licenseId)}/reactivate`,
+      method: 'POST',
+      body: { reason },
+    });
+  }
+
+  /** Bind/move a license to a hardware id (central transfer endpoint). */
+  async transferLicense(licenseId: string, newHardwareId: string, reason?: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/licenses/${encodeURIComponent(licenseId)}/transfer`,
+      method: 'POST',
+      body: { newHardwareId, reason },
+    });
+  }
+
+  // ── Devices ────────────────────────────────────────────────────────────────
+
+  async listDevices(query: { tenantId?: string; status?: string } = {}): Promise<PlatformDevice[]> {
+    const params: Record<string, string> = {};
+    if (query.tenantId) params.tenantId = query.tenantId;
+    if (query.status) params.status = query.status;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/devices${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return (Array.isArray(rows) ? rows : []).map(mapCentralDevice);
+  }
+
+  private async deviceAction(id: string, action: 'suspend' | 'release' | 'revoke', reason?: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/devices/${encodeURIComponent(id)}/${action}`,
+      method: 'POST',
+      body: { reason },
+    });
+  }
+
+  suspendDevice(deviceId: string, reason?: string): Promise<any> {
+    return this.deviceAction(deviceId, 'suspend', reason);
+  }
+
+  releaseDevice(deviceId: string, reason?: string): Promise<any> {
+    return this.deviceAction(deviceId, 'release', reason);
+  }
+
+  revokeDevice(deviceId: string, reason?: string): Promise<any> {
+    return this.deviceAction(deviceId, 'revoke', reason);
+  }
+
+  async updateTenant(id: string, payload: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}`,
+      method: 'PUT',
+      body: payload,
+    });
+  }
+
+  async setTenantStatus(id: string, status: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/status`,
+      method: 'POST',
+      body: { status },
+    });
+  }
+
+  async archiveTenant(id: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/archive`,
+      method: 'POST',
+    });
+  }
+
+  async getTenantProfile(id: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/profile`,
+      method: 'GET',
+    });
+  }
+
+  async createTenantAccount(
+    id: string,
+    input: { username?: string; email?: string; fullName?: string; password?: string } = {}
+  ): Promise<{ account: any; temporaryPassword: string; activationCode: string }> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  async resetTenantAccountPassword(id: string): Promise<{ temporaryPassword: string }> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account/reset-password`,
+      method: 'POST',
+    });
+  }
+
+  async setTenantAccountActive(id: string, isActive: boolean): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account/status`,
+      method: 'POST',
+      body: { isActive },
+    });
+  }
+
+  // ── Tenant directory users ────────────────────────────────────────────────
+
+  async listTenantUsers(tenantId: string): Promise<any[]> {
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createTenantUser(tenantId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  async updateTenantUser(tenantId: string, userId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`,
+      method: 'PUT',
+      body: input,
+    });
+  }
+
+  async deleteTenantUser(tenantId: string, userId: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`,
+      method: 'DELETE',
+    });
+  }
+
+  async setTenantUserActive(tenantId: string, userId: string, isActive: boolean): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/status`,
+      method: 'POST',
+      body: { isActive },
+    });
+  }
+
+  async resendTenantUserInvite(tenantId: string, userId: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/resend-invite`,
+      method: 'POST',
+    });
+  }
+
+  // ── Tenant overrides ─────────────────────────────────────────────────────
+
+  async listTenantOverrides(tenantId: string): Promise<any[]> {
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async addTenantOverride(tenantId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  async removeTenantOverride(tenantId: string, overrideId: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides/${encodeURIComponent(overrideId)}`,
+      method: 'DELETE',
+    });
+  }
+
+  // ── Payments ──────────────────────────────────────────────────────────────
+
+  async recordTenantPayment(tenantId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/payments`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  // ── Remote control ────────────────────────────────────────────────────────
+
+  async getTenantRemoteControl(tenantId: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote`, method: 'GET' });
+  }
+
+  async pushTenantConfig(tenantId: string, input: { key: string; value: any; scope?: string; targetDeviceIds?: string[] }): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote/config`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  async forceTenantSync(tenantId: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote/sync`,
+      method: 'POST',
+    });
+  }
+
+  // ── Tenant branches ────────────────────────────────────────────────────────
+
+  async listTenantBranches(tenantId: string): Promise<any[]> {
+    const rows = await this.request<any[]>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches`,
+      method: 'GET',
+    });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createTenantBranch(tenantId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches`,
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  async updateTenantBranch(tenantId: string, branchId: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches/${encodeURIComponent(branchId)}`,
+      method: 'PUT',
+      body: input,
+    });
+  }
+
+  async closeTenantBranch(tenantId: string, branchId: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches/${encodeURIComponent(branchId)}`,
+      method: 'DELETE',
+    });
+  }
+
+  // ── Subscriptions ──────────────────────────────────────────────────────────
+
+  async listSubscriptions(filters: { status?: string; planId?: string; search?: string } = {}): Promise<PlatformSubscription[]> {
+    const params: Record<string, string> = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.planId) params.planId = filters.planId;
+    if (filters.search) params.search = filters.search;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/subscriptions${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return (Array.isArray(rows) ? rows : []).map((row: any) => ({
+      id: String(row.id),
+      tenantId: String(row.tenantId ?? row.tenant_id),
+      tenantName: row.tenantName ?? row.tenant_name ?? null,
+      planId: String(row.planId ?? row.plan_id),
+      planName: row.planName ?? row.plan_name ?? null,
+      status: String(row.status) as PlatformSubscription['status'],
+      startDate: String(row.startDate ?? row.start_date),
+      endDate: row.endDate ?? row.end_date ?? null,
+      seats: toNumber(row.seats, 1),
+      price: toNumber(row.price, 0) / 100,
+      discount: toNumber(row.discount, 0) / 100,
+      billingCycle: String(row.billingCycle ?? row.billing_cycle) as PlatformSubscription['billingCycle'],
+      autoRenew: Boolean(row.autoRenew ?? row.auto_renew),
+      branchesLimit: toNumber(row.branchesLimit ?? row.branches_limit, 1),
+      createdAt: String(row.createdAt ?? row.created_at ?? ''),
+      updatedAt: String(row.updatedAt ?? row.updated_at ?? ''),
+    }));
+  }
+
+  async renewSubscription(tenantId: string, months: number): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/renew`,
+      method: 'POST',
+      body: { months },
+    });
+  }
+
+  async cancelSubscription(tenantId: string, reason?: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/cancel`,
+      method: 'POST',
+      body: { reason },
+    });
+  }
+
+  async changeSubscriptionPlan(
+    tenantId: string,
+    planId: string,
+    options: { months?: number; seats?: number; reason?: string } = {}
+  ): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/change-plan`,
+      method: 'POST',
+      body: { planId, months: options.months, seats: options.seats, reason: options.reason },
+    });
+  }
+
+  // ── Backups ────────────────────────────────────────────────────────────────
+
+  async listBackups(filters: { tenantId?: string; status?: string; type?: string; q?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.status) params.status = filters.status;
+    if (filters.type) params.type = filters.type;
+    if (filters.q) params.q = filters.q;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/backups${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createBackup(input: { tenantId?: string | null; name?: string; type?: string; notes?: string; triggerSource?: string }): Promise<any> {
+    return this.request<any>({ path: '/api/v1/admin/backups', method: 'POST', body: input });
+  }
+
+  async getBackup(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/backups/${encodeURIComponent(id)}`, method: 'GET' });
+  }
+
+  /** Downloads the raw backup artifact (a JSON document, not an API envelope). */
+  async downloadBackupArtifact(id: string): Promise<any> {
+    const bridge = (window as any)?.ceramisys?.central;
+    if (!bridge?.request) {
+      throw new Error('بوابة الاتصال بالسيرفر المركزي غير متاحة في هذا الإصدار.');
+    }
+    const headers: Record<string, string> = {};
+    const token = this.getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await bridge.request({
+      path: `/api/v1/admin/backups/${encodeURIComponent(id)}/download`,
+      method: 'GET',
+      headers,
+    });
+    if (!res?.ok) {
+      const message = res?.body?.error || res?.body?.message || `فشل تنزيل النسخة (${res?.status ?? '؟'})`;
+      throw new Error(message);
+    }
+    return res.body;
+  }
+
+  async restoreBackup(id: string, notes = ''): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/backups/${encodeURIComponent(id)}/restore`,
+      method: 'POST',
+      body: { notes },
+    });
+  }
+
+  // ── Application (ERP) backups — opaque encrypted device snapshots ──────────
+
+  async listAppBackups(filters: { tenantId?: string; status?: string; restoreStatus?: string; q?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.status) params.status = filters.status;
+    if (filters.restoreStatus) params.restoreStatus = filters.restoreStatus;
+    if (filters.q) params.q = filters.q;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/app-backups${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async getAppBackup(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/app-backups/${encodeURIComponent(id)}`, method: 'GET' });
+  }
+
+  async requestAppBackupRestore(id: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/app-backups/${encodeURIComponent(id)}/restore`,
+      method: 'POST',
+      body: {},
+    });
+  }
+
+  async cancelAppBackupRestore(id: string): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/app-backups/${encodeURIComponent(id)}/restore/cancel`,
+      method: 'POST',
+      body: {},
+    });
+  }
+
+  async listBackupRestores(filters: { tenantId?: string; status?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.status) params.status = filters.status;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/backups/restores${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  // ── Operations jobs & usage ────────────────────────────────────────────────
+
+  async listOpsJobs(filters: { status?: string; type?: string; tenantId?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.type) params.type = filters.type;
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/operations/jobs${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createOpsJob(input: { tenantId?: string | null; type: string; payload?: any; runAt?: string | null }): Promise<any> {
+    return this.request<any>({ path: '/api/v1/admin/operations/jobs', method: 'POST', body: input });
+  }
+
+  async cancelOpsJob(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/operations/jobs/${encodeURIComponent(id)}/cancel`, method: 'POST' });
+  }
+
+  async retryOpsJob(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/operations/jobs/${encodeURIComponent(id)}/retry`, method: 'POST' });
+  }
+
+  async listTenantUsage(filters: { status?: string; planId?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.planId) params.planId = filters.planId;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/operations/usage${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async getTenantUsageDetail(tenantId: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/operations/usage/${encodeURIComponent(tenantId)}`, method: 'GET' });
+  }
+
+  // ── Support tickets ────────────────────────────────────────────────────────
+
+  async listSupportTickets(filters: { tenantId?: string; status?: string; priority?: string; category?: string; q?: string; assigneeId?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.status) params.status = filters.status;
+    if (filters.priority) params.priority = filters.priority;
+    if (filters.category) params.category = filters.category;
+    if (filters.q) params.q = filters.q;
+    if (filters.assigneeId) params.assigneeId = filters.assigneeId;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/support${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createSupportTicket(input: Record<string, any>): Promise<any> {
+    return this.request<any>({ path: '/api/v1/admin/support', method: 'POST', body: input });
+  }
+
+  async getSupportTicket(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/support/${encodeURIComponent(id)}`, method: 'GET' });
+  }
+
+  async updateSupportTicket(id: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/support/${encodeURIComponent(id)}`, method: 'PUT', body: input });
+  }
+
+  async addSupportTicketMessage(id: string, body: string, internal = false): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/support/${encodeURIComponent(id)}/messages`,
+      method: 'POST',
+      body: { body, internal },
+    });
+  }
+
+  async deleteSupportTicket(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/support/${encodeURIComponent(id)}`, method: 'DELETE' });
+  }
+
+  // ── Error monitoring ───────────────────────────────────────────────────────
+
+  async listErrorReports(filters: { status?: string; severity?: string; tenantId?: string; q?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.severity) params.severity = filters.severity;
+    if (filters.tenantId) params.tenantId = filters.tenantId;
+    if (filters.q) params.q = filters.q;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/monitoring/errors${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async getErrorReportsSummary(): Promise<any> {
+    return this.request<any>({ path: '/api/v1/admin/monitoring/errors/summary', method: 'GET' });
+  }
+
+  async setErrorReportStatus(id: string, action: 'acknowledge' | 'resolve' | 'ignore' | 'reopen'): Promise<any> {
+    return this.request<any>({
+      path: `/api/v1/admin/monitoring/errors/${encodeURIComponent(id)}/${action}`,
+      method: 'POST',
+    });
+  }
+
+  // ── Releases & phased rollout ──────────────────────────────────────────────
+
+  async listReleases(filters: { status?: string; channel?: string; q?: string } = {}): Promise<any[]> {
+    const params: Record<string, string> = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.channel) params.channel = filters.channel;
+    if (filters.q) params.q = filters.q;
+    const qs = new URLSearchParams(params).toString();
+    const rows = await this.request<any[]>({ path: `/api/v1/admin/releases${qs ? `?${qs}` : ''}`, method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async createRelease(input: Record<string, any>): Promise<any> {
+    return this.request<any>({ path: '/api/v1/admin/releases', method: 'POST', body: input });
+  }
+
+  async updateRelease(id: string, input: Record<string, any>): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/releases/${encodeURIComponent(id)}`, method: 'PUT', body: input });
+  }
+
+  async publishRelease(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/releases/${encodeURIComponent(id)}/publish`, method: 'POST' });
+  }
+
+  async rollbackRelease(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/releases/${encodeURIComponent(id)}/rollback`, method: 'POST' });
+  }
+
+  async deleteRelease(id: string): Promise<any> {
+    return this.request<any>({ path: `/api/v1/admin/releases/${encodeURIComponent(id)}`, method: 'DELETE' });
+  }
+
+  /** Cross-tenant clone detection; requires full tenant scope server-side. */
+  async detectCloneDevices(): Promise<{ devices: PlatformDevice[]; licenses: PlatformLicense[]; alerts: string[] }> {
+    const envelope = await this.requestEnvelope<{ devices: any[]; licenses: any[]; alerts: string[] }>({
+      path: '/api/v1/admin/devices/detect-clones',
+      method: 'POST',
+    });
+    if (envelope.success === false) {
+      throw new CentralApiError({ status: 0, envelope });
+    }
+    const data = (envelope.data as any) || {};
+    return {
+      devices: (Array.isArray(data.devices) ? data.devices : []).map(mapCentralDevice),
+      licenses: (Array.isArray(data.licenses) ? data.licenses : []).map(mapCentralLicense),
+      alerts: Array.isArray(data.alerts) ? data.alerts.map(String) : [],
+    };
   }
 }
 

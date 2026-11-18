@@ -1,7 +1,7 @@
 import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Activity, LayoutDashboard, Megaphone, Users, Workflow } from 'lucide-react';
-import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -21,15 +21,6 @@ const TABS: WorkspaceHubTab[] = [
   { id: 'campaigns', label: 'الحملات', path: '/crm/campaigns', icon: Megaphone },
 ];
 
-const REQUIRED_PERMISSION: Record<string, string> = {
-  customers: 'customers.view',
-  dashboard: 'crm.view',
-  leads: 'crm.view',
-  pipeline: 'crm.view',
-  activities: 'crm.view',
-  campaigns: 'crm.view',
-};
-
 const PAGE_BY_TAB = {
   customers: CustomersView,
   dashboard: CrmDashboardPage,
@@ -41,12 +32,20 @@ const PAGE_BY_TAB = {
 
 export const CRMHubPage: React.FC = () => {
   const { pathname } = useLocation();
-  const can = usePermission();
-  const tabs = TABS.filter((tab) => can(REQUIRED_PERMISSION[tab.id]));
-  const activeTab = tabs.find((tab) => tab.path === pathname)?.id ?? tabs[0]?.id;
+  const canAccess = useRouteAccess();
+  // Tabs follow the exact same route rules as the MainLayout guard — no
+  // per-tab permission map that can drift from ROUTE_PERMISSIONS.
+  const tabs = TABS.filter((tab) => canAccess(tab.path));
+  const matchedTab = TABS.find((tab) => tab.path === pathname);
+  const matchedAllowed = matchedTab ? tabs.some((tab) => tab.id === matchedTab.id) : false;
+  const activeTab = matchedTab ? (matchedAllowed ? matchedTab.id : null) : tabs[0]?.id ?? null;
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
-  if (!tabs.length || !ActivePage) {
+  if (matchedTab && !matchedAllowed) {
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من مركز CRM.</div>;
+  }
+
+  if (!activeTab || !ActivePage) {
     return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى مركز CRM.</div>;
   }
 

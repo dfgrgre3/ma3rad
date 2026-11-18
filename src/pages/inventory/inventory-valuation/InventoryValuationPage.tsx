@@ -8,19 +8,23 @@ import { exportToExcel } from '../../../utils/export/export';
 export const InventoryValuationPage: React.FC = () => {
   const [data, setData] = useState<WarehouseValuation[]>([]);
   const [_loading, setLoading] = useState(true);
+  const loadSeq = React.useRef(0);
 
   useEffect(() => {
     loadValuation();
   }, []);
 
   const loadValuation = () => {
-    try {
-      setData(new InventoryValuationService().getByWarehouse());
-    } catch (e) {
-      console.error('Error fetching inventory valuation:', e);
-    } finally {
-      setLoading(false);
-    }
+    const seq = ++loadSeq.current;
+    void (async () => {
+      try {
+        setData(await new InventoryValuationService().getByWarehouse());
+      } catch (e) {
+        console.error('Error fetching inventory valuation:', e);
+      } finally {
+        if (seq === loadSeq.current) setLoading(false);
+      }
+    })();
   };
 
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';

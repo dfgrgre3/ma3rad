@@ -18,6 +18,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import type { PlatformAuditEvent } from '../../services/domains/platform/PlatformAdminApiClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import type {
   PlatformAuditEntry,
   AuditSeverity,
@@ -66,6 +69,48 @@ const ACTOR_LABELS: Record<AuditActorType, string> = {
   SYSTEM: 'النظام الآلي',
 };
 
+const CENTRAL_ACTOR_LABELS: Record<string, string> = {
+  PLATFORM: 'مسؤول المنصة',
+  TENANT: 'مستخدم عميل',
+  SYSTEM: 'النظام',
+};
+
+const CENTRAL_ACTOR_TO_LOCAL: Record<string, AuditActorType> = {
+  PLATFORM: 'SUPER_ADMIN',
+  TENANT: 'TENANT_ADMIN',
+  SYSTEM: 'SYSTEM',
+};
+
+const LOCAL_ACTOR_TO_CENTRAL: Record<string, string> = {
+  SUPER_ADMIN: 'PLATFORM',
+  TENANT_ADMIN: 'TENANT',
+  SYSTEM: 'SYSTEM',
+};
+
+/** Adapt a central audit-chain event to the shape this page renders. */
+function mapCentralAuditEntry(event: PlatformAuditEvent): PlatformAuditEntry {
+  return {
+    id: event.id,
+    actorId: event.actorId,
+    actorName: event.actorName,
+    actorType: CENTRAL_ACTOR_TO_LOCAL[event.actorType] ?? 'SYSTEM',
+    tenantId: event.tenantId,
+    action: event.action,
+    entityType: event.resourceType ?? '',
+    entityId: event.resourceId,
+    severity: 'INFO' as AuditSeverity,
+    status: 'SUCCESS' as AuditStatus,
+    details: null,
+    oldValues: event.beforeData,
+    newValues: event.afterData,
+    ipAddress: event.ipAddress,
+    userAgent: event.userAgent,
+    prevHash: event.prevHash,
+    recordHash: event.recordHash,
+    createdAt: event.createdAt,
+  };
+}
+
 function formatJsonBlock(str?: string | null): string {
   if (!str) return '—';
   try {
@@ -95,6 +140,7 @@ export const PlatformAuditPage: React.FC = () => {
   const [dateTo, setDateTo] = React.useState('');
 
   const [tenants, setTenants] = React.useState<any[]>([]);
+  const [centralMode, setCentralMode] = React.useState(false);
   const [integrityState, setIntegrityState] = React.useState<{ checked: boolean; valid: boolean; count?: number }>({
     checked: false,
     valid: true,
@@ -103,27 +149,49 @@ export const PlatformAuditPage: React.FC = () => {
   // Selected entry for modal view (Diff & details)
   const [selectedEntry, setSelectedEntry] = React.useState<PlatformAuditEntry | null>(null);
 
-  const loadData = React.useCallback(() => {
+  const loadData = React.useCallback(async () => {
     setLoading(true);
     try {
-      const filters: PlatformAuditFilters = {
-        search: search.trim() || undefined,
-        tenantId: tenantId || undefined,
-        severity: severity !== 'all' ? severity : undefined,
-        status: status !== 'all' ? status : undefined,
-        actorType: actorType !== 'all' ? actorType : undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        page,
-        pageSize,
-      };
+      const central = getCentralDataSourceState();
+      setCentralMode(central.active);
+      if (central.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
 
-      const res = platformAdminService.queryAuditPaginated(filters);
-      setEntries(res.entries);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
+      if (central.active) {
+        const res = await centralPlatformClient.listAuditEvents({
+          q: search.trim() || undefined,
+          tenantId: tenantId || undefined,
+          actorType: actorType !== 'all' ? LOCAL_ACTOR_TO_CENTRAL[actorType] : undefined,
+          from: dateFrom || undefined,
+          to: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
+          page,
+          limit: pageSize,
+        });
+        setEntries(res.data.map(mapCentralAuditEntry));
+        setTotal(res.meta.total);
+        setTotalPages(Math.max(1, Math.ceil(res.meta.total / res.meta.limit)));
+      } else {
+        const filters: PlatformAuditFilters = {
+          search: search.trim() || undefined,
+          tenantId: tenantId || undefined,
+          severity: severity !== 'all' ? severity : undefined,
+          status: status !== 'all' ? status : undefined,
+          actorType: actorType !== 'all' ? actorType : undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          page,
+          pageSize,
+        };
+
+        const res = platformAdminService.queryAuditPaginated(filters);
+        setEntries(res.entries);
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+      }
+
       if (tenants.length === 0) {
-        setTenants(platformAdminService.listTenants());
+        setTenants(central.active ? await centralPlatformClient.listTenants() : platformAdminService.listTenants());
       }
       setError(null);
     } catch (err) {
@@ -134,10 +202,24 @@ export const PlatformAuditPage: React.FC = () => {
   }, [search, tenantId, severity, status, actorType, dateFrom, dateTo, page, pageSize, tenants.length]);
 
   React.useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
-  const handleVerifyIntegrity = () => {
+  const handleVerifyIntegrity = async () => {
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      setError('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
+    if (central.active) {
+      try {
+        const check = await centralPlatformClient.verifyAuditChain();
+        setIntegrityState({ checked: true, valid: check.isValid, count: check.checkedCount });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'تعذر فحص البصمة التشفيرية للسجلات.');
+      }
+      return;
+    }
     try {
       const check = platformAdminService.verifyAuditIntegrity();
       setIntegrityState({ checked: true, valid: check.isValid, count: check.checkedCount });
@@ -146,17 +228,44 @@ export const PlatformAuditPage: React.FC = () => {
     }
   };
 
-  const handleFullExport = () => {
+  const handleFullExport = async () => {
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      setError('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      const allMatching = platformAdminService.queryAuditForExport({
-        search: search.trim() || undefined,
-        tenantId: tenantId || undefined,
-        severity: severity !== 'all' ? severity : undefined,
-        status: status !== 'all' ? status : undefined,
-        actorType: actorType !== 'all' ? actorType : undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-      });
+      let allMatching: PlatformAuditEntry[];
+      if (central.active) {
+        // Page through the central endpoint (max 200 rows per request).
+        const collected: PlatformAuditEntry[] = [];
+        let currentPage = 1;
+        for (;;) {
+          const res = await centralPlatformClient.listAuditEvents({
+            q: search.trim() || undefined,
+            tenantId: tenantId || undefined,
+            actorType: actorType !== 'all' ? LOCAL_ACTOR_TO_CENTRAL[actorType] : undefined,
+            from: dateFrom || undefined,
+            to: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
+            page: currentPage,
+            limit: 200,
+          });
+          collected.push(...res.data.map(mapCentralAuditEntry));
+          if (collected.length >= res.meta.total || res.data.length === 0) break;
+          currentPage += 1;
+        }
+        allMatching = collected;
+      } else {
+        allMatching = platformAdminService.queryAuditForExport({
+          search: search.trim() || undefined,
+          tenantId: tenantId || undefined,
+          severity: severity !== 'all' ? severity : undefined,
+          status: status !== 'all' ? status : undefined,
+          actorType: actorType !== 'all' ? actorType : undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        });
+      }
 
       downloadCsv('platform-central-audit-full.csv', [
         [
@@ -223,7 +332,7 @@ export const PlatformAuditPage: React.FC = () => {
                   <Lock className="h-4 w-4 text-slate-500" />
                 )
               }
-              onClick={handleVerifyIntegrity}
+              onClick={() => void handleVerifyIntegrity()}
             >
               {integrityState.checked
                 ? integrityState.valid
@@ -231,14 +340,14 @@ export const PlatformAuditPage: React.FC = () => {
                   : 'تم اكتشاف تلاعب في السجل!'
                 : 'فحص سلامة التشفير'}
             </Button>
-            <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={loadData}>
+            <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void loadData()}>
               تحديث
             </Button>
             <Button
               variant="secondary"
               size="sm"
               leadingIcon={<Download className="h-3.5 w-3.5 text-slate-600" />}
-              onClick={handleFullExport}
+              onClick={() => void handleFullExport()}
             >
               تصدير شامل ({total})
             </Button>
@@ -278,34 +387,38 @@ export const PlatformAuditPage: React.FC = () => {
             ))}
           </select>
 
-          <select
-            value={severity}
-            onChange={(e) => {
-              setSeverity(e.target.value as any);
-              setPage(1);
-            }}
-            className={`${inputClass} max-w-[140px]`}
-          >
-            <option value="all">كل مستويات الخطورة</option>
-            <option value="INFO">معلومات (INFO)</option>
-            <option value="WARNING">تحذير (WARNING)</option>
-            <option value="SECURITY">أمني (SECURITY)</option>
-            <option value="CRITICAL">حرج (CRITICAL)</option>
-          </select>
+          {!centralMode && (
+            <>
+              <select
+                value={severity}
+                onChange={(e) => {
+                  setSeverity(e.target.value as any);
+                  setPage(1);
+                }}
+                className={`${inputClass} max-w-[140px]`}
+              >
+                <option value="all">كل مستويات الخطورة</option>
+                <option value="INFO">معلومات (INFO)</option>
+                <option value="WARNING">تحذير (WARNING)</option>
+                <option value="SECURITY">أمني (SECURITY)</option>
+                <option value="CRITICAL">حرج (CRITICAL)</option>
+              </select>
 
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as any);
-              setPage(1);
-            }}
-            className={`${inputClass} max-w-[130px]`}
-          >
-            <option value="all">كل النتائج</option>
-            <option value="SUCCESS">ناجحة</option>
-            <option value="FAILURE">فاشلة</option>
-            <option value="BLOCKED">محظورة</option>
-          </select>
+              <select
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value as any);
+                  setPage(1);
+                }}
+                className={`${inputClass} max-w-[130px]`}
+              >
+                <option value="all">كل النتائج</option>
+                <option value="SUCCESS">ناجحة</option>
+                <option value="FAILURE">فاشلة</option>
+                <option value="BLOCKED">محظورة</option>
+              </select>
+            </>
+          )}
 
           <select
             value={actorType}
@@ -316,11 +429,21 @@ export const PlatformAuditPage: React.FC = () => {
             className={`${inputClass} max-w-[150px]`}
           >
             <option value="all">كل المنفذين</option>
-            <option value="SUPER_ADMIN">مسؤول المنصة</option>
-            <option value="TENANT_ADMIN">مدير العميل</option>
-            <option value="DEVICE">جهاز / POS</option>
-            <option value="API_CLIENT">واجهة API</option>
-            <option value="SYSTEM">النظام</option>
+            {centralMode ? (
+              <>
+                <option value="SUPER_ADMIN">{CENTRAL_ACTOR_LABELS.PLATFORM}</option>
+                <option value="TENANT_ADMIN">{CENTRAL_ACTOR_LABELS.TENANT}</option>
+                <option value="SYSTEM">{CENTRAL_ACTOR_LABELS.SYSTEM}</option>
+              </>
+            ) : (
+              <>
+                <option value="SUPER_ADMIN">مسؤول المنصة</option>
+                <option value="TENANT_ADMIN">مدير العميل</option>
+                <option value="DEVICE">جهاز / POS</option>
+                <option value="API_CLIENT">واجهة API</option>
+                <option value="SYSTEM">النظام</option>
+              </>
+            )}
           </select>
         </div>
 
@@ -400,8 +523,8 @@ export const PlatformAuditPage: React.FC = () => {
               <thead className="border-b border-slate-200 bg-slate-50/75 text-slate-600 font-semibold">
                 <tr>
                   <th className="py-3 px-4">الوقت والتاريخ</th>
-                  <th className="py-3 px-4">مستوى الخطورة</th>
-                  <th className="py-3 px-4">النتيجة</th>
+                  {!centralMode && <th className="py-3 px-4">مستوى الخطورة</th>}
+                  {!centralMode && <th className="py-3 px-4">النتيجة</th>}
                   <th className="py-3 px-4">المنفذ</th>
                   <th className="py-3 px-4">الإجراء</th>
                   <th className="py-3 px-4">نوع الكيان</th>
@@ -417,29 +540,33 @@ export const PlatformAuditPage: React.FC = () => {
                       <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono" dir="ltr">
                         {formatDateTime(entry.createdAt)}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}
-                        >
-                          {badge.icon}
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {entry.status === 'SUCCESS' ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> ناجح
+                      {!centralMode && (
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}
+                          >
+                            {badge.icon}
+                            {badge.label}
                           </span>
-                        ) : entry.status === 'BLOCKED' ? (
-                          <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
-                            <Lock className="h-3.5 w-3.5" /> محظور
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-rose-700 font-medium">
-                            <XCircle className="h-3.5 w-3.5" /> فاشل
-                          </span>
-                        )}
-                      </td>
+                        </td>
+                      )}
+                      {!centralMode && (
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          {entry.status === 'SUCCESS' ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> ناجح
+                            </span>
+                          ) : entry.status === 'BLOCKED' ? (
+                            <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
+                              <Lock className="h-3.5 w-3.5" /> محظور
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-rose-700 font-medium">
+                              <XCircle className="h-3.5 w-3.5" /> فاشل
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td className="py-3 px-4">
                         <p className="font-semibold text-slate-800">{entry.actorName || 'النظام'}</p>
                         <p className="text-[10px] text-slate-400">

@@ -5,7 +5,7 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformSettingsMap,
   PlatformPolicyDocument,
   PlatformPolicyRetention,
@@ -96,7 +96,8 @@ export class PlatformSettingsService {
     const rows = this.db.query<any>('SELECT key, value FROM platform_settings');
     const settings: PlatformSettingsMap = {};
     for (const row of rows) {
-      settings[row.key] = row.value;
+      const raw = String(row.value ?? '');
+      settings[row.key] = /^-?\d+$/.test(raw) ? Number(raw) : raw;
     }
     return settings;
   }

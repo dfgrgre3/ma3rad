@@ -393,7 +393,7 @@ export class RecruitmentService {
     const actor = this.require('hr.recruitment.view');
     this.requireCandidate(actor, candidateId);
     return this.db.query<RecruitmentOffer>(
-      `SELECT id, candidate_id AS candidateId, salary, salary_type AS salaryType,
+      `SELECT id, candidate_id AS candidateId, salary / 100.0 AS salary, salary_type AS salaryType,
               offered_at AS offeredAt, expires_at AS expiresAt, status, terms
        FROM hr_candidate_offers WHERE candidate_id = ?`,
       [candidateId]
@@ -432,7 +432,7 @@ export class RecruitmentService {
     this.db.run(
       `INSERT INTO hr_candidate_offers
        (id, candidate_id, salary, salary_type, offered_at, expires_at, terms, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`,
       [id, candidateId, input.salary, input.salaryType, input.offeredAt, input.expiresAt || null,
         input.terms?.trim() || null, actor.id, now, now]
     );

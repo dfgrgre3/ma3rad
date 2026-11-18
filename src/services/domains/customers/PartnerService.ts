@@ -248,7 +248,7 @@ const typeTotal = (type: PartnerTransactionType, alias: string): string => `
     WHEN t.transaction_type = '${type}' THEN t.amount
     WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = '${type}' THEN -t.amount
     ELSE 0
-  END), 0) AS ${alias}`;
+  END), 0) / 100.0 AS ${alias}`;
 
 const PARTNER_SUMMARY_SQL = `
   ${typeTotal('CAPITAL_CONTRIBUTION', 'capitalContributions')},
@@ -266,8 +266,8 @@ const PARTNER_SUMMARY_SQL = `
     WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'ADJUSTMENT_INCREASE' THEN -t.amount
     WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'ADJUSTMENT_DECREASE' THEN t.amount
     ELSE 0
-  END), 0) AS adjustments,
-  COALESCE(SUM(t.balance_effect), 0) AS netBalance
+  END), 0) / 100.0 AS adjustments,
+  COALESCE(SUM(t.balance_effect), 0) / 100.0 AS netBalance
 `;
 
 const PARTNER_SUMMARY_JOIN = `
@@ -278,7 +278,7 @@ const PARTNER_SUMMARY_JOIN = `
 const PARTNER_SELECT_COLUMNS = `
   p.id, p.company_id AS companyId, p.name, p.phone, p.email,
   p.ownership_percent AS ownershipPercent, p.profit_share_percent AS profitSharePercent,
-  p.capital_amount AS capitalAmount,
+  p.capital_amount / 100.0 AS capitalAmount,
   p.is_active AS isActive, p.notes, p.created_at AS createdAt, p.updated_at AS updatedAt
 `;
 
@@ -309,7 +309,7 @@ export class PartnerService {
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'CAPITAL_CONTRIBUTION' THEN -t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'WITHDRAWAL' THEN t.amount
                ELSE 0
-             END), 0)) AS remainingCapital
+             END), 0)) / 100.0 AS remainingCapital
       ${PARTNER_SUMMARY_JOIN}
       WHERE ${scope.clause}
       GROUP BY p.id
@@ -399,7 +399,7 @@ export class PartnerService {
       JOIN users u ON u.id = h.created_by
       WHERE h.partner_id = ? AND ${scope.clause}
       UNION ALL
-      SELECT h.id, 'CAPITAL' AS type, h.old_amount AS oldValue, h.new_amount AS newValue,
+      SELECT h.id, 'CAPITAL' AS type, h.old_amount / 100.0 AS oldValue, h.new_amount / 100.0 AS newValue,
              h.effective_date AS effectiveDate, h.reason, u.full_name AS createdByName,
              h.created_at AS createdAt
       FROM partner_capital_history h
@@ -421,7 +421,7 @@ export class PartnerService {
 
     const openingBalance = from
       ? money(this.db.query<{ balance: number }>(`
-          SELECT COALESCE(SUM(t.balance_effect), 0) AS balance
+          SELECT COALESCE(SUM(t.balance_effect), 0) / 100.0 AS balance
           FROM partner_account_transactions t
           JOIN business_partners p ON p.id = t.partner_id
           WHERE t.partner_id = ? AND ${scope.clause} AND t.transaction_date < ?
@@ -454,7 +454,7 @@ export class PartnerService {
       attachmentsJson?: string;
     }>(`
       SELECT t.id, t.partner_id AS partnerId, t.transaction_type AS transactionType,
-             t.amount, t.balance_effect AS balanceEffect, t.transaction_date AS transactionDate,
+             t.amount / 100.0 AS amount, t.balance_effect / 100.0 AS balanceEffect, t.transaction_date AS transactionDate,
              t.payment_type AS paymentType, cr.name AS registerName, ba.account_name AS bankAccountName,
              b.name AS branchName,
              t.reference_number AS referenceNumber, t.description,
@@ -549,7 +549,7 @@ export class PartnerService {
       db.run(`
         INSERT INTO business_partners
           (id, company_id, name, phone, email, ownership_percent, profit_share_percent, capital_amount, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?)
       `, [
         id, companyId, cleanName, draft.phone?.trim() || null, draft.email?.trim() || null,
         ownershipPercent, profitSharePercent, capitalAmount, draft.notes?.trim() || null, actor.id,
@@ -638,7 +638,7 @@ export class PartnerService {
         && this.areProfitSharesAligned(db, current.companyId);
       db.run(`
         UPDATE business_partners
-        SET name = ?, phone = ?, email = ?, ownership_percent = ?, profit_share_percent = ?, capital_amount = ?, notes = ?,
+        SET name = ?, phone = ?, email = ?, ownership_percent = ?, profit_share_percent = ?, capital_amount = ROUND(?*100), notes = ?,
             is_active = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [
@@ -701,15 +701,18 @@ export class PartnerService {
     const isAdjustment = draft.transactionType === 'ADJUSTMENT_INCREASE'
       || draft.transactionType === 'ADJUSTMENT_DECREASE';
     PermissionService.require(actor, 'ui.partners.partners.view');
-    if (isAdjustment) {
-      PermissionService.require(actor, 'ui.partners.partners.adjust');
-    } else {
-      PermissionService.require(actor, 'ui.partners.partners.transactions');
-    }
+    const actionCode = isAdjustment ? 'ui.partners.partners.adjust' : 'ui.partners.partners.transactions';
     const partner = this.getPartnerById(draft.partnerId);
     if (!partner.isActive) throw new Error('لا يمكن تسجيل حركات على حساب شريك غير نشط.');
 
     return this.db.executeFinancialTransaction((db) => {
+      // حدود المبلغ/النطاق داخل المعاملة — استهلاك اعتماد المبلغ ذرّي
+      // مع قيد الحركة فلا تحترق الموافقة إذا فشلت العملية.
+      PermissionService.require(actor, actionCode, undefined, {
+        amount: draft.amount,
+        branchId: this.branchAccess.getCurrentBranchId(actor),
+        operation: 'partners.transaction',
+      });
       const transactionId = this.postTransactionInDb(db, actor, draft, partner);
       return this.getPartnerStatement(draft.partnerId).transactions
         .find((transaction) => transaction.id === transactionId)!;
@@ -745,7 +748,7 @@ export class PartnerService {
     }>(`
       SELECT t.id, t.partner_id AS partnerId, t.company_id AS companyId,
              t.branch_id AS branchId, t.transaction_type AS transactionType,
-             t.amount, t.balance_effect AS balanceEffect, t.payment_type AS paymentType,
+             t.amount / 100.0 AS amount, t.balance_effect / 100.0 AS balanceEffect, t.payment_type AS paymentType,
              t.register_id AS registerId, t.bank_account_id AS bankAccountId,
              t.journal_entry_id AS journalEntryId,
              t.reversal_of_id AS reversalOfId, t.description
@@ -786,7 +789,7 @@ export class PartnerService {
           id, partner_id, company_id, branch_id, transaction_type, amount, balance_effect,
             transaction_date, payment_type, register_id, bank_account_id, reference_number, description,
           journal_entry_id, reversal_of_id, reversal_of_type, created_by
-          ) VALUES (?, ?, ?, ?, 'REVERSAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, 'REVERSAL', ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         reversalId, original.partnerId, original.companyId, original.branchId,
         original.amount, money(-Number(original.balanceEffect)), transactionDate,
@@ -804,7 +807,7 @@ export class PartnerService {
         );
       }
       if (original.paymentType === 'BANK_TRANSFER' && original.bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [
           this.cashDelta(original.transactionType, original.amount), original.bankAccountId,
         ]);
       }
@@ -881,7 +884,7 @@ export class PartnerService {
           INSERT INTO partner_account_transactions (
             id, partner_id, company_id, branch_id, transaction_type, amount, balance_effect,
             transaction_date, reference_number, description, journal_entry_id, allocation_batch_id, created_by
-          ) VALUES (?, ?, ?, ?, 'PROFIT_ALLOCATION', ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, 'PROFIT_ALLOCATION', ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?)
         `, [
           transactionId, partner.id, partner.companyId, branchId, allocation.amount,
           allocation.amount, transactionDate, `DIST-${batchId}-${partner.id}`, description,
@@ -981,7 +984,7 @@ export class PartnerService {
       referenceNumber: string | null;
     }>(`
       SELECT t.id, t.partner_id AS partnerId, t.company_id AS companyId,
-             p.name AS partnerName, t.amount, t.reference_number AS referenceNumber
+             p.name AS partnerName, t.amount / 100.0 AS amount, t.reference_number AS referenceNumber
       FROM partner_account_transactions t
       JOIN business_partners p ON p.id = t.partner_id
       WHERE t.allocation_batch_id = ? AND t.transaction_type = 'PROFIT_ALLOCATION'
@@ -1000,7 +1003,7 @@ export class PartnerService {
       const targetAmount = money(targetProfit * initialAmount / invoiceProfit);
       const outstanding = partnerAllocations.map((allocation) => {
         const reversed = Number(db.query<{ amount: number }>(`
-          SELECT COALESCE(SUM(amount), 0) AS amount
+          SELECT COALESCE(SUM(amount), 0) / 100.0 AS amount
           FROM partner_account_transactions
           WHERE reversal_of_id = ? AND transaction_type = 'REVERSAL'
             AND reversal_of_type = 'PROFIT_ALLOCATION'
@@ -1061,7 +1064,7 @@ export class PartnerService {
                WHEN t.transaction_type = 'PROFIT_ALLOCATION' THEN t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'PROFIT_ALLOCATION' THEN -t.amount
                ELSE 0
-             END), 0) AS totalAmount,
+             END), 0) / 100.0 AS totalAmount,
              COUNT(DISTINCT CASE WHEN t.transaction_type = 'PROFIT_ALLOCATION' THEN t.partner_id END) AS partnersCount,
              MAX(t.created_at) AS createdAt
       FROM partner_account_transactions t
@@ -1085,7 +1088,7 @@ export class PartnerService {
                WHEN t.transaction_type = 'PROFIT_ALLOCATION' THEN t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'PROFIT_ALLOCATION' THEN -t.amount
                ELSE 0
-             END), 0) AS amount,
+             END), 0) / 100.0 AS amount,
              GROUP_CONCAT(DISTINCT je.entry_number) AS journalEntryNumber
       FROM partner_account_transactions t
       JOIN business_partners p ON p.id = t.partner_id
@@ -1111,7 +1114,7 @@ export class PartnerService {
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'CAPITAL_CONTRIBUTION' THEN -t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'WITHDRAWAL' THEN t.amount
                ELSE 0
-             END), 0)) AS remainingCapital
+             END), 0)) / 100.0 AS remainingCapital
       ${PARTNER_SUMMARY_JOIN}
       WHERE p.id = ? AND ${scope.clause}
       GROUP BY p.id
@@ -1217,14 +1220,14 @@ export class PartnerService {
       capitalAmount: number;
       netContributions: number;
     }>(`
-      SELECT p.id, p.capital_amount AS capitalAmount,
+      SELECT p.id, p.capital_amount / 100.0 AS capitalAmount,
              COALESCE(SUM(CASE
                WHEN t.transaction_type = 'CAPITAL_CONTRIBUTION' THEN t.amount
                WHEN t.transaction_type = 'WITHDRAWAL' THEN -t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'CAPITAL_CONTRIBUTION' THEN -t.amount
                WHEN t.transaction_type = 'REVERSAL' AND t.reversal_of_type = 'WITHDRAWAL' THEN t.amount
                ELSE 0
-             END), 0) AS netContributions
+             END), 0) / 100.0 AS netContributions
       FROM business_partners p
       LEFT JOIN partner_account_transactions t ON t.partner_id = p.id
       WHERE p.company_id = ? AND p.is_active = 1 AND p.id <> ?
@@ -1335,7 +1338,7 @@ export class PartnerService {
     db.run(`
       INSERT INTO partner_capital_history (
         id, partner_id, company_id, old_amount, new_amount, effective_date, reason, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?)
     `, [
       `pcap_${uuidv4().slice(0, 10)}`, partnerId, companyId,
       money(oldAmount), money(newAmount), assertDate(effectiveDate), cleanReason, actor.id,
@@ -1537,7 +1540,7 @@ export class PartnerService {
     const movementDelta = this.cashDelta(transactionType, amount);
     if (paymentType === 'CASH' && registerId && movementDelta < 0) {
       const balance = db.query<{ currentBalance: number }>(
-        'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ? AND is_active = 1',
+        'SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = ? AND is_active = 1',
         [registerId]
       )[0]?.currentBalance;
       if (balance === undefined || Number(balance) + MONEY_EPSILON < amount) {
@@ -1546,7 +1549,7 @@ export class PartnerService {
     }
     if (paymentType === 'BANK_TRANSFER' && bankAccountId && movementDelta < 0) {
       const balance = db.query<{ currentBalance: number }>(
-        'SELECT current_balance AS currentBalance FROM bank_accounts WHERE id = ? AND is_active = 1',
+        'SELECT current_balance / 100.0 AS currentBalance FROM bank_accounts WHERE id = ? AND is_active = 1',
         [bankAccountId]
       )[0]?.currentBalance;
       if (balance === undefined || Number(balance) + MONEY_EPSILON < amount) {
@@ -1570,7 +1573,7 @@ export class PartnerService {
         id, partner_id, company_id, branch_id, transaction_type, amount, balance_effect,
         transaction_date, payment_type, register_id, bank_account_id, reference_number,
         description, journal_entry_id, attachments_json, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       transactionId, draft.partnerId, partner.companyId, branchId, transactionType,
       amount, signedAmount(transactionType, amount), transactionDate, paymentType || null,
@@ -1579,7 +1582,7 @@ export class PartnerService {
     ]);
     this.applyCashMovement(db, transactionType, amount, paymentType, registerId, branchId, false);
     if (bankAccountId) {
-      db.run('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?', [movementDelta, bankAccountId]);
+      db.run('UPDATE bank_accounts SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [movementDelta, bankAccountId]);
     }
     this.audit(db, actor, this.transactionLabel(transactionType), transactionId, null, {
       partnerId: draft.partnerId, amount, transactionDate, paymentType, referenceNumber,
@@ -1665,7 +1668,7 @@ export class PartnerService {
         id, partner_id, company_id, branch_id, transaction_type, amount, balance_effect,
         transaction_date, reference_number, description, journal_entry_id, allocation_batch_id,
         reversal_of_id, reversal_of_type, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       transactionId,
       input.partnerId,
@@ -1784,7 +1787,7 @@ export class PartnerService {
     const delta = isReversal ? -Number(originalDelta ?? this.cashDelta(type, amount)) : this.cashDelta(type, amount);
     if (delta === 0) return;
 
-    db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [delta, registerId]);
+    db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [delta, registerId]);
     const shift = db.query<{ id: string }>(
       `SELECT id FROM cash_shifts WHERE register_id = ? AND branch_id = ? AND status = 'OPEN'
        ORDER BY opened_at DESC LIMIT 1`,
@@ -1794,18 +1797,18 @@ export class PartnerService {
 
     if (!isReversal) {
       if (delta > 0) {
-        db.run('UPDATE cash_shifts SET total_partner_inflows = total_partner_inflows + ? WHERE id = ?', [amount, shift.id]);
+        db.run('UPDATE cash_shifts SET total_partner_inflows = total_partner_inflows + ROUND(?*100) WHERE id = ?', [amount, shift.id]);
       } else {
-        db.run('UPDATE cash_shifts SET total_partner_outflows = total_partner_outflows + ? WHERE id = ?', [amount, shift.id]);
+        db.run('UPDATE cash_shifts SET total_partner_outflows = total_partner_outflows + ROUND(?*100) WHERE id = ?', [amount, shift.id]);
       }
       return;
     }
 
     const originalWasInflow = Number(originalDelta) > 0;
     if (originalWasInflow) {
-      db.run('UPDATE cash_shifts SET total_partner_inflows = MAX(0, total_partner_inflows - ?) WHERE id = ?', [amount, shift.id]);
+      db.run('UPDATE cash_shifts SET total_partner_inflows = MAX(0, total_partner_inflows - ROUND(?*100)) WHERE id = ?', [amount, shift.id]);
     } else {
-      db.run('UPDATE cash_shifts SET total_partner_outflows = MAX(0, total_partner_outflows - ?) WHERE id = ?', [amount, shift.id]);
+      db.run('UPDATE cash_shifts SET total_partner_outflows = MAX(0, total_partner_outflows - ROUND(?*100)) WHERE id = ?', [amount, shift.id]);
     }
   }
 

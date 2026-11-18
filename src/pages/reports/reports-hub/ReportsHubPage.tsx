@@ -1,8 +1,10 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, BarChart3, Search, Sparkles } from 'lucide-react';
-import { REPORT_CATEGORIES, REPORT_DEFINITIONS } from './reportCatalog';
+import { REPORT_CATEGORIES, REPORT_DEFINITIONS, reportPermission } from './reportCatalog';
 import type { ReportCategoryId, ReportDefinition } from './reportCatalog';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { ReportView } from './ReportView';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { getBusinessProfile, getProfileReports } from '../../../config/businessProfiles';
@@ -53,6 +55,9 @@ const LegacyReport: React.FC<{ tab: LegacyTab }> = ({ tab }) => (
 export const ReportsHubPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams<{ reportId?: string; categoryId?: string }>();
+  const currentUser = AuthService.getCurrentUser();
+  const canSeeReport = (report: ReportDefinition) =>
+    PermissionService.can(currentUser, reportPermission(report));
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const urlCategory = params.categoryId || searchParams.get('category');
@@ -89,6 +94,13 @@ export const ReportsHubPage: React.FC = () => {
     navigate(category === 'all' ? '/reports' : `/reports/category/${category}`);
 
   if (selectedReport) {
+    if (!canSeeReport(selectedReport)) {
+      return (
+        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">
+          لا تملك صلاحية عرض هذا التقرير.
+        </div>
+      );
+    }
     if (selectedReport.legacyTab) {
       return (
         <div className="flex h-full flex-col bg-slate-50">
@@ -113,6 +125,13 @@ export const ReportsHubPage: React.FC = () => {
 
   if (isLegacyTab(tabParam)) {
     const legacy = REPORT_DEFINITIONS.find((report) => report.legacyTab === tabParam);
+    if (legacy && !canSeeReport(legacy)) {
+      return (
+        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">
+          لا تملك صلاحية عرض هذا التقرير.
+        </div>
+      );
+    }
     return (
       <div className="flex h-full flex-col bg-slate-50">
         <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
@@ -139,15 +158,16 @@ export const ReportsHubPage: React.FC = () => {
       !needle ||
       report.title.toLowerCase().includes(needle) ||
       report.description.toLowerCase().includes(needle);
-    return categoryMatch && searchMatch;
+    return categoryMatch && searchMatch && canSeeReport(report);
   });
+  const visibleCount = REPORT_DEFINITIONS.filter(canSeeReport).length;
 
   return (
     <div className="erp-page" dir="rtl">
       <PageHeader
         icon={<BarChart3 className="h-5 w-5" />}
         title="مركز التقارير والتحليلات"
-        description={`${REPORT_DEFINITIONS.length} تقريرًا في الحركة والمبيعات والائتمان والمخزون والمالية والتوقعات — ابحث واختر التقرير المطلوب.`}
+        description={`${visibleCount} تقريرًا في الحركة والمبيعات والائتمان والمخزون والمالية والتوقعات — ابحث واختر التقرير المطلوب.`}
         meta={
           getProfileReports(getEffectiveBusinessType()).length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">

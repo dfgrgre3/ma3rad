@@ -8,6 +8,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
   historyCount,
   statusFilter,
   onStatusFilterChange,
+  canViewSummary = true,
 }) => (
   <div className="px-6 pt-4 bg-white border-b border-slate-200 flex items-center justify-between">
     <div className="flex gap-2">
@@ -31,6 +32,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
       >
         سجل حركات التحويل المنفذة ({historyCount})
       </button>
+      {canViewSummary && (
       <button
         onClick={() => onTabChange('summary')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
@@ -41,6 +43,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
       >
         ملخص حركة المخازن
       </button>
+      )}
     </div>
 
     {activeTab === 'workflow' && (

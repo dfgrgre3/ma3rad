@@ -146,9 +146,18 @@ test('sync policies: every supported entity type can pass the outbox policy gate
         dataScope: 'TENANT', payload: {},
       });
     }
-    const pendingTypes = new Set(outbox.listPending(500, SyncPolicyService.pushGate())
-      .filter((event) => event.tenantId === identity.tenantId)
-      .map((event) => event.entityType));
+    // 'product' events are intentionally held back until pending category/brand
+    // parent events are acknowledged, so drain the outbox in rounds.
+    const pendingTypes = new Set<string>();
+    for (let round = 0; round < SUPPORTED_SYNC_ENTITY_TYPES.length + 2; round++) {
+      const batch = outbox.listPending(500, SyncPolicyService.pushGate())
+        .filter((event) => event.tenantId === identity.tenantId && event.entityType !== 'sync_policy');
+      if (batch.length === 0) break;
+      for (const event of batch) {
+        pendingTypes.add(event.entityType);
+        outbox.markAcknowledged(event.eventId);
+      }
+    }
     assert.deepEqual([...pendingTypes].sort(), [...SUPPORTED_SYNC_ENTITY_TYPES].sort());
   } finally {
     acknowledgeTenantOutbox(manager, identity.tenantId);

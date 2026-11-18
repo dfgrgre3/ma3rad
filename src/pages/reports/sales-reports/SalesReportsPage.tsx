@@ -72,7 +72,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT date, COALESCE(SUM(revenue), 0) AS revenue,
+      SELECT date, COALESCE(SUM(revenue), 0) / 100.0 AS revenue,
         COUNT(DISTINCT invoiceId) AS invoiceCount, COUNT(DISTINCT returnId) AS returnCount
       FROM activity
       GROUP BY date
@@ -110,8 +110,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         LEFT JOIN ${type === 'by_brand' ? 'brands' : 'categories'} g ON g.id = p.${groupColumn}
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
-        COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      SELECT label, COALESCE(SUM(revenue), 0) / 100.0 AS revenue, COALESCE(SUM(cost), 0) / 100.0 AS cost,
+        COALESCE(SUM(revenue - cost), 0) / 100.0 AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC
@@ -143,8 +143,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN products p ON p.id = sri.product_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
-        COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      SELECT label, COALESCE(SUM(revenue), 0) / 100.0 AS revenue, COALESCE(SUM(cost), 0) / 100.0 AS cost,
+        COALESCE(SUM(revenue - cost), 0) / 100.0 AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC
@@ -178,8 +178,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN customers cu ON cu.id = sr.customer_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
-        COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      SELECT label, COALESCE(SUM(revenue), 0) / 100.0 AS revenue, COALESCE(SUM(cost), 0) / 100.0 AS cost,
+        COALESCE(SUM(profit), 0) / 100.0 AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC
@@ -207,7 +207,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN customers cu ON cu.id = sr.customer_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT label, COALESCE(SUM(revenue), 0) AS revenue,
+      SELECT label, COALESCE(SUM(revenue), 0) / 100.0 AS revenue,
         COUNT(DISTINCT invoiceId) AS count, COUNT(DISTINCT customerId) AS customers
       FROM activity
       GROUP BY label
@@ -248,8 +248,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         LEFT JOIN users u ON u.id = si.created_by
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
-      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
-        COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      SELECT label, COALESCE(SUM(revenue), 0) / 100.0 AS revenue, COALESCE(SUM(cost), 0) / 100.0 AS cost,
+        COALESCE(SUM(profit), 0) / 100.0 AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC

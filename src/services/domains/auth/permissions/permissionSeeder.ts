@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../../../../database/repositories/databaseManager';
 import { GRANULAR_PERMISSIONS } from '../../../../config/permissionMatrix';
+import { listScreens } from '../../../../config/screenRegistry';
 import {
   PERMISSIONS,
   ROLE_NAMES,
@@ -20,6 +21,35 @@ export class PermissionSeeder {
     PermissionSeeder.seedRoleDefaults(db);
     // الأدوار المخصصة التي أُنشئت قبل الترقية تحتاج أيضاً إلى الصلاحيات الدقيقة.
     PermissionSeeder.backfillAllRolesGranular(db);
+    PermissionSeeder.seedScreenPermissions(db);
+  }
+
+  /**
+   * يملأ screen_permissions من ScreenRegistry — الإسقاط الموحّد للمصادر
+   * الثلاثة (ROUTE_PERMISSIONS + عناصر القوائم + PAGE_VIEW_PERMISSIONS).
+   * آمن للتكرار: الشاشة معرّفة بالكود المصدري لا ببيانات محلية.
+   */
+  public static seedScreenPermissions(db: DatabaseManager): void {
+    try {
+      for (const screen of listScreens()) {
+        db.run(
+          `INSERT OR REPLACE INTO screen_permissions
+             (screen_key, path_pattern, tab_key, required_all, required_any, label_ar)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            screen.screenKey,
+            screen.pathPattern,
+            screen.tabKey,
+            JSON.stringify(screen.requiredAll),
+            JSON.stringify(screen.requiredAny),
+            screen.labelAr,
+          ]
+        );
+      }
+    } catch {
+      // الجدول قد لا يكون مُرحَّلاً بعد في قواعد قديمة — التخطي آمن لأن
+      // AuthorizationService يقرأ المتطلب من ScreenRegistry مباشرة.
+    }
   }
 
   public static seedPermissionCatalog(db: DatabaseManager): void {
@@ -81,6 +111,7 @@ export class PermissionSeeder {
     PermissionSeeder.backfillExportPermissions(db, roleCode);
     PermissionSeeder.backfillReceivablesPermissions(db, roleCode);
     PermissionSeeder.backfillPermissionMappings(db, roleCode);
+    PermissionSeeder.backfillSensitivityViewPermissions(db, roleCode);
     PermissionSeeder.backfillPartnerPermissions(db, roleCode);
     PermissionSeeder.backfillGranularPermissions(db, roleCode);
   }
@@ -191,6 +222,35 @@ export class PermissionSeeder {
     if (roleCode === 'ADMIN') {
       for (const permission of Object.keys(PERMISSION_BACKFILL_SOURCES)) {
         db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, permission]);
+      }
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
+  }
+
+  /**
+   * أكواد رؤية التكلفة/الربح (finance.cost.view / finance.profit.view) لا
+   * توجد في الأدوار المزروعة سابقاً. تُشتق فقط للأدوار التي تملك اليوم
+   * صلاحية مالية فعلية — لا تُفتح generalized عبر reports.view.
+   */
+  public static backfillSensitivityViewPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.sensitivityView.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    const current = new Set(
+      db.query<{ permissionCode: string }>(
+        'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
+        [roleCode]
+      ).map((row) => row.permissionCode)
+    );
+    const sources: Record<string, string[]> = {
+      'finance.cost.view': ['finance.view', 'reports.financial.view', 'inventory.valuation.view'],
+      'finance.profit.view': ['finance.view', 'reports.financial.view', 'reports.profit_loss.view'],
+    };
+    for (const [permission, required] of Object.entries(sources)) {
+      if (required.some((source) => current.has(source))) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          [roleCode, permission]
+        );
       }
     }
     db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);

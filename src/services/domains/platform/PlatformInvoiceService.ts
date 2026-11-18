@@ -4,7 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import {
+import type {
   PlatformInvoice,
   PlatformInvoiceInput,
   PlatformInvoiceStatus,
@@ -145,7 +145,7 @@ export class PlatformInvoiceService {
     this.db.run(
       `INSERT INTO platform_invoices
         (id, tenant_id, subscription_id, number, issue_date, due_date, status, currency, subtotal, discount, tax, total, paid_amount, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'EGP', ?, ?, ?, ?, 0, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'EGP', ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, ?, ?, ?)`,
       [id, input.tenantId, input.subscriptionId ?? null, `INV-${Date.now()}`, issueDate, dueDate, input.status ?? 'DRAFT', subtotal, discount, tax, total, input.notes ?? null, now, now]
     );
 
@@ -154,7 +154,7 @@ export class PlatformInvoiceService {
       const itemId = `ivi_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       this.db.run(
         `INSERT INTO platform_invoice_items (id, invoice_id, description, quantity, unit_price, total, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?)`,
         [itemId, id, item.description, item.quantity, item.unitPrice, item.quantity * item.unitPrice, now]
       );
     }
@@ -237,14 +237,14 @@ export class PlatformInvoiceService {
     this.db.run(
       `INSERT INTO platform_payments
         (id, tenant_id, invoice_id, amount, method, reference, paid_at, notes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?)`,
       [id, input.tenantId, input.invoiceId ?? null, toNumber(input.amount, 0), input.method, input.reference ?? null, paidAt, input.notes ?? null, now]
     );
 
     // Update invoice paid amount
     if (input.invoiceId) {
       this.db.run(
-        `UPDATE platform_invoices SET paid_amount = paid_amount + ?, updated_at = ?
+        `UPDATE platform_invoices SET paid_amount = paid_amount + ROUND(?*100), updated_at = ?
          WHERE id = ?`,
         [toNumber(input.amount, 0), now, input.invoiceId]
       );
@@ -279,7 +279,7 @@ export class PlatformInvoiceService {
       // Update invoice paid amount
       if (payment.invoiceId) {
         this.db.run(
-          `UPDATE platform_invoices SET paid_amount = paid_amount - ?, updated_at = ? WHERE id = ?`,
+          `UPDATE platform_invoices SET paid_amount = paid_amount - ROUND(?*100), updated_at = ? WHERE id = ?`,
           [payment.amount, now, payment.invoiceId]
         );
 
@@ -303,7 +303,12 @@ export class PlatformInvoiceService {
 
   public getPayment(id: string): PlatformPayment | null {
     PlatformInvoiceService.requirePlatformAccess('payments', 'platform.payments.view');
-    const row = this.db.query<any>('SELECT * FROM platform_payments WHERE id = ?', [id])[0];
+    const row = this.db.query<any>(
+      `SELECT p.*, i.number AS invoice_number FROM platform_payments p
+       LEFT JOIN platform_invoices i ON i.id = p.invoice_id
+       WHERE p.id = ?`,
+      [id]
+    )[0];
     return row ? this.mapPayment(row) : null;
   }
 
@@ -320,11 +325,11 @@ export class PlatformInvoiceService {
       dueDate: row.due_date ?? null,
       status: row.status,
       currency: row.currency ?? 'EGP',
-      subtotal: toNumber(row.subtotal, 0),
-      discount: toNumber(row.discount, 0),
-      tax: toNumber(row.tax, 0),
-      total: toNumber(row.total, 0),
-      paidAmount: toNumber(row.paid_amount, 0),
+      subtotal: toNumber(row.subtotal, 0) / 100,
+      discount: toNumber(row.discount, 0) / 100,
+      tax: toNumber(row.tax, 0) / 100,
+      total: toNumber(row.total, 0) / 100,
+      paidAmount: toNumber(row.paid_amount, 0) / 100,
       notes: row.notes ?? null,
       createdAt: String(row.created_at),
       items: row.items ? JSON.parse(row.items) : undefined,
@@ -335,10 +340,10 @@ export class PlatformInvoiceService {
     return {
       id: String(row.id),
       invoiceId: row.invoice_id ?? null,
-      invoiceNumber: row.invoiceNumber ?? null,
+      invoiceNumber: row.invoiceNumber ?? row.invoice_number ?? null,
       tenantId: String(row.tenant_id),
       tenantName: row.tenantName ?? null,
-      amount: toNumber(row.amount, 0),
+      amount: toNumber(row.amount, 0) / 100,
       method: row.method,
       reference: row.reference ?? null,
       paidAt: String(row.paid_at),

@@ -53,7 +53,7 @@ export const CampaignsPage: React.FC = () => {
     setLoading(true);
     try {
       setRows(db.query<Campaign>(
-        `SELECT c.*, (SELECT COUNT(*) FROM leads l WHERE l.campaign_id = c.id) AS lead_count
+        `SELECT c.*, c.budget / 100.0 AS budget, (SELECT COUNT(*) FROM leads l WHERE l.campaign_id = c.id) AS lead_count
          FROM campaigns c ORDER BY c.created_at DESC`
       ));
       setError(null);
@@ -92,7 +92,7 @@ export const CampaignsPage: React.FC = () => {
     try {
       if (editing) {
         db.run(
-          `UPDATE campaigns SET name = ?, channel = ?, starts_at = ?, ends_at = ?, budget = ?, target_audience = ?, status = ?, notes = ? WHERE id = ?`,
+          `UPDATE campaigns SET name = ?, channel = ?, starts_at = ?, ends_at = ?, budget = ROUND(?*100), target_audience = ?, status = ?, notes = ? WHERE id = ?`,
           [form.name.trim(), form.channel, form.startsAt || null, form.endsAt || null, Number(form.budget || 0), form.targetAudience || null, form.status, form.notes || null, editing.id]
         );
       } else {
@@ -101,7 +101,7 @@ export const CampaignsPage: React.FC = () => {
         const next = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
         db.run(
           `INSERT INTO campaigns (id, code, name, channel, starts_at, ends_at, budget, target_audience, status, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?)`,
           [`cmp_${uuidv4().substring(0, 8)}`, `CMP-${String(next).padStart(4, '0')}`, form.name.trim(), form.channel, form.startsAt || null, form.endsAt || null, Number(form.budget || 0), form.targetAudience || null, form.status, form.notes || null, AuthService.getCurrentUser()?.id || 'usr_admin']
         );
       }

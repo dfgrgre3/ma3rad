@@ -141,9 +141,9 @@ export class PayrollSocialInsuranceService {
               effective_to AS effectiveTo, is_active AS isActive,
               employee_share_percent AS employeeSharePercent,
               employer_share_percent AS employerSharePercent,
-              contribution_ceiling AS contributionCeiling,
-              minimum_contribution_base AS minimumContributionBase,
-              maximum_contribution_base AS maximumContributionBase,
+              contribution_ceiling / 100.0 AS contributionCeiling,
+              minimum_contribution_base / 100.0 AS minimumContributionBase,
+              maximum_contribution_base / 100.0 AS maximumContributionBase,
               end_of_service_per_year_percent AS endOfServicePerYearPercent,
               end_of_service_months_per_year AS endOfServiceMonthsPerYear,
               created_at AS createdAt, updated_at AS updatedAt
@@ -161,9 +161,9 @@ export class PayrollSocialInsuranceService {
               effective_to AS effectiveTo, is_active AS isActive,
               employee_share_percent AS employeeSharePercent,
               employer_share_percent AS employerSharePercent,
-              contribution_ceiling AS contributionCeiling,
-              minimum_contribution_base AS minimumContributionBase,
-              maximum_contribution_base AS maximumContributionBase,
+              contribution_ceiling / 100.0 AS contributionCeiling,
+              minimum_contribution_base / 100.0 AS minimumContributionBase,
+              maximum_contribution_base / 100.0 AS maximumContributionBase,
               end_of_service_per_year_percent AS endOfServicePerYearPercent,
               end_of_service_months_per_year AS endOfServiceMonthsPerYear
        FROM payroll_social_insurance_rules
@@ -241,7 +241,7 @@ export class PayrollSocialInsuranceService {
         db.run(
           `UPDATE payroll_social_insurance_rules SET name = ?, effective_from = ?, effective_to = ?,
              is_active = ?, employee_share_percent = ?, employer_share_percent = ?,
-             contribution_ceiling = ?, minimum_contribution_base = ?, maximum_contribution_base = ?,
+             contribution_ceiling = ROUND(?*100), minimum_contribution_base = ROUND(?*100), maximum_contribution_base = ROUND(?*100),
              end_of_service_per_year_percent = ?, end_of_service_months_per_year = ?,
              updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND company_id = ?`,
@@ -258,7 +258,7 @@ export class PayrollSocialInsuranceService {
               minimum_contribution_base, maximum_contribution_base,
               end_of_service_per_year_percent, end_of_service_months_per_year,
               created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)`,
           [ruleId, companyId, name, input.effectiveFrom, input.effectiveTo || null, isActive ? 1 : 0,
             employeeSharePercent, employerSharePercent, contributionCeiling,
             minimumContributionBase, maximumContributionBase,
@@ -302,9 +302,9 @@ export class PayrollSocialInsuranceService {
               effective_to AS effectiveTo, is_active AS isActive,
               employee_share_percent AS employeeSharePercent,
               employer_share_percent AS employerSharePercent,
-              contribution_ceiling AS contributionCeiling,
-              minimum_contribution_base AS minimumContributionBase,
-              maximum_contribution_base AS maximumContributionBase,
+              contribution_ceiling / 100.0 AS contributionCeiling,
+              minimum_contribution_base / 100.0 AS minimumContributionBase,
+              maximum_contribution_base / 100.0 AS maximumContributionBase,
               end_of_service_per_year_percent AS endOfServicePerYearPercent,
               end_of_service_months_per_year AS endOfServiceMonthsPerYear
        FROM payroll_social_insurance_rules WHERE id = ? AND company_id = ?`,
@@ -614,10 +614,10 @@ export class PayrollSocialInsuranceService {
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     const rows = this.db.query<any>(
       `SELECT sic.id, sic.payroll_run_item_id AS payrollRunItemId, sic.employee_id AS employeeId,
-              e.name AS employeeName, sic.period, sic.contribution_base AS contributionBase,
-              sic.employee_share_amount AS employeeShareAmount,
-              sic.employer_share_amount AS employerShareAmount,
-              sic.total_amount AS totalAmount, sic.rule_name AS ruleName
+              e.name AS employeeName, sic.period, sic.contribution_base / 100.0 AS contributionBase,
+              sic.employee_share_amount / 100.0 AS employeeShareAmount,
+              sic.employer_share_amount / 100.0 AS employerShareAmount,
+              sic.total_amount / 100.0 AS totalAmount, sic.rule_name AS ruleName
        FROM payroll_social_insurance_contributions sic
        JOIN payroll_run_items pri ON pri.id = sic.payroll_run_item_id
        JOIN payroll_runs pr ON pr.id = sic.payroll_run_id
@@ -652,7 +652,7 @@ export class PayrollSocialInsuranceService {
          (id, payroll_run_id, payroll_run_item_id, employee_id, period,
           contribution_base, employee_share_amount, employer_share_amount,
           total_amount, rule_id, rule_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?)`,
       [
         `sic_${uuidv4().replace(/-/g, '').slice(0, 16)}`, payrollRunId, payrollRunItemId,
         employeeId, period, calculation.contributionBase, calculation.employeeShareAmount,

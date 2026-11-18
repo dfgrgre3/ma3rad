@@ -90,7 +90,6 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/crm/pipeline', any: ['crm.pipeline.view', 'crm.view'] },
   { path: '/crm/activities', any: ['crm.activities.view', 'crm.view'] },
   { path: '/crm/campaigns', any: ['crm.campaigns.view', 'crm.view'] },
-  { path: '/crm', any: ['crm.view', 'customers.view'] },
   { path: '/partners', all: ['partners.view'] },
   { path: '/customers', all: ['customers.view'] },
   { path: '/customers/imported-products', all: ['sales.view'] },
@@ -152,13 +151,17 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
 
   // التقارير
   { path: '/reports', all: ['reports.view'] },
+  { path: '/reports/category/finance', all: ['reports.financial.view'] },
+  { path: '/reports/category/credit', all: ['reports.financial.view'] },
+  { path: '/reports/category/sales', all: ['reports.sales.view'] },
+  { path: '/reports/category/inventory', any: ['reports.purchases.view', 'reports.inventory.view'] },
   { path: '/reports/category', all: ['reports.view'] },
-  { path: '/reports/tax', all: ['reports.view'] },
-  { path: '/reports/profit-loss', all: ['reports.view'] },
-  { path: '/reports/statements', all: ['reports.view'] },
-  { path: '/reports/sales', all: ['reports.view'] },
-  { path: '/reports/pos', all: ['reports.view'] },
-  { path: '/reports/purchases', all: ['reports.view'] },
+  { path: '/reports/tax', all: ['reports.tax.view'] },
+  { path: '/reports/profit-loss', all: ['reports.profit_loss.view'] },
+  { path: '/reports/statements', all: ['reports.financial.view'] },
+  { path: '/reports/sales', all: ['reports.sales.view'] },
+  { path: '/reports/pos', all: ['reports.pos.view'] },
+  { path: '/reports/purchases', all: ['reports.purchases.view'] },
 
   // الموافقات والمستندات والأمان
   { path: '/approvals', all: ['approvals.view'] },
@@ -176,9 +179,10 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   // الإعدادات والنظام
   { path: '/data-import/types', any: ['settings.dynamic_data.view', 'settings.view'] },
   { path: '/data-import', any: DATA_IMPORT_ACCESS_PERMISSIONS },
-  { path: '/settings', any: ['settings.view', 'settings.backup'] },
+  { path: '/settings', any: ['settings.view', 'settings.backup', 'settings.app_config.view', 'settings.config_studio.view'] },
   { path: '/settings/app-configuration', any: ['settings.app_config.view', 'settings.view'] },
   { path: '/settings/configuration-studio', any: ['settings.config_studio.view', 'settings.view'] },
+  { path: '/settings/approvals', any: ['approvals.view', 'approvals.settings.manage', 'settings.view', 'settings.backup'] },
   { path: '/users', all: ['users.view'] },
   { path: '/backup', all: ['settings.backup'] },
   { path: '/system-health', all: ['settings.health.view'] },

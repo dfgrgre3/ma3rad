@@ -490,10 +490,293 @@ async function createTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON platform_invoices(tenant_id, status);
 
-    CREATE TABLE IF NOT EXISTS platform_ops_jobs (id TEXT PRIMARY KEY, type TEXT, status TEXT DEFAULT 'PENDING', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS platform_tenant_accounts (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT UNIQUE NOT NULL,
+      username TEXT NOT NULL,
+      email TEXT,
+      full_name TEXT,
+      password_hash TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+      activation_code TEXT,
+      last_activated_at TEXT,
+      last_login_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_tenant_users (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      username TEXT,
+      full_name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      role TEXT NOT NULL DEFAULT 'USER',
+      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','SUSPENDED','INVITED')),
+      notes TEXT,
+      provisioning_status TEXT NOT NULL DEFAULT 'NOT_REQUESTED'
+        CHECK(provisioning_status IN ('NOT_REQUESTED','PENDING','INVITED','PROVISIONED','FAILED','DIRECTORY_ONLY')),
+      provisioning_mode TEXT CHECK(provisioning_mode IN ('INVITE','DIRECT_CREATE')),
+      identity_user_id TEXT,
+      scope TEXT,
+      invite_code TEXT,
+      temporary_password TEXT,
+      invite_expires_at TEXT,
+      provisioned_at TEXT,
+      last_error TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_users_tenant ON platform_tenant_users(tenant_id, status);
+
+    CREATE TABLE IF NOT EXISTS platform_tenant_overrides (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'MODULE',
+      code TEXT NOT NULL,
+      value TEXT,
+      is_enabled INTEGER NOT NULL DEFAULT 1 CHECK(is_enabled IN (0,1)),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_overrides_tenant ON platform_tenant_overrides(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS platform_tenant_branches (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      city TEXT,
+      country TEXT,
+      address TEXT,
+      phone TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE'
+        CHECK(status IN ('ACTIVE','SUSPENDED','CLOSED')),
+      seats_limit INTEGER NOT NULL DEFAULT 1,
+      devices_limit INTEGER NOT NULL DEFAULT 1,
+      is_main INTEGER NOT NULL DEFAULT 0 CHECK(is_main IN (0,1)),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(tenant_id, code),
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tenant_branches_tenant ON platform_tenant_branches(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS platform_payments (
+      id TEXT PRIMARY KEY,
+      invoice_id TEXT,
+      tenant_id TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      method TEXT NOT NULL DEFAULT 'CASH',
+      reference TEXT,
+      notes TEXT,
+      paid_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE,
+      FOREIGN KEY (invoice_id) REFERENCES platform_invoices(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_payments_tenant ON platform_payments(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS platform_remote_config (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      config_key TEXT NOT NULL,
+      config_value TEXT,
+      scope TEXT NOT NULL DEFAULT 'TENANT',
+      target_device_ids TEXT,
+      status TEXT NOT NULL DEFAULT 'APPLIED',
+      applied_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_remote_config_tenant ON platform_remote_config(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS platform_ops_jobs (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING'
+        CHECK(status IN ('PENDING','RUNNING','COMPLETED','FAILED','CANCELLED')),
+      payload TEXT,
+      result TEXT,
+      error TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      run_at TEXT,
+      started_at TEXT,
+      finished_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id);
+
     CREATE TABLE IF NOT EXISTS platform_webhook_endpoints (id TEXT PRIMARY KEY, url TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS platform_notification_templates (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS platform_backups (id TEXT PRIMARY KEY, type TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+    CREATE TABLE IF NOT EXISTS platform_backups (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      name TEXT,
+      type TEXT NOT NULL DEFAULT 'FULL'
+        CHECK(type IN ('FULL','INCREMENTAL','PRE_RESTORE')),
+      status TEXT NOT NULL DEFAULT 'REQUESTED'
+        CHECK(status IN ('REQUESTED','IN_PROGRESS','COMPLETED','FAILED','EXPIRED')),
+      size_bytes INTEGER,
+      storage_uri TEXT,
+      trigger_source TEXT NOT NULL DEFAULT 'MANUAL'
+        CHECK(trigger_source IN ('MANUAL','SCHEDULED','PRE_UPDATE','PRE_RESTORE')),
+      triggered_by TEXT,
+      notes TEXT,
+      error TEXT,
+      checksum TEXT,
+      completed_at TEXT,
+      expires_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_backups_status ON platform_backups(status);
+
+    CREATE TABLE IF NOT EXISTS platform_backup_restores (
+      id TEXT PRIMARY KEY,
+      backup_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'REQUESTED'
+        CHECK(status IN ('REQUESTED','IN_PROGRESS','COMPLETED','FAILED','ROLLED_BACK')),
+      requested_by TEXT,
+      notes TEXT,
+      error TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (backup_id) REFERENCES platform_backups(id) ON DELETE CASCADE,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_backup_restores_tenant ON platform_backup_restores(tenant_id, created_at);
+
+    -- Tenant application (ERP) database snapshots uploaded by licensed devices.
+    -- The artifact is the device's own encrypted .sqlite.enc file: the central
+    -- server stores it opaquely and can never read the tenant's business data.
+    CREATE TABLE IF NOT EXISTS platform_app_backups (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      device_id TEXT,
+      name TEXT,
+      type TEXT NOT NULL DEFAULT 'FULL'
+        CHECK(type IN ('FULL','INCREMENTAL','MANUAL')),
+      status TEXT NOT NULL DEFAULT 'COMPLETED'
+        CHECK(status IN ('REQUESTED','IN_PROGRESS','COMPLETED','FAILED')),
+      size_bytes INTEGER,
+      checksum TEXT NOT NULL,
+      storage_uri TEXT NOT NULL,
+      notes TEXT,
+      restore_status TEXT NOT NULL DEFAULT 'NONE'
+        CHECK(restore_status IN ('NONE','REQUESTED','IN_PROGRESS','COMPLETED','FAILED')),
+      restore_requested_by TEXT,
+      restore_requested_at TEXT,
+      restore_error TEXT,
+      restore_completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_app_backups_tenant ON platform_app_backups(tenant_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS platform_error_reports (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      device_id TEXT,
+      fingerprint TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      stack TEXT,
+      issue_type TEXT,
+      severity TEXT NOT NULL DEFAULT 'medium'
+        CHECK(severity IN ('low','medium','high','critical')),
+      app_version TEXT,
+      os TEXT,
+      occurrences INTEGER NOT NULL DEFAULT 1,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      status TEXT NOT NULL DEFAULT 'OPEN'
+        CHECK(status IN ('OPEN','ACKNOWLEDGED','RESOLVED','IGNORED')),
+      acknowledged_by TEXT,
+      resolved_by TEXT,
+      resolved_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_error_reports_status ON platform_error_reports(status, last_seen_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_error_reports_tenant ON platform_error_reports(tenant_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_error_reports_fingerprint ON platform_error_reports(fingerprint);
+
+    CREATE TABLE IF NOT EXISTS platform_support_tickets (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'GENERAL',
+      priority TEXT NOT NULL DEFAULT 'NORMAL'
+        CHECK(priority IN ('LOW','NORMAL','HIGH','URGENT')),
+      status TEXT NOT NULL DEFAULT 'OPEN'
+        CHECK(status IN ('OPEN','IN_PROGRESS','WAITING_CUSTOMER','RESOLVED','CLOSED')),
+      requester_name TEXT,
+      requester_email TEXT,
+      requester_phone TEXT,
+      assignee_id TEXT,
+      assignee_name TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_message_at TEXT,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_support_tickets_tenant ON platform_support_tickets(tenant_id, status);
+
+    CREATE TABLE IF NOT EXISTS platform_support_messages (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      author_type TEXT NOT NULL CHECK(author_type IN ('STAFF','CUSTOMER','SYSTEM')),
+      author_id TEXT,
+      author_name TEXT,
+      body TEXT NOT NULL,
+      internal INTEGER NOT NULL DEFAULT 0 CHECK(internal IN (0,1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (ticket_id) REFERENCES platform_support_tickets(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_support_messages_ticket ON platform_support_messages(ticket_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS platform_releases (
+      id TEXT PRIMARY KEY,
+      version TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'STABLE'
+        CHECK(channel IN ('STABLE','BETA','ALPHA')),
+      status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK(status IN ('DRAFT','PUBLISHED','ROLLED_BACK','ARCHIVED')),
+      rollout_strategy TEXT NOT NULL DEFAULT 'FULL'
+        CHECK(rollout_strategy IN ('FULL','PHASED')),
+      rollout_percent INTEGER NOT NULL DEFAULT 100 CHECK(rollout_percent BETWEEN 0 AND 100),
+      target_tenant_ids TEXT,
+      download_url TEXT,
+      checksum TEXT,
+      release_notes TEXT,
+      min_required_version TEXT,
+      is_mandatory INTEGER NOT NULL DEFAULT 0 CHECK(is_mandatory IN (0,1)),
+      published_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_releases_status ON platform_releases(status, channel, created_at);
+
     CREATE TABLE IF NOT EXISTS platform_policies (id TEXT PRIMARY KEY, slug TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
     CREATE TABLE IF NOT EXISTS platform_notifications (
@@ -529,6 +812,55 @@ async function createTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_platform_notification_deliveries_notification ON platform_notification_deliveries(notification_id, created_at);
   `);
+
+  // Upgrade stub tables created by earlier versions (CREATE IF NOT EXISTS
+  // does not add columns to existing tables).
+  const ensureColumns = async (table, additions) => {
+    const cols = (await db.all(`PRAGMA table_info('${table}')`)).map((c) => c.name);
+    for (const [name, ddl] of additions) {
+      if (!cols.includes(name)) {
+        await db.exec(`ALTER TABLE "${table}" ADD COLUMN ${ddl}`);
+      }
+    }
+  };
+  await ensureColumns('platform_ops_jobs', [
+    ['tenant_id', 'tenant_id TEXT'],
+    ['payload', 'payload TEXT'],
+    ['result', 'result TEXT'],
+    ['error', 'error TEXT'],
+    ['attempts', 'attempts INTEGER NOT NULL DEFAULT 0'],
+    ['run_at', 'run_at TEXT'],
+    ['started_at', 'started_at TEXT'],
+    ['finished_at', 'finished_at TEXT'],
+    ['updated_at', 'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP'],
+  ]);
+  await ensureColumns('platform_backups', [
+    ['tenant_id', 'tenant_id TEXT'],
+    ['name', 'name TEXT'],
+    ['type', "type TEXT NOT NULL DEFAULT 'FULL'"],
+    ['status', "status TEXT NOT NULL DEFAULT 'REQUESTED'"],
+    ['size_bytes', 'size_bytes INTEGER'],
+    ['storage_uri', 'storage_uri TEXT'],
+    ['trigger_source', "trigger_source TEXT NOT NULL DEFAULT 'MANUAL'"],
+    ['triggered_by', 'triggered_by TEXT'],
+    ['notes', 'notes TEXT'],
+    ['error', 'error TEXT'],
+    ['checksum', 'checksum TEXT'],
+    ['completed_at', 'completed_at TEXT'],
+    ['expires_at', 'expires_at TEXT'],
+    ['updated_at', 'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP'],
+  ]);
+  await ensureColumns('platform_app_backups', [
+    ['restore_status', "restore_status TEXT NOT NULL DEFAULT 'NONE'"],
+    ['restore_requested_by', 'restore_requested_by TEXT'],
+    ['restore_requested_at', 'restore_requested_at TEXT'],
+    ['restore_error', 'restore_error TEXT'],
+    ['restore_completed_at', 'restore_completed_at TEXT'],
+  ]);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_status ON platform_backups(status)');
 
   console.log('Tables created successfully');
 }
@@ -674,6 +1006,22 @@ async function seedPlatformRBAC() {
       feature_permissions TEXT NOT NULL DEFAULT '[]',
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (tenant_id, plan_id)
+    );
+  `);
+  await db.exec(`
+    -- حدود صلاحيات على مستوى المنصة لكل مستأجر (المرحلة 4 من توحيد الصلاحيات).
+    -- المنصة تقيّد ولا توسّع: disabled=1 يمنع كليًا، max_amount سقف صلب
+    -- لا يمكن تجاوزه حتى باعتماد محلي، وcost_visible/profit_visible=0
+    -- يمنع كشف البيانات الحساسة مهما مُنحت الصلاحية محليًا.
+    CREATE TABLE IF NOT EXISTS tenant_permission_limits (
+      tenant_id TEXT NOT NULL,
+      permission_code TEXT NOT NULL,
+      max_amount REAL,
+      cost_visible INTEGER,
+      profit_visible INTEGER,
+      disabled INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (tenant_id, permission_code)
     );
   `);
 

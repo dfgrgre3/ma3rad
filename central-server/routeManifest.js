@@ -42,8 +42,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/roles', ['GET'], {
     GET: ['platform.staff.view', 'platform.staff.manage_permissions'],
   }),
-  route('/api/v1/admin/roles/:code/permissions', ['GET'], {
+  route('/api/v1/admin/roles/:code/permissions', ['GET', 'PUT'], {
     GET: ['platform.staff.view', 'platform.staff.manage_permissions'],
+    PUT: ['platform.staff.manage_permissions'],
   }),
   route('/api/v1/admin/permissions/catalog', ['GET'], {
     GET: ['platform.staff.view', 'platform.staff.manage_permissions'],
@@ -54,13 +55,87 @@ const ROUTE_MANIFEST = [
     GET: ['platform.tenants.view', 'platform.tenants.manage'],
     POST: ['platform.tenants.create', 'platform.tenants.manage'],
   }),
-  route('/api/v1/admin/tenants/:id', ['GET'], {
+  route('/api/v1/admin/tenants/:id', ['GET', 'PUT'], {
     GET: ['platform.tenants.view', 'platform.tenants.manage'],
+    PUT: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/status', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/archive', ['POST'], {
+    POST: ['platform.tenants.delete', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/profile', ['GET'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/account', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/account/reset-password', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/account/status', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/users', ['GET', 'POST'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/users/:userId', ['PUT', 'DELETE'], {
+    PUT: ['platform.tenants.update', 'platform.tenants.manage'],
+    DELETE: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/users/:userId/status', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/users/:userId/resend-invite', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/overrides', ['GET', 'POST'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/overrides/:overrideId', ['DELETE'], {
+    DELETE: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/payments', ['POST'], {
+    POST: ['platform.billing.create', 'platform.billing.manage', 'platform.tenants.update'],
+  }),
+  route('/api/v1/admin/tenants/:id/remote', ['GET'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/remote/config', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/remote/sync', ['POST'], {
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/branches', ['GET', 'POST'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/branches/:branchId', ['PUT', 'DELETE'], {
+    PUT: ['platform.tenants.update', 'platform.tenants.manage'],
+    DELETE: ['platform.tenants.update', 'platform.tenants.manage'],
   }),
 
   // ── Plans ─────────────────────────────────────────────────────────────────
   route('/api/v1/admin/plans', ['GET'], {
     GET: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+
+  // ── Subscriptions ──────────────────────────────────────────────────────────
+  route('/api/v1/admin/subscriptions', ['GET'], {
+    GET: ['platform.subscriptions.view'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId/renew', ['POST'], {
+    POST: ['platform.subscriptions.update'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId/cancel', ['POST'], {
+    POST: ['platform.subscriptions.delete'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId/change-plan', ['POST'], {
+    POST: ['platform.subscriptions.update'],
   }),
 
   // ── Licenses ──────────────────────────────────────────────────────────────
@@ -74,6 +149,9 @@ const ROUTE_MANIFEST = [
     POST: ['platform.licenses.update', 'platform.licenses.manage'],
   }),
   route('/api/v1/admin/licenses/:id/suspend', ['POST'], {
+    POST: ['platform.licenses.update', 'platform.licenses.manage'],
+  }),
+  route('/api/v1/admin/licenses/:id/reactivate', ['POST'], {
     POST: ['platform.licenses.update', 'platform.licenses.manage'],
   }),
   route('/api/v1/admin/licenses/:id/revoke', ['POST'], {
@@ -121,8 +199,21 @@ const ROUTE_MANIFEST = [
   }),
 
   // ── Operations ─────────────────────────────────────────────────────────────
-  route('/api/v1/admin/operations/jobs', ['GET'], {
+  route('/api/v1/admin/operations/jobs', ['GET', 'POST'], {
     GET: ['platform.operations.view'],
+    POST: ['platform.operations.create', 'platform.operations.approve'],
+  }),
+  route('/api/v1/admin/operations/jobs/:id/cancel', ['POST'], {
+    POST: ['platform.operations.update', 'platform.operations.approve'],
+  }),
+  route('/api/v1/admin/operations/jobs/:id/retry', ['POST'], {
+    POST: ['platform.operations.update', 'platform.operations.approve'],
+  }),
+  route('/api/v1/admin/operations/usage', ['GET'], {
+    GET: ['platform.operations.view', 'platform.platform-health.view', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/operations/usage/:tenantId', ['GET'], {
+    GET: ['platform.operations.view', 'platform.platform-health.view', 'platform.tenants.view'],
   }),
 
   // ── Integrations ───────────────────────────────────────────────────────────
@@ -148,8 +239,85 @@ const ROUTE_MANIFEST = [
   }),
 
   // ── Backups ─────────────────────────────────────────────────────────────────
-  route('/api/v1/admin/backups', ['GET'], {
+  route('/api/v1/admin/backups', ['GET', 'POST'], {
     GET: ['platform.backups.view'],
+    POST: ['platform.backups.create', 'platform.backups.approve'],
+  }),
+  route('/api/v1/admin/backups/restores', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+  route('/api/v1/admin/backups/:id', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+  route('/api/v1/admin/backups/:id/download', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+  route('/api/v1/admin/backups/:id/restore', ['POST'], {
+    POST: ['platform.backups.restore', 'platform.backups.approve'],
+  }),
+
+  // ── Application (ERP) backups — opaque encrypted device snapshots ─────────
+  route('/api/v1/admin/app-backups', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+  route('/api/v1/admin/app-backups/:id', ['GET'], {
+    GET: ['platform.backups.view'],
+  }),
+  route('/api/v1/admin/app-backups/:id/restore', ['POST'], {
+    POST: ['platform.backups.restore', 'platform.backups.approve'],
+  }),
+  route('/api/v1/admin/app-backups/:id/restore/cancel', ['POST'], {
+    POST: ['platform.backups.restore', 'platform.backups.approve'],
+  }),
+
+  // ── Support portal ──────────────────────────────────────────────────────────
+  route('/api/v1/admin/support', ['GET', 'POST'], {
+    GET: ['platform.support.view'],
+    POST: ['platform.support.create', 'platform.support.update'],
+  }),
+  route('/api/v1/admin/support/:id', ['GET', 'PUT', 'DELETE'], {
+    GET: ['platform.support.view'],
+    PUT: ['platform.support.update'],
+    DELETE: ['platform.support.delete'],
+  }),
+  route('/api/v1/admin/support/:id/messages', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
+
+  // ── Error monitoring ────────────────────────────────────────────────────────
+  route('/api/v1/admin/monitoring/errors', ['GET'], {
+    GET: ['platform.platform-health.view', 'platform.operations.view', 'platform.system-health.view'],
+  }),
+  route('/api/v1/admin/monitoring/errors/summary', ['GET'], {
+    GET: ['platform.platform-health.view', 'platform.operations.view', 'platform.system-health.view'],
+  }),
+  route('/api/v1/admin/monitoring/errors/:id/acknowledge', ['POST'], {
+    POST: ['platform.platform-health.update', 'platform.operations.update', 'platform.system-health.update'],
+  }),
+  route('/api/v1/admin/monitoring/errors/:id/resolve', ['POST'], {
+    POST: ['platform.platform-health.update', 'platform.operations.update', 'platform.system-health.update'],
+  }),
+  route('/api/v1/admin/monitoring/errors/:id/ignore', ['POST'], {
+    POST: ['platform.platform-health.update', 'platform.operations.update', 'platform.system-health.update'],
+  }),
+  route('/api/v1/admin/monitoring/errors/:id/reopen', ['POST'], {
+    POST: ['platform.platform-health.update', 'platform.operations.update', 'platform.system-health.update'],
+  }),
+
+  // ── Releases & phased rollout ───────────────────────────────────────────────
+  route('/api/v1/admin/releases', ['GET', 'POST'], {
+    GET: ['platform.releases.view'],
+    POST: ['platform.releases.create'],
+  }),
+  route('/api/v1/admin/releases/:id', ['PUT', 'DELETE'], {
+    PUT: ['platform.releases.update'],
+    DELETE: ['platform.releases.delete'],
+  }),
+  route('/api/v1/admin/releases/:id/publish', ['POST'], {
+    POST: ['platform.releases.approve', 'platform.releases.update'],
+  }),
+  route('/api/v1/admin/releases/:id/rollback', ['POST'], {
+    POST: ['platform.releases.approve', 'platform.releases.update'],
   }),
 
   // ── Policies ───────────────────────────────────────────────────────────────
@@ -162,15 +330,26 @@ const ROUTE_MANIFEST = [
     GET: ['platform.app-configuration.view'],
     PUT: ['platform.app-configuration.update', 'platform.settings.update'],
   }),
+  route('/api/v1/admin/config/permission-limits', ['GET', 'PUT'], {
+    GET: ['platform.app-configuration.view'],
+    PUT: ['platform.app-configuration.update', 'platform.settings.update'],
+  }),
 
-  // ── Client-owned endpoints (served by licensing/update services) ──────────
+  // ── Client-owned endpoints (device-authenticated, served by this server) ──
   route('/api/v1/licensing/activate', [], null, ['POST']),
   route('/api/v1/licensing/validate', [], null, ['POST']),
   route('/api/v1/licensing/heartbeat', [], null, ['POST']),
   route('/api/v1/configuration/establishment', [], null, ['GET']),
   route('/api/v1/configuration/current', [], null, ['GET']),
-  route('/api/v1/telemetry/errors', [], null, ['POST']),
-  route('/api/v1/releases', [], null, ['GET']),
+  route('/api/v1/telemetry/errors', ['POST'], null),
+  route('/api/v1/releases', ['GET'], null),
+  // Device-authenticated application backup channel (X-Device-Id +
+  // X-Device-Credential; tenant resolved from the registered device).
+  route('/api/v1/device/backups', ['GET'], null),
+  route('/api/v1/device/backups/pending-restore', ['GET'], null),
+  route('/api/v1/device/backups/upload', ['POST'], null),
+  route('/api/v1/device/backups/:id/download', ['GET'], null),
+  route('/api/v1/device/backups/:id/restore-result', ['POST'], null),
 ];
 
 module.exports = { ROUTE_MANIFEST };

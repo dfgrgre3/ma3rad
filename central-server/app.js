@@ -20,9 +20,15 @@ function createApp() {
 
   app.use(helmet());
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  // Fail closed in production: without an explicit CORS_ALLOWED_ORIGINS list no
+  // browser origin is trusted (origin-less server-to-server calls still pass).
   const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
     ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : isProduction ? [] : ['http://localhost:5173', 'http://localhost:3000'];
+  if (isProduction && !process.env.CORS_ALLOWED_ORIGINS) {
+    console.warn('[central-server] CORS_ALLOWED_ORIGINS is not set — all browser origins will be rejected.');
+  }
 
   app.use(cors({
     origin: (origin, callback) => {

@@ -498,7 +498,7 @@ export class BranchService {
     const scope = this.access.sqlScope('b.id', undefined, actor);
     return this.db.query<any>(`
       SELECT b.id as branchId, b.name as branchName,
-             COALESCE(SUM(si.total_amount), 0) as totalSales,
+             COALESCE(SUM(si.total_amount), 0) / 100.0 as totalSales,
              COUNT(si.id) as totalOrders
       FROM branches b
       LEFT JOIN sales_invoices si ON si.branch_id = b.id AND si.invoice_status != 'VOID'

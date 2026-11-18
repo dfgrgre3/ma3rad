@@ -20,13 +20,13 @@ public saveBudget(input: {
     this.db.executeFinancialTransaction((tx) => {
       tx.run(`
         INSERT INTO budgets (id, budget_code, fiscal_year_id, cost_center_id, name, total_allocated, status, approved_by, approved_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'APPROVED', ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ROUND(?*100), 'APPROVED', ?, CURRENT_TIMESTAMP)
       `, [budgetId, budgetCode, input.fiscalYearId, input.costCenterId || null, input.name.trim(), totalAllocated, actor.id]);
 
       for (const item of input.items) {
         tx.run(`
           INSERT INTO budget_items (id, budget_id, account_id, allocated_amount, notes)
-          VALUES (?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ROUND(?*100), ?)
         `, [`bi_${uuidv4().substring(0, 8)}`, budgetId, item.accountId, round2(item.allocatedAmount), item.notes || null]);
       }
     });

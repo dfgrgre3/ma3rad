@@ -261,7 +261,7 @@ test('partner accounts support loans, drawings, adjustments, filtered statements
 
   const overview = service.getOverview();
   assert.equal(overview.totalNetBalance, db.query<{ total: number }>(
-    'SELECT COALESCE(SUM(balance_effect), 0) AS total FROM partner_account_transactions'
+    'SELECT COALESCE(SUM(balance_effect), 0) / 100.0 AS total FROM partner_account_transactions'
   )[0].total);
 
   // Isolate the new partner so the profit allocation batch can be verified end-to-end.
@@ -308,8 +308,8 @@ test('partner capital payments update paid-basis ownership and preserve payment 
   db.run(`
     INSERT INTO bank_accounts (id, account_name, bank_name, account_number, currency, opening_balance,
       current_balance, gl_account_id, branch_id, is_active)
-    VALUES ('bank_partner_test', 'Partner Test Bank', 'Test Bank', 'PT-001', 'EGP', 10000,
-      10000, ?, (SELECT branch_id FROM cash_registers WHERE id = 'cr_main'), 1)
+    VALUES ('bank_partner_test', 'Partner Test Bank', 'Test Bank', 'PT-001', 'EGP', 1000000,
+      1000000, ?, (SELECT branch_id FROM cash_registers WHERE id = 'cr_main'), 1)
   `, [bankGlAccount.id]);
   const service = new PartnerService();
   const first = service.createPartner({
@@ -365,7 +365,7 @@ test('partner capital payments update paid-basis ownership and preserve payment 
   assert.match(contribution?.referenceNumber || '', /^PAR-\d{8}-[A-F0-9]{8}$/);
   assert.equal(db.query<{ balance: number }>(
     "SELECT current_balance AS balance FROM bank_accounts WHERE id = 'bank_partner_test'"
-  )[0].balance, 10750);
+  )[0].balance, 1075000);
 
   const capitalHistory = service.getPartnerCapitalHistory(first.id);
   assert.ok(capitalHistory.length > 0);
@@ -388,7 +388,7 @@ test('partner capital payments update paid-basis ownership and preserve payment 
   service.reverseTransaction(contribution!.id, 'إلغاء إيصال الاختبار');
   assert.equal(db.query<{ balance: number }>(
     "SELECT current_balance AS balance FROM bank_accounts WHERE id = 'bank_partner_test'"
-  )[0].balance, 10500);
+  )[0].balance, 1050000);
   assert.equal(service.getPartnerStatement(first.id).partner.remainingCapital, 500);
   assert.equal(service.getPartnerStatement(first.id).partner.ownershipPercent, 50);
   assert.equal(service.getPartnerStatement(second.id).partner.ownershipPercent, 50);

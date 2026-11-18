@@ -36,14 +36,14 @@ export class CustomerReportsService {
     const scope = this.salesScope();
     const rows = this.db.query<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
-        COALESCE(c.credit_limit, 0) AS creditLimit,
-        COALESCE(c.current_balance, 0) AS balance,
-        SUM(si.remaining_amount) AS outstanding,
-        SUM(CASE WHEN si.due_date IS NOT NULL AND si.due_date < ? THEN si.remaining_amount ELSE 0 END) AS overdue,
-        MIN(CASE WHEN si.remaining_amount > 0.01 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
+        COALESCE(c.credit_limit, 0) / 100.0 AS creditLimit,
+        COALESCE(c.current_balance, 0) / 100.0 AS balance,
+        SUM(si.remaining_amount) / 100.0 AS outstanding,
+        SUM(CASE WHEN si.due_date IS NOT NULL AND si.due_date < ? THEN si.remaining_amount ELSE 0 END) / 100.0 AS overdue,
+        MIN(CASE WHEN si.remaining_amount > 1 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
       FROM customers c
       LEFT JOIN sales_invoices si ON si.customer_id = c.id
-        AND si.remaining_amount > 0.01 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+        AND si.remaining_amount > 1 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY c.id
       HAVING outstanding > 0.01 OR balance > 0.01
       ORDER BY outstanding DESC
@@ -89,7 +89,7 @@ export class CustomerReportsService {
   public chequeMaturity({ to }: ReportParams): ReportResult {
     const rows = this.db.query<any>(`
       SELECT cheque_number AS chequeNumber, type, party_name AS party, bank_name AS bank,
-        amount, due_date AS dueDate,
+        amount / 100.0 AS amount, due_date AS dueDate,
         CAST(julianday(due_date) - julianday(?) AS INTEGER) AS daysLeft,
         status
       FROM cheques
@@ -126,12 +126,12 @@ export class CustomerReportsService {
     ) / 86_400_000;
     const rows = this.db.query<any>(`
       SELECT c.id AS customerId, c.name AS customer, c.phone,
-        COALESCE(c.credit_limit, 0) AS creditLimit,
-        SUM(si.remaining_amount) AS outstanding,
-        MIN(CASE WHEN si.remaining_amount > 0.01 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
+        COALESCE(c.credit_limit, 0) / 100.0 AS creditLimit,
+        SUM(si.remaining_amount) / 100.0 AS outstanding,
+        MIN(CASE WHEN si.remaining_amount > 1 THEN COALESCE(si.due_date, si.date) END) AS oldestDue
       FROM customers c
       LEFT JOIN sales_invoices si ON si.customer_id = c.id
-        AND si.remaining_amount > 0.01 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+        AND si.remaining_amount > 1 AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY c.id
       HAVING outstanding > 0.01
     `, [to, ...scope.params]);

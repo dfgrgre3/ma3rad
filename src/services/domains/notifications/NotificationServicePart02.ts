@@ -38,7 +38,7 @@ public runScheduledChecks(): { created: number } {
       }
 
       const dueCheques = this.db.query<any>(`
-        SELECT id, cheque_number AS chequeNumber, party_name AS partyName, amount, due_date AS dueDate, type
+        SELECT id, cheque_number AS chequeNumber, party_name AS partyName, amount / 100.0 AS amount, due_date AS dueDate, type
         FROM cheques
         WHERE status = 'PENDING' AND due_date <= ?
         ORDER BY due_date ASC LIMIT 100
@@ -117,10 +117,10 @@ public runScheduledChecks(): { created: number } {
       }
 
       const overdueInvoices = this.db.query<any>(`
-        SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.remaining_amount AS remaining,
+        SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.remaining_amount / 100.0 AS remaining,
                c.name AS customerName
         FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-        WHERE si.invoice_status != 'VOID' AND si.remaining_amount > 0.009
+        WHERE si.invoice_status != 'VOID' AND si.remaining_amount > 1
           AND si.date < date('now', '-30 day')
         ORDER BY si.date ASC LIMIT 100
       `);

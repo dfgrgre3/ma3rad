@@ -9,7 +9,7 @@ const {
 const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { getVerifyingKey, getKeyId } = require('../lib/signing');
-const { verifyAuditChain } = require('../lib/audit');
+const { verifyAuditChain, recordAuditEvent } = require('../lib/audit');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -92,6 +92,83 @@ router.get(
   }
 );
 
+router.put(
+  '/admin/roles/:code/permissions',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.staff.manage_permissions']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { code } = req.params;
+      const { permissions } = req.body || {};
+
+      // The platform owner role is immutable: it always holds every permission.
+      if (code === 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'The SUPER_ADMIN role cannot be modified' });
+      }
+      const role = await db.get('SELECT code FROM platform_roles WHERE code = ?', [code]);
+      if (!role) return res.status(404).json({ error: 'Role not found' });
+      if (!Array.isArray(permissions) || permissions.some((p) => typeof p !== 'string')) {
+        return res.status(400).json({ error: 'permissions must be an array of permission codes' });
+      }
+
+      const unique = [...new Set(permissions.map((p) => String(p).trim()).filter(Boolean))];
+      if (unique.includes('*')) {
+        return res.status(400).json({ error: 'Wildcard permission is reserved for SUPER_ADMIN' });
+      }
+      if (unique.length) {
+        const placeholders = unique.map(() => '?').join(',');
+        const known = await db.all(
+          `SELECT code FROM platform_permissions WHERE code IN (${placeholders})`,
+          unique
+        );
+        const knownCodes = new Set(known.map((row) => row.code));
+        const unknown = unique.filter((p) => !knownCodes.has(p));
+        if (unknown.length) {
+          return res.status(400).json({ error: `Unknown permission codes: ${unknown.join(', ')}` });
+        }
+      }
+
+      const before = await db.all(
+        'SELECT permission_code AS permissionCode FROM platform_role_permissions WHERE role_code = ? ORDER BY permission_code',
+        [code]
+      );
+
+      await db.exec('BEGIN TRANSACTION');
+      try {
+        await db.run('DELETE FROM platform_role_permissions WHERE role_code = ?', [code]);
+        for (const permissionCode of unique) {
+          await db.run(
+            'INSERT INTO platform_role_permissions (role_code, permission_code) VALUES (?, ?)',
+            [code, permissionCode]
+          );
+        }
+        await db.run('UPDATE platform_roles SET updated_at = ? WHERE code = ?', [nowIso(), code]);
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
+      }
+
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        action: 'ROLE_PERMISSIONS_UPDATED',
+        resourceType: 'platform_roles',
+        resourceId: code,
+        beforeData: { permissions: before.map((row) => row.permissionCode) },
+        afterData: { permissions: unique },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({ data: { roleCode: code, permissions: unique }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 function mapAuditRow(row) {
   return {
     id: row.id,
@@ -123,6 +200,7 @@ router.get(
       const {
         action = '',
         actorId = '',
+        actorType = '',
         tenantId = '',
         resourceType = '',
         from = '',
@@ -147,6 +225,7 @@ router.get(
       }
       if (action) { clauses.push('action = ?'); params.push(action); }
       if (actorId) { clauses.push('actor_id = ?'); params.push(actorId); }
+      if (actorType) { clauses.push('actor_type = ?'); params.push(actorType); }
       if (tenantId) { clauses.push('tenant_id = ?'); params.push(tenantId); }
       if (resourceType) { clauses.push('resource_type = ?'); params.push(resourceType); }
       if (from) { clauses.push('created_at >= ?'); params.push(from); }

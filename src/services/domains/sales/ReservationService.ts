@@ -159,7 +159,7 @@ export class ReservationService {
         || Number(stock.reserved) < Number(currentReservation.quantity)) {
         throw new Error('رصيد المخزون أو الكمية المحجوزة غير كافٍ لتنفيذ الحجز.');
       }
-      const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [currentReservation.productId])[0];
+      const product = db.query<any>(`SELECT cost_price / 100.0 AS costPrice FROM products WHERE id = ?`, [currentReservation.productId])[0];
       const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
         ? InventoryCostingService.planFifo(db, currentReservation.productId, currentReservation.warehouseId, Number(currentReservation.quantity))
         : null;
@@ -181,7 +181,7 @@ export class ReservationService {
       db.run(
         `INSERT INTO inventory_transactions (id, transaction_number, product_id, warehouse_id, type,
            quantity_m2, unit_cost, total_cost, reference_type, reference_id, notes, performed_by)
-         VALUES (?, ?, ?, ?, 'ADJUSTMENT_SUB', ?, ?, ?, 'RESERVATION', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, 'ADJUSTMENT_SUB', ?, ROUND(?*100), ROUND(?*100), 'RESERVATION', ?, ?, ?)`,
         [
           transactionId, db.nextNumber('ITX'), currentReservation.productId, currentReservation.warehouseId,
           -Number(currentReservation.quantity), unitCost, totalCost,

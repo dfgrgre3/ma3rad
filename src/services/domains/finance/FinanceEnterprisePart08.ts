@@ -29,18 +29,18 @@ public getCashFlowForecast(daysAhead = 60): {
     // 2. Fetch upcoming items:
     // a) Open customer invoices with due dates >= today
     const invoiceInflows = this.db.query<any>(`
-      SELECT si.id, si.due_date as date, (si.total_amount - si.paid_amount) as amount,
+      SELECT si.id, si.due_date as date, (si.total_amount - si.paid_amount) / 100.0 as amount,
              'INVOICE' as sourceType, 'تحصيل فاتورة مبيعات' as category,
              ('فاتورة ' || si.invoice_number || ' - ' || c.name) as description
       FROM sales_invoices si
       JOIN customers c ON si.customer_id = c.id
-      WHERE si.invoice_status != 'VOID' AND (si.total_amount - si.paid_amount) > 0.01
+      WHERE si.invoice_status != 'VOID' AND (si.total_amount - si.paid_amount) > 1
         AND si.due_date IS NOT NULL AND si.due_date >= ?
     `, [today]);
 
     // b) Pending received cheques
     const chequeInflows = this.db.query<any>(`
-      SELECT id, due_date as date, amount, 'CHEQUE' as sourceType, 'شيك برسم التحصيل' as category,
+      SELECT id, due_date as date, amount / 100.0 as amount, 'CHEQUE' as sourceType, 'شيك برسم التحصيل' as category,
              ('شيك وارد رقم ' || cheque_number || ' - ' || party_name) as description
       FROM cheques
       WHERE type = 'RECEIVED' AND status IN ('PENDING', 'DEPOSITED', 'RE_PRESENTED')
@@ -49,17 +49,17 @@ public getCashFlowForecast(daysAhead = 60): {
 
     // c) Unpaid supplier invoices due
     const purchaseOutflows = this.db.query<any>(`
-      SELECT pi.id, pi.due_date as date, pi.remaining_amount as amount,
+      SELECT pi.id, pi.due_date as date, pi.remaining_amount / 100.0 as amount,
              'PURCHASE' as sourceType, 'سداد مستحقات موردين' as category,
              ('فاتورة شراء ' || pi.invoice_number || ' - ' || s.name) as description
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
-      WHERE pi.remaining_amount > 0.01 AND pi.due_date IS NOT NULL AND pi.due_date >= ?
+      WHERE pi.remaining_amount > 1 AND pi.due_date IS NOT NULL AND pi.due_date >= ?
     `, [today]);
 
     // d) Issued cheques payable
     const chequeOutflows = this.db.query<any>(`
-      SELECT id, due_date as date, amount, 'CHEQUE' as sourceType, 'صرف شيك صادر' as category,
+      SELECT id, due_date as date, amount / 100.0 as amount, 'CHEQUE' as sourceType, 'صرف شيك صادر' as category,
              ('شيك صادر رقم ' || cheque_number || ' - ' || party_name) as description
       FROM cheques
       WHERE type = 'ISSUED' AND status IN ('PENDING', 'DEPOSITED', 'RE_PRESENTED')

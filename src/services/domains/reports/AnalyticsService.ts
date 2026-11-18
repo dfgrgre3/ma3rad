@@ -6,6 +6,19 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { round2 } from '../finance/financials';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const INVOICE_MONEY_FIELDS = [
+  'subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'extra_fees',
+  'total_amount', 'paid_amount', 'remaining_amount', 'total_cost', 'gross_profit', 'returned_amount',
+] as const;
+const INVOICE_ITEM_MONEY_FIELDS = [
+  'unit_price', 'original_unit_price', 'unit_cost', 'discount_amount', 'total_price', 'total_cost', 'profit',
+] as const;
+const RETURN_MONEY_FIELDS = [
+  'total_amount', 'return_tax_amount', 'refunded_amount', 'remaining_to_balance',
+] as const;
+const RETURN_ITEM_MONEY_FIELDS = ['unit_price', 'unit_cost', 'total_refund'] as const;
 
 type ProductRevenue = { productId: string; productName: string; quantity: number; revenue: number };
 type CustomerSpent = { customerId: string; customerName: string; totalSpent: number; orderCount: number };
@@ -23,7 +36,7 @@ export class AnalyticsService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
 
-  public getSalesAnalytics(dateFrom: string, dateTo: string): SalesAnalytics {
+  public async getSalesAnalytics(dateFrom: string, dateTo: string): Promise<SalesAnalytics> {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.view', '/sales');
 
@@ -33,16 +46,16 @@ export class AnalyticsService {
       actor
     );
 
-    const invoices = this.db.query<any>(`
+    const invoices = (await this.db.queryAsync<any>(`
       SELECT si.*, c.name as customerName
       FROM sales_invoices si
       JOIN customers c ON c.id = si.customer_id
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status = 'COMPLETED'
         AND ${scope.clause}
       ORDER BY si.date ASC
-    `, [dateFrom, dateTo, ...scope.params]);
+    `, [dateFrom, dateTo, ...scope.params])).map((row) => unscaleMoneyRow(row, INVOICE_MONEY_FIELDS));
 
-    const saleItems = this.db.query<any>(`
+    const saleItems = (await this.db.queryAsync<any>(`
       SELECT sii.*, p.name AS productName
       FROM sales_invoice_items sii
       JOIN sales_invoices si ON si.id = sii.invoice_id
@@ -50,7 +63,7 @@ export class AnalyticsService {
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status = 'COMPLETED'
         AND ${scope.clause}
       ORDER BY si.date ASC, sii.id ASC
-    `, [dateFrom, dateTo, ...scope.params]);
+    `, [dateFrom, dateTo, ...scope.params])).map((row) => unscaleMoneyRow(row, INVOICE_ITEM_MONEY_FIELDS));
     const saleItemsByInvoice = this.groupItemsByParent(saleItems, item => item.invoiceId);
 
     const totals: SalesAnalyticsTotals = {
@@ -64,9 +77,9 @@ export class AnalyticsService {
     const totalOrders = invoices.length;
     this.aggregateInvoices(invoices, saleItemsByInvoice, totals);
 
-    const returns = this.db.query<any>(`
-      SELECT sr.*, si.subtotal AS invoiceSubtotal, si.discount_amount AS invoiceDiscount,
-        si.tax_amount AS invoiceTax,
+    const returns = (await this.db.queryAsync<any>(`
+      SELECT sr.*, si.subtotal / 100.0 AS invoiceSubtotal, si.discount_amount / 100.0 AS invoiceDiscount,
+        si.tax_amount / 100.0 AS invoiceTax,
         c.name AS customerName
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -74,9 +87,9 @@ export class AnalyticsService {
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status = 'COMPLETED'
         AND ${scope.clause}
       ORDER BY sr.date ASC
-    `, [dateFrom, dateTo, ...scope.params]);
+    `, [dateFrom, dateTo, ...scope.params])).map((row) => unscaleMoneyRow(row, RETURN_MONEY_FIELDS));
 
-    const returnItems = this.db.query<any>(`
+    const returnItems = (await this.db.queryAsync<any>(`
       SELECT sri.*, p.name AS productName
       FROM sales_return_items sri
       JOIN sales_returns sr ON sr.id = sri.return_id
@@ -85,7 +98,7 @@ export class AnalyticsService {
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status = 'COMPLETED'
         AND ${scope.clause}
       ORDER BY sr.date ASC, sri.id ASC
-    `, [dateFrom, dateTo, ...scope.params]);
+    `, [dateFrom, dateTo, ...scope.params])).map((row) => unscaleMoneyRow(row, RETURN_ITEM_MONEY_FIELDS));
     const returnItemsByReturn = this.groupItemsByParent(returnItems, item => item.returnId);
     this.aggregateReturns(returns, returnItemsByReturn, totals);
 
@@ -222,16 +235,16 @@ export class AnalyticsService {
     `, [id, metricName, metricValue, dimension || null, periodStart, periodEnd, branchId, now]);
   }
 
-  public getSnapshots(metricName: string, periodStart: string, periodEnd: string): AnalyticsSnapshot[] {
+  public async getSnapshots(metricName: string, periodStart: string, periodEnd: string): Promise<AnalyticsSnapshot[]> {
     PermissionService.require(AuthService.requireAuth(), 'ui.analytics.overview.view');
-    return this.db.query<AnalyticsSnapshot>(`
+    return this.db.queryAsync<AnalyticsSnapshot>(`
       SELECT * FROM analytics_snapshots
       WHERE metric_name = ? AND period_start >= ? AND period_end <= ?
       ORDER BY created_at DESC
     `, [metricName, periodStart, periodEnd]);
   }
 
-  public getDashboardMetrics(): Array<{ name: string; value: number; label: string; trend: 'up' | 'down' | 'stable' }> {
+  public async getDashboardMetrics(): Promise<Array<{ name: string; value: number; label: string; trend: 'up' | 'down' | 'stable' }>> {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.analytics.overview.view');
     const today = localDateString();
@@ -242,26 +255,26 @@ export class AnalyticsService {
       actor
     );
 
-    const totalSalesToday = this.db.query<any>(`
+    const totalSalesToday = (await this.db.queryAsync<any>(`
       SELECT
-        COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+        (COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
         - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
-          WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
-    `, [today, ...scope.params, today, ...scope.params])[0]?.total || 0;
+          WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)) / 100.0 AS total
+    `, [today, ...scope.params, today, ...scope.params]))[0]?.total || 0;
 
-    const totalSalesMonth = this.db.query<any>(`
+    const totalSalesMonth = (await this.db.queryAsync<any>(`
       SELECT
-        COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+        (COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
         - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
-          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
-    `, [monthStartStr, today, ...scope.params, monthStartStr, today, ...scope.params])[0]?.total || 0;
+          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)) / 100.0 AS total
+    `, [monthStartStr, today, ...scope.params, monthStartStr, today, ...scope.params]))[0]?.total || 0;
 
-    const totalCustomers = this.db.query<any>('SELECT COUNT(*) as cnt FROM customers')[0]?.cnt || 0;
-    const totalProducts = this.db.query<any>("SELECT COUNT(*) as cnt FROM products WHERE is_active = 1")[0]?.cnt || 0;
+    const totalCustomers = (await this.db.queryAsync<any>('SELECT COUNT(*) as cnt FROM customers'))[0]?.cnt || 0;
+    const totalProducts = (await this.db.queryAsync<any>("SELECT COUNT(*) as cnt FROM products WHERE is_active = 1"))[0]?.cnt || 0;
 
     return [
       { name: 'المبيعات اليوم', value: Number(totalSalesToday), label: 'ج.م', trend: 'up' },

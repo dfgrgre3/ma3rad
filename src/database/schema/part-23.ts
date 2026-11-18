@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS platform_license_activations (
   status TEXT NOT NULL DEFAULT 'SUCCESS' CHECK(status IN ('SUCCESS','FAILED','PENDING')),
   ip_address TEXT,
   notes TEXT,
+  is_online INTEGER,
+  activated_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (license_id) REFERENCES platform_licenses(id) ON DELETE CASCADE,
   FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE

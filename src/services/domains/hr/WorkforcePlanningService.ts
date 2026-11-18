@@ -182,8 +182,8 @@ export class WorkforcePlanningService {
               b.name AS branchName, wp.department_id AS departmentId,
               d.name AS departmentName, wp.period_month AS periodMonth,
               wp.planned_headcount AS plannedHeadcount,
-              wp.approved_recruitment_budget AS approvedRecruitmentBudget,
-              wp.expected_employee_cost AS expectedEmployeeCost,
+              wp.approved_recruitment_budget / 100.0 AS approvedRecruitmentBudget,
+              wp.expected_employee_cost / 100.0 AS expectedEmployeeCost,
               wp.notes, wp.status,
               wp.created_by AS createdBy, u.full_name AS createdByName,
               wp.created_at AS createdAt, wp.updated_at AS updatedAt
@@ -213,8 +213,8 @@ export class WorkforcePlanningService {
               b.name AS branchName, wp.department_id AS departmentId,
               d.name AS departmentName, wp.period_month AS periodMonth,
               wp.planned_headcount AS plannedHeadcount,
-              wp.approved_recruitment_budget AS approvedRecruitmentBudget,
-              wp.expected_employee_cost AS expectedEmployeeCost,
+              wp.approved_recruitment_budget / 100.0 AS approvedRecruitmentBudget,
+              wp.expected_employee_cost / 100.0 AS expectedEmployeeCost,
               wp.notes, wp.status,
               wp.created_by AS createdBy, u.full_name AS createdByName,
               wp.created_at AS createdAt, wp.updated_at AS updatedAt
@@ -239,7 +239,7 @@ export class WorkforcePlanningService {
     return this.db.query<any>(
       `SELECT id, plan_id AS planId, job_title AS jobTitle,
               employment_type AS employmentType, planned_openings AS plannedOpenings,
-              estimated_monthly_salary AS estimatedMonthlySalary, notes,
+              estimated_monthly_salary / 100.0 AS estimatedMonthlySalary, notes,
               created_at AS createdAt
        FROM hr_workforce_plan_jobs WHERE plan_id = ?
        ORDER BY job_title`,
@@ -295,7 +295,7 @@ export class WorkforcePlanningService {
       if (id) {
         db.run(
           `UPDATE hr_workforce_plans SET branch_id = ?, department_id = ?, period_month = ?,
-             planned_headcount = ?, approved_recruitment_budget = ?, expected_employee_cost = ?,
+             planned_headcount = ?, approved_recruitment_budget = ROUND(?*100), expected_employee_cost = ROUND(?*100),
              notes = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND company_id = ?`,
           [input.branchId, input.departmentId, input.periodMonth, input.plannedHeadcount,
@@ -307,7 +307,7 @@ export class WorkforcePlanningService {
           `INSERT INTO hr_workforce_plans
              (id, company_id, branch_id, department_id, period_month, planned_headcount,
               approved_recruitment_budget, expected_employee_cost, notes, status, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, 'DRAFT', ?)`,
           [planId, companyId, input.branchId, input.departmentId, input.periodMonth,
             input.plannedHeadcount, approvedRecruitmentBudget, expectedEmployeeCost,
             input.notes || null, actor.id]
@@ -319,7 +319,7 @@ export class WorkforcePlanningService {
           `INSERT INTO hr_workforce_plan_jobs
              (id, plan_id, job_title, employment_type, planned_openings,
               estimated_monthly_salary, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?)`,
           [`wfpj_${uuidv4().replace(/-/g, '').slice(0, 14)}`, planId, job.jobTitle.trim(),
             job.employmentType || 'FULL_TIME', Math.max(0, Number(job.plannedOpenings || 0)),
             roundMoney(Math.max(0, Number(job.estimatedMonthlySalary || 0))), job.notes || null]
@@ -400,7 +400,7 @@ export class WorkforcePlanningService {
               b.name AS branchName, hr.department_id AS departmentId,
               d.name AS departmentName, hr.requisition_number AS requisitionNumber,
               hr.job_title AS jobTitle, hr.employment_type AS employmentType,
-              hr.openings, hr.estimated_monthly_salary AS estimatedMonthlySalary,
+              hr.openings, hr.estimated_monthly_salary / 100.0 AS estimatedMonthlySalary,
               hr.justification, hr.status,
               hr.requested_by AS requestedBy, req.full_name AS requestedByName,
               hr.requested_at, hr.decided_by AS decidedBy,
@@ -443,7 +443,7 @@ export class WorkforcePlanningService {
          (id, company_id, branch_id, department_id, requisition_number, job_title,
           employment_type, openings, estimated_monthly_salary, justification,
           status, requested_by, linked_plan_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 'PENDING', ?, ?)`,
       [id, companyId, input.branchId, input.departmentId, requisitionNumber,
         input.jobTitle.trim(), input.employmentType || 'FULL_TIME', input.openings,
         roundMoney(Math.max(0, Number(input.estimatedMonthlySalary || 0))),

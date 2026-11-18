@@ -36,13 +36,17 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
   const can = usePermission();
   const canView = mode === 'showroom' ? can('inventory.showroom_stock.view') : can('inventory.warehouse_stock.view');
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const nextWarehouses = inventoryService.getAllWarehouses();
+      const [nextWarehouses, nextProducts, nextStock] = await Promise.all([
+        inventoryService.getAllWarehousesAsync(),
+        productService.getAllProductsAsync(),
+        inventoryService.getWarehouseStockAsync(),
+      ]);
       setWarehouses(nextWarehouses);
-      setProducts(productService.getAllProducts());
-      setStock(inventoryService.getWarehouseStock());
+      setProducts(nextProducts);
+      setStock(nextStock);
 
       const showrooms = nextWarehouses.filter((warehouse) => warehouse.warehouseType === 'SHOWROOM');
       const stores = nextWarehouses.filter((warehouse) => warehouse.warehouseType !== 'SHOWROOM');

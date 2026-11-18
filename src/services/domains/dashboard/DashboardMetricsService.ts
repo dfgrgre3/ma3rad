@@ -116,13 +116,13 @@ export class DashboardMetricsService {
     // ===== UNIFIED NET SALES CALCULATION =====
     // Net Sales = subtotal - discount_amount - returns
     const salesRow = this.db.exec(
-      `SELECT COALESCE(SUM(si.subtotal - si.discount_amount),0) as total 
+      `SELECT COALESCE(SUM(si.subtotal - si.discount_amount),0) / 100.0 as total 
        FROM sales_invoices si 
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}`,
       [fromStr, periodTo, ...salesScope.params, ...salesCompanyScope.params]
     );
     const returnsRow = this.db.exec(
-      `SELECT COALESCE(SUM(sr.total_amount),0) 
+      `SELECT COALESCE(SUM(sr.total_amount),0) / 100.0 
        FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id 
        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}`,
       [fromStr, periodTo, ...salesScope.params, ...salesCompanyScope.params]
@@ -142,7 +142,7 @@ export class DashboardMetricsService {
       // Try fallback: gross profit from invoices
       try {
         const grossProfitRow = this.db.exec(
-          `SELECT COALESCE(SUM(si.gross_profit),0) 
+          `SELECT COALESCE(SUM(si.gross_profit),0) / 100.0 
            FROM sales_invoices si 
            WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}`,
           [fromStr, periodTo, ...salesScope.params, ...salesCompanyScope.params]
@@ -155,13 +155,13 @@ export class DashboardMetricsService {
 
     // ===== SALES TREND (today vs yesterday) =====
     const yesterdayRow = this.db.exec(
-      `SELECT COALESCE((SELECT SUM(si.subtotal-si.discount_amount) FROM sales_invoices si WHERE si.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0) - 
-              COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id WHERE sr.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0)`,
+      `SELECT (COALESCE((SELECT SUM(si.subtotal-si.discount_amount) FROM sales_invoices si WHERE si.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0) - 
+              COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id WHERE sr.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0)) / 100.0`,
       [yesterday, ...salesScope.params, ...salesCompanyScope.params, yesterday, ...salesScope.params, ...salesCompanyScope.params]
     );
     const todayRow = this.db.exec(
-      `SELECT COALESCE((SELECT SUM(si.subtotal-si.discount_amount) FROM sales_invoices si WHERE si.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0) - 
-              COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id WHERE sr.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0)`,
+      `SELECT (COALESCE((SELECT SUM(si.subtotal-si.discount_amount) FROM sales_invoices si WHERE si.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0) - 
+              COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id WHERE sr.date=? AND si.invoice_status!='VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}),0)) / 100.0`,
       [today, ...salesScope.params, ...salesCompanyScope.params, today, ...salesScope.params, ...salesCompanyScope.params]
     );
     const todaySales = (todayRow[0]?.values[0]?.[0] as number) ?? 0;
@@ -170,7 +170,7 @@ export class DashboardMetricsService {
 
     // ===== TOTAL DEBT =====
     const debtRow = this.db.exec(
-      `SELECT COALESCE(SUM(si.remaining_amount),0) 
+      `SELECT COALESCE(SUM(si.remaining_amount),0) / 100.0 
        FROM sales_invoices si 
        WHERE si.remaining_amount > 0 AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause}`,
       [...salesScope.params, ...salesCompanyScope.params]
@@ -179,7 +179,7 @@ export class DashboardMetricsService {
 
     // ===== TOTAL PURCHASES =====
     const totalPurchasesRow = this.db.exec(
-      `SELECT COALESCE(SUM(pi.total_amount),0) 
+      `SELECT COALESCE(SUM(pi.total_amount),0) / 100.0 
        FROM purchase_invoices pi 
        WHERE pi.date BETWEEN ? AND ? AND ${purchaseScope.clause} AND ${purchaseCompanyScope.clause}`,
       [fromStr, periodTo, ...purchaseScope.params, ...purchaseCompanyScope.params]
@@ -188,7 +188,7 @@ export class DashboardMetricsService {
 
     // ===== TOTAL RECEIVED =====
     const receivedRow = this.db.exec(
-      `SELECT COALESCE(SUM(cp.amount),0) 
+      `SELECT COALESCE(SUM(cp.amount),0) / 100.0 
        FROM customer_payments cp 
        WHERE cp.date BETWEEN ? AND ? AND ${paymentScope.clause}`,
       [fromStr, periodTo, ...paymentScope.params]
@@ -209,7 +209,7 @@ export class DashboardMetricsService {
 
     // ===== DAILY SALES DATA =====
     const salesByDayRow = this.db.exec(
-      `SELECT si.date as day, COALESCE(SUM(si.subtotal-si.discount_amount),0) as sales 
+      `SELECT si.date as day, COALESCE(SUM(si.subtotal-si.discount_amount),0) / 100.0 as sales 
        FROM sales_invoices si 
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause} 
        GROUP BY si.date ORDER BY day ASC`,
@@ -219,7 +219,7 @@ export class DashboardMetricsService {
     salesByDayRow[0]?.values.forEach((row: any[]) => { salesMap[row[0] as string] = row[1] as number; });
 
     const returnByDayRow = this.db.exec(
-      `SELECT sr.date, SUM(sr.total_amount) AS revenue 
+      `SELECT sr.date, SUM(sr.total_amount) / 100.0 AS revenue 
        FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id 
        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause} 
        GROUP BY sr.date`,
@@ -248,7 +248,7 @@ export class DashboardMetricsService {
     // ===== TOP PRODUCTS =====
     // Use net revenue (total_price - returns) for consistency
     const topProductsRow = this.db.exec(
-      `SELECT p.name, SUM(sii.quantity_m2) as qty, SUM(sii.total_price) as revenue, p.product_type, p.base_unit, p.custom_unit
+      `SELECT p.name, SUM(sii.quantity_m2) as qty, SUM(sii.total_price) / 100.0 as revenue, p.product_type, p.base_unit, p.custom_unit
        FROM sales_invoice_items sii 
        JOIN products p ON sii.product_id = p.id 
        JOIN sales_invoices si ON sii.invoice_id = si.id 
@@ -262,7 +262,7 @@ export class DashboardMetricsService {
 
     // ===== RECENT INVOICES =====
     const recentInvRow = this.db.exec(
-      `SELECT si.id, c.name, si.total_amount, si.date, si.payment_status 
+      `SELECT si.id, c.name, si.total_amount / 100.0 AS total_amount, si.date, si.payment_status 
        FROM sales_invoices si JOIN customers c ON si.customer_id = c.id 
        WHERE si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause} 
        ORDER BY si.created_at DESC LIMIT 5`,
@@ -274,7 +274,7 @@ export class DashboardMetricsService {
 
     // ===== DEBT CUSTOMERS =====
     const debtCustRow = this.db.exec(
-      `SELECT c.name, SUM(si.remaining_amount) AS current_balance 
+      `SELECT c.name, SUM(si.remaining_amount) / 100.0 AS current_balance 
        FROM sales_invoices si JOIN customers c ON c.id = si.customer_id 
        WHERE si.remaining_amount > 0 AND si.invoice_status != 'VOID' AND ${salesScope.clause} AND ${salesCompanyScope.clause} 
        GROUP BY c.id ORDER BY current_balance DESC LIMIT 5`,
@@ -285,10 +285,10 @@ export class DashboardMetricsService {
     // ===== BRANCH DATA =====
     const allAuthorizedBranchesScope = this.branchAccess.sqlScope('si.branch_id', undefined, actor, true);
     const branchRow = this.db.exec(
-      `SELECT b.name, COALESCE(SUM(si.total_amount), 0) 
+      `SELECT b.name, COALESCE(SUM(si.total_amount), 0) / 100.0 
        FROM branches b JOIN sales_invoices si ON si.branch_id = b.id 
        WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${allAuthorizedBranchesScope.clause} AND ${salesCompanyScope.clause} 
-       GROUP BY b.id HAVING COALESCE(SUM(si.total_amount), 0) > 0 ORDER BY 2 DESC`,
+       GROUP BY b.id HAVING COALESCE(SUM(si.total_amount), 0) / 100.0 > 0 ORDER BY 2 DESC`,
       [fromStr, periodTo, ...allAuthorizedBranchesScope.params, ...salesCompanyScope.params]
     );
     const branchDataList = branchRow[0]?.values.map((r: any[]) => ({ name: String(r[0]), value: Number(r[1]) })) ?? [];

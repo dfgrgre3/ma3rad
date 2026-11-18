@@ -4,6 +4,11 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { ProjectService } from './ProjectService';
 import type { ApartmentEstimateVersion } from '../../../types/projects/apartmentEstimate';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const CONTRACT_MONEY_FIELDS = ['contract_value'] as const;
+const CERTIFICATE_MONEY_FIELDS = ['requested_amount', 'approved_amount', 'paid_amount'] as const;
+const COST_ENTRY_MONEY_FIELDS = ['amount'] as const;
 
 type EstimateRow = { id: string; projectId: string; versionId: string; versionNumber: number; status: string; snapshotJson: string };
 export type ProjectExecutionSummary = {
@@ -98,7 +103,7 @@ export class ProjectExecutionService {
         [input.quotationId, input.estimateId, estimate.versionId, input.projectId]
       )[0];
       if (!link) throw new Error('عرض السعر غير مرتبط بهذا الإصدار المعتمد.');
-      amount = Number(this.db.query<{ totalAmount: number }>('SELECT total_amount AS totalAmount FROM quotations WHERE id = ?', [input.quotationId])[0]?.totalAmount) || amount;
+      amount = Number(this.db.query<{ totalAmount: number }>('SELECT total_amount / 100.0 AS totalAmount FROM quotations WHERE id = ?', [input.quotationId])[0]?.totalAmount) || amount;
     }
     const contractId = `pec_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const contractNumber = this.db.nextNumber('PCN');
@@ -106,10 +111,10 @@ export class ProjectExecutionService {
       db.run(
         `INSERT INTO project_estimate_contracts
          (id, project_id, estimate_id, estimate_version_id, contract_number, contract_date, contract_value, terms, quotation_id, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
         [contractId, input.projectId, input.estimateId, estimate.versionId, contractNumber, input.contractDate, amount, input.terms?.trim() || null, input.quotationId || null, actor.id]
       );
-      db.run('UPDATE projects SET contract_value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [amount, input.projectId]);
+      db.run('UPDATE projects SET contract_value = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?', [amount, input.projectId]);
     });
     this.audit('إنشاء عقد من إصدار مقايسة معتمد', contractId, { projectId: input.projectId, estimateId: input.estimateId, versionId: estimate.versionId, contractNumber, amount });
     return { id: contractId, contractNumber, contractValue: amount };
@@ -121,7 +126,7 @@ export class ProjectExecutionService {
       `SELECT c.*, v.version_number AS versionNumber, q.quotation_number AS quotationNumber
        FROM project_estimate_contracts c JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        LEFT JOIN quotations q ON q.id = c.quotation_id WHERE c.project_id = ? ORDER BY c.created_at DESC`, [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS));
   }
 
   public updateContractStatus(contractId: string, status: 'SIGNED' | 'CANCELLED') {
@@ -140,7 +145,7 @@ export class ProjectExecutionService {
       `SELECT c.*, v.version_number AS versionNumber FROM project_payment_certificates c
        JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id = ? ORDER BY c.certificate_date DESC, c.created_at DESC`, [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS));
   }
 
   public createCertificate(input: { projectId: string; estimateId: string; versionId?: string; contractId?: string; date: string; periodStart?: string; periodEnd?: string; description: string; progressPercent: number; amount: number }) {
@@ -154,11 +159,11 @@ export class ProjectExecutionService {
       if (!contract || contract.estimate_version_id !== estimate.versionId || contract.status === 'CANCELLED') throw new Error('العقد لا يتوافق مع إصدار المقايسة المعتمد.');
     }
     const contractValue = this.db.query<{ amount: number }>(
-      `SELECT contract_value AS amount FROM project_estimate_contracts WHERE project_id = ? AND status <> 'CANCELLED'`,
+      `SELECT contract_value / 100.0 AS amount FROM project_estimate_contracts WHERE project_id = ? AND status <> 'CANCELLED'`,
       [input.projectId]
     ).reduce((sum, contract) => sum + (Number(contract.amount) || 0), 0);
     const approvedCertificates = this.db.query<{ amount: number }>(
-      `SELECT COALESCE(SUM(approved_amount), 0) AS amount FROM project_payment_certificates WHERE project_id = ? AND status IN ('APPROVED','PAID')`,
+      `SELECT COALESCE(SUM(approved_amount), 0) / 100.0 AS amount FROM project_payment_certificates WHERE project_id = ? AND status IN ('APPROVED','PAID')`,
       [input.projectId]
     )[0]?.amount || 0;
     if (Number(approvedCertificates) + input.amount > contractValue + 0.005) throw new Error('قيمة المستخلص تتجاوز الرصيد المتبقي من العقود المعتمدة.');
@@ -167,7 +172,7 @@ export class ProjectExecutionService {
     this.db.run(
       `INSERT INTO project_payment_certificates
        (id, project_id, estimate_id, estimate_version_id, contract_id, certificate_number, certificate_date, period_start, period_end, description, progress_percent, requested_amount, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?)`,
       [id, input.projectId, input.estimateId, estimate.versionId, input.contractId || null, number, input.date, input.periodStart || null, input.periodEnd || null, input.description.trim(), input.progressPercent, input.amount, actor.id]
     );
     this.audit('إنشاء مستخلص مشروع', id, { projectId: input.projectId, estimateId: input.estimateId, versionId: estimate.versionId, amount: input.amount });
@@ -185,14 +190,14 @@ export class ProjectExecutionService {
   public reviewCertificate(id: string, decision: 'APPROVED' | 'RETURNED', notes = '') {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.projects.list.approve');
-    const row = this.db.query<any>('SELECT * FROM project_payment_certificates WHERE id = ?', [id])[0];
+    const row = unscaleMoneyRow(this.db.query<any>('SELECT * FROM project_payment_certificates WHERE id = ?', [id])[0], CERTIFICATE_MONEY_FIELDS);
     if (!row) throw new Error('المستخلص غير موجود.');
     if (!this.projects.getProjectById(row.project_id)) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
     if (row.status !== 'SUBMITTED') throw new Error('المستخلص يجب أن يكون مرسلًا للمراجعة.');
     if (row.created_by === actor.id) throw new Error('يجب أن يراجع المستخلص مستخدم مخول غير منشئه.');
     if (decision === 'RETURNED' && !notes.trim()) throw new Error('أضف ملاحظة عند إعادة المستخلص.');
     this.db.run(
-      `UPDATE project_payment_certificates SET status = ?, approved_amount = ?, review_notes = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE project_payment_certificates SET status = ?, approved_amount = ROUND(?*100), review_notes = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [decision, decision === 'APPROVED' ? Number(row.requested_amount) : null, notes.trim() || null, actor.id, id]
     );
     this.audit(decision === 'APPROVED' ? 'اعتماد مستخلص مشروع' : 'إعادة مستخلص للمراجعة', id, { projectId: row.project_id, notes: notes.trim() || null });
@@ -200,13 +205,13 @@ export class ProjectExecutionService {
 
   public recordCertificatePayment(id: string, amount: number, reference = '') {
     const _actor = this.requireWriteForRecord('project_payment_certificates', id);
-    const row = this.db.query<any>('SELECT * FROM project_payment_certificates WHERE id = ?', [id])[0];
+    const row = unscaleMoneyRow(this.db.query<any>('SELECT * FROM project_payment_certificates WHERE id = ?', [id])[0], CERTIFICATE_MONEY_FIELDS);
     if (!row || !['APPROVED', 'PAID'].includes(row.status)) throw new Error('لا يمكن تسجيل دفعة لمستخلص غير معتمد.');
     if (!Number.isFinite(amount) || amount <= 0 || Number(row.paid_amount) + amount > Number(row.approved_amount) + 0.005) throw new Error('قيمة الدفعة تتجاوز الرصيد المعتمد أو غير صالحة.');
     const paid = Number(row.paid_amount) + amount;
     this.db.run(
-      `UPDATE project_payment_certificates SET paid_amount = ?, payment_reference = ?, paid_at = CURRENT_TIMESTAMP,
-       status = CASE WHEN ? + 0.005 >= approved_amount THEN 'PAID' ELSE 'APPROVED' END WHERE id = ?`,
+      `UPDATE project_payment_certificates SET paid_amount = ROUND(?*100), payment_reference = ?, paid_at = CURRENT_TIMESTAMP,
+       status = CASE WHEN ? * 100 + 0.5 >= approved_amount THEN 'PAID' ELSE 'APPROVED' END WHERE id = ?`,
       [Number(paid.toFixed(2)), reference.trim() || null, paid, id]
     );
     this.audit('تسجيل دفعة مستخلص', id, { projectId: row.project_id, amount, totalPaid: paid, reference: reference.trim() || null });
@@ -219,7 +224,7 @@ export class ProjectExecutionService {
       `SELECT c.*, v.version_number AS versionNumber FROM project_actual_cost_entries c
        LEFT JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id = ? ORDER BY c.cost_date DESC, c.created_at DESC`, [projectId]
-    );
+    ).map((row) => unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS));
   }
 
   public addActualCost(input: { projectId: string; versionId?: string; budgetLineId?: string; date: string; category: string; description: string; amount: number; sourceType?: 'MANUAL' | 'PURCHASE' | 'LABOR' | 'OTHER'; referenceId?: string }) {
@@ -238,7 +243,7 @@ export class ProjectExecutionService {
     const id = `pac_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     this.db.run(
       `INSERT INTO project_actual_cost_entries (id, project_id, estimate_version_id, budget_line_id, cost_date, category, description, amount, source_type, reference_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?)`,
       [id, input.projectId, input.versionId || null, input.budgetLineId || null, input.date, input.category.trim(), input.description.trim(), input.amount, input.sourceType || 'MANUAL', input.referenceId?.trim() || null, actor.id]
     );
     this.audit('تسجيل تكلفة فعلية للمشروع', id, { projectId: input.projectId, amount: input.amount, sourceType: input.sourceType || 'MANUAL' });
@@ -248,11 +253,11 @@ export class ProjectExecutionService {
   public getSummary(projectId: string): ProjectExecutionSummary {
     this.requireView(projectId);
     const budget = this.projects.getBudgetLines(projectId);
-    const costs = this.db.query<{ category: string; amount: number }>(`SELECT category, SUM(amount) AS amount FROM project_actual_cost_entries WHERE project_id = ? GROUP BY category`, [projectId]);
+    const costs = this.db.query<{ category: string; amount: number }>(`SELECT category, SUM(amount) / 100.0 AS amount FROM project_actual_cost_entries WHERE project_id = ? GROUP BY category`, [projectId]);
     const costByCategory = new Map(costs.map((row) => [row.category, Number(row.amount) || 0]));
     const certs = this.db.query<{ approved: number; paid: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN status IN ('APPROVED','PAID') THEN approved_amount ELSE 0 END),0) AS approved,
-              COALESCE(SUM(paid_amount),0) AS paid FROM project_payment_certificates WHERE project_id = ?`, [projectId]
+      `SELECT COALESCE(SUM(CASE WHEN status IN ('APPROVED','PAID') THEN approved_amount ELSE 0 END),0) / 100.0 AS approved,
+              COALESCE(SUM(paid_amount),0) / 100.0 AS paid FROM project_payment_certificates WHERE project_id = ?`, [projectId]
     )[0];
     const project = this.projects.getProjectById(projectId);
     const plannedCost = budget.reduce((sum, item) => sum + Number(item.plannedAmount || 0), 0);

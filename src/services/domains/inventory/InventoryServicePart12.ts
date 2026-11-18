@@ -1,5 +1,6 @@
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { financialFieldVisibility } from '../auth/sensitiveFields';
 import { InventoryServicePart11 } from './InventoryServicePart11';
 import { StockTrackedProductPolicy } from './StockTrackedProductPolicy';
 
@@ -18,7 +19,7 @@ public getReorderPlanning(warehouseId?: string, search?: string, includeInsuffic
         w.id as warehouseId, w.name as warehouseName,
         COALESCE(ws.quantity_m2, 0) as currentStockM2,
         COALESCE(ws.reserved_m2, 0) as reservedStockM2,
-        COALESCE(p.cost_price, 0) as unitCost,
+        COALESCE(p.cost_price, 0) / 100.0 as unitCost,
         COALESCE(pwp.min_stock_level, p.min_stock_level, 0) as minStockLevel,
         COALESCE(pwp.max_stock_level, p.max_stock_level, 0) as maxStockLevel,
         COALESCE(pwp.reorder_point, p.reorder_point, 0) as reorderPoint,
@@ -72,6 +73,7 @@ public getReorderPlanning(warehouseId?: string, search?: string, includeInsuffic
     }
     sql += ` ORDER BY p.name ASC`;
 
+    const canSeeCost = financialFieldVisibility().cost;
     const rows = this.db.query<any>(sql, params);
 
     return rows.map(r => {
@@ -143,7 +145,8 @@ public getReorderPlanning(warehouseId?: string, search?: string, includeInsuffic
         netSalesPast60Days: netSales60,
         salesPast60Days: netSales60,
         suggestedOrderM2,
-        suggestedOrderValue,
+        suggestedOrderValue: canSeeCost ? suggestedOrderValue : 0,
+        unitCost: canSeeCost ? unitCost : 0,
         stockStatus,
         predictionStatus,
         suggestionReason,

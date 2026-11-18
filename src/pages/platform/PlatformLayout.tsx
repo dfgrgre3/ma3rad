@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -268,7 +268,9 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

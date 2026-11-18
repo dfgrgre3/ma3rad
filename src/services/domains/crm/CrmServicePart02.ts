@@ -56,7 +56,7 @@ public deleteActivity(id: string): void {
 public getPipelineStats(): { stage: LeadStage; count: number; value: number }[] {
     this.requireView();
     return this.db.query<{ stage: LeadStage; count: number; value: number }>(
-      `SELECT stage, COUNT(*) AS count, COALESCE(SUM(estimated_value), 0) AS value
+      `SELECT stage, COUNT(*) AS count, COALESCE(SUM(estimated_value) / 100.0, 0) AS value
        FROM leads GROUP BY stage`
     );
   }

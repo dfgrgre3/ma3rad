@@ -55,7 +55,7 @@ public dispatchTransfer(transferId: string, idempotencyKey?: string): void {
         const productId = item.productId ?? item.product_id;
         const productName = item.productName ?? item.product_name;
         const quantityM2 = Number(item.quantityM2 ?? item.quantity_m2 ?? 0);
-        const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0);
+        const itemUnitCost = Number(item.unitCost ?? item.unit_cost ?? 0) / 100;
 
         const stock = txDb.query<{ quantity: number; reserved: number }>(`
           SELECT quantity_m2 AS quantity, COALESCE(reserved_m2, 0) AS reserved
@@ -101,7 +101,7 @@ public dispatchTransfer(transferId: string, idempotencyKey?: string): void {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
             notes, performed_by, created_at
-          ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
           txId, txNum, productId, fromWarehouseId,
           -quantityM2, -boxes, unitCost, Number((quantityM2 * unitCost).toFixed(2)),
@@ -129,7 +129,7 @@ public dispatchTransfer(transferId: string, idempotencyKey?: string): void {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
             notes, performed_by, created_at
-          ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER_TRANSIT', ?, ?, ?, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'TRANSFER_TRANSIT', ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
           transitTxId, transitTxNum, productId, transitWarehouseId,
           quantityM2, boxes, unitCost, Number((quantityM2 * unitCost).toFixed(2)),
@@ -150,7 +150,7 @@ public dispatchTransfer(transferId: string, idempotencyKey?: string): void {
 
         txDb.run(`
           UPDATE stock_transfer_items
-          SET shipped_m2 = quantity_m2, unit_cost = ?
+          SET shipped_m2 = quantity_m2, unit_cost = ROUND(?*100)
           WHERE id = ?
         `, [unitCost, item.id]);
 

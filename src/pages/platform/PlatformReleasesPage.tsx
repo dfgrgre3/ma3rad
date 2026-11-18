@@ -17,6 +17,8 @@ import {
   FileCode,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
+import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformRelease,
@@ -50,11 +52,55 @@ const emptyRelease: PlatformRelease = {
   updatedAt: '',
 };
 
+interface CentralReleaseRow {
+  id: string;
+  version: string;
+  channel: string;
+  status: string;
+  rolloutStrategy: string;
+  rolloutPercent: number;
+  targetTenantIds: string[];
+  downloadUrl: string | null;
+  checksum: string | null;
+  releaseNotes: string | null;
+  minRequiredVersion: string | null;
+  isMandatory: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapCentralRelease(r: CentralReleaseRow): PlatformRelease & { _central?: CentralReleaseRow } {
+  const targets = Array.isArray(r.targetTenantIds) ? r.targetTenantIds : [];
+  return {
+    id: r.id,
+    version: r.version,
+    channel: (r.channel === 'BETA' ? 'BETA' : r.channel === 'ALPHA' ? 'ALPHA' : 'STABLE') as PlatformRelease['channel'],
+    status: (r.status === 'PUBLISHED' ? 'PUBLISHED' : r.status === 'DRAFT' ? 'DRAFT' : 'DEPRECATED') as PlatformRelease['status'],
+    isMandatory: r.isMandatory,
+    minVersion: r.minRequiredVersion || '1.0.0',
+    rolloutGroup: targets.length
+      ? `TARGETED ${targets.length}`
+      : r.rolloutStrategy === 'PHASED'
+        ? `PHASED ${r.rolloutPercent}%`
+        : 'ALL',
+    notes: r.releaseNotes || '',
+    fileUrl: r.downloadUrl || '',
+    fileName: '',
+    checksumSha256: r.checksum || '',
+    changelog: r.releaseNotes || '',
+    createdAt: r.publishedAt || r.createdAt,
+    updatedAt: r.updatedAt,
+    _central: r,
+  } as PlatformRelease & { _central?: CentralReleaseRow };
+}
+
 export const PlatformReleasesPage: React.FC = () => {
   const [releases, setReleases] = useState<PlatformRelease[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const centralActive = getCentralDataSourceState().active;
 
   // Targets Modal
   const [activeReleaseForTargets, setActiveReleaseForTargets] = useState<PlatformRelease | null>(null);
@@ -70,6 +116,17 @@ export const PlatformReleasesPage: React.FC = () => {
 
   const loadData = useCallback(() => {
     setLoading(true);
+    if (centralActive) {
+      Promise.all([centralPlatformClient.listReleases(), centralPlatformClient.listTenants('', '', '')])
+        .then(([rels, tens]) => {
+          setReleases((rels as CentralReleaseRow[]).map(mapCentralRelease));
+          setTenants(tens as PlatformTenant[]);
+          setError(null);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل إصدارات المنصة.'))
+        .finally(() => setLoading(false));
+      return;
+    }
     try {
       const rels = platformAdminService.listReleases();
       const tens = platformAdminService.listTenants();
@@ -81,7 +138,7 @@ export const PlatformReleasesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [centralActive]);
 
   useEffect(() => {
     loadData();
@@ -90,6 +147,13 @@ export const PlatformReleasesPage: React.FC = () => {
   const handleOpenTargets = (rel: PlatformRelease) => {
     setActiveReleaseForTargets(rel);
     setTargetsLoading(true);
+    if (centralActive) {
+      const central = (rel as any)._central as CentralReleaseRow | undefined;
+      setSelectedTenantIds(Array.isArray(central?.targetTenantIds) ? central.targetTenantIds : []);
+      setTargets([]);
+      setTargetsLoading(false);
+      return;
+    }
     try {
       const list = platformAdminService.listReleaseTargets(rel.id);
       setTargets(list);
@@ -107,6 +171,17 @@ export const PlatformReleasesPage: React.FC = () => {
       alert('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
+    if (centralActive) {
+      const central = (activeReleaseForTargets as any)._central as CentralReleaseRow | undefined;
+      centralPlatformClient.updateRelease(activeReleaseForTargets.id, {
+        targetTenantIds: selectedTenantIds,
+        rolloutStrategy: selectedTenantIds.length ? 'PHASED' : (central?.rolloutStrategy === 'PHASED' ? 'PHASED' : 'FULL'),
+        rolloutPercent: central?.rolloutPercent ?? 100,
+      })
+        .then(() => { setActiveReleaseForTargets(null); loadData(); })
+        .catch((err) => alert(err instanceof Error ? err.message : 'فشل تحديث أهداف العملاء.'));
+      return;
+    }
     try {
       platformAdminService.setReleaseTargets(activeReleaseForTargets.id, selectedTenantIds);
       setActiveReleaseForTargets(null);
@@ -119,6 +194,22 @@ export const PlatformReleasesPage: React.FC = () => {
   const handleDisableRelease = (id: string) => {
     if (!canManageReleases) {
       alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
+    const rel = releases.find((r) => r.id === id);
+    if (centralActive) {
+      const central = (rel as any)?._central as CentralReleaseRow | undefined;
+      if (central?.status === 'PUBLISHED') {
+        if (!confirm('إيقاف هذا الإصدار المنشور (rollback)؟ لن يصل للعملاء الجدد.')) return;
+        centralPlatformClient.rollbackRelease(id)
+          .then(loadData)
+          .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إيقاف الإصدار.'));
+      } else {
+        if (!confirm('حذف هذا الإصدار غير المنشور؟')) return;
+        centralPlatformClient.deleteRelease(id)
+          .then(loadData)
+          .catch((err) => alert(err instanceof Error ? err.message : 'تعذر حذف الإصدار.'));
+      }
       return;
     }
     if (!confirm('هل أنت متأكد من تعطيل/إيقاف هذا الإصدار لمنع تحميله أو استخدامه؟')) return;
@@ -135,6 +226,13 @@ export const PlatformReleasesPage: React.FC = () => {
       alert('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
+    if (centralActive) {
+      if (!confirm(`إيقاف الإصدار ${rel.version} (rollback)؟`)) return;
+      centralPlatformClient.rollbackRelease(rel.id)
+        .then(loadData)
+        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع.'));
+      return;
+    }
     const safeVer = prompt(`أدخل الإصدار الآمن الذي ترغب في التراجع الطارئ إليه (الإصدار الحالي: ${rel.version}):`);
     if (!safeVer || !safeVer.trim()) return;
     try {
@@ -145,6 +243,16 @@ export const PlatformReleasesPage: React.FC = () => {
     }
   };
 
+  const handlePublish = (id: string) => {
+    if (!canManageReleases) {
+      alert('لا تملك صلاحية إدارة الإصدارات.');
+      return;
+    }
+    centralPlatformClient.publishRelease(id)
+      .then(loadData)
+      .catch((err) => alert(err instanceof Error ? err.message : 'تعذر نشر الإصدار.'));
+  };
+
   const handleSaveRelease = () => {
     if (!canManageReleases) {
       alert('لا تملك صلاحية إدارة الإصدارات.');
@@ -152,6 +260,30 @@ export const PlatformReleasesPage: React.FC = () => {
     }
     if (!releaseForm.version.trim()) {
       alert('رقم الإصدار مطلوب.');
+      return;
+    }
+    if (centralActive) {
+      const channel = releaseForm.channel === 'HOTFIX' ? 'BETA' : releaseForm.channel;
+      const payload = {
+        version: releaseForm.version.trim(),
+        channel,
+        releaseNotes: releaseForm.changelog || releaseForm.notes || '',
+        downloadUrl: releaseForm.fileUrl || '',
+        checksum: releaseForm.checksumSha256 || '',
+        minRequiredVersion: releaseForm.minVersion || '',
+        isMandatory: Boolean(releaseForm.isMandatory),
+        rolloutStrategy: 'FULL',
+        rolloutPercent: 100,
+        targetTenantIds: [],
+      };
+      const existing = (releaseForm as any)._central as CentralReleaseRow | undefined;
+      const request = existing
+        ? centralPlatformClient.updateRelease(releaseForm.id, payload)
+        : centralPlatformClient.createRelease(payload).then((created: any) =>
+            centralPlatformClient.publishRelease(created?.id ?? created?.data?.id ?? releaseForm.id));
+      Promise.resolve(request)
+        .then(() => { setIsUpsertOpen(false); loadData(); })
+        .catch((err) => alert(err instanceof Error ? err.message : 'فشل حفظ الإصدار.'));
       return;
     }
     try {
@@ -292,6 +424,16 @@ export const PlatformReleasesPage: React.FC = () => {
                             العملاء
                           </button>
 
+                          {centralActive && rel.status === 'DRAFT' && canManageReleases && (
+                            <button
+                              onClick={() => handlePublish(rel.id)}
+                              className="text-emerald-400 hover:text-emerald-300 text-xs font-bold"
+                              title="نشر الإصدار"
+                            >
+                              نشر
+                            </button>
+                          )}
+
                           {rel.status !== 'DEPRECATED' && canManageReleases && (
                             <>
                               <button
@@ -419,7 +561,7 @@ export const PlatformReleasesPage: React.FC = () => {
                 className={inputClass}
               >
                 <option value="STABLE">مستقر (STABLE)</option>
-                <option value="HOTFIX">إصلاح طارئ (HOTFIX)</option>
+                {!centralActive && <option value="HOTFIX">إصلاح طارئ (HOTFIX)</option>}
                 <option value="BETA">تجريبي (BETA)</option>
                 <option value="ALPHA">داخلي (ALPHA)</option>
               </select>

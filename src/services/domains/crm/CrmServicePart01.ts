@@ -28,12 +28,18 @@ public getLeads(search = '', stage?: string): Lead[] {
       params.push(stage);
     }
     sql += ` ORDER BY l.created_at DESC`;
-    return this.db.query<Lead>(sql, params);
+    return this.db.query<Lead>(sql, params).map((row: any) => {
+      const v = Number(row.estimated_value ?? row.estimatedValue ?? 0);
+      return { ...row, estimated_value: v / 100, estimatedValue: v / 100 };
+    });
   }
 
 public getLeadById(id: string): Lead | null {
     this.requireView();
-    return this.db.query<Lead>(`SELECT * FROM leads WHERE id = ?`, [id])[0] || null;
+    const row: any = this.db.query<Lead>(`SELECT * FROM leads WHERE id = ?`, [id])[0];
+    if (!row) return null;
+    const v = Number(row.estimated_value ?? row.estimatedValue ?? 0);
+    return { ...row, estimated_value: v / 100, estimatedValue: v / 100 };
   }
 
 public createLead(input: {
@@ -52,7 +58,7 @@ public createLead(input: {
         `INSERT INTO leads (
           id, code, name, phone, email, city, address, source, lead_type, stage,
           estimated_value, probability, assigned_to, next_follow_up, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?)`,
         [
           id, code, input.name.trim(), input.phone.trim(), input.email || null, input.city || null,
           input.address || null, input.source || 'OTHER', input.leadType || 'RETAIL',
@@ -76,7 +82,7 @@ public updateLead(id: string, patch: Partial<Lead>): Lead {
           name = COALESCE(?, name), phone = COALESCE(?, phone), phone2 = COALESCE(?, phone2),
           email = COALESCE(?, email), city = COALESCE(?, city), address = COALESCE(?, address),
           source = COALESCE(?, source), lead_type = COALESCE(?, lead_type), stage = COALESCE(?, stage),
-          estimated_value = COALESCE(?, estimated_value), probability = COALESCE(?, probability),
+          estimated_value = COALESCE(ROUND(?*100), estimated_value), probability = COALESCE(?, probability),
           assigned_to = COALESCE(?, assigned_to), next_follow_up = ?,
           lost_reason = COALESCE(?, lost_reason), notes = COALESCE(?, notes),
           updated_at = ?

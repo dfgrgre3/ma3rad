@@ -7,6 +7,7 @@ import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { NotificationService } from '../notifications/NotificationService';
 import { localDateString, addLocalDays } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
 
 export type FacilityServiceCategory = 'MAINTENANCE' | 'CLEANING' | 'SECURITY' | 'UTILITY' | 'LEASE' | 'OTHER';
 export type ContractStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'TERMINATED';
@@ -364,12 +365,12 @@ export class FacilityContractSLAService {
               fl.name AS locationName, fc.contract_type AS contractType, fc.title,
               fc.vendor_name AS vendorName, fc.supplier_id AS supplierId,
               s.name AS supplierName, fc.starts_at AS startsAt, fc.ends_at AS endsAt,
-              fc.next_payment_date AS nextPaymentDate, fc.payment_amount AS paymentAmount,
+              fc.next_payment_date AS nextPaymentDate, fc.payment_amount / 100.0 AS paymentAmount,
               fc.payment_cycle AS paymentCycle, fc.status,
               fc.expense_reference AS expenseReference,
               fc.sla_response_time_minutes AS slaResponseTimeMinutes,
               fc.sla_resolution_time_minutes AS slaResolutionTimeMinutes,
-              fc.sla_penalty_per_delay AS slaPenaltyPerDelay,
+              fc.sla_penalty_per_delay / 100.0 AS slaPenaltyPerDelay,
               fc.auto_renew AS autoRenew, fc.renewal_notice_days AS renewalNoticeDays,
               fc.vendor_rating AS vendorRating, fc.last_evaluation_date AS lastEvaluationDate,
               fc.amendment_count AS amendmentCount
@@ -453,7 +454,7 @@ export class FacilityContractSLAService {
     setField('supplier_id', input.supplierId);
     setField('sla_response_time_minutes', input.slaResponseTimeMinutes);
     setField('sla_resolution_time_minutes', input.slaResolutionTimeMinutes);
-    setField('sla_penalty_per_delay', input.slaPenaltyPerDelay);
+    if (input.slaPenaltyPerDelay !== undefined) { updates.push('sla_penalty_per_delay = ROUND(?*100)'); params.push(input.slaPenaltyPerDelay); }
     setField('auto_renew', input.autoRenew !== undefined ? (input.autoRenew ? 1 : 0) : undefined);
     setField('renewal_notice_days', input.renewalNoticeDays);
     if (!updates.length) throw new Error('لا توجد بيانات للتعديل.');
@@ -473,8 +474,8 @@ export class FacilityContractSLAService {
     const today = localDateString();
     const rows = this.db.query<any>(
       `SELECT fcp.id, fcp.contract_id AS contractId, fcp.payment_number AS paymentNumber,
-              fcp.due_date AS dueDate, fcp.amount_due AS amountDue,
-              fcp.amount_paid AS amountPaid, fcp.payment_date AS paymentDate,
+              fcp.due_date AS dueDate, fcp.amount_due / 100.0 AS amountDue,
+              fcp.amount_paid / 100.0 AS amountPaid, fcp.payment_date AS paymentDate,
               fcp.payment_method AS paymentMethod, fcp.reference_number AS referenceNumber,
               fcp.proof_reference AS proofReference, fcp.status,
               fcp.notes, fcp.created_by AS createdBy, fcp.created_at AS createdAt,
@@ -526,7 +527,7 @@ export class FacilityContractSLAService {
       `INSERT INTO facility_contract_payments
          (id, contract_id, payment_number, due_date, amount_due, amount_paid,
           payment_method, reference_number, proof_reference, status, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'PENDING', ?, ?)`,
+       VALUES (?, ?, ?, ?, ROUND(?*100), 0, ?, ?, ?, 'PENDING', ?, ?)`,
       [id, contractId, input.paymentNumber.trim(), input.dueDate,
         Math.max(0, Number(input.amountDue)), input.paymentMethod || null,
         input.referenceNumber || null, input.proofReference || null,
@@ -556,6 +557,7 @@ export class FacilityContractSLAService {
        WHERE fcp.id = ? AND fc.company_id = ?`,
       [paymentId, companyId]
     )[0];
+    if (payment) unscaleMoneyRow(payment, ['amount_due', 'amount_paid']);
     if (!payment) throw new Error('الدفعة غير موجودة.');
     if (payment.status === 'PAID') throw new Error('الدفعة مسددة مسبقاً.');
     if (!isValidDate(input.paymentDate)) throw new Error('تاريخ الدفع غير صالح.');
@@ -564,7 +566,7 @@ export class FacilityContractSLAService {
     const newPaid = roundNumber(Number(payment.amount_paid) + Number(input.amountPaid));
     const newStatus = newPaid >= Number(payment.amount_due) ? 'PAID' : 'PARTIAL';
     this.db.run(
-      `UPDATE facility_contract_payments SET amount_paid = ?, payment_date = ?,
+      `UPDATE facility_contract_payments SET amount_paid = ROUND(?*100), payment_date = ?,
          payment_method = ?, reference_number = COALESCE(?, reference_number),
          proof_reference = COALESCE(?, proof_reference), status = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
@@ -629,7 +631,7 @@ export class FacilityContractSLAService {
     const rows = this.db.query<any>(
       `SELECT fcr.id, fcr.contract_id AS contractId, fc.title AS contractTitle,
               fcr.renewal_number AS renewalNumber, fcr.previous_ends_at AS previousEndsAt,
-              fcr.new_ends_at AS newEndsAt, fcr.new_payment_amount AS newPaymentAmount,
+              fcr.new_ends_at AS newEndsAt, fcr.new_payment_amount / 100.0 AS newPaymentAmount,
               fcr.new_payment_cycle AS newPaymentCycle, fcr.status,
               fcr.approved_by AS approvedBy, u.full_name AS approvedByName,
               fcr.approved_at AS approvedAt, fcr.notes,
@@ -679,7 +681,7 @@ export class FacilityContractSLAService {
       `INSERT INTO facility_contract_renewals
          (id, contract_id, renewal_number, previous_ends_at, new_ends_at,
           new_payment_amount, new_payment_cycle, status, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, 'PENDING', ?, ?)`,
       [id, contractId, renewalNumber, contract.endsAt, input.newEndsAt,
         Math.max(0, Number(input.newPaymentAmount)), input.newPaymentCycle,
         input.notes || null, actor.id]

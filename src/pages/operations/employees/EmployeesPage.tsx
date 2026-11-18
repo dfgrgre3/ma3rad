@@ -35,6 +35,7 @@ export const EmployeesPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.manage');
   const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.export');
+  const canViewAttendance = PermissionService.can(AuthService.getCurrentUser(), 'employees.attendance.view');
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -113,6 +114,8 @@ export const EmployeesPage: React.FC = () => {
 
   // --- Active Tab ---
   const [activeTab, setActiveTab] = useState<EmployeeTab>('directory');
+  // تبويب الحضور يتطلب صلاحية الحضور المنفصلة — الدليل متاح لكل من يملك عرض الموظفين.
+  const viewTab: EmployeeTab = activeTab === 'attendance' && !canViewAttendance ? 'directory' : activeTab;
 
   // --- Filtering & Search ---
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -501,12 +504,13 @@ export const EmployeesPage: React.FC = () => {
         canExport={canExportEmployees}
         onExport={handleExportEmployees}
       />
-      {activeTab === 'directory' && <div className="px-4 pb-2"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>}
+      {viewTab === 'directory' && <div className="px-4 pb-2"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>}
 
       {/* Tabs Switcher */}
       <EmployeeTabs
-        activeTab={activeTab}
+        activeTab={viewTab}
         canManageEmployees={canManageEmployees}
+        canViewAttendance={canViewAttendance}
         onTabChange={setActiveTab}
       />
 
@@ -514,7 +518,7 @@ export const EmployeesPage: React.FC = () => {
       <div className="flex-1 overflow-hidden flex flex-col">
 
         <EmployeeFilters
-          activeTab={activeTab}
+          activeTab={viewTab}
           searchQuery={searchQuery}
           selectedLocation={selectedLocation}
           attendanceDate={attendanceDate}
@@ -528,7 +532,7 @@ export const EmployeesPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4">
 
           {/* TAB 1: DIRECTORY (دليل العمال وتوزيعهم) */}
-          {activeTab === 'directory' && (
+          {viewTab === 'directory' && (
             <EmployeeDirectoryTab
               employees={filteredEmployees}
               canManageEmployees={canManageEmployees}
@@ -544,7 +548,7 @@ export const EmployeesPage: React.FC = () => {
           )}
 
           {/* TAB 2: WAGES & FINANCES (أجور وحسابات العمال) */}
-          {activeTab === 'finance' && (
+          {viewTab === 'finance' && (
             <EmployeeFinanceTab
               employees={filteredEmployees}
               allEmployees={employees}
@@ -560,7 +564,7 @@ export const EmployeesPage: React.FC = () => {
           )}
 
           {/* TAB 3: ATTENDANCE (حضور وانصراف العمال اليومي) */}
-          {activeTab === 'attendance' && (
+          {viewTab === 'attendance' && (
             <EmployeeAttendanceTab
               employees={filteredEmployees}
               allEmployees={employees}
@@ -572,7 +576,7 @@ export const EmployeesPage: React.FC = () => {
           )}
 
           {/* TAB 4: ANALYTICS & REPORTS (لوحة التقارير والتحليلات) */}
-          {activeTab === 'analytics' && (
+          {viewTab === 'analytics' && (
             <EmployeeAnalyticsTab
               employees={employees}
               transactions={transactions}

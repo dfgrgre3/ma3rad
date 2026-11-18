@@ -182,19 +182,24 @@ export const SalesView: React.FC = () => {
 
   const load = () => {
     setLoading(true);
-    try {
-      const currentInvoices = salesService.getInvoicesFiltered(filters) as InvoiceRow[];
-      setOperationalFields(operationalFieldService.getDefinitions('sales_invoices'));
-      const valueMap = operationalFieldService.getRecordValuesForRecords('sales_invoices', currentInvoices.map((invoice) => invoice.id));
-      setOperationalValuesByInvoice(valueMap);
-      setInvoices(currentInvoices.filter((invoice) => matchesOperationalFieldFilters(invoice.id, valueMap, operationalFieldFilters)));
-      setStats(salesService.getStats(filters));
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل فواتير المبيعات.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const [currentInvoices, statsResult] = await Promise.all([
+          salesService.getInvoicesFilteredAsync(filters) as Promise<InvoiceRow[]>,
+          salesService.getStatsAsync(filters),
+        ]);
+        setOperationalFields(operationalFieldService.getDefinitions('sales_invoices'));
+        const valueMap = operationalFieldService.getRecordValuesForRecords('sales_invoices', currentInvoices.map((invoice) => invoice.id));
+        setOperationalValuesByInvoice(valueMap);
+        setInvoices(currentInvoices.filter((invoice) => matchesOperationalFieldFilters(invoice.id, valueMap, operationalFieldFilters)));
+        setStats(statsResult);
+        setError(null);
+      } catch (e: any) {
+        setError(e?.message || 'تعذر تحميل فواتير المبيعات.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,16 +211,26 @@ export const SalesView: React.FC = () => {
   const pageItems = invoices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const openDetails = (invoice: InvoiceRow) => {
-    const full = salesService.getInvoiceById(invoice.id);
-    if (!full) return;
-    setSelected(full);
-    setPayments(canViewDebts ? salesService.getInvoicePayments(invoice.id) : []);
+    (async () => {
+      const [full, payments] = await Promise.all([
+        salesService.getInvoiceByIdAsync(invoice.id),
+        canViewDebts ? salesService.getInvoicePaymentsAsync(invoice.id) : Promise.resolve([]),
+      ]);
+      if (!full) return;
+      setSelected(full);
+      setPayments(payments);
+    })();
   };
 
   const refreshSelected = (invoiceId: string) => {
-    const full = salesService.getInvoiceById(invoiceId);
-    setSelected(full);
-    setPayments(canViewDebts ? salesService.getInvoicePayments(invoiceId) : []);
+    (async () => {
+      const [full, payments] = await Promise.all([
+        salesService.getInvoiceByIdAsync(invoiceId),
+        canViewDebts ? salesService.getInvoicePaymentsAsync(invoiceId) : Promise.resolve([]),
+      ]);
+      setSelected(full);
+      setPayments(payments);
+    })();
   };
 
   const openVoid = (invoice: InvoiceRow) => {

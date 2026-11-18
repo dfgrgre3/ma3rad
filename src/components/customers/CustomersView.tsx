@@ -87,9 +87,9 @@ export const CustomersView: React.FC = () => {
     catch { setBankAccounts([]); }
   }, [financeEnterpriseService]);
 
-  const loadCustomers = useCallback(() => {
+  const loadCustomers = useCallback(async () => {
     try {
-      const result = customerService.getCustomersPage(search, page, pageSize, fieldFilters);
+      const result = await customerService.getCustomersPageAsync(search, page, pageSize, fieldFilters);
       setCustomers(result.items);
       setOperationalFields(operationalFieldService.getDefinitions('customers'));
       setCustomerFieldValues(operationalFieldService.getRecordValuesForExport(

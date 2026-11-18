@@ -44,6 +44,15 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
   // Key rotation state
   const [rotatingKey, setRotatingKey] = React.useState(false);
 
+  // Central data source state
+  const [dataSource, setDataSourceState] = React.useState<'local' | 'central'>(() => {
+    try {
+      return platformAdminService.getDataSource();
+    } catch {
+      return 'local';
+    }
+  });
+
   // Password Change state
   const [passwordForm, setPasswordForm] = React.useState({ current: '', next: '', confirm: '' });
   const [changingPassword, setChangingPassword] = React.useState(false);
@@ -83,6 +92,27 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       toast.error('تعذر حفظ الإعدادات', err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDataSourceChange = (value: 'local' | 'central') => {
+    if (!canManageSettings) {
+      toast.error('لا تملك صلاحية تعديل إعدادات المنصة');
+      return;
+    }
+    if (!window.confirm(
+      value === 'central'
+        ? 'تحويل شاشات المنصة لقراءة وكتابة البيانات من السيرفر المركزي؟ الشاشات غير المتوافقة بعد ستبقى على القاعدة المحلية.'
+        : 'إعادة شاشات المنصة للقراءة والكتابة من القاعدة المحلية؟'
+    )) {
+      return;
+    }
+    try {
+      platformAdminService.setDataSource(value);
+      setDataSourceState(value);
+      toast.success(value === 'central' ? 'تم تفعيل المصدر المركزي للبيانات' : 'تم تفعيل المصدر المحلي للبيانات');
+    } catch (err) {
+      toast.error('تعذر تغيير مصدر البيانات', err instanceof Error ? err.message : undefined);
     }
   };
 
@@ -563,6 +593,29 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 </label>
               </div>
             </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <h4 className="text-xs font-bold text-slate-800 mb-1">مصدر بيانات لوحة المنصة</h4>
+              <p className="text-[11px] text-slate-500 mb-3">
+                «المحلي» يقرأ ويكتب قاعدة بيانات هذا الجهاز. «المركزي» يوجّه الشاشات المدعومة (الأدوار، سجل العمليات، الأجهزة، التراخيص، الإشعارات، التكاملات) إلى السيرفر المركزي عبر جسر الاتصال الآمن.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={dataSource}
+                  disabled={!canManageSettings}
+                  onChange={(e) => handleDataSourceChange(e.target.value as 'local' | 'central')}
+                  className={`${inputClass} max-w-[220px]`}
+                >
+                  <option value="local">محلي (Local Database)</option>
+                  <option value="central">مركزي (Central Server)</option>
+                </select>
+                {dataSource === 'central' && (
+                  <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[10.5px] font-bold text-sky-700 border border-sky-200">
+                    الشاشات المدعومة تقرأ من السيرفر المركزي
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -658,7 +711,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <div>
                   تاريخ آخر تدوير:{' '}
                   <strong className="text-slate-800 font-mono">
-                    {formatDateTime(settings.lastEncryptionRotation || '2026-01-01')}
+                    {formatDateTime(String(settings.lastEncryptionRotation || '2026-01-01'))}
                   </strong>
                 </div>
               </div>

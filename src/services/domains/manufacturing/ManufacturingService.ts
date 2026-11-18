@@ -292,7 +292,7 @@ export class ManufacturingService {
     return this.db.query<WorkCenter>(
       `SELECT * FROM work_centers wc WHERE ${conditions.join(' AND ')} ORDER BY wc.code`,
       params
-    );
+    ).map((row: any) => ({ ...row, cost_per_hour: Number(row.cost_per_hour ?? 0) / 100, costPerHour: Number(row.cost_per_hour ?? row.costPerHour ?? 0) / 100 }));
   }
 
   public createWorkCenter(input: CreateWorkCenterDTO): WorkCenter {
@@ -307,14 +307,16 @@ export class ManufacturingService {
     const now = new Date().toISOString();
     this.db.run(
       `INSERT INTO work_centers (id, code, name, description, cost_per_hour, capacity_per_day, branch_id, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, 1, ?, ?)`,
       [
         id, input.code.trim().toUpperCase(), input.name.trim(), input.description?.trim() || null,
         input.costPerHour ?? 0, input.capacityPerDay ?? 0, branchId, now, now,
       ]
     );
     this.audit('إضافة مركز عمل', id, { code: input.code.trim(), name: input.name.trim(), branchId });
-    return this.db.query<WorkCenter>(`SELECT * FROM work_centers WHERE id = ?`, [id])[0];
+    const wc: any = this.db.query<WorkCenter>(`SELECT * FROM work_centers WHERE id = ?`, [id])[0];
+    if (wc) { wc.cost_per_hour = Number(wc.cost_per_hour ?? 0) / 100; wc.costPerHour = Number(wc.cost_per_hour) / 100; }
+    return wc;
   }
 
   public getBoms(productId?: string): BillOfMaterials[] {
@@ -974,7 +976,7 @@ export class ManufacturingService {
     if (input.cost !== undefined) {
       const v = Number(input.cost);
       if (!Number.isFinite(v) || v < 0) throw new Error('التكلفة غير صالحة.');
-      updates.push('cost = ?'); params.push(v);
+      updates.push('cost = ROUND(?*100)'); params.push(v);
     }
     if (input.notes !== undefined) {
       updates.push('notes = ?');
@@ -998,7 +1000,7 @@ export class ManufacturingService {
       status: row.status,
       scheduledDate: row.scheduledDate ?? null,
       completedDate: row.completedDate ?? null,
-      cost: Number(row.cost || 0),
+      cost: Number(row.cost || 0) / 100,
       notes: row.notes ?? null,
       performedBy: row.performedBy ?? null,
       branchId: row.branchId ?? null,
@@ -1012,7 +1014,7 @@ export class ManufacturingService {
     const scope = this.branchAccess.sqlScope('o.branch_id', undefined, actor);
     const rows = this.db.query<any>(
       `SELECT o.id, o.order_number AS orderNumber, o.product_id AS productId, p.name AS productName,
-              o.quantity, o.status, o.branch_id AS branchId, p.cost_price AS finishedProductCostPrice
+              o.quantity, o.status, o.branch_id AS branchId, p.cost_price / 100.0 AS finishedProductCostPrice
        FROM production_orders o
        JOIN products p ON p.id = o.product_id
        WHERE o.status IN ('RELEASED', 'IN_PROGRESS') AND ${scope.clause}
@@ -1021,7 +1023,7 @@ export class ManufacturingService {
     );
     const orders: WipOrder[] = rows.map((row) => {
       const materials = this.db.query<any>(
-        `SELECT m.planned_qty AS plannedQty, pr.cost_price AS costPrice
+        `SELECT m.planned_qty AS plannedQty, pr.cost_price / 100.0 AS costPrice
          FROM production_order_materials m
          JOIN products pr ON pr.id = m.product_id
          WHERE m.order_id = ?`,

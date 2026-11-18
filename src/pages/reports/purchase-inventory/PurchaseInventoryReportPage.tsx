@@ -92,21 +92,25 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadSeq = useRef(0);
   const load = useCallback(() => {
     if (tab === 'inventory' ? !canViewInventory : !canViewPurchases) {
       setLoading(false);
       return;
     }
+    const seq = ++loadSeq.current;
     setLoading(true);
-    try {
-      if (tab !== 'inventory') setPurchaseKpi(loadPurchaseKpi(from, to));
-      if (tab === 'inventory') setInventoryKpi(loadInventoryKpi());
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل التقرير.');
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      try {
+        if (tab !== 'inventory') setPurchaseKpi(await loadPurchaseKpi(from, to));
+        if (tab === 'inventory') setInventoryKpi(await loadInventoryKpi());
+        if (seq === loadSeq.current) setError(null);
+      } catch (e: any) {
+        if (seq === loadSeq.current) setError(e?.message || 'تعذر تحميل التقرير.');
+      } finally {
+        if (seq === loadSeq.current) setLoading(false);
+      }
+    })();
   }, [canViewInventory, canViewPurchases, from, tab, to]);
 
   useEffect(() => {

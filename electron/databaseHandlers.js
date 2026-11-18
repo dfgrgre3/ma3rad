@@ -1,4 +1,5 @@
 const { createCipheriv, createDecipheriv, randomBytes, scrypt } = require('node:crypto');
+const { gzipSync, gunzipSync } = require('node:zlib');
 const path = require('node:path');
 const os = require('node:os');
 const backupStrategyService = require('./backupStrategyService');
@@ -172,11 +173,35 @@ async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, crea
   return key;
 }
 
+// Snapshots are whole-database exports written on every debounced save, so
+// compressing the plaintext before AES-GCM shrinks both the disk write and
+// every backup artifact. The gzip magic (1f 8b) can never prefix a SQLite
+// header ("SQLite format 3\0"), so decompression stays unambiguous and older
+// uncompressed files keep loading unchanged.
+const GZIP_MAGIC_0 = 0x1f;
+const GZIP_MAGIC_1 = 0x8b;
+const MIN_COMPRESS_BYTES = 4096;
+
+function compressSnapshotPlaintext(bytes) {
+  const plain = Buffer.from(bytes);
+  if (plain.length < MIN_COMPRESS_BYTES) return plain;
+  const compressed = gzipSync(plain);
+  return compressed.length < plain.length ? compressed : plain;
+}
+
+function decompressSnapshotPlaintext(bytes) {
+  const plain = Buffer.from(bytes);
+  if (plain.length > 2 && plain[0] === GZIP_MAGIC_0 && plain[1] === GZIP_MAGIC_1) {
+    return gunzipSync(plain);
+  }
+  return plain;
+}
+
 function encryptDatabaseBytes(bytes, key) {
   if (hasDatabaseMagic(bytes)) return Buffer.from(bytes);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const ciphertext = Buffer.concat([cipher.update(Buffer.from(bytes)), cipher.final()]);
+  const ciphertext = Buffer.concat([cipher.update(compressSnapshotPlaintext(bytes)), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([DB_MAGIC, iv, tag, ciphertext]);
 }
@@ -194,7 +219,7 @@ function decryptDatabaseBytes(bytes, key) {
   try {
     const decipher = createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return decompressSnapshotPlaintext(Buffer.concat([decipher.update(ciphertext), decipher.final()]));
   } catch {
     throw new Error('تعذر فك تشفير قاعدة البيانات. مفتاح النظام غير متاح أو الملف تالف.');
   }

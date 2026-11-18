@@ -134,7 +134,7 @@ export class RestaurantService {
     return this.db.query<RestaurantMenuItem>(
       `SELECT m.id, m.branch_id AS branchId, m.product_id AS productId,
               p.name AS productName, p.base_unit AS baseUnit,
-              p.selling_price_m2 AS unitPrice, m.is_available AS isAvailable
+              p.selling_price_m2 / 100.0 AS unitPrice, m.is_available AS isAvailable
        FROM restaurant_menu_items m
        JOIN products p ON p.id = m.product_id
        WHERE ${scope.clause} AND ${company.clause}
@@ -167,7 +167,7 @@ export class RestaurantService {
     const menuItem = this.db.query<RestaurantMenuItem>(
       `SELECT m.id, m.branch_id AS branchId, m.product_id AS productId,
               p.name AS productName, p.base_unit AS baseUnit,
-              p.selling_price_m2 AS unitPrice, m.is_available AS isAvailable
+              p.selling_price_m2 / 100.0 AS unitPrice, m.is_available AS isAvailable
        FROM restaurant_menu_items m JOIN products p ON p.id = m.product_id
        WHERE m.branch_id = ? AND m.product_id = ?`,
       [branchId, product.id]
@@ -287,7 +287,7 @@ export class RestaurantService {
       if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('كمية أحد الأصناف غير صالحة.');
       const product = this.db.query<{ id: string; name: string; baseUnit: string; price: number; companyId: string | null }>(
         `SELECT p.id, p.name, p.base_unit AS baseUnit,
-                p.selling_price_m2 AS price, p.company_id AS companyId
+                p.selling_price_m2 / 100.0 AS price, p.company_id AS companyId
          FROM products p
          JOIN restaurant_menu_items m ON m.product_id = p.id AND m.branch_id = ?
          WHERE p.id = ? AND p.is_active = 1 AND m.is_available = 1 AND ${scope.clause}`,
@@ -320,7 +320,7 @@ export class RestaurantService {
         db.run(
           `INSERT INTO restaurant_order_items
             (id, order_id, product_id, quantity, unit_price, notes, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
           [`roi_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, item.productId,
             item.quantity, item.unitPrice, item.notes, now, now]
         );
@@ -455,7 +455,7 @@ export class RestaurantService {
     return this.db.query<RestaurantOrderItem>(
       `SELECT i.id, i.order_id AS orderId, i.product_id AS productId,
               p.name AS productName, p.base_unit AS baseUnit,
-              i.quantity, i.unit_price AS unitPrice, i.notes,
+              i.quantity, i.unit_price / 100.0 AS unitPrice, i.notes,
               i.kitchen_status AS kitchenStatus, i.production_order_id AS productionOrderId
        FROM restaurant_order_items i
        JOIN products p ON p.id = i.product_id
@@ -470,7 +470,7 @@ export class RestaurantService {
     const item = this.db.query<RestaurantOrderItem & { orderStatus: string; warehouseId: string; branchId: string }>(
       `SELECT i.id, i.order_id AS orderId, i.product_id AS productId,
               p.name AS productName, p.base_unit AS baseUnit,
-              i.quantity, i.unit_price AS unitPrice, i.notes,
+              i.quantity, i.unit_price / 100.0 AS unitPrice, i.notes,
               i.kitchen_status AS kitchenStatus, i.production_order_id AS productionOrderId,
               o.status AS orderStatus, o.warehouse_id AS warehouseId, o.branch_id AS branchId
        FROM restaurant_order_items i

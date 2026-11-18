@@ -298,7 +298,7 @@ export class HrAlertsService {
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
 
     const rows = this.db.query<any>(`
-      SELECT i.id, i.due_date AS dueDate, i.amount, i.status,
+      SELECT i.id, i.due_date AS dueDate, i.amount / 100.0 AS amount, i.status,
              l.id AS loanId, l.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode
       FROM hr_loan_installments i
       JOIN hr_loans l ON l.id = i.loan_id
@@ -349,7 +349,7 @@ export class HrAlertsService {
 
     // استعلام أحداث الرواتب من التقويم المالي (event_type = 'PAYROLL')
     const rows = this.db.query<any>(`
-      SELECT fce.id, fce.title, fce.due_date AS dueDate, fce.amount, fce.paid_amount AS paidAmount,
+      SELECT fce.id, fce.title, fce.due_date AS dueDate, fce.amount / 100.0 AS amount, fce.paid_amount / 100.0 AS paidAmount,
              fce.status, fce.reference, fce.branch_id AS branchId, b.name AS branchName
       FROM financial_calendar_events fce
       JOIN branches b ON b.id = fce.branch_id

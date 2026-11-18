@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS platform_tenants (
   plan_id TEXT,
   subscription_started_at TEXT,
   subscription_expires_at TEXT,
+  subscription_id TEXT,
+  price REAL,
   seats_limit INTEGER NOT NULL DEFAULT 1,
   branches_limit INTEGER NOT NULL DEFAULT 1,
   devices_limit INTEGER NOT NULL DEFAULT 1,
@@ -258,6 +260,7 @@ CREATE TABLE IF NOT EXISTS platform_invoices (
   tax REAL NOT NULL DEFAULT 0,
   total REAL NOT NULL DEFAULT 0,
   paid_amount REAL NOT NULL DEFAULT 0,
+  paid_at TEXT,
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -274,6 +277,7 @@ CREATE TABLE IF NOT EXISTS platform_invoice_items (
   quantity REAL NOT NULL DEFAULT 1,
   unit_price REAL NOT NULL DEFAULT 0,
   total REAL NOT NULL DEFAULT 0,
+  created_at TEXT,
   FOREIGN KEY (invoice_id) REFERENCES platform_invoices(id) ON DELETE CASCADE
 );
 
@@ -329,6 +333,8 @@ CREATE TABLE IF NOT EXISTS platform_releases (
   status TEXT NOT NULL DEFAULT 'PUBLISHED'
     CHECK(status IN ('DRAFT','PUBLISHED','DEPRECATED')),
   is_mandatory INTEGER NOT NULL DEFAULT 0 CHECK(is_mandatory IN (0,1)),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+  release_date TEXT,
   min_version TEXT,
   rollout_group TEXT NOT NULL DEFAULT 'ALL',
   notes TEXT,
@@ -367,6 +373,29 @@ CREATE INDEX IF NOT EXISTS idx_platform_audit_severity ON platform_audit_logs(se
 CREATE INDEX IF NOT EXISTS idx_platform_audit_tenant ON platform_audit_logs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_platform_audit_status ON platform_audit_logs(status);
 CREATE INDEX IF NOT EXISTS idx_platform_audit_actor ON platform_audit_logs(actor_id, actor_type);
+
+-- Compatibility view: several platform services still read the legacy
+-- platform_audit name and hash column. Writes go to platform_audit_logs.
+CREATE VIEW IF NOT EXISTS platform_audit AS
+SELECT id, actor_id, actor_name, actor_type, tenant_id, device_id, device_name,
+       ip_address, user_agent, action, entity_type, entity_id, severity, status,
+       details, old_values, new_values, error_message, prev_hash,
+       record_hash AS hash, created_at
+FROM platform_audit_logs;
+
+CREATE TABLE IF NOT EXISTS platform_branches (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  code TEXT,
+  branches_limit INTEGER NOT NULL DEFAULT 1,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_branches_tenant ON platform_branches(tenant_id);
 
 CREATE TABLE IF NOT EXISTS platform_settings (
   key TEXT PRIMARY KEY,
@@ -490,6 +519,9 @@ CREATE TABLE IF NOT EXISTS platform_op_approvals (
   op_payload TEXT NOT NULL DEFAULT '{}',
   requested_by TEXT NOT NULL,
   approved_by TEXT,
+  approved_at TEXT,
+  rejected_by TEXT,
+  rejected_at TEXT,
   status TEXT NOT NULL DEFAULT 'PENDING'
     CHECK(status IN ('PENDING','APPROVED','REJECTED','CANCELLED')),
   notes TEXT,
@@ -748,6 +780,13 @@ CREATE TABLE IF NOT EXISTS platform_staff (
   password_hash TEXT,
   salt TEXT,
   permissions_override TEXT,
+  username TEXT,
+  mfa_enabled INTEGER NOT NULL DEFAULT 0 CHECK(mfa_enabled IN (0,1)),
+  mfa_enforcement TEXT NOT NULL DEFAULT 'optional',
+  totp_secret TEXT,
+  backup_codes TEXT,
+  data_scope_tenant_ids TEXT,
+  force_password_change INTEGER NOT NULL DEFAULT 0 CHECK(force_password_change IN (0,1)),
   failed_login_attempts INTEGER NOT NULL DEFAULT 0,
   locked_until TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
@@ -762,11 +801,15 @@ CREATE TABLE IF NOT EXISTS platform_staff_logins (
   id TEXT PRIMARY KEY,
   staff_id TEXT,
   email TEXT NOT NULL,
+  username TEXT,
   ip_address TEXT,
   user_agent TEXT,
   status TEXT NOT NULL CHECK(status IN ('SUCCESS', 'FAILED', 'BLOCKED')),
+  success INTEGER,
+  mfa_used INTEGER,
   failure_reason TEXT,
-  attempted_at TEXT DEFAULT CURRENT_TIMESTAMP
+  attempted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS platform_staff_sessions (

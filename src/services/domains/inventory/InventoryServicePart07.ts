@@ -33,8 +33,8 @@ public resolveSpecialStock(
 
     const productId = item.productId ?? item.product_id;
     const quantityM2 = Number(item.quantityM2 ?? item.quantity_m2 ?? 0);
-    const unitCost = Number(item.unitCost ?? item.unit_cost ?? 0);
-    const totalCost = Number(item.totalCost ?? item.total_cost ?? (quantityM2 * unitCost));
+    const unitCost = Number(item.unitCost ?? item.unit_cost ?? 0) / 100;
+    const totalCost = Number(item.totalCost ?? item.total_cost ?? (quantityM2 * unitCost * 100)) / 100;
     const specialNumber = item.specialNumber ?? item.special_number ?? item.id;
 
     this.db.executeFinancialTransaction((txDb) => {
@@ -96,7 +96,7 @@ public resolveSpecialStock(
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
             notes, performed_by, created_at
-          ) VALUES (?, ?, 'ADJUSTMENT_ADD', ?, ?, ?, ?, ?, ?, 'SPECIAL_STOCK_RESTORE', ?, ?, ?, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, 'ADJUSTMENT_ADD', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'SPECIAL_STOCK_RESTORE', ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
           txId, txNum, productId, warehouseId,
           quantityM2, boxes, unitCost, totalCost,
@@ -125,7 +125,7 @@ public resolveSpecialStock(
       } else if (action === 'DOWNGRADE_SALE') {
         const price = Number(discountedUnitPrice);
         const product = txDb.query<any>(`
-          SELECT selling_price_m2 AS sellingPrice FROM products WHERE id = ?
+          SELECT selling_price_m2 / 100.0 AS sellingPrice FROM products WHERE id = ?
         `, [productId])[0];
         if (!Number.isFinite(price) || price <= 0 || price >= Number(product?.sellingPrice || 0)) {
           throw new Error('يجب تحديد سعر بيع مخفض موجب وأقل من سعر البيع الأساسي.');
@@ -133,7 +133,7 @@ public resolveSpecialStock(
         txDb.run(`
           UPDATE inventory_special_stocks
           SET status = 'DOWNGRADED_SALE', remaining_quantity_m2 = quantity_m2,
-              discounted_unit_price = ?, resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
+              discounted_unit_price = ROUND(?*100), resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
           WHERE id = ? AND status = 'INSPECTED'
         `, [price, notes.trim(), actor.id, id]);
       }
@@ -147,9 +147,9 @@ public setSpecialStockSalePrice(id: string, discountedUnitPrice: number): void {
   const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
   const companyScope = this.branchAccess.companyScope('w.company_id', actor);
   const item = this.db.query<any>(`
-    SELECT iss.status, iss.discounted_unit_price AS discountedUnitPrice,
+    SELECT iss.status, iss.discounted_unit_price / 100.0 AS discountedUnitPrice,
       iss.product_id AS productId, iss.warehouse_id AS warehouseId,
-      p.selling_price_m2 AS sellingPrice
+      p.selling_price_m2 / 100.0 AS sellingPrice
     FROM inventory_special_stocks iss
     JOIN warehouses w ON w.id = iss.warehouse_id
     JOIN products p ON p.id = iss.product_id
@@ -166,14 +166,14 @@ public setSpecialStockSalePrice(id: string, discountedUnitPrice: number): void {
   }
   this.db.executeFinancialTransaction((txDb) => {
     const current = txDb.query<any>(`
-      SELECT status, discounted_unit_price AS discountedUnitPrice
+      SELECT status, discounted_unit_price / 100.0 AS discountedUnitPrice
       FROM inventory_special_stocks WHERE id = ?
     `, [id])[0];
     if (current?.status !== 'DOWNGRADED_SALE' || current.discountedUnitPrice != null) {
       throw new Error('تم تغيير السجل؛ أعد تحميله قبل تحديد السعر.');
     }
     txDb.run(`
-      UPDATE inventory_special_stocks SET discounted_unit_price = ?
+      UPDATE inventory_special_stocks SET discounted_unit_price = ROUND(?*100)
       WHERE id = ? AND status = 'DOWNGRADED_SALE' AND discounted_unit_price IS NULL
     `, [price, id]);
   });
@@ -189,10 +189,10 @@ public getDiscountedSaleStocks(warehouseId: string): any[] {
   return this.db.query<any>(`
     SELECT iss.id, iss.special_number AS specialNumber, iss.product_id AS productId,
       iss.warehouse_id AS warehouseId, iss.remaining_quantity_m2 AS availableQuantityM2,
-      iss.discounted_unit_price AS discountedUnitPrice, iss.unit_cost AS unitCost,
+      iss.discounted_unit_price / 100.0 AS discountedUnitPrice, iss.unit_cost / 100.0 AS unitCost,
       p.name AS productName, p.sku, p.grade, p.size, p.product_type AS productType,
       p.base_unit AS baseUnit, p.custom_unit AS customUnit, p.meters_per_box AS metersPerBox,
-      p.pieces_per_box AS piecesPerBox, p.selling_price_m2 AS originalUnitPrice
+      p.pieces_per_box AS piecesPerBox, p.selling_price_m2 / 100.0 AS originalUnitPrice
     FROM inventory_special_stocks iss
     JOIN warehouses w ON w.id = iss.warehouse_id
     JOIN products p ON p.id = iss.product_id
@@ -221,7 +221,7 @@ public getTransfersWithDetails(status?: string, warehouseId?: string): any[] {
         st.id, st.transfer_number as transferNumber, st.date,
         st.from_warehouse_id as fromWarehouseId, w_from.name as fromWarehouseName,
         st.to_warehouse_id as toWarehouseId, w_to.name as toWarehouseName,
-        st.status, st.total_quantity_m2 as totalQuantityM2, st.total_cost as totalCost,
+        st.status, st.total_quantity_m2 as totalQuantityM2, st.total_cost / 100.0 as totalCost,
         st.total_shipped_m2 as totalShippedM2, st.total_received_m2 as totalReceivedM2,
         st.total_lost_m2 as totalLostM2, st.rejection_reason as rejectionReason,
         st.notes, st.created_at as createdAt,

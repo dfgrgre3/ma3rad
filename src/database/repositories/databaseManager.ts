@@ -38,6 +38,31 @@ function getDatabaseManagerState(): DatabaseManagerState {
 }
 
 /**
+ * Production builds must never persist the database snapshot unencrypted:
+ * the browser fallback key lives in localStorage next to the data, so a
+ * plaintext snapshot would expose the entire business database to any script
+ * running on the origin. Development/test builds keep the legacy plaintext
+ * fallback so local previews and unit tests keep working.
+ */
+function isProductionBuild(): boolean {
+  try {
+    return typeof import.meta !== 'undefined' && Boolean((import.meta as { env?: { PROD?: boolean } }).env?.PROD);
+  } catch {
+    return false;
+  }
+}
+
+const SQLITE_IMAGE_HEADER = 'SQLite format 3\0';
+
+function isSqliteImage(bytes: Uint8Array): boolean {
+  if (bytes.length < SQLITE_IMAGE_HEADER.length) return false;
+  for (let i = 0; i < SQLITE_IMAGE_HEADER.length; i++) {
+    if (bytes[i] !== SQLITE_IMAGE_HEADER.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/**
  * Encryption utilities for IndexedDB storage using Web Crypto API (AES-GCM).
  * Falls back to unencrypted storage if crypto is unavailable.
  */
@@ -129,8 +154,13 @@ async function readBrowserSnapshot(): Promise<Uint8Array | null> {
           try {
             return await decryptData(stored, key);
           } catch (decryptError) {
-            console.warn('[database] Failed to decrypt snapshot, trying unencrypted read:', decryptError);
-            // Fall through to return raw data (might be unencrypted legacy data)
+            // Only accept plaintext when it is recognizably a legacy SQLite
+            // image — never feed ciphertext back into sql.js as if it were data.
+            if (isSqliteImage(stored)) {
+              console.warn('[database] Snapshot is not decryptable; treating it as legacy unencrypted data:', decryptError);
+              return stored;
+            }
+            throw new Error('Database snapshot could not be decrypted and is not a valid SQLite image', { cause: decryptError });
           }
         }
         return stored;
@@ -141,11 +171,18 @@ async function readBrowserSnapshot(): Promise<Uint8Array | null> {
 }
 
 async function writeBrowserSnapshot(bytes: Uint8Array, key = DB_IDB_KEY): Promise<void> {
+  // Resolve the key once up front so the plaintext guard covers both the
+  // IndexedDB and localStorage branches.
+  const encryptionKey = await getOrCreateEncryptionKey();
+  if (!encryptionKey && isProductionBuild()) {
+    throw new Error(
+      'Encrypted browser storage is unavailable (Web Crypto API missing or key setup failed). ' +
+      'Refusing to persist the database unencrypted in a production build.'
+    );
+  }
   if (typeof indexedDB !== 'undefined') {
     const db = await openDatabaseStorage();
     try {
-      // Encrypt data if encryption key is available
-      const encryptionKey = await getOrCreateEncryptionKey();
       const dataToWrite = encryptionKey ? await encryptData(bytes, encryptionKey) : bytes;
 
       await new Promise<void>((resolve, reject) => {
@@ -245,7 +282,11 @@ function snakeToCamel(s: string): string {
 function snakeToCamelKeys<T extends Record<string, unknown>>(row: T): T {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(row)) {
-    out[snakeToCamel(key)] = row[key];
+    const camel = snakeToCamel(key);
+    out[camel] = row[key];
+    // Some platform-domain mappers still read the raw snake_case key; keep it
+    // alongside the camelCase alias so both access styles resolve.
+    if (camel !== key) out[key] = row[key];
   }
   return out as T;
 }
@@ -307,6 +348,13 @@ export class DatabaseManager {
   // for off-thread queries, so it must never write snapshots — persistence is
   // owned exclusively by the renderer's DatabaseManager (file API / IndexedDB).
   private persistenceSuppressed = false;
+  // Optional callback (installed by databaseAsyncService) that mirrors every
+  // mutation to the worker replica as a plain SQL statement, so the worker
+  // stays in sync without full-database snapshot transfers.
+  private mutationForwarder: ((kind: 'run' | 'exec' | 'reset', sql: string, params: unknown[]) => void) | null = null;
+  // Serializes snapshot exports so a slow worker export can never be overtaken
+  // by a newer one and write an older snapshot to disk last.
+  private saveChain: Promise<void> = Promise.resolve();
 
   private constructor() {}
 
@@ -327,6 +375,24 @@ export class DatabaseManager {
     formatter: ((prefix: string, seq: number, date: Date) => string) | null,
   ): void {
     getDatabaseManagerState().numberFormatter = formatter;
+  }
+
+  /**
+   * Initializes only the sql.js engine with an empty in-memory database.
+   * Used inside the database Web Worker, which must NOT read the persisted
+   * snapshot itself (browser snapshots may be encrypted with a key that only
+   * exists on the main thread's localStorage). The authoritative state is
+   * pushed from the main thread via importDatabaseBytes right after init.
+   */
+  public async initializeEngineOnly(): Promise<void> {
+    if (this.db) return;
+    if (!this.SQL) {
+      await this.initializeSqlEngine();
+    }
+    const emptyDb = new this.SQL.Database();
+    this.applyPerformancePragmas(emptyDb);
+    this.db = emptyDb;
+    this.initializedSuccessfully = true;
   }
 
   public initialize(): Promise<Database> {
@@ -383,10 +449,14 @@ export class DatabaseManager {
     // IPC snapshot while migrations and later exports allocate more memory.
     savedBytes = null;
 
-    const schemaBeforeMigrations = this.getSchemaSignature();
+    // When the schema bundle fingerprint already matches, runMigrations takes
+    // its steady-state fast path and cannot change sqlite_master, so both
+    // full-schema signature serializations are pure overhead — skip them.
+    const { runMigrations, isSchemaBundleCurrent } = await import('../migrations');
+    const schemaBundleCurrent = isSchemaBundleCurrent(this.getDatabase());
+    const schemaBeforeMigrations = schemaBundleCurrent ? '' : this.getSchemaSignature();
     const legacyDataChanged = this.ensureLegacySalesInvoiceStatusColumns();
     const migrationStartedAt = performance.now();
-    const { runMigrations } = await import('../migrations');
     const report = runMigrations(this.getDatabase());
     console.info('[performance] Database migrations completed', JSON.stringify({
       durationMs: Math.round((performance.now() - migrationStartedAt) * 100) / 100,
@@ -398,7 +468,7 @@ export class DatabaseManager {
     const databaseChanged = isFreshDatabase
       || legacyDataChanged
       || report.applied.length > 0
-      || schemaBeforeMigrations !== this.getSchemaSignature();
+      || (!schemaBundleCurrent && schemaBeforeMigrations !== this.getSchemaSignature());
     const persistenceStartedAt = performance.now();
     await this.persistInitializedDatabase(isFreshDatabase, databaseChanged);
     console.info('[performance] Initial database persistence completed', JSON.stringify({
@@ -893,17 +963,50 @@ export class DatabaseManager {
       ? (fn: () => void) => { const ch = new MessageChannel(); ch.port1.onmessage = fn; ch.port2.postMessage(null); }
       : (fn: () => void) => setTimeout(fn, 0);
     scheduleExport(() => {
-      try {
-        this.doSaveToStorage();
-      } finally {
-        this.saveInProgress = false;
-      }
+      // Exports are serialized through saveChain so snapshots reach disk in
+      // mutation order even when the worker export resolves asynchronously.
+      this.saveChain = this.saveChain
+        .then(() => this.performSaveToStorage())
+        .finally(() => {
+          this.saveInProgress = false;
+          // Mutations that arrived while the export was in flight are not
+          // covered by this snapshot (mutationSeq moved past lastSnapshotSeq);
+          // schedule another save for them. A persist still in flight will
+          // clear the dirty flag itself when it completes.
+          if (this.dirtySinceLastSave && this.mutationSeq !== this.lastSnapshotSeq) {
+            this.scheduleDebouncedSave(this.SAVE_MIN_INTERVAL_MS);
+          }
+        });
     });
   }
 
-  private doSaveToStorage(): void {
+  private async performSaveToStorage(): Promise<void> {
+    const exportBeganAt = performance.now();
+    // Preferred path: export inside the database Web Worker so the
+    // multi-megabyte synchronous db.export() never blocks the UI thread.
+    // The worker is kept in sync via statement forwarding, so its snapshot is
+    // identical to the main one. Any failure falls back to the main-thread
+    // export so persistence never depends on the worker being healthy.
+    const requestedSeq = this.mutationSeq;
+    try {
+      const { exportDatabaseAsync } = await this.importAsyncService();
+      const snapshot = await exportDatabaseAsync();
+      this.lastSnapshotSeq = requestedSeq;
+      const exportDurationMs = Math.max(0, performance.now() - exportBeganAt);
+      if (exportDurationMs >= SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS) {
+        console.warn('[performance] Slow database snapshot export (worker)', JSON.stringify({
+          durationMs: Math.round(exportDurationMs * 100) / 100,
+          bytes: snapshot.byteLength,
+        }));
+      }
+      this.persist(snapshot);
+      return;
+    } catch (workerError) {
+      console.warn('[database] Worker snapshot export unavailable; falling back to main-thread export.', workerError);
+    }
+
     let snapshot: Uint8Array;
-    const exportStartedAt = performance.now();
+    const exportStartedAt = exportBeganAt;
     try {
       snapshot = this.exportSnapshot();
     } catch (e) {
@@ -1048,9 +1151,23 @@ export class DatabaseManager {
       }
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+    // Bound the drain wait as well: a stuck disk write must surface as an
+    // error instead of hanging durable transactions (invoices, payments)
+    // forever.
+    const persistDeadline = Date.now() + 60000;
     while (this.isPersisting || this.pendingSnapshot) {
-      const queue = this.persistQueue;
-      await queue;
+      const remaining = persistDeadline - Date.now();
+      if (remaining <= 0) {
+        throw new AppError(
+          'انتهت مهلة انتظار حفظ تغييرات قاعدة البيانات على القرص.',
+          'DATABASE_PERSIST_TIMEOUT',
+          true,
+        );
+      }
+      await Promise.race([
+        this.persistQueue,
+        new Promise((resolve) => setTimeout(resolve, Math.min(500, remaining))),
+      ]);
     }
     if (this.lastPersistError) {
       throw new AppError(`تعذر حفظ تغييرات قاعدة البيانات: ${this.lastPersistError}`, 'DATABASE_PERSIST_FAILED', true, {
@@ -1070,7 +1187,7 @@ export class DatabaseManager {
   public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string; code?: string } {
     if (this.lastPersistError) return { status: 'error', error: this.lastPersistError, code: this.lastPersistErrorCode || 'DATABASE_PERSIST_FAILED' };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
-    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null || this.isPersisting || this.pendingSnapshot) {
+    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null || this.isPersisting || this.pendingSnapshot || this.saveInProgress) {
       return { status: 'saving' };
     }
     if (this.storageBackend === 'localStorage' || this.storageBackend === 'indexedDB') {
@@ -1092,6 +1209,31 @@ export class DatabaseManager {
           if (property === 'run' || property === 'exec') {
             return (...args: unknown[]) => {
               const sql = args[0];
+              const applyAndForward = () => {
+                try {
+                  const result = Reflect.apply(value, target, args);
+                  this.forwardMutation(
+                    property,
+                    typeof sql === 'string' ? sql : '',
+                    Array.isArray(args[1]) ? args[1] : [],
+                  );
+                  return result;
+                } catch (error) {
+                  // exec() can apply several statements before failing, so a
+                  // failed exec may still have mutated the database. Mirror it
+                  // to the worker replica as well — it will fail identically
+                  // and its error response triggers a resync if needed. A
+                  // failed run() is a no-op on both sides, so it is skipped.
+                  if (property === 'exec') {
+                    this.forwardMutation(
+                      'exec',
+                      typeof sql === 'string' ? sql : '',
+                      Array.isArray(args[1]) ? args[1] : [],
+                    );
+                  }
+                  throw error;
+                }
+              };
               return this.trackQuery(typeof sql === 'string' ? sql : '', () => {
                 if (typeof sql !== 'string' || this.isMutatingSql(sql)) {
                   this.clearQueryCache();
@@ -1104,12 +1246,12 @@ export class DatabaseManager {
                     const key = `exec:${cacheKey}`;
                     const cached = this.getCachedQuery<unknown>(key);
                     if (cached !== undefined) return cached;
-                    const result = Reflect.apply(value, target, args);
+                    const result = applyAndForward();
                     this.setCachedQuery(key, result);
                     return result;
                   }
                 }
-                return Reflect.apply(value, target, args);
+                return applyAndForward();
               });
             };
           }
@@ -1148,7 +1290,9 @@ export class DatabaseManager {
     this.db = candidate;
     this.databaseFacade = null;
     this.databaseFacadeTarget = null;
+    this.clearQueryCache();
     this.markDirty();
+    this.notifyDatabaseReplaced();
     this.scheduleDebouncedSave();
   }
 
@@ -1393,6 +1537,7 @@ export class DatabaseManager {
       }
       db.run(sql, params);
       this.markDirty();
+      this.forwardMutation('run', sql, params);
       // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
       if (this.transactionDepth === 0) {
         this.scheduleDebouncedSave();
@@ -1422,6 +1567,32 @@ export class DatabaseManager {
   /** Monotonic counter bumped on every mutation; used to detect main↔worker drift. */
   public getMutationSeq(): number {
     return this.mutationSeq;
+  }
+
+  /**
+   * Installs the callback that mirrors mutations to the database Web Worker.
+   * Installed once by databaseAsyncService; safe to call with null to detach.
+   */
+  public setMutationForwarder(
+    forwarder: ((kind: 'run' | 'exec' | 'reset', sql: string, params: unknown[]) => void) | null,
+  ): void {
+    this.mutationForwarder = forwarder;
+  }
+
+  private forwardMutation(kind: 'run' | 'exec' | 'reset', sql: string, params: unknown[]): void {
+    try {
+      this.mutationForwarder?.(kind, sql, params);
+    } catch {
+      // Forwarding must never break a write that already succeeded locally.
+    }
+  }
+
+  /**
+   * The whole database was replaced (import/restore). Individual statement
+   * forwarding cannot express this — the worker must resync from a snapshot.
+   */
+  private notifyDatabaseReplaced(): void {
+    this.forwardMutation('reset', '', []);
   }
 
   private trackQuery<T>(sql: string, operation: () => T): T {
@@ -1747,7 +1918,9 @@ export class DatabaseManager {
     this.db = imported;
     this.databaseFacade = null;
     this.databaseFacadeTarget = null;
+    this.clearQueryCache();
     this.markDirty();
+    this.notifyDatabaseReplaced();
     this.saveToStorage();
   }
 

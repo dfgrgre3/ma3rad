@@ -24,8 +24,8 @@ const PLATFORM_PERMISSIONS = [
 
 const DEFAULT_PLANS: Array<[string, string, string, string, string, number, number, number, number, number, string, string, number, number]> = [
   ['plan_basic', 'BASIC', 'الأساسية', 'مناسبة للمعارض الصغيرة والبداية السريعة', 'YEARLY', 1499, 2, 1, 2, 1, '["dashboard","sales","pos","inventory"]', '["offline_sync"]', 1, 1],
-  ['plan_professional', 'PROFESSIONAL', 'الاحترافية', 'الأكثر طلباً للمعارض المتوسطة متعددة الفروع', 'YEARLY', 3499, 10, 3, 8, 2, '["dashboard","sales","pos","inventory","purchases","customers","crm","finance","reports"]', '["offline_sync","multi_branch","advanced_reports","e_invoicing"]', 2, 0],
-  ['plan_enterprise', 'ENTERPRISE', 'المؤسسية', 'تحكم كامل بكل الوحدات والفروع والمستخدمين', 'YEARLY', 7999, 50, 20, 30, 3, '["dashboard","sales","pos","inventory","purchases","customers","crm","finance","cashier","reports","hr","projects","manufacturing","operations","documents","approvals","restaurant"]', '["offline_sync","multi_branch","advanced_reports","e_invoicing","loyalty","restaurant_mode","api_access","audit_export"]', 3, 0],
+  ['plan_professional', 'PROFESSIONAL', 'الاحترافية', 'الأكثر طلباً للمعارض المتوسطة متعددة الفروع', 'YEARLY', 3499, 10, 3, 8, 2, '["dashboard","sales","pos","inventory","purchases","customers","crm","finance","reports"]', '["offline_sync","multi_branch","advanced_reports","e_invoicing"]', 0, 0],
+  ['plan_enterprise', 'ENTERPRISE', 'المؤسسية', 'تحكم كامل بكل الوحدات والفروع والمستخدمين', 'YEARLY', 7999, 50, 20, 30, 3, '["dashboard","sales","pos","inventory","purchases","customers","crm","finance","cashier","reports","hr","projects","manufacturing","operations","documents","approvals","restaurant"]', '["offline_sync","multi_branch","advanced_reports","e_invoicing","loyalty","restaurant_mode","api_access","audit_export"]', 0, 0],
 ];
 
 const DEFAULT_MODULES: Array<[string, string, string, string, number]> = [

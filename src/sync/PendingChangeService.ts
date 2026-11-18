@@ -125,12 +125,14 @@ function describeChange(entityType: string, operationType: string, payload: unkn
     .map((field) => header[field])
     .find((value) => typeof value === 'string' && value.trim().length > 0);
   const amountFields = ['totalAmount', 'amount', 'totalCost'];
+  const minorUnitEntities = new Set(['sales_invoice', 'sales_return']);
+  const scale = minorUnitEntities.has(entityType) ? 100 : 1;
   const amount = amountFields
     .map((field) => header[field])
     .find((value) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== ''));
   const parts = [`${op} ${label}`];
   if (number) parts.push(String(number));
-  if (amount !== undefined) parts.push(`بقيمة ${new Intl.NumberFormat('ar-EG').format(Number(amount))}`);
+  if (amount !== undefined) parts.push(`بقيمة ${new Intl.NumberFormat('ar-EG').format(Number(amount) / scale)}`);
   return parts.join(' — ');
 }
 

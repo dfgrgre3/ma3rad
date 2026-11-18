@@ -99,23 +99,25 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
     setSuggestionsLoading(true);
     setSuggestionsError('');
     const timer = window.setTimeout(() => {
-      try {
-        const result = new ProductService().getProductsPage(
-          query,
-          undefined,
-          undefined,
-          1,
-          7,
-          { status: 'active', productIds: allowedProductIds },
-        );
-        if (request === suggestionRequestId.current) setSuggestions(result.items);
-      } catch (error) {
-        if (request !== suggestionRequestId.current) return;
-        setSuggestions([]);
-        setSuggestionsError(error instanceof Error ? error.message : 'تعذر البحث عن الأصناف.');
-      } finally {
-        if (request === suggestionRequestId.current) setSuggestionsLoading(false);
-      }
+      (async () => {
+        try {
+          const result = await new ProductService().getProductsPageAsync(
+            query,
+            undefined,
+            undefined,
+            1,
+            7,
+            { status: 'active', productIds: allowedProductIds },
+          );
+          if (request === suggestionRequestId.current) setSuggestions(result.items);
+        } catch (error) {
+          if (request !== suggestionRequestId.current) return;
+          setSuggestions([]);
+          setSuggestionsError(error instanceof Error ? error.message : 'تعذر البحث عن الأصناف.');
+        } finally {
+          if (request === suggestionRequestId.current) setSuggestionsLoading(false);
+        }
+      })();
     }, 180);
 
     return () => {
@@ -166,29 +168,31 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
     setLoading(true);
     setLoadError('');
     const timer = window.setTimeout(() => {
-      try {
-        const result = new ProductService().getProductsPage(
-          search,
-          categoryId || undefined,
-          brandId || undefined,
-          page,
-          PAGE_SIZE,
-          { stockStatus, sortBy, status: 'active', productIds: allowedProductIds },
-        );
-        if (request !== requestId.current) return;
-        setProducts(result.items);
-        setTotalItems(result.totalItems);
-        setTotalPages(result.totalPages);
-        setPage(result.page);
-      } catch (error) {
-        if (request !== requestId.current) return;
-        setProducts([]);
-        setTotalItems(0);
-        setTotalPages(1);
-        setLoadError(error instanceof Error ? error.message : 'تعذر تحميل الأصناف.');
-      } finally {
-        if (request === requestId.current) setLoading(false);
-      }
+      (async () => {
+        try {
+          const result = await new ProductService().getProductsPageAsync(
+            search,
+            categoryId || undefined,
+            brandId || undefined,
+            page,
+            PAGE_SIZE,
+            { stockStatus, sortBy, status: 'active', productIds: allowedProductIds },
+          );
+          if (request !== requestId.current) return;
+          setProducts(result.items);
+          setTotalItems(result.totalItems);
+          setTotalPages(result.totalPages);
+          setPage(result.page);
+        } catch (error) {
+          if (request !== requestId.current) return;
+          setProducts([]);
+          setTotalItems(0);
+          setTotalPages(1);
+          setLoadError(error instanceof Error ? error.message : 'تعذر تحميل الأصناف.');
+        } finally {
+          if (request === requestId.current) setLoading(false);
+        }
+      })();
     }, 120);
     return () => {
       window.clearTimeout(timer);

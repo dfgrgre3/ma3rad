@@ -7,13 +7,13 @@ import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import { CUSTOMER_TYPE_LABELS } from './customerLabels';
 import { reportSlowReactRender } from '../../../../services/shared/rendererPerformanceMonitor';
 
-type CustomerPage = ReturnType<CustomerService['getCustomersPage']>;
+type CustomerPage = Awaited<ReturnType<CustomerService['getCustomersPageAsync']>>;
 type CustomerTypeFilter = Customer['customerType'] | 'ALL';
 type CustomerStatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
 interface PosCustomerSelectionDialogProps {
   isOpen: boolean;
-  customerService: Pick<CustomerService, 'getCustomersPage'>;
+  customerService: Pick<CustomerService, 'getCustomersPageAsync'>;
   selectedCustomerId?: string;
   canSearchTaxNumber?: boolean;
   onClose: () => void;
@@ -52,28 +52,30 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
     setIsLoading(true);
     setError('');
     const timer = window.setTimeout(() => {
-      try {
-        const nextResult = customerService.getCustomersPage(
-          debouncedSearch,
-          page,
-          PAGE_SIZE,
-          {},
-          {
-            customerType: customerType === 'ALL' ? undefined : customerType,
-            status: status === 'ALL' ? undefined : status,
-              includeTaxNumber: canSearchTaxNumber,
-          },
-        );
-        if (!cancelled) {
-          setResult(nextResult);
-          setIsLoading(false);
+      (async () => {
+        try {
+          const nextResult = await customerService.getCustomersPageAsync(
+            debouncedSearch,
+            page,
+            PAGE_SIZE,
+            {},
+            {
+              customerType: customerType === 'ALL' ? undefined : customerType,
+              status: status === 'ALL' ? undefined : status,
+                includeTaxNumber: canSearchTaxNumber,
+            },
+          );
+          if (!cancelled) {
+            setResult(nextResult);
+            setIsLoading(false);
+          }
+        } catch (loadError) {
+          if (!cancelled) {
+            setError(loadError instanceof Error ? loadError.message : 'تعذر تحميل قائمة العملاء.');
+            setIsLoading(false);
+          }
         }
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'تعذر تحميل قائمة العملاء.');
-          setIsLoading(false);
-        }
-      }
+      })();
     }, 0);
     return () => {
       cancelled = true;

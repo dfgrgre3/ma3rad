@@ -4,11 +4,14 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { PurchaseService } from './PurchaseService';
 import { CustomerSupplyService } from '../customers/CustomerSupplyService';
 import type { PaymentType, PurchaseInvoice } from '../../../types';
 
 export type PurchaseOrderStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+
+const PO_MONEY_FIELDS = ['subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'total_amount'] as const;
 
 export interface PurchaseOrderRow {
   id: string;
@@ -71,7 +74,7 @@ export interface CreatePurchaseOrderDTO {
 export class PurchaseOrderService {
   private db = DatabaseManager.getInstance();
 
-  public getAllOrders(search = '', status: 'ALL' | PurchaseOrderStatus = 'ALL'): PurchaseOrderRow[] {
+  private buildOrdersQuery(search: string, status: 'ALL' | PurchaseOrderStatus): { sql: string; params: any[] } {
     let sql = `
       SELECT po.*, s.name AS supplierName, s.phone AS supplierPhone, s.address AS supplierAddress, w.name AS warehouseName, u.full_name AS createdByName,
         (SELECT COUNT(*) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS itemsCount
@@ -89,31 +92,66 @@ export class PurchaseOrderService {
       params.push(term, term, term);
     }
     sql += ` ORDER BY po.created_at DESC`;
-    return this.db.query<PurchaseOrderRow>(sql, params);
+    return { sql, params };
   }
 
-  public getOrderById(id: string): (PurchaseOrderRow & { items: PurchaseOrderItem[] }) | null {
-    const row = this.db.query<PurchaseOrderRow>(`
+  public getAllOrders(search = '', status: 'ALL' | PurchaseOrderStatus = 'ALL'): PurchaseOrderRow[] {
+    const { sql, params } = this.buildOrdersQuery(search, status);
+    return this.db.query<PurchaseOrderRow>(sql, params).map((row) => unscaleMoneyRow(row, PO_MONEY_FIELDS));
+  }
+
+  public async getAllOrdersAsync(search = '', status: 'ALL' | PurchaseOrderStatus = 'ALL'): Promise<PurchaseOrderRow[]> {
+    const { sql, params } = this.buildOrdersQuery(search, status);
+    const rows = await this.db.queryAsync<PurchaseOrderRow>(sql, params);
+    return rows.map((row) => unscaleMoneyRow(row, PO_MONEY_FIELDS));
+  }
+
+  private buildOrderByIdQueries(id: string): { orderSql: string; orderParams: any[]; itemsSql: string; itemsParams: any[] } {
+    return {
+      orderSql: `
       SELECT po.*, s.name AS supplierName, s.phone AS supplierPhone, s.address AS supplierAddress, w.name AS warehouseName, u.full_name AS createdByName
       FROM purchase_orders po
       JOIN suppliers s ON s.id = po.supplier_id
       JOIN warehouses w ON w.id = po.warehouse_id
       LEFT JOIN users u ON u.id = po.created_by
       WHERE po.id = ?
-    `, [id])[0];
-    if (!row) return null;
-    const items = this.db.query<PurchaseOrderItem>(`
+    `,
+      orderParams: [id],
+      itemsSql: `
       SELECT i.id, i.purchase_order_id AS purchaseOrderId, i.product_id AS productId,
              i.product_name AS productName, i.quantity_m2 AS quantityM2, i.boxes_count AS boxesCount,
-             i.received_m2 AS receivedM2, i.unit_cost AS unitCost, i.total_cost AS totalCost,
+             i.received_m2 AS receivedM2, i.unit_cost / 100.0 AS unitCost, i.total_cost / 100.0 AS totalCost,
              p.sku AS productCode, p.barcode, p.grade, p.size, b.name AS brandName, c.name AS categoryName,
              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
              COALESCE(NULLIF(p.custom_unit,''),p.base_unit) AS unit
       FROM purchase_order_items i LEFT JOIN products p ON p.id=i.product_id
       LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id
       WHERE i.purchase_order_id = ?
-    `, [id]);
+    `,
+      itemsParams: [id],
+    };
+  }
+
+  private mapOrderById(row: PurchaseOrderRow | undefined, items: PurchaseOrderItem[]): (PurchaseOrderRow & { items: PurchaseOrderItem[] }) | null {
+    if (!row) return null;
     return { ...row, items };
+  }
+
+  public getOrderById(id: string): (PurchaseOrderRow & { items: PurchaseOrderItem[] }) | null {
+    const { orderSql, orderParams, itemsSql, itemsParams } = this.buildOrderByIdQueries(id);
+    const row = this.db.query<PurchaseOrderRow>(orderSql, orderParams).map((r) => unscaleMoneyRow(r, PO_MONEY_FIELDS))[0];
+    const items = this.db.query<PurchaseOrderItem>(itemsSql, itemsParams);
+    return this.mapOrderById(row, items);
+  }
+
+  public async getOrderByIdAsync(id: string): Promise<(PurchaseOrderRow & { items: PurchaseOrderItem[] }) | null> {
+    const { orderSql, orderParams, itemsSql, itemsParams } = this.buildOrderByIdQueries(id);
+    const [orderRows, items] = await Promise.all([
+      this.db.queryAsync<PurchaseOrderRow>(orderSql, orderParams),
+      this.db.queryAsync<PurchaseOrderItem>(itemsSql, itemsParams),
+    ]);
+    const row = orderRows.map((r) => unscaleMoneyRow(r, PO_MONEY_FIELDS))[0];
+    return this.mapOrderById(row, items);
   }
 
   public createOrder(dto: CreatePurchaseOrderDTO): PurchaseOrderRow {
@@ -158,7 +196,7 @@ export class PurchaseOrderService {
         INSERT INTO purchase_orders (
           id, order_number, date, supplier_id, warehouse_id, request_id, expected_date,
           subtotal, discount_amount, tax_amount, shipping_cost, total_amount, status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 'DRAFT', ?, ?)
       `, [
         orderId, orderNumber, today, dto.supplierId, dto.warehouseId, dto.requestId || null,
         dto.expectedDate || null, subtotal, discount, tax, shipping, total, dto.notes || null, actor.id,
@@ -169,7 +207,7 @@ export class PurchaseOrderService {
           INSERT INTO purchase_order_items (
             id, purchase_order_id, product_id, product_name, quantity_m2,
             boxes_count, received_m2, unit_cost, total_cost
-          ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, 0, ROUND(?*100), ROUND(?*100))
         `, [
           item.id, orderId, item.productId, item.productName, item.quantityM2,
           item.boxesCount, item.unitCost, item.totalCost,

@@ -14,6 +14,7 @@
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { financialFieldVisibility } from '../auth/sensitiveFields';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { round2 } from '../finance/financials';
 
@@ -362,7 +363,7 @@ export class InventoryIntelligenceService {
         p.id                            AS productId,
         p.name                          AS productName,
         p.sku                           AS productSku,
-        p.cost_price                    AS unitCost,
+        p.cost_price / 100.0        AS unitCost,
         w.id                            AS warehouseId,
         w.name                          AS warehouseName,
         w.company_id                    AS companyId,
@@ -567,6 +568,8 @@ export class InventoryIntelligenceService {
     limit?: number;
   } = {}): LowMarginAlert[] {
     const actor = this.requireView();
+    // التقرير نفسه هامش ربح — بلا صلاحية رؤية الربح لا تُرجع نتائج.
+    if (!financialFieldVisibility().profit) return [];
     const scope = this.warehouseScope('w');
     const days = Math.max(1, Math.floor(filter.days ?? 90));
     const threshold = Number.isFinite(filter.thresholdPct) ? Number(filter.thresholdPct) : 10;
@@ -577,12 +580,12 @@ export class InventoryIntelligenceService {
         p.id                     AS productId,
         p.name                   AS productName,
         p.sku                    AS productSku,
-        COALESCE(p.selling_price_m2, 0) AS listSellingPriceM2,
-        COALESCE(p.cost_price, 0)       AS listCostPrice,
+        COALESCE(p.selling_price_m2, 0) / 100.0 AS listSellingPriceM2,
+        COALESCE(p.cost_price, 0) / 100.0       AS listCostPrice,
         COALESCE(SUM(sii.quantity_m2), 0)  AS quantitySoldM2,
         COUNT(DISTINCT si.id)              AS invoiceCount,
-        COALESCE(SUM(sii.total_price), 0)  AS revenue,
-        COALESCE(SUM(sii.total_cost), 0)   AS cost
+        COALESCE(SUM(sii.total_price), 0) / 100.0  AS revenue,
+        COALESCE(SUM(sii.total_cost), 0) / 100.0   AS cost
       FROM sales_invoice_items sii
       JOIN sales_invoices si ON si.id = sii.invoice_id
       JOIN products p ON p.id = sii.product_id
@@ -598,9 +601,9 @@ export class InventoryIntelligenceService {
     }
     sql += `
       GROUP BY p.id
-      HAVING COALESCE(SUM(sii.total_price), 0) > 0
-      ORDER BY (COALESCE(SUM(sii.total_price), 0) - COALESCE(SUM(sii.total_cost), 0)) * 1.0
-               / COALESCE(SUM(sii.total_price), 0) ASC
+      HAVING COALESCE(SUM(sii.total_price), 0) / 100.0 > 0
+      ORDER BY ((COALESCE(SUM(sii.total_price), 0) - COALESCE(SUM(sii.total_cost), 0)) / 100.0 * 1.0
+               / COALESCE(SUM(sii.total_price), 0)) ASC
     `;
 
     const rows = this.db.query<any>(sql, params);
@@ -662,6 +665,7 @@ export class InventoryIntelligenceService {
     limit?: number;
   } = {}): DeadStockRow[] {
     const actor = this.requireView();
+    const canSeeCost = financialFieldVisibility().cost;
     if (filter.warehouseId) this.branchAccess.requireWarehouseAuthorization(filter.warehouseId, actor);
     const scope = this.warehouseScope('w');
     const days = Math.max(1, Math.floor(filter.days ?? 90));
@@ -677,7 +681,7 @@ export class InventoryIntelligenceService {
         w.name                    AS warehouseName,
         COALESCE(ws.quantity_m2, 0) AS quantityM2,
         COALESCE(ws.reserved_m2, 0) AS reservedM2,
-        COALESCE(p.cost_price, 0)   AS unitCost,
+        COALESCE(p.cost_price, 0) / 100.0   AS unitCost,
         (
           SELECT MAX(si.date)
           FROM sales_invoice_items sii
@@ -729,9 +733,11 @@ export class InventoryIntelligenceService {
       const quantity = round2(Number(row.quantityM2) || 0);
       const reserved = round2(Number(row.reservedM2) || 0);
       const available = round2(Math.max(0, quantity - reserved));
-      const unitCost = round2(Number(row.unitCost) || 0);
-      const stockValue = round2(available * unitCost);
-      if (stockValue < minValue) continue;
+      const realUnitCost = round2(Number(row.unitCost) || 0);
+      const realStockValue = round2(available * realUnitCost);
+      if (realStockValue < minValue) continue;
+      const unitCost = canSeeCost ? realUnitCost : 0;
+      const stockValue = canSeeCost ? realStockValue : 0;
 
       const daysSinceLastSale = this.daysBetween(row.lastSoldDate ?? null);
       const batchAgeDays = this.daysBetween(row.oldestBatchDate ?? null);
@@ -752,9 +758,13 @@ export class InventoryIntelligenceService {
         oldestBatchDate: row.oldestBatchDate ?? null,
         batchAgeDays,
         batches: this.deadStockBatches(row.productId, row.warehouseId),
-        reason: row.lastSoldDate
-          ? `بدون مبيعات منذ ${daysSinceLastSale} يوماً؛ قيمة المخزون المتاح ${stockValue.toFixed(2)} ج.م.`
-          : `لم يُبع هذا الصنف من هذا المخزن إطلاقاً؛ قيمة المخزون المتاح ${stockValue.toFixed(2)} ج.م.`,
+        reason: canSeeCost
+          ? (row.lastSoldDate
+            ? `بدون مبيعات منذ ${daysSinceLastSale} يوماً؛ قيمة المخزون المتاح ${stockValue.toFixed(2)} ج.م.`
+            : `لم يُبع هذا الصنف من هذا المخزن إطلاقاً؛ قيمة المخزون المتاح ${stockValue.toFixed(2)} ج.م.`)
+          : (row.lastSoldDate
+            ? `بدون مبيعات منذ ${daysSinceLastSale} يوماً.`
+            : `لم يُبع هذا الصنف من هذا المخزن إطلاقاً.`),
       });
 
       if (result.length >= limit) break;
@@ -818,8 +828,8 @@ export class InventoryIntelligenceService {
         COALESCE(sci.system_quantity_m2, 0)  AS systemQuantityM2,
         COALESCE(sci.counted_quantity_m2, 0) AS countedQuantityM2,
         COALESCE(sci.variance_m2, 0)         AS varianceM2,
-        COALESCE(sci.unit_cost, 0)           AS unitCost,
-        COALESCE(sci.variance_value, 0)      AS varianceValue,
+        COALESCE(sci.unit_cost, 0) / 100.0           AS unitCost,
+        COALESCE(sci.variance_value, 0) / 100.0      AS varianceValue,
         sci.notes          AS itemNotes
       FROM stock_count_items sci
       JOIN stock_counts sc ON sc.id = sci.count_id
@@ -839,10 +849,17 @@ export class InventoryIntelligenceService {
     sql += ` ORDER BY ABS(COALESCE(sci.variance_value, 0)) DESC LIMIT ?`;
     params.push(limit);
 
+    const canSeeCost = financialFieldVisibility().cost;
     const rawRows = this.db.query<any>(sql, params);
     const rows: CountVarianceRow[] = [];
 
     for (const raw of rawRows) {
+      // قيمة الفرق نقدية — تُخفى كليًا (unitCost + varianceValue) لغير المصرَّح،
+      // فتُشتق severity والتجميعات أصفارًا دون تسريب نسبي.
+      if (!canSeeCost) {
+        raw.unitCost = 0;
+        raw.varianceValue = 0;
+      }
       const systemQuantity = round2(Number(raw.systemQuantityM2) || 0);
       const countedQuantity = round2(Number(raw.countedQuantityM2) || 0);
       const variance = round2(Number(raw.varianceM2) || 0);

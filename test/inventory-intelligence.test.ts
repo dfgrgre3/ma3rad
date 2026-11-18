@@ -27,7 +27,7 @@ function insertProduct(id: string, name: string, grade = 'GRADE_1'): void {
     pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
     min_selling_price_m2, min_stock_level, reorder_point, safety_stock, lead_time_days, is_active
   ) VALUES (?, ?, ?, ?, 'cat_intel', 'brand_intel', ?, '60x60', 'M2', 'M2',
-    4, 1.44, 100, 200, 180, 150, 0, 10, 5, 7, 1)`, [
+    4, 1.44, 10000, 20000, 18000, 15000, 0, 10, 5, 7, 1)`, [
     id, `SKU-${id}`, `BAR-${id}`, name, grade,
   ]);
 }
@@ -133,17 +133,17 @@ test('inventory intelligence reports batch availability, transfer needs, low mar
   db.run(`INSERT INTO product_batches (
     id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade, cost_price,
     quantity_m2, quantity_remaining_m2, received_date, created_by
-  ) VALUES ('batch_intel_a', ?, ?, 'LOT-INTEL-A', 'A12', '0', 'GRADE_1', 100, 120, 120, '2025-01-01', ?)`,
+  ) VALUES ('batch_intel_a', ?, ?, 'LOT-INTEL-A', 'A12', '0', 'GRADE_1', 10000, 120, 120, '2025-01-01', ?)`,
   [productId, sourceId, adminId]);
   db.run(`INSERT INTO product_batches (
     id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade, cost_price,
     quantity_m2, quantity_remaining_m2, received_date, created_by
-  ) VALUES ('batch_intel_b', ?, ?, 'LOT-INTEL-B', 'A12', '0', 'GRADE_2', 110, 80, 80, '2025-02-01', ?)`,
+  ) VALUES ('batch_intel_b', ?, ?, 'LOT-INTEL-B', 'A12', '0', 'GRADE_2', 11000, 80, 80, '2025-02-01', ?)`,
   [productId, sourceId, adminId]);
   db.run(`INSERT INTO product_batches (
     id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade, cost_price,
     quantity_m2, quantity_remaining_m2, received_date, created_by
-  ) VALUES ('batch_intel_dst', ?, ?, 'LOT-INTEL-DST', 'A12', '0', 'GRADE_1', 100, 5, 5, '2025-03-01', ?)`,
+  ) VALUES ('batch_intel_dst', ?, ?, 'LOT-INTEL-DST', 'A12', '0', 'GRADE_1', 10000, 5, 5, '2025-03-01', ?)`,
   [productId, targetId, adminId]);
   db.run(`INSERT INTO product_location_stock (id, location_id, product_id, quantity_m2)
           VALUES ('pls_intel_a', ?, ?, 120)`, [locationId, productId]);
@@ -155,13 +155,13 @@ test('inventory intelligence reports batch availability, transfer needs, low mar
     id, invoice_number, date, customer_id, warehouse_id, subtotal, total_amount, created_by,
     payment_type, payment_status, invoice_status
   ) VALUES ('inv_intel_demand', 'INV-INTEL-DEMAND', date('now', '-10 days'), 'cust_intel', ?,
-    120, 120, ?, 'CASH', 'PAID', 'COMPLETED')`, [targetId, adminId]);
+    12000, 12000, ?, 'CASH', 'PAID', 'COMPLETED')`, [targetId, adminId]);
   db.run(`INSERT INTO sales_invoice_items (
     id, invoice_id, product_id, product_name, product_sku, product_grade, size, sold_by,
     quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price, unit_cost,
     total_price, total_cost, profit, meters_per_box, pieces_per_box
   ) VALUES ('sii_intel_demand', 'inv_intel_demand', ?, 'سيراميك اختبار الذكاء', ?, 'GRADE_1',
-    '60x60', 'M2', 60, 1, 4, 2, 2, 1.8, 120, 108, 12, 1.44, 4)`, [productId, `SKU-${productId}`]);
+    '60x60', 'M2', 60, 1, 4, 200, 200, 180, 12000, 10800, 1200, 1.44, 4)`, [productId, `SKU-${productId}`]);
 
   const intelligence = new InventoryIntelligenceService();
 
@@ -222,16 +222,16 @@ test('count variance analysis classifies direction, severity and reasons', async
   db.run(`INSERT INTO stock_count_items (
     id, count_id, product_id, product_name, system_quantity_m2, counted_quantity_m2,
     variance_m2, unit_cost, variance_value, notes, counted_by
-  ) VALUES ('sci_intel_a', 'cnt_intel_a', ?, 'سيراميك اختبار الجرد', 100, 90, -10, 100, -1000,
+  ) VALUES ('sci_intel_a', 'cnt_intel_a', ?, 'سيراميك اختبار الجرد', 100, 90, -10, 10000, -100000,
     'عجز نتيجة كسر أثناء المناولة', ?)`, [productId, adminId]);
   db.run(`INSERT INTO stock_count_items (
     id, count_id, product_id, product_name, system_quantity_m2, counted_quantity_m2,
     variance_m2, unit_cost, variance_value, notes
-  ) VALUES ('sci_intel_b', 'cnt_intel_b', ?, 'سيراميك اختبار الجرد', 50, 52, 2, 100, 200, NULL)`, [productId]);
+  ) VALUES ('sci_intel_b', 'cnt_intel_b', ?, 'سيراميك اختبار الجرد', 50, 52, 2, 10000, 20000, NULL)`, [productId]);
   db.run(`INSERT INTO stock_count_items (
     id, count_id, product_id, product_name, system_quantity_m2, counted_quantity_m2,
     variance_m2, unit_cost, variance_value, notes
-  ) VALUES ('sci_intel_c', 'cnt_intel_c', ?, 'سيراميك اختبار الجرد', 30, 29, -1, 100, -100, NULL)`, [productId]);
+  ) VALUES ('sci_intel_c', 'cnt_intel_c', ?, 'سيراميك اختبار الجرد', 30, 29, -1, 10000, -10000, NULL)`, [productId]);
 
   const analysis = new InventoryIntelligenceService().getCountVarianceAnalysis({ warehouseId });
   assert.equal(analysis.totals.sessions, 3);

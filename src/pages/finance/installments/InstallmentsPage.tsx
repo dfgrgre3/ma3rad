@@ -72,7 +72,7 @@ export const InstallmentsPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
   const canManage = PermissionService.can(actor, 'ui.finance.installments.manage');
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     const currentActor = AuthService.getCurrentUser();
     if (!PermissionService.can(currentActor, 'ui.finance.installments.view') && !PermissionService.can(currentActor, 'ui.finance.installments.manage')) {
       setPlans([]);
@@ -95,9 +95,9 @@ export const InstallmentsPage: React.FC = () => {
         ...invoiceOptions.map((invoice) => invoice.customerId),
         ...planRows.map((row: any[]) => String(row[2])),
       ]);
-      const scopedCustomers = [...visibleCustomerIds]
-        .map((customerId) => customerService.getCustomerById(customerId))
-        .filter((customer): customer is Customer => !!customer);
+      const scopedCustomers = (await Promise.all(
+        [...visibleCustomerIds].map((customerId) => customerService.getCustomerByIdAsync(customerId))
+      )).filter((customer): customer is Customer => !!customer);
       setCustomers(scopedCustomers);
       const selectedCustomerIsVisible = scopedCustomers.some((customer) => customer.id === selectedCustomerId);
       const initialCustomerId = selectedCustomerIsVisible ? selectedCustomerId : (scopedCustomers[0]?.id || '');

@@ -17,6 +17,8 @@ import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem, ReturnDisposition } from '../../../types/sales/serviceTypes';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { PartnerService } from '../customers/PartnerService';
+import { AppConfigService } from '../config/AppConfigService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../../../types/effects';
@@ -29,6 +31,8 @@ type ReturnOptions = {
   bankAccountId?: string;
   idempotencyKey?: string;
   requestFingerprint?: string;
+  /** Approved approval_requests id required when return policy demands approval. */
+  approvalId?: string;
 };
 
 interface ReturnTransactionParams {
@@ -110,7 +114,9 @@ export function createSaleReturn(
   if (idempotencyKey) {
     const prior = ctx.db.query<any>(
       `SELECT id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
-              date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason, refund_method,
+              date, total_amount / 100.0 AS total_amount, return_tax_amount / 100.0 AS return_tax_amount,
+              refunded_amount / 100.0 AS refunded_amount, remaining_to_balance / 100.0 AS remaining_to_balance,
+              reason, refund_method,
               request_fingerprint, created_by, created_at
        FROM sales_returns WHERE idempotency_key = ?`,
       [idempotencyKey]
@@ -248,6 +254,58 @@ function createReturnInTransaction(
   const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
   const returnTax = calculateReturnTax(totalReturnAmount, Number(inv.taxAmount || 0), taxableInvoiceBase);
   const totalReturnIncludingTax = round2(totalReturnAmount + returnTax);
+
+  // ── Approval gate: قيمة المرتجع، عمر الفاتورة، ونسبته من إجماليها ──
+  const gate = new OperationApprovalGate(sqliteDb);
+  const { policy: returnPolicy, required: policyRequired } = gate.evaluate('sales.return.create', totalReturnIncludingTax);
+  const invoiceDate = String(inv.date || '').slice(0, 10);
+  const invoiceAgeDays = /^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)
+    ? Math.max(0, Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${invoiceDate}T00:00:00Z`)) / 86_400_000))
+    : 0;
+  const maxReturnAgeDays = AppConfigService.getPolicyNumber('sales.returnApprovalMaxDays', 0);
+  const maxReturnPercent = AppConfigService.getPolicyNumber('sales.returnApprovalPercent', 0);
+  const returnPercent = Number(inv.totalAmount) > 0 ? (totalReturnIncludingTax / Number(inv.totalAmount)) * 100 : 0;
+  const ageExceeded = maxReturnAgeDays > 0 && invoiceAgeDays > maxReturnAgeDays;
+  const percentExceeded = maxReturnPercent > 0 && returnPercent > maxReturnPercent;
+  const approvalRequired = policyRequired || ageExceeded || percentExceeded;
+  const approvalDetails = {
+    invoiceId,
+    invoiceNumber: inv.invoiceNumber,
+    returnAmount: totalReturnAmount,
+    totalReturnIncludingTax,
+    invoiceAgeDays,
+    returnPercent: round2(returnPercent),
+    reasons: [
+      ...(policyRequired ? ['policy'] : []),
+      ...(ageExceeded ? ['invoice_age'] : []),
+      ...(percentExceeded ? ['return_percent'] : []),
+    ],
+  };
+  let resolvedApprovalId: string | null = null;
+  if (approvalRequired) {
+    const returnMatchDetails = { invoiceId, returnAmount: totalReturnAmount };
+    resolvedApprovalId = options.approvalId
+      ?? gate.findApproved('sales.return.create', 'SALES_RETURN', returnMatchDetails, sqliteDb);
+    if (options.approvalId) {
+      gate.assertApproved(options.approvalId, 'sales.return.create', returnMatchDetails, sqliteDb);
+    }
+    if (!resolvedApprovalId) {
+      const approvalId = gate.requestApproval({
+        operationCode: 'sales.return.create',
+        requestType: 'SALES_RETURN',
+        title: `مرتجع فاتورة ${inv.invoiceNumber} — ${inv.customerName ?? ''}`.trim(),
+        description: `قيمة المرتجع: ${totalReturnIncludingTax} ج${ageExceeded ? ` · عمر الفاتورة ${invoiceAgeDays} يوم` : ''}${percentExceeded ? ` · نسبة المرتجع ${round2(returnPercent)}%` : ''}`,
+        branchId: inv.warehouseId ? sqliteDb.query<{ branchId: string | null }>(
+          'SELECT branch_id AS branchId FROM warehouses WHERE id = ?', [inv.warehouseId]
+        )[0]?.branchId ?? null : null,
+        requestedValue: totalReturnIncludingTax,
+        currentValue: Number(inv.totalAmount) || null,
+        details: { ...approvalDetails, dedupeKey: `return:${invoiceId}:${totalReturnAmount}`, policy: returnPolicy },
+      }, sqliteDb);
+      gate.throwRequested(approvalId);
+    }
+  }
+
   const refundMethod = options.refundMethod || 'CASH';
   const impact = computeReturnImpact({
     invoiceTotal: inv.totalAmount,
@@ -309,8 +367,8 @@ function createReturnInTransaction(
   ];
   defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
   const returnedTotals = sqliteDb.query<{ revenue: number; cost: number }>(`
-    SELECT COALESCE(SUM(sri.total_refund), 0) AS revenue,
-           COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) AS cost
+    SELECT COALESCE(SUM(sri.total_refund) / 100.0, 0) AS revenue,
+           COALESCE(SUM(sri.quantity_m2 * sri.unit_cost) / 100.0, 0) AS cost
     FROM sales_return_items sri
     JOIN sales_returns sr ON sr.id = sri.return_id
     WHERE sr.original_invoice_id = ?
@@ -331,6 +389,10 @@ function createReturnInTransaction(
     targetProfit: Math.max(0, round2(Number(inv.grossProfit || 0) - returnedProfit)),
     actorId: actor.id,
   });
+
+  if (resolvedApprovalId) {
+    gate.consume(resolvedApprovalId, 'SALES_RETURN', returnId, sqliteDb);
+  }
 
   return {
     id: returnId,
@@ -514,7 +576,7 @@ function insertSalesReturn(
       id, return_number, original_invoice_id, original_invoice_number, customer_id,
       warehouse_id, date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
       register_id, shift_id, refund_method, created_by, idempotency_key, request_fingerprint, refund_bank_account_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
     inv.warehouseId, today, totalReturnAmount, returnTaxAmount, impact.cashRefund, impact.balanceDelta,
@@ -575,7 +637,7 @@ function processReturnItem(
   let invoiceUnitCost = 0;
   if (item.invoiceItemId) {
     const invoiceLine = sqliteDb.query<{ unit_cost: number }>(
-      `SELECT unit_cost FROM sales_invoice_items WHERE id = ? AND invoice_id = ?`,
+      `SELECT unit_cost / 100.0 AS unit_cost FROM sales_invoice_items WHERE id = ? AND invoice_id = ?`,
       [item.invoiceItemId, invoiceId]
     )[0];
     if (invoiceLine) invoiceUnitCost = Number(invoiceLine.unit_cost || 0);
@@ -645,7 +707,7 @@ function insertSalesReturnItem(
     INSERT INTO sales_return_items (
       id, return_id, invoice_item_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund,
       source_type, special_stock_id, disposition
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, ?)
   `, [
     returnItemId, returnId, item.invoiceItemId || null, item.productId, product.name, product.grade,
     item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
@@ -707,7 +769,7 @@ function holdReturnedAsSpecialStock(
       id, special_number, warehouse_id, product_id, category,
       quantity_m2, boxes_count, unit_cost, total_cost, status,
       source_type, source_id, inspection_notes, created_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECORDED', 'SALES_RETURN', ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), 'RECORDED', 'SALES_RETURN', ?, ?, ?, CURRENT_TIMESTAMP)
   `, [
     specialId, sqliteDb.nextNumber('SPC'), inv.warehouseId, item.productId, category,
     item.quantityM2, boxesCount, unitCost, round2(item.quantityM2 * unitCost),
@@ -765,7 +827,7 @@ function insertReturnInventoryTransaction(
       id, transaction_number, type, product_id, warehouse_id,
       quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
       reference_id, notes, performed_by
-    ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)
   `, [
     `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-RET'),
     item.productId, inv.warehouseId, item.quantityM2, boxesCount, unitCost,
@@ -782,8 +844,8 @@ function updateCustomerAfterReturn(
 ): void {
   sqliteDb.run(`
     UPDATE customers SET
-      current_balance = current_balance - ?,
-      total_purchases = total_purchases - ?,
+      current_balance = current_balance - ROUND(?*100),
+      total_purchases = total_purchases - ROUND(?*100),
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `, [balanceDelta, totalReturnAmount, customerId]);
@@ -798,7 +860,7 @@ function updateCashRegisterAfterReturn(
   if (cashRefund > 0 && refundMethod === 'CASH') {
     if (!options.registerId) throw new Error('يجب تحديد خزينة الفرع للمرتجع النقدي.');
     sqliteDb.run(
-      `UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`,
+      `UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?`,
       [cashRefund, options.registerId]
     );
   }
@@ -842,7 +904,7 @@ function updateShiftRefunds(
 ): void {
   if (!shiftId) return;
   sqliteDb.run(
-    `UPDATE cash_shifts SET total_refunds = total_refunds + ? WHERE id = ?`,
+    `UPDATE cash_shifts SET total_refunds = total_refunds + ROUND(?*100) WHERE id = ?`,
     [cashRefund, shiftId]
   );
 }
@@ -855,10 +917,10 @@ function updateInvoiceReturnedAmount(
 ): void {
   sqliteDb.run(
     `UPDATE sales_invoices SET
-     returned_amount = COALESCE(returned_amount, 0) + ?,
-     remaining_amount = MAX(0, COALESCE(remaining_amount, 0) - ?),
+     returned_amount = COALESCE(returned_amount, 0) + ROUND(? * 100),
+     remaining_amount = MAX(0, COALESCE(remaining_amount, 0) - ROUND(? * 100)),
      payment_status = CASE
-       WHEN MAX(0, COALESCE(remaining_amount, 0) - ?) <= 0.009 THEN 'PAID'
+       WHEN MAX(0, COALESCE(remaining_amount, 0) - ROUND(? * 100)) <= 1 THEN 'PAID'
        WHEN COALESCE(paid_amount, 0) > 0 THEN 'PARTIAL'
        ELSE 'UNPAID'
      END,

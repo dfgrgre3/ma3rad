@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { SalesService, ReturnStats } from '../../../services/domains/sales/SalesService';
 import { PrintService } from '../../../services/shared/PrintService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 import { SalesInvoice, SalesReturnItem } from '../../../types';
 import { useToast } from '../../../components/ui/Toast';
@@ -51,6 +53,9 @@ export const AfterSalesPage: React.FC = () => {
   const printService = useMemo(() => new PrintService(), []);
 
   const [activeTab, setActiveTab] = useState<'returns' | 'warranty' | 'analytics'>('returns');
+  // تبويب التحليلات يعرض تجميعات أوسع من السجل — يتطلب صلاحية التحليلات.
+  const canAnalytics = PermissionService.can(AuthService.getCurrentUser(), 'sales.analytics.view');
+  const viewTab = activeTab === 'analytics' && !canAnalytics ? 'returns' : activeTab;
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -208,7 +213,7 @@ export const AfterSalesPage: React.FC = () => {
           <button
             onClick={() => setActiveTab('returns')}
             className={getTabButtonClass(
-              activeTab === 'returns',
+              viewTab === 'returns',
               'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm'
             )}
           >
@@ -218,23 +223,25 @@ export const AfterSalesPage: React.FC = () => {
           <button
             onClick={() => setActiveTab('warranty')}
             className={getTabButtonClass(
-              activeTab === 'warranty',
+              viewTab === 'warranty',
               'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
             )}
           >
             <ShieldCheck className="w-4 h-4" />
             مطالبات الضمان وخدمة ما بعد البيع
           </button>
+          {canAnalytics && (
           <button
             onClick={() => setActiveTab('analytics')}
             className={getTabButtonClass(
-              activeTab === 'analytics',
+              viewTab === 'analytics',
               'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
             )}
           >
             <PieIcon className="w-4 h-4" />
             تحليل أسباب المرتجعات
           </button>
+          )}
         </div>
 
         {/* Search */}
@@ -258,7 +265,7 @@ export const AfterSalesPage: React.FC = () => {
           <Loader2 className="w-8 h-8 text-rose-600 animate-spin mb-3" />
           <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
         </div>
-      ) : activeTab === 'returns' ? (
+      ) : viewTab === 'returns' ? (
         /* Returns Table */
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -336,7 +343,7 @@ export const AfterSalesPage: React.FC = () => {
             </table>
           </div>
         </div>
-      ) : activeTab === 'warranty' ? (
+      ) : viewTab === 'warranty' ? (
         <WarrantyClaimsPanel invoices={recentInvoices} onChanged={loadData} />
       ) : (
         /* Analytics of Return Reasons */

@@ -7,6 +7,9 @@ import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAcces
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { LeaveService } from './LeaveService';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
+const CONTRACT_MONEY_FIELDS = ['salary'] as const;
+
 import type { User } from '../../../types/auth/identity';
 import type {
   ContractSalaryComponent,
@@ -101,7 +104,7 @@ export class ContractService {
        LEFT JOIN branches b ON b.id = c.branch_id
        WHERE c.id = ? AND ${scope.clause} AND ${departmentScope.clause}`,
       [id, ...scope.params, ...departmentScope.params]
-    )[0];
+    ).map((r) => unscaleMoneyRow(r, CONTRACT_MONEY_FIELDS))[0];
     return row ? this.decorate(row) : null;
   }
 
@@ -171,7 +174,7 @@ export class ContractService {
        WHERE ${conditions.join(' AND ')}
        ORDER BY c.start_date DESC, c.created_at DESC`,
       params
-    ).map((row) => this.decorate(row));
+    ).map((row) => this.decorate(unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS)));
 
     if (filters.effectiveStatus && filters.effectiveStatus !== 'ALL') {
       return rows.filter((row) => row.effectiveStatus === filters.effectiveStatus);
@@ -215,7 +218,7 @@ export class ContractService {
            id, employee_id, branch_id, contract_number, contract_type, start_date, end_date,
            job_title, salary, salary_components_json, currency, status, renewal_notice_days,
            notes, created_by, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?)` ,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, 'DRAFT', ?, ?, ?, ?, ?)` ,
         [
           id, input.employeeId, employee.branchId, contractNumber, contractType, input.startDate,
           input.endDate || null, input.jobTitle.trim(), salary,
@@ -274,7 +277,7 @@ export class ContractService {
          start_date = COALESCE(?, start_date),
          end_date = ?,
          job_title = COALESCE(?, job_title),
-         salary = COALESCE(?, salary),
+         salary = COALESCE(ROUND(?*100), salary),
          salary_components_json = ?,
          currency = COALESCE(?, currency),
          renewal_notice_days = COALESCE(?, renewal_notice_days),
@@ -324,7 +327,7 @@ export class ContractService {
       salaryType: 'MONTHLY' | 'DAILY';
       terminatedAt: string | null;
     }>(
-      `SELECT status, base_salary AS baseSalary, salary_type AS salaryType, terminated_at AS terminatedAt
+      `SELECT status, base_salary / 100.0 AS baseSalary, salary_type AS salaryType, terminated_at AS terminatedAt
        FROM employees WHERE id = ?`,
       [existing.employeeId]
     )[0];
@@ -357,7 +360,7 @@ export class ContractService {
         `INSERT INTO employee_salary_history (
            id, employee_id, previous_salary, next_salary, salary_type, effective_date,
            source_type, source_id, reason, actor_id
-         ) VALUES (?, ?, ?, ?, ?, ?, 'CONTRACT', ?, ?, ?)`,
+         ) VALUES (?, ?, ROUND(?*100), ROUND(?*100), ?, ?, 'CONTRACT', ?, ?, ?)`,
         [
           `sal_${uuidv4().replace(/-/g, '').slice(0, 16)}`, existing.employeeId,
           employee.baseSalary, existing.salary, employee.salaryType, existing.startDate,
@@ -365,7 +368,7 @@ export class ContractService {
         ]
       );
       db.run(
-        'UPDATE employees SET base_salary = ?, updated_at = ? WHERE id = ?',
+        'UPDATE employees SET base_salary = ROUND(?*100), updated_at = ? WHERE id = ?',
         [existing.salary, now, existing.employeeId]
       );
       if (employee.status === 'PROBATION' && existing.startDate <= localDateString()) {
@@ -505,7 +508,7 @@ export class ContractService {
       ))
       : roundMoney(totalMonthly * elapsedDays / monthDays);
     const salaryPayouts = Number(this.db.query<{ amount: number }>(
-      `SELECT COALESCE(SUM(amount), 0) AS amount FROM payroll_transactions
+      `SELECT COALESCE(SUM(amount), 0) / 100.0 AS amount FROM payroll_transactions
        WHERE employee_id = ? AND branch_id = ? AND type = 'SALARY_PAYOUT'
          AND date BETWEEN ? AND ?`,
       [existing.employeeId, existing.branchId, calendarMonthStart, input.terminationDate]
@@ -548,7 +551,7 @@ export class ContractService {
            id, employee_id, contract_id, branch_id, termination_date, reason, salary_type,
            base_salary, earned_wages, unused_annual_leave_days, leave_payout, total_amount,
            details_json, created_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ROUND(?*100), ROUND(?*100), ?, ?)`,
         [
           settlementId, existing.employeeId, id, existing.branchId, input.terminationDate, reason,
           employee.salaryType, existing.salary, earnedWages, unusedAnnualLeaveDays, leavePayout,
@@ -641,7 +644,7 @@ export class ContractService {
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
     this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     const salaryChanges = this.db.query<EmployeeLifecycleHistory['salaryChanges'][number]>(
-      `SELECT h.id, h.previous_salary AS previousSalary, h.next_salary AS nextSalary,
+      `SELECT h.id, h.previous_salary / 100.0 AS previousSalary, h.next_salary / 100.0 AS nextSalary,
               h.salary_type AS salaryType, h.effective_date AS effectiveDate,
               h.source_type AS sourceType, h.reason, u.full_name AS actorName
        FROM employee_salary_history h

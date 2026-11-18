@@ -94,14 +94,14 @@ export class SalesFinancialReconciliationService {
     const warehouseCompanyScope = this.branchAccess.companyScope('w.company_id');
 
     const netSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost + COALESCE(si.extra_fees, 0)), 0)
+      SELECT (COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost + COALESCE(si.extra_fees, 0)), 0)
         - COALESCE((
           SELECT SUM(sr.total_amount)
           FROM sales_returns sr
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
             AND ${returnScope.clause}
-        ), 0) AS amount
+        ), 0)) / 100.0 AS amount
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
     `, [
@@ -109,7 +109,7 @@ export class SalesFinancialReconciliationService {
       dateFrom, dateTo, ...invoiceScope.params,
     ])[0]?.amount || 0);
     const ledgerSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(l.credit - l.debit), 0) AS amount
+      SELECT COALESCE(SUM(l.credit - l.debit), 0) / 100.0 AS amount
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -130,7 +130,7 @@ export class SalesFinancialReconciliationService {
     `, [dateFrom, dateTo, ...ledgerScope.params])[0]?.amount || 0);
 
     const costOfSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(si.total_cost), 0)
+      SELECT (COALESCE(SUM(si.total_cost), 0)
         - COALESCE((
           SELECT SUM(sri.quantity_m2 * sri.unit_cost)
           FROM sales_return_items sri
@@ -138,7 +138,7 @@ export class SalesFinancialReconciliationService {
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
             AND ${returnScope.clause}
-        ), 0) AS amount
+        ), 0)) / 100.0 AS amount
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
     `, [
@@ -146,7 +146,7 @@ export class SalesFinancialReconciliationService {
       dateFrom, dateTo, ...invoiceScope.params,
     ])[0]?.amount || 0);
     const ledgerCostOfSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS amount
+      SELECT COALESCE(SUM(l.debit - l.credit), 0) / 100.0 AS amount
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -165,19 +165,19 @@ export class SalesFinancialReconciliationService {
     `, [dateFrom, dateTo, ...ledgerScope.params])[0]?.amount || 0);
 
     const accountBalance = (code: string) => Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+      SELECT COALESCE(SUM(l.debit - l.credit), 0) / 100.0 AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND a.code = ? AND ${ledgerScope.clause}
     `, [code, ...ledgerScope.params])[0]?.balance || 0);
     const customerBalance = Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
+      SELECT COALESCE(SUM(si.remaining_amount), 0) / 100.0 AS balance
       FROM sales_invoices si
       WHERE si.invoice_status != 'VOID' AND ${invoiceScope.clause}
     `, invoiceScope.params)[0]?.balance || 0);
     const inventoryValue = Number(this.db.query<{ value: number }>(`
-      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) / 100.0 AS value
       FROM inventory_cost_layers icl
       JOIN warehouses w ON w.id = icl.warehouse_id
       WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause} AND (${warehouseCompanyScope.clause})
@@ -188,7 +188,7 @@ export class SalesFinancialReconciliationService {
     const currentInventoryValue = costingMethod === 'FIFO'
       ? inventoryValue
       : Number(this.db.query<{ value: number }>(`
-          SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
+          SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 AS value
           FROM warehouse_stock ws
           JOIN warehouses w ON w.id = ws.warehouse_id
           JOIN products p ON p.id = ws.product_id
@@ -196,7 +196,7 @@ export class SalesFinancialReconciliationService {
         `, [...warehouseScope.params, ...warehouseCompanyScope.params])[0]?.value || 0);
     const registerScope = this.branchAccess.sqlScope('branch_id');
     const cashRegisters = Number(this.db.query<{ balance: number }>(
-      `SELECT COALESCE(SUM(current_balance), 0) AS balance FROM cash_registers WHERE ${registerScope.clause}`,
+      `SELECT COALESCE(SUM(current_balance) / 100.0, 0) AS balance FROM cash_registers WHERE ${registerScope.clause}`,
       registerScope.params
     )[0]?.balance || 0);
 
@@ -216,7 +216,7 @@ export class SalesFinancialReconciliationService {
     ];
     const bankScope = this.branchAccess.sqlScope('ba.branch_id');
     const bankAccounts = this.db.query<{ count: number; balance: number }>(`
-      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) AS balance
+      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) / 100.0 AS balance
       FROM bank_accounts ba WHERE ${bankScope.clause}
     `, bankScope.params)[0];
     checks.push(this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), Number(bankAccounts?.balance || 0),
@@ -225,7 +225,7 @@ export class SalesFinancialReconciliationService {
     const outstandingDeposits = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(MAX(0, od.amount - COALESCE((
         SELECT SUM(r.amount) FROM order_deposit_refunds r WHERE r.order_deposit_id = od.id
-      ), 0))), 0) AS amount
+      ), 0))), 0) / 100.0 AS amount
       FROM order_deposits od
       JOIN orders o ON o.id = od.order_id
       JOIN branches b ON b.id = o.branch_id

@@ -43,129 +43,8 @@ import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { PlatformBootstrapService } from './PlatformBootstrapService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import {
-  PlatformTenant,
-  PlatformTenantInput,
-  PlatformTenantStatus,
-  PLATFORM_TENANT_STATUS_LABELS,
-  PLATFORM_INVOICE_STATUS_LABELS,
-  PlatformTenantAccount,
-  PlatformTenantAccountInput,
-  PlatformTenantProfile,
-  PlatformTenantUser,
-  PlatformTenantUserInput,
-  PlatformTenantUserProvisioningResult,
-  PlatformTenantOverride,
-  PlatformTenantOverrideInput,
-  PlatformPlan,
-  PlatformPlanInput,
-  PlatformPlanVersion,
-  PlatformPlanVersionInput,
-  PlatformPriceHistoryEntry,
-  PlatformPlanUpgradeRule,
-  PlatformPlanUpgradeRuleInput,
-  PlatformPlanCopyResult,
-  PlatformPlanImpactPreview,
-  PlatformSubscription,
-  PlatformSubscriptionCreateInput,
-  PlatformTrialCreateInput,
-  PlatformLicense,
-  PlatformLicenseStatus,
-  PlatformLicenseActivation,
-  PlatformDevice,
-  PlatformCoupon,
-  PlatformCouponInput,
-  PlatformInvoice,
-  PlatformInvoiceInput,
-  PlatformInvoiceStatus,
-  PlatformPayment,
-  PlatformPaymentInput,
-  PlatformSupportTicket,
-  PlatformSupportMessage,
-  PlatformCannedReply,
-  PlatformRemoteSession,
-  PlatformSupportTicketDetails,
-  PlatformStaff,
-  PlatformStaffInput,
-  PlatformStaffRoleDefinition,
-  PlatformStaffInvite,
-  PlatformStaffInviteInput,
-  PlatformStaffInviteCreated,
-  PlatformStaffInviteStatus,
-  PlatformTrustedDevice,
-  PlatformStaffSession,
-  PlatformStaffLogin,
-  PlatformCentralSecurityIncident,
-  PlatformSigningKey,
-  PlatformCentralSecurityOverview,
-  PlatformStaffDataScopeState,
-  PlatformRoleMatrix,
-  PlatformSettingsMap,
-  PlatformPolicyDocument,
-  PlatformPolicyRetention,
-  PlatformTenantActivityConfig,
-  PlatformTenantActivityInput,
-  PlatformTenantActivityVersion,
-  PlatformBrandingConfig,
-  PlatformBrandingInput,
-  PlatformBrandingVersion,
-  PlatformUiProfile,
-  PlatformTenantUiCustomization,
-  PlatformTenantUiInput,
-  PlatformTenantUiVersion,
-  PlatformConfigTemplate,
-  PlatformTenantConfig,
-  PlatformTenantConfigInput,
-  PlatformTenantConfigVersion,
-  PlatformConfigRollout,
-  PlatformConfigRolloutInput,
-  PlatformConfigAck,
-  RolloutTargetType,
-  RolloutStatus,
-  PlatformComprehensiveHealth,
-  PlatformTechnicalHealthMetrics,
-  PlatformHealthDashboardData,
-  PlatformCentralBackup,
-  PlatformServiceIncident,
-  PlatformOverview,
-  PlatformBusinessPerformance,
-  PlatformCustomerMetrics,
-  PlatformSubscriptionMetrics,
-  PlatformLicenseMetrics,
-  PlatformOperationsMetrics,
-  PlatformPeriod,
-  PlatformAlertDetail,
-  PlatformAuditEntry,
-  PlatformAuditFilters,
-  PlatformAuditPaginatedResult,
-  PlatformModule,
-  PlatformFeatureFlag,
-  PlatformFeatureOverride,
-  PlatformRelease,
-  PlatformReleaseTarget,
-  PlatformPlanChangeRequest,
-  PlatformPlanChangeResult,
-  PlatformPlanChangeType,
-  PlatformPlanVersioningInput,
-  PlatformSubscriptionStatus,
-  PlatformPaymentMethod,
-  PlatformBillingCycle,
-  PlatformCouplingMode,
-  PlatformModuleUsage,
-  PlatformMetricComparison,
-  PlatformTimeSeriesPoint,
-  PlatformTenantUsage,
-  PlatformActivationDetails,
-  PlatformOpsJob,
-  PlatformOpsJobStatus,
-  PlatformOpsJobType,
-  PlatformMaintenanceWindow,
-  PlatformMaintenanceStatus,
-  PlatformOpApproval,
-  PlatformOpApprovalStatus,
-  PlatformSyncLogEntry,
-  PlatformSyncStatus,
-} from './platformTypes';
+import { PLATFORM_TENANT_STATUS_LABELS, PLATFORM_INVOICE_STATUS_LABELS } from './platformTypes';
+import type { PlatformTenant, PlatformTenantInput, PlatformTenantStatus, PlatformTenantAccount, PlatformTenantAccountInput, PlatformTenantProfile, PlatformTenantUser, PlatformTenantUserInput, PlatformTenantUserProvisioningResult, PlatformTenantOverride, PlatformTenantOverrideInput, PlatformPlan, PlatformPlanInput, PlatformPlanVersion, PlatformPlanVersionInput, PlatformPriceHistoryEntry, PlatformPlanUpgradeRule, PlatformPlanUpgradeRuleInput, PlatformPlanCopyResult, PlatformPlanImpactPreview, PlatformSubscription, PlatformSubscriptionCreateInput, PlatformTrialCreateInput, PlatformLicense, PlatformLicenseStatus, PlatformLicenseActivation, PlatformDevice, PlatformCoupon, PlatformCouponInput, PlatformInvoice, PlatformInvoiceInput, PlatformInvoiceStatus, PlatformPayment, PlatformPaymentInput, PlatformSupportTicket, PlatformSupportMessage, PlatformCannedReply, PlatformRemoteSession, PlatformSupportTicketDetails, PlatformStaff, PlatformStaffInput, PlatformStaffRoleDefinition, PlatformStaffInvite, PlatformStaffInviteInput, PlatformStaffInviteCreated, PlatformStaffInviteStatus, PlatformTrustedDevice, PlatformStaffSession, PlatformStaffLogin, PlatformCentralSecurityIncident, PlatformSigningKey, PlatformCentralSecurityOverview, PlatformStaffDataScopeState, PlatformRoleMatrix, PlatformSettingsMap, PlatformPolicyDocument, PlatformPolicyRetention, PlatformTenantActivityConfig, PlatformTenantActivityInput, PlatformTenantActivityVersion, PlatformBrandingConfig, PlatformBrandingInput, PlatformBrandingVersion, PlatformUiProfile, PlatformTenantUiCustomization, PlatformTenantUiInput, PlatformTenantUiVersion, PlatformConfigTemplate, PlatformTenantConfig, PlatformTenantConfigInput, PlatformTenantConfigVersion, PlatformConfigRollout, PlatformConfigRolloutInput, PlatformConfigAck, RolloutTargetType, RolloutStatus, PlatformComprehensiveHealth, PlatformTechnicalHealthMetrics, PlatformHealthDashboardData, PlatformCentralBackup, PlatformServiceIncident, PlatformOverview, PlatformBusinessPerformance, PlatformCustomerMetrics, PlatformSubscriptionMetrics, PlatformLicenseMetrics, PlatformOperationsMetrics, PlatformPeriod, PlatformAlertDetail, PlatformAuditEntry, PlatformAuditFilters, PlatformAuditPaginatedResult, PlatformModule, PlatformFeatureFlag, PlatformFeatureOverride, PlatformRelease, PlatformReleaseTarget, PlatformPlanChangeRequest, PlatformPlanChangeResult, PlatformPlanChangeType, PlatformPlanVersioningInput, PlatformSubscriptionStatus, PlatformPaymentMethod, PlatformBillingCycle, PlatformCouplingMode, PlatformModuleUsage, PlatformMetricComparison, PlatformTimeSeriesPoint, PlatformTenantUsage, PlatformActivationDetails, PlatformOpsJob, PlatformOpsJobStatus, PlatformOpsJobType, PlatformMaintenanceWindow, PlatformMaintenanceStatus, PlatformOpApproval, PlatformOpApprovalStatus, PlatformSyncLogEntry, PlatformSyncStatus } from './platformTypes';;
 import { nowIso, toNumber, formatDate, addDays, addMonths, randomToken, generateTemporaryPassword, generateActivationCode, generateLicenseActivationCode, safeJsonArray, signCertificate, mapTenantAccount, mapTenantOverride } from './platformUtils';
 
 const PLATFORM_ROLE_CODES_SET: ReadonlySet<string> = new Set([
@@ -407,6 +286,7 @@ export class PlatformAdminService {
       priceLockMonths?: number;
       reason?: string;
       allowLocal?: boolean;
+      approvalId?: string;
     } = {}
   ): PlatformPlanChangeResult {
     return platformSubscriptionService.changeSubscriptionPlan(tenantId, targetPlanId, options);
@@ -426,6 +306,7 @@ export class PlatformAdminService {
       priceLockMonths?: number;
       reason?: string;
       allowLocal?: boolean;
+      approvalId?: string;
     } = {}
   ): PlatformPlanChangeResult {
     return this.changeSubscriptionPlan(tenantId, targetPlanId, options);
@@ -458,7 +339,8 @@ export class PlatformAdminService {
 
   public resetTenantDevices(tenantId: string): number {
     const now = nowIso();
-    this.db.run('UPDATE platform_devices SET status = \'RELEASED\', updated_at = ? WHERE license_id IN (SELECT id FROM platform_licenses WHERE tenant_id = ?)', [now, tenantId]);
+    this.db.run('UPDATE platform_devices SET status = \'REVOKED\', updated_at = ? WHERE license_id IN (SELECT id FROM platform_licenses WHERE tenant_id = ?)', [now, tenantId]);
+    this.db.run('UPDATE platform_licenses SET hardware_id = NULL, updated_at = ? WHERE tenant_id = ?', [now, tenantId]);
     return this.db.query<any>('SELECT changes() AS c')[0]?.c ?? 0;
   }
 
@@ -692,7 +574,7 @@ export class PlatformAdminService {
     return platformLicenseService.issueLicense({ tenantId, planId, ...options }) as any;
   }
 
-  public async renewLicense(id: string, months = 12): Promise<PlatformLicense> {
+  public renewLicense(id: string, months = 12): PlatformLicense {
     return platformLicenseService.renewLicense(id, months);
   }
 
@@ -1020,7 +902,7 @@ export class PlatformAdminService {
     return platformStaffService.getStaffMfaCompliance();
   }
 
-  public startMfaEnrollmentForStaffSelf(): any {
+  public async startMfaEnrollmentForStaffSelf(): Promise<any> {
     return platformStaffService.startMfaEnrollmentForStaffSelf();
   }
 

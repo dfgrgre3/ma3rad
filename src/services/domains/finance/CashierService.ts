@@ -7,6 +7,13 @@ import { BranchAccessService } from '../auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../../database/repositories/ledger';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
+import { AppConfigService } from '../config/AppConfigService';
+import { round2 } from './financials';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const EXPENSE_MONEY_FIELDS = ['amount'] as const;
+const CASH_SHIFT_MONEY_FIELDS = ['opening_balance','expected_ending_cash','actual_ending_cash','cash_difference','total_sales_cash','total_sales_card','total_sales_transfer','total_customer_payments','total_supplier_payments','total_expenses','total_refunds','total_partner_inflows','total_partner_outflows'] as const;
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -14,20 +21,40 @@ export class CashierService {
   private static readonly AUTO_CLOSE_ENABLED_KEY = 'cashShiftAutoCloseEnabled';
   private static readonly AUTO_CLOSE_TIME_KEY = 'cashShiftAutoCloseTime';
 
-  public getAllRegisters(): CashRegister[] {
-    const actor = AuthService.requireAuth();
+  private buildRegistersQuery(actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('cr.branch_id', undefined, actor);
-    return this.db.query<CashRegister>(`
+    return {
+      sql: `
       SELECT cr.*, cr.branch_id AS branchId, b.name AS branchName
       FROM cash_registers cr
       JOIN branches b ON b.id = cr.branch_id
       WHERE cr.is_active = 1 AND ${scope.clause}
-      ORDER BY cr.is_default DESC, b.name ASC, cr.name ASC
-    `, scope.params);
+      ORDER BY cr.is_default DESC, b.name ASC, cr.name ASC`,
+      params: scope.params,
+    };
   }
 
-  public getActiveShift(userId?: string, branchId?: string): CashShift | null {
+  private mapRegisters(rows: any[]): CashRegister[] {
+    return rows.map((row: any) => ({
+      ...row,
+      current_balance: Number(row.current_balance ?? 0) / 100,
+      currentBalance: Number(row.current_balance ?? row.currentBalance ?? 0) / 100,
+    }));
+  }
+
+  public getAllRegisters(): CashRegister[] {
     const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildRegistersQuery(actor);
+    return this.mapRegisters(this.db.query(sql, params));
+  }
+
+  public async getAllRegistersAsync(): Promise<CashRegister[]> {
+    const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildRegistersQuery(actor);
+    return this.mapRegisters(await this.db.queryAsync(sql, params));
+  }
+
+  private buildActiveShiftQuery(userId: string | undefined, branchId: string | undefined, actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('cr.branch_id', undefined, actor);
     if (branchId) this.branchAccess.requireBranchAccess(branchId, actor);
     let sql = `
@@ -47,8 +74,20 @@ export class CashierService {
       params.push(branchId);
     }
     sql += ` ORDER BY cs.opened_at DESC LIMIT 1`;
+    return { sql, params };
+  }
 
+  public getActiveShift(userId?: string, branchId?: string): CashShift | null {
+    const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildActiveShiftQuery(userId, branchId, actor);
     const rows = this.db.query<CashShift>(sql, params);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  public async getActiveShiftAsync(userId?: string, branchId?: string): Promise<CashShift | null> {
+    const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildActiveShiftQuery(userId, branchId, actor);
+    const rows = await this.db.queryAsync<CashShift>(sql, params);
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -66,6 +105,20 @@ export class CashierService {
     return rows[0] || null;
   }
 
+  public async getLastClosedShiftAsync(registerId: string): Promise<CashShift | null> {
+    const actor = AuthService.requireAuth();
+    this.branchAccess.requireRegisterAccess(registerId, actor);
+    const rows = await this.db.queryAsync<CashShift>(`
+      SELECT cs.*, cs.branch_id AS branchId, cr.name as registerName, u.full_name as userName
+      FROM cash_shifts cs
+      JOIN cash_registers cr ON cs.register_id = cr.id
+      JOIN users u ON cs.user_id = u.id
+      WHERE cs.register_id = ? AND cs.status = 'CLOSED'
+      ORDER BY cs.closed_at DESC LIMIT 1
+    `, [registerId]);
+    return rows[0] || null;
+  }
+
   public getSuggestedOpeningBalance(registerId: string): number {
     this.branchAccess.requireRegisterAccess(registerId);
     const lastShift = this.getLastClosedShift(registerId);
@@ -73,7 +126,7 @@ export class CashierService {
       return Number(lastShift.actualEndingCash ?? lastShift.expectedEndingCash ?? 0);
     }
     const register = this.db.query<{ currentBalance: number }>(
-      'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?',
+      'SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = ?',
       [registerId]
     )[0];
     return Number(register?.currentBalance || 0);
@@ -128,7 +181,7 @@ export class CashierService {
       SELECT * FROM cash_shifts
       WHERE status = 'OPEN'
       ORDER BY opened_at ASC
-    `);
+    `).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS));
     const cutoffTimestamp = cutoff.getTime();
     return shifts
       .filter((shift) => {
@@ -192,7 +245,7 @@ export class CashierService {
         INSERT INTO cash_shifts (
           id, shift_number, register_id, user_id, branch_id, opening_balance,
           expected_ending_cash, operation_shift_id, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+        ) VALUES (?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, 'OPEN')
       `, [shiftId, shiftNumber, registerId, userId, branchId, openingBalance, openingBalance,
         linkedOperationShiftId]);
 
@@ -230,7 +283,7 @@ export class CashierService {
       JOIN users u ON u.id = cs.user_id
       WHERE cs.operation_shift_id = ? AND ${scope.clause}
       ORDER BY cs.opened_at
-    `, [operationShiftId, ...scope.params]);
+    `, [operationShiftId, ...scope.params]).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS));
   }
 
   public getCashShiftSummaryForOperationShift(operationShiftId: string): {
@@ -281,7 +334,7 @@ export class CashierService {
     }>(
       `SELECT * FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
       [previousShiftId]
-    )[0];
+    ).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS))[0];
     if (!previous) throw new Error('وردية الكاشير السابقة غير موجودة أو مغلقة.');
     this.branchAccess.requireRegisterAccess(previous.registerId, actor);
     if (actor.id !== previous.userId && actor.id !== nextUserId && actor.role !== 'ADMIN') {
@@ -361,7 +414,7 @@ export class CashierService {
       const shift = this.db.query<CashShift>(
         `SELECT * FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
         [shiftId]
-      )[0];
+      ).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS))[0];
       if (!shift) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
       const expected = this.calculateExpectedEndingCash(shift);
       const diff = actualEndingCash === null
@@ -371,9 +424,9 @@ export class CashierService {
       sqliteDb.run(`
         UPDATE cash_shifts SET
           closed_at = CURRENT_TIMESTAMP,
-          expected_ending_cash = ?,
-          actual_ending_cash = ?,
-          cash_difference = ?,
+          expected_ending_cash = ROUND(?*100),
+          actual_ending_cash = ROUND(?*100),
+          cash_difference = ROUND(?*100),
           status = 'CLOSED',
           closing_notes = ?,
           auto_closed = ?
@@ -392,7 +445,7 @@ export class CashierService {
         JSON.stringify({ expected, actualEndingCash, diff, autoClosed }),
       ]);
 
-      return this.db.query<CashShift>(`SELECT * FROM cash_shifts WHERE id = ?`, [shiftId])[0];
+      return this.db.query<CashShift>(`SELECT * FROM cash_shifts WHERE id = ?`, [shiftId]).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS))[0];
     }, { immediatePersist: true });
   }
 
@@ -400,11 +453,14 @@ export class CashierService {
     return this.db.query<ExpenseCategory>(`SELECT * FROM expense_categories ORDER BY name ASC`);
   }
 
-  public getAllExpenses(dateFrom?: string, dateTo?: string): Expense[] {
-    const actor = AuthService.requireAuth();
+  public async getExpenseCategoriesAsync(): Promise<ExpenseCategory[]> {
+    return this.db.queryAsync<ExpenseCategory>(`SELECT * FROM expense_categories ORDER BY name ASC`);
+  }
+
+  private buildExpensesQuery(dateFrom: string | undefined, dateTo: string | undefined, actor: ReturnType<typeof AuthService.requireAuth>): { sql: string; params: any[] } {
     const scope = this.branchAccess.sqlScope('e.branch_id', 'cr.branch_id', actor);
     let sql = `
-      SELECT e.id, e.category, e.amount,
+      SELECT e.id, e.category, e.amount / 100.0 AS amount,
              e.register_id AS registerId, e.branch_id AS branchId, e.shift_id AS shiftId,
              e.payment_type AS paymentType, e.date, e.recipient, e.description,
              e.performed_by AS performedBy, e.created_at AS createdAt,
@@ -427,7 +483,19 @@ export class CashierService {
     }
 
     sql += ` ORDER BY e.created_at DESC`;
+    return { sql, params };
+  }
+
+  public getAllExpenses(dateFrom?: string, dateTo?: string): Expense[] {
+    const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildExpensesQuery(dateFrom, dateTo, actor);
     return this.db.query<Expense>(sql, params);
+  }
+
+  public async getAllExpensesAsync(dateFrom?: string, dateTo?: string): Promise<Expense[]> {
+    const actor = AuthService.requireAuth();
+    const { sql, params } = this.buildExpensesQuery(dateFrom, dateTo, actor);
+    return this.db.queryAsync<Expense>(sql, params);
   }
 
   public addExpense(
@@ -438,12 +506,57 @@ export class CashierService {
     shiftId?: string,
     paymentType: PaymentType = 'CASH',
     recipient = '',
-    performedBy = 'usr_admin'
+    performedBy = 'usr_admin',
+    options: { approvalId?: string } = {}
   ): Expense {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.cashier.expenses.expense');
     if (amount <= 0) throw new Error('مبلغ المصروف يجب أن يكون أكبر من الصفر.');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
+
+    // ── Approval gate: سقف المصروف-policy.maxValue أو الحد اليومي للمصروفات ──
+    const gate = new OperationApprovalGate(this.db);
+    const { policy: expensePolicy, required: policyRequired } = gate.evaluate('finance.expense.create', amount);
+    const today = localDateString();
+    const dailyLimit = AppConfigService.getPolicyNumber('finance.dailyExpenseLimit', 0);
+    let dailyExceeded = false;
+    if (dailyLimit > 0) {
+      const spentToday = Number(this.db.query<{ total: number }>(
+        `SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM expenses WHERE branch_id = ? AND date = ?`,
+        [branchId, today]
+      )[0]?.total || 0);
+      dailyExceeded = round2(spentToday + amount) > dailyLimit;
+    }
+    const approvalRequired = policyRequired || dailyExceeded;
+    let resolvedApprovalId: string | null = null;
+    if (approvalRequired) {
+      const details = {
+        category, amount, description, paymentType, registerId, branchId,
+        dailySpent: dailyLimit > 0 ? Number(this.db.query<{ total: number }>(
+          `SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM expenses WHERE branch_id = ? AND date = ?`,
+          [branchId, today]
+        )[0]?.total || 0) : null,
+        dailyLimit: dailyLimit > 0 ? dailyLimit : null,
+        reasons: [...(policyRequired ? ['policy'] : []), ...(dailyExceeded ? ['daily_limit'] : [])],
+      };
+      resolvedApprovalId = options.approvalId
+        ?? gate.findApproved('finance.expense.create', 'EXPENSE', { amount, category });
+      if (options.approvalId) {
+        gate.assertApproved(options.approvalId, 'finance.expense.create', { amount, category });
+      }
+      if (!resolvedApprovalId) {
+        const approvalId = gate.requestApproval({
+          operationCode: 'finance.expense.create',
+          requestType: 'EXPENSE',
+          title: `مصروف ${category} — ${amount} ج`,
+          description: `${description}${recipient ? ` · المستفيد: ${recipient}` : ''}`,
+          branchId,
+          requestedValue: amount,
+          details: { ...details, dedupeKey: `expense:${branchId}:${category}:${amount}:${today}`, policy: expensePolicy },
+        });
+        gate.throwRequested(approvalId);
+      }
+    }
     if (shiftId) {
       const shift = this.db.query<{ registerId: string; status: string }>(
         'SELECT register_id AS registerId, status FROM cash_shifts WHERE id = ? AND branch_id = ?',
@@ -455,19 +568,25 @@ export class CashierService {
     }
 
     const expId = `exp_${uuidv4().substring(0, 8)}`;
-    const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
+      // بُعدا المبلغ والنطاق داخل المعاملة — استهلاك اعتماد المبلغ ذرّي
+      // مع قيد المصروف (فوق بوابة OperationApprovalGate القائمة).
+      PermissionService.require(actor, 'ui.cashier.expenses.expense', undefined, {
+        branchId,
+        amount,
+        operation: 'ui.cashier.expenses.expense',
+      });
       // 1. Insert Expense
       sqliteDb.run(`
         INSERT INTO expenses (
           id, category, amount, register_id, shift_id, branch_id, payment_type, date, recipient, description, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [expId, category, amount, registerId, shiftId || null, branchId, paymentType, today, recipient || null, description, actor.id]);
 
       // 2. Deduct from Cash register if cash
       if (paymentType === 'CASH') {
-        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, registerId]);
+        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?`, [amount, registerId]);
       }
       postLedgerEntry(sqliteDb.getDatabase(), {
         date: today,
@@ -489,7 +608,11 @@ export class CashierService {
 
       // 3. Update shift if active
       if (shiftId) {
-        sqliteDb.run(`UPDATE cash_shifts SET total_expenses = total_expenses + ? WHERE id = ?`, [amount, shiftId]);
+        sqliteDb.run(`UPDATE cash_shifts SET total_expenses = total_expenses + ROUND(?*100) WHERE id = ?`, [amount, shiftId]);
+      }
+
+      if (resolvedApprovalId) {
+        gate.consume(resolvedApprovalId, 'EXPENSE', expId, sqliteDb);
       }
 
       return {
@@ -520,7 +643,7 @@ export class CashierService {
       SELECT e.*, e.branch_id AS branchId
       FROM expenses e LEFT JOIN cash_registers cr ON cr.id = e.register_id
       WHERE e.id = ? AND ${scope.clause}
-    `, [id, ...scope.params])[0];
+    `, [id, ...scope.params]).map((row) => unscaleMoneyRow(row, EXPENSE_MONEY_FIELDS))[0];
     if (!current) throw new Error('المصروف غير موجود.');
     if (!patch.description.trim()) throw new Error('بيان المصروف مطلوب.');
     if (!patch.amount || patch.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا أكبر من صفر.');
@@ -547,19 +670,19 @@ export class CashierService {
         });
       }
       if (current.payment_type === 'CASH') {
-        db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [current.amount, current.register_id]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [current.amount, current.register_id]);
         if (current.shift_id) {
-          db.run('UPDATE cash_shifts SET total_expenses = total_expenses - ? WHERE id = ?', [current.amount, current.shift_id]);
+          db.run('UPDATE cash_shifts SET total_expenses = total_expenses - ROUND(?*100) WHERE id = ?', [current.amount, current.shift_id]);
         }
       }
       if (patch.paymentType === 'CASH') {
-        db.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [patch.amount, registerId]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [patch.amount, registerId]);
         if (current.shift_id) {
-          db.run('UPDATE cash_shifts SET total_expenses = total_expenses + ? WHERE id = ?', [patch.amount, current.shift_id]);
+          db.run('UPDATE cash_shifts SET total_expenses = total_expenses + ROUND(?*100) WHERE id = ?', [patch.amount, current.shift_id]);
         }
       }
       db.run(
-        `UPDATE expenses SET category = ?, amount = ?, description = ?, recipient = ?, payment_type = ?, register_id = ?, branch_id = ?
+        `UPDATE expenses SET category = ?, amount = ROUND(?*100), description = ?, recipient = ?, payment_type = ?, register_id = ?, branch_id = ?
          WHERE id = ?`,
         [patch.category, patch.amount, patch.description.trim(), patch.recipient || null, patch.paymentType, registerId, branchId, id]
       );
@@ -592,7 +715,7 @@ export class CashierService {
       SELECT e.*, e.branch_id AS branchId
       FROM expenses e LEFT JOIN cash_registers cr ON cr.id = e.register_id
       WHERE e.id = ? AND ${scope.clause}
-    `, [id, ...scope.params])[0];
+    `, [id, ...scope.params]).map((row) => unscaleMoneyRow(row, EXPENSE_MONEY_FIELDS))[0];
     if (!expense) throw new Error('المصروف غير موجود.');
     this.branchAccess.requireRegisterAccess(expense.register_id, actor, expense.branchId);
 
@@ -616,9 +739,9 @@ export class CashierService {
         });
       }
       if (expense.payment_type === 'CASH') {
-        db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [expense.amount, expense.register_id]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?', [expense.amount, expense.register_id]);
         if (expense.shift_id) {
-          db.run('UPDATE cash_shifts SET total_expenses = total_expenses - ? WHERE id = ?', [expense.amount, expense.shift_id]);
+          db.run('UPDATE cash_shifts SET total_expenses = total_expenses - ROUND(?*100) WHERE id = ?', [expense.amount, expense.shift_id]);
         }
       }
       db.run('DELETE FROM expenses WHERE id = ?', [id]);

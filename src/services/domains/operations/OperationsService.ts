@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { BranchService } from '../organization/BranchService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
@@ -288,8 +289,8 @@ export class OperationsService {
     const scope = this.branchAccess.sqlScope('w.branch_id', undefined, actor);
     const fifo = InventoryCostingService.costingMethod(this.db) === 'FIFO';
     const valueExpr = fifo
-      ? `(SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) FROM inventory_cost_layers icl WHERE icl.warehouse_id = w.id AND icl.quantity_remaining > 0)`
-      : `(SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id WHERE ws.warehouse_id = w.id)`;
+      ? `(SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) / 100.0 FROM inventory_cost_layers icl WHERE icl.warehouse_id = w.id AND icl.quantity_remaining > 0)`
+      : `(SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) / 100.0 FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id WHERE ws.warehouse_id = w.id)`;
     let sql = `
       SELECT w.*, b.name AS branch_name,
         (SELECT COUNT(DISTINCT ws.product_id) FROM warehouse_stock ws WHERE ws.warehouse_id = w.id AND ws.quantity_m2 > 0) AS products_count,
@@ -596,7 +597,7 @@ export class OperationsService {
       params.push(term, term, term, term);
     }
     sql += ` ORDER BY dl.date DESC, dl.created_at DESC`;
-    return this.db.query<Delivery>(sql, params);
+    return this.db.query<Delivery>(sql, params).map((row) => unscaleMoneyRow(row, ['delivery_fee']));
   }
 
   public createDelivery(input: {
@@ -618,7 +619,7 @@ export class OperationsService {
       db.run(
         `INSERT INTO deliveries (id, delivery_number, date, customer_id, warehouse_id, driver_id, vehicle_id,
           address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 'PENDING', ?, ?, ?)`,
         [
           id, deliveryNumber, input.date || localDateString(), input.customerId,
           warehouse.id, input.driverId || null, input.vehicleId || null, input.address.trim(),

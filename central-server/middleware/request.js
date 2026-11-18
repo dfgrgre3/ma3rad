@@ -23,7 +23,11 @@ function requestContext(req, res, next) {
  * which terminates TLS. It checks the X-Forwarded-Proto header set by the proxy.
  */
 function requireHttps(req, res, next) {
-  if (process.env.REQUIRE_HTTPS !== '1') {
+  // Fail closed: HTTPS is mandatory in production unless explicitly disabled
+  // with REQUIRE_HTTPS=0 (e.g. a trusted internal network without TLS).
+  const enforce = process.env.REQUIRE_HTTPS === '1' ||
+    (process.env.NODE_ENV === 'production' && process.env.REQUIRE_HTTPS !== '0');
+  if (!enforce) {
     return next();
   }
 

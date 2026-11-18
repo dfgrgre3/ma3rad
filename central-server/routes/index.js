@@ -9,6 +9,7 @@ const planRoutes = require('./plans');
 const licenseRoutes = require('./licenses');
 const deviceRoutes = require('./devices');
 const billingRoutes = require('./billing');
+const subscriptionRoutes = require('./subscriptions');
 const operationsRoutes = require('./operations');
 const integrationsRoutes = require('./integrations');
 const notificationsRoutes = require('./notifications');
@@ -16,6 +17,11 @@ const backupsRoutes = require('./backups');
 const policiesRoutes = require('./policies');
 const systemRoutes = require('./system');
 const configRoutes = require('./config');
+const supportRoutes = require('./support');
+const monitoringRoutes = require('./monitoring');
+const telemetryRoutes = require('./telemetry');
+const { adminRouter: releasesAdminRoutes, clientRouter: releasesClientRoutes } = require('./releases');
+const { adminRouter: appBackupsAdminRoutes, clientRouter: appBackupsClientRoutes } = require('./appBackups');
 
 /**
  * Mounts every central API router under /api/v1.
@@ -33,11 +39,19 @@ function createApiRouter() {
   router.use('/admin/licenses', licenseRoutes);
   router.use('/admin/devices', deviceRoutes);
   router.use('/admin/billing', billingRoutes);
+  router.use('/admin/subscriptions', subscriptionRoutes);
   router.use('/admin/operations', operationsRoutes);
   router.use('/admin/integrations', integrationsRoutes);
   router.use('/admin/notifications', notificationsRoutes);
   router.use('/admin/backups', backupsRoutes);
+  router.use('/admin/app-backups', appBackupsAdminRoutes);
   router.use('/admin/policies', policiesRoutes);
+  router.use('/admin/support', supportRoutes);
+  router.use('/admin/monitoring', monitoringRoutes);
+  router.use('/admin/releases', releasesAdminRoutes);
+  router.use('/telemetry', telemetryRoutes);
+  router.use('/releases', releasesClientRoutes);
+  router.use('/device/backups', appBackupsClientRoutes);
   router.use('/', systemRoutes);
   router.use('/', configRoutes);
 

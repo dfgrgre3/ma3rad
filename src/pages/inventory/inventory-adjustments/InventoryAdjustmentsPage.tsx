@@ -66,7 +66,7 @@ export function loadBranchAdjustments(): Adjustment[] {
       COALESCE(u_created.full_name, 'النظام') AS adjustedBy,
       u_approved.full_name AS approvedByName, u_posted.full_name AS postedByName,
       sa.approval_status AS approvalStatus, sa.adjustment_type AS type, sa.status,
-      sa.total_quantity_m2 AS totalQuantityM2, sa.total_value AS totalValue,
+      sa.total_quantity_m2 AS totalQuantityM2, sa.total_value / 100.0 AS totalValue,
       COALESCE((
         SELECT p.product_type FROM stock_adjustment_items sai
         JOIN products p ON p.id = sai.product_id
@@ -152,7 +152,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
         id: string; name: string; sku: string; costPrice: number; metersPerBox: number;
         productType: 'CERAMIC' | 'GENERAL'; baseUnit: NonNullable<AdjustmentItem['baseUnit']>; customUnit?: string;
       }>(`
-        SELECT id, name, sku, cost_price AS costPrice, meters_per_box AS metersPerBox,
+        SELECT id, name, sku, cost_price / 100.0 AS costPrice, meters_per_box AS metersPerBox,
           product_type AS productType, COALESCE(base_unit, 'M2') AS baseUnit, custom_unit AS customUnit
         FROM products WHERE is_active = 1 ORDER BY name
       `);
@@ -171,7 +171,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
       const items = db.query<AdjustmentItem>(`
         SELECT sai.id, sai.product_id AS productId, sai.product_name AS productName,
           sai.quantity_m2 AS quantityM2, sai.boxes_count AS boxesCount,
-          sai.unit_cost AS unitCost, sai.total_value AS totalValue,
+          sai.unit_cost / 100.0 AS unitCost, sai.total_value / 100.0 AS totalValue,
           COALESCE(sai.notes, '') AS notes,
           COALESCE(p.product_type, 'CERAMIC') AS productType,
           p.base_unit AS baseUnit, p.custom_unit AS customUnit

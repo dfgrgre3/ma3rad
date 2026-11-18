@@ -83,14 +83,16 @@ export const GoodsReceiptsPage: React.FC = () => {
 
   const loadData = useCallback(() => {
     setLoading(true);
-    try {
-      const rows = service.getAllGoodsReceipts(search, statusFilter);
-      setReceipts(rows);
-    } catch (e: any) {
-      toast.error(e?.message || 'تعذر تحميل أذونات الاستلام.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const rows = await service.getAllGoodsReceiptsAsync(search, statusFilter);
+        setReceipts(rows);
+      } catch (e: any) {
+        toast.error(e?.message || 'تعذر تحميل أذونات الاستلام.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [search, statusFilter, service, toast]);
 
   useEffect(() => {
@@ -103,22 +105,26 @@ export const GoodsReceiptsPage: React.FC = () => {
       setExpandedDetails(null);
       return;
     }
-    const details = service.getGoodsReceiptById(id);
-    setExpandedDetails(details);
-    setExpandedId(id);
+    service.getGoodsReceiptByIdAsync(id).then((details) => {
+      setExpandedDetails(details);
+      setExpandedId(id);
+    }).catch((e: any) => toast.error(e?.message));
   };
 
   const openNewReceiptModal = () => {
-    try {
-      const sups = new SupplierService().getAllSuppliers();
-      const whs = new OperationsService().getWarehouses();
-      const prods = new ProductService().getAllProducts();
-      const pos = poService.getAllOrders('', 'ALL').filter((o) => ['SENT', 'CONFIRMED', 'PARTIAL'].includes(o.status));
+    (async () => {
+      try {
+        const [sups, prods] = await Promise.all([
+          new SupplierService().getAllSuppliersAsync(),
+          new ProductService().getAllProductsAsync(),
+        ]);
+        const whs = new OperationsService().getWarehouses();
+        const pos = poService.getAllOrders('', 'ALL').filter((o) => ['SENT', 'CONFIRMED', 'PARTIAL'].includes(o.status));
 
-      setSuppliers(sups);
-      setWarehouses(whs);
-      setProducts(prods);
-      setOpenPurchaseOrders(pos);
+        setSuppliers(sups);
+        setWarehouses(whs);
+        setProducts(prods);
+        setOpenPurchaseOrders(pos);
 
       setSelectedPoId('');
       setSelectedSupplierId(sups[0]?.id || '');
@@ -143,41 +149,43 @@ export const GoodsReceiptsPage: React.FC = () => {
         inspectionNotes: 'فحص سليم مطابق',
       }]);
 
-      setModalOpen(true);
-    } catch (e: any) {
-      toast.error(e?.message);
-    }
+        setModalOpen(true);
+      } catch (e: any) {
+        toast.error(e?.message);
+      }
+    })();
   };
 
   const handleSelectPo = (poId: string) => {
     setSelectedPoId(poId);
     if (!poId) return;
-    const po = poService.getOrderById(poId);
-    if (!po) return;
+    poService.getOrderByIdAsync(poId).then((po) => {
+      if (!po) return;
 
-    setSelectedSupplierId(po.supplierId);
-    setSelectedWarehouseId(po.warehouseId);
-    setItems(
-      po.items.map((it) => {
-        const remaining = Math.max(0, it.quantityM2 - it.receivedM2);
-        return {
-          purchaseOrderItemId: it.id,
-          productId: it.productId,
-          productName: it.productName,
-          orderedQuantityM2: it.quantityM2,
-          receivedQuantityM2: remaining,
-          acceptedQuantityM2: remaining,
-          damagedQuantityM2: 0,
-          shortageQuantityM2: 0,
-          batchNumber: `LOT-${Date.now().toString().slice(-4)}`,
-          toneShade: 'T1',
-          caliber: '0',
-          grade: 'GRADE_1',
-          unitCost: it.unitCost,
-          inspectionNotes: 'فحص استلام مطابق لأمر الشراء',
-        };
-      })
-    );
+      setSelectedSupplierId(po.supplierId);
+      setSelectedWarehouseId(po.warehouseId);
+      setItems(
+        po.items.map((it) => {
+          const remaining = Math.max(0, it.quantityM2 - it.receivedM2);
+          return {
+            purchaseOrderItemId: it.id,
+            productId: it.productId,
+            productName: it.productName,
+            orderedQuantityM2: it.quantityM2,
+            receivedQuantityM2: remaining,
+            acceptedQuantityM2: remaining,
+            damagedQuantityM2: 0,
+            shortageQuantityM2: 0,
+            batchNumber: `LOT-${Date.now().toString().slice(-4)}`,
+            toneShade: 'T1',
+            caliber: '0',
+            grade: 'GRADE_1',
+            unitCost: it.unitCost,
+            inspectionNotes: 'فحص استلام مطابق لأمر الشراء',
+          };
+        })
+      );
+    });
   };
 
   const handleItemChange = (idx: number, patch: Partial<typeof items[0]>) => {

@@ -75,7 +75,7 @@ public getBudgets(fiscalYearId?: string): Budget[] {
       costCenterId: r.costCenterId,
       costCenterName: r.costCenterName,
       name: r.name,
-      totalAllocated: Number(r.totalAllocated),
+      totalAllocated: Number(r.totalAllocated) / 100,
       status: r.status,
       approvedBy: r.approvedBy,
       approvedByName: r.approvedByName,
@@ -105,7 +105,7 @@ public getBudgetWithItems(budgetId: string): Budget | null {
       // Calculate actual spending for this account within this fiscal year and optional cost center
       const scope = this.ledgerScope();
       let actualSql = `
-        SELECT COALESCE(SUM(l.debit - l.credit), 0) as spent
+        SELECT COALESCE(SUM(l.debit - l.credit), 0) / 100.0 as spent
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id
         WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
@@ -117,7 +117,7 @@ public getBudgetWithItems(budgetId: string): Budget | null {
         actualParams.push(budget.costCenterId);
       }
       const actualSpent = round2(Number(this.db.query<any>(actualSql, actualParams)[0]?.spent || 0));
-      const allocatedAmount = Number(i.allocatedAmount);
+      const allocatedAmount = Number(i.allocatedAmount) / 100;
       const variance = round2(allocatedAmount - actualSpent);
 
       return {

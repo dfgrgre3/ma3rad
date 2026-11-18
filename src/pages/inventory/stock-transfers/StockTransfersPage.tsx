@@ -10,6 +10,7 @@ import { TransferDetailsModal } from './components/TransferDetailsModal';
 import { useStockTransfers } from '../../../hooks/pages/inventory/stock-transfers/useStockTransfers';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import type { StockTransferTab } from '../../../types/inventory/stockTransfers';
 
 export const StockTransfersPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
@@ -17,6 +18,8 @@ export const StockTransfersPage: React.FC = () => {
   const canApprove = PermissionService.can(actor, 'inventory.transfer.workflow.approve');
   const canExecute = PermissionService.can(actor, 'inventory.transfer.execute');
   const canReceive = PermissionService.can(actor, 'inventory.transfer.receive');
+  // ملخص أرصدة المخازن صلاحية عرض مخزون — منفصلة عن صلاحيات تنفيذ التحويلات.
+  const canViewSummary = PermissionService.can(actor, 'inventory.view');
   const {
     activeTab,
     setActiveTab,
@@ -60,6 +63,8 @@ export const StockTransfersPage: React.FC = () => {
     handleViewDetails,
   } = useStockTransfers();
 
+  const viewTab: StockTransferTab = activeTab === 'summary' && !canViewSummary ? 'history' : activeTab;
+
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       <StockTransfersHeader
@@ -70,16 +75,17 @@ export const StockTransfersPage: React.FC = () => {
       />
 
       <StockTransfersTabs
-        activeTab={activeTab}
+        activeTab={viewTab}
         onTabChange={setActiveTab}
         workflowCount={workflowTransfers.length}
         historyCount={transfers.length}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        canViewSummary={canViewSummary}
       />
 
       <div className="flex-1 overflow-auto p-6">
-        {activeTab === 'workflow' && (
+        {viewTab === 'workflow' && (
           <WorkflowTransfersTable
             transfers={workflowTransfers}
             canApprove={canApprove}
@@ -94,9 +100,9 @@ export const StockTransfersPage: React.FC = () => {
           />
         )}
 
-        {activeTab === 'history' && <TransferHistoryTable transfers={transfers} />}
+        {viewTab === 'history' && <TransferHistoryTable transfers={transfers} />}
 
-        {activeTab === 'summary' && <WarehouseSummaryGrid warehouseSummary={warehouseSummary} />}
+        {viewTab === 'summary' && <WarehouseSummaryGrid warehouseSummary={warehouseSummary} />}
       </div>
 
       {showCreateModal && canCreateTransfer && (

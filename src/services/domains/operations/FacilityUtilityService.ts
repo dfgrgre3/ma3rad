@@ -280,7 +280,7 @@ export class FacilityUtilityService {
               um.branch_id AS branchId, b.name AS branchName,
               um.meter_code AS meterCode, um.meter_name AS meterName,
               um.utility_type AS utilityType, um.unit_of_measure AS unitOfMeasure,
-              um.tariff_per_unit AS tariffPerUnit, um.fixed_monthly_fee AS fixedMonthlyFee,
+              um.tariff_per_unit / 100.0 AS tariffPerUnit, um.fixed_monthly_fee / 100.0 AS fixedMonthlyFee,
               um.installation_date AS installationDate, um.last_reading_date AS lastReadingDate,
               um.last_reading_value AS lastReadingValue, um.is_active AS isActive,
               um.notes, um.created_by AS createdBy, u.full_name AS createdByName,
@@ -325,7 +325,7 @@ export class FacilityUtilityService {
          (id, location_id, branch_id, meter_code, meter_name, utility_type,
           unit_of_measure, tariff_per_unit, fixed_monthly_fee, installation_date,
           is_active, notes, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?)`,
       [id, input.locationId, location.branch_id, meterCode, input.meterName.trim(),
         input.utilityType, input.unitOfMeasure ?? 'kWh',
         input.tariffPerUnit ?? 0, input.fixedMonthlyFee ?? 0,
@@ -359,8 +359,8 @@ export class FacilityUtilityService {
     setField('meter_name', input.meterName?.trim() || null);
     setField('utility_type', input.utilityType || null);
     setField('unit_of_measure', input.unitOfMeasure || null);
-    setField('tariff_per_unit', input.tariffPerUnit !== undefined ? input.tariffPerUnit : undefined);
-    setField('fixed_monthly_fee', input.fixedMonthlyFee !== undefined ? input.fixedMonthlyFee : undefined);
+    if (input.tariffPerUnit !== undefined) { updates.push('tariff_per_unit = ROUND(?*100)'); params.push(input.tariffPerUnit); }
+    if (input.fixedMonthlyFee !== undefined) { updates.push('fixed_monthly_fee = ROUND(?*100)'); params.push(input.fixedMonthlyFee); }
     setField('installation_date', input.installationDate || null);
     setField('notes', input.notes || null);
     if (!updates.length) throw new Error('لا توجد بيانات للتعديل.');
@@ -420,7 +420,7 @@ export class FacilityUtilityService {
       `SELECT ur.id, ur.meter_id AS meterId, um.meter_code AS meterCode,
               um.meter_name AS meterName, ur.reading_date AS readingDate,
               ur.reading_value AS readingValue, ur.previous_value AS previousValue,
-              ur.consumption, ur.cost, ur.is_estimated AS isEstimated,
+              ur.consumption, ur.cost / 100.0 AS cost, ur.is_estimated AS isEstimated,
               ur.recorded_by AS recordedBy, u.full_name AS recordedByName,
               ur.recorded_at AS recordedAt, ur.notes
        FROM facility_utility_readings ur
@@ -441,7 +441,7 @@ export class FacilityUtilityService {
     const companyId = this.currentCompanyId(actor);
     const meter = this.db.query<{ id: string; meterCode: string; meterName: string; lastReadingValue: number; tariffPerUnit: number }>(
       `SELECT um.id, um.meter_code AS meterCode, um.meter_name AS meterName,
-              um.last_reading_value AS lastReadingValue, um.tariff_per_unit AS tariffPerUnit
+              um.last_reading_value AS lastReadingValue, um.tariff_per_unit / 100.0 AS tariffPerUnit
        FROM facility_utility_meters um
        WHERE um.id = ? AND um.company_id = ? AND um.is_active = 1`,
       [input.meterId, companyId]
@@ -463,7 +463,7 @@ export class FacilityUtilityService {
         `INSERT INTO facility_utility_readings
            (id, meter_id, reading_date, reading_value, previous_value, consumption,
             cost, is_estimated, recorded_by, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
         [id, input.meterId, input.readingDate, Number(input.readingValue),
           previousValue, consumption, cost, input.isEstimated ? 1 : 0, actor.id,
           input.notes || null]
@@ -524,8 +524,8 @@ export class FacilityUtilityService {
               um.meter_name AS meterName, um.utility_type AS utilityType,
               fub.bill_number AS billNumber, fub.billing_period_start AS billingPeriodStart,
               fub.billing_period_end AS billingPeriodEnd, fub.bill_date AS billDate,
-              fub.due_date AS dueDate, fub.amount_due AS amountDue,
-              fub.amount_paid AS amountPaid, fub.consumption, fub.status,
+              fub.due_date AS dueDate, fub.amount_due / 100.0 AS amountDue,
+              fub.amount_paid / 100.0 AS amountPaid, fub.consumption, fub.status,
               fub.payment_date AS paymentDate, fub.payment_reference AS paymentReference,
               fub.payment_proof AS paymentProof, fub.expense_id AS expenseId,
               fub.contract_id AS contractId, fub.notes,
@@ -586,7 +586,7 @@ export class FacilityUtilityService {
          (id, meter_id, bill_number, billing_period_start, billing_period_end,
           bill_date, due_date, amount_due, amount_paid, consumption, status,
           expense_id, contract_id, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'PENDING', ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 0, ?, 'PENDING', ?, ?, ?, ?)`,
       [id, input.meterId, input.billNumber.trim(), input.billingPeriodStart,
         input.billingPeriodEnd, input.billDate, input.dueDate,
         Math.max(0, Number(input.amountDue)), input.consumption ?? 0,
@@ -608,7 +608,7 @@ export class FacilityUtilityService {
     const actor = this.requireManage();
     const companyId = this.currentCompanyId(actor);
     const bill = this.db.query<{ id: string; amountDue: number; amountPaid: number; meterId: string; status: string }>(
-      `SELECT fub.id, fub.amount_due AS amountDue, fub.amount_paid AS amountPaid,
+      `SELECT fub.id, fub.amount_due / 100.0 AS amountDue, fub.amount_paid / 100.0 AS amountPaid,
               fub.meter_id AS meterId, fub.status
        FROM facility_utility_bills fub
        JOIN facility_utility_meters um ON um.id = fub.meter_id
@@ -622,7 +622,7 @@ export class FacilityUtilityService {
     const newPaid = roundNumber(Number(bill.amountPaid) + Number(input.amountPaid));
     const newStatus = newPaid >= Number(bill.amountDue) ? 'PAID' : 'PARTIAL';
     this.db.run(
-      `UPDATE facility_utility_bills SET amount_paid = ?, payment_date = ?,
+      `UPDATE facility_utility_bills SET amount_paid = ROUND(?*100), payment_date = ?,
          payment_reference = COALESCE(?, payment_reference),
          payment_proof = COALESCE(?, payment_proof), status = ?,
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,

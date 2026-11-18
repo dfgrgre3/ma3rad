@@ -59,21 +59,21 @@ export class FinancialReportsService {
       : this.allBranchesTableScope('branch_id');
     const paymentRows = this.db.query<any>(`
       SELECT date, cp.created_at AS createdAt, 'وارد' AS direction, 'سند قبض' AS source, receipt_number AS document,
-        c.name AS party, amount, cp.register_id AS registerId
+        c.name AS party, amount / 100.0 AS amount, cp.register_id AS registerId
       FROM customer_payments cp
       LEFT JOIN customers c ON c.id = cp.customer_id
       LEFT JOIN cash_registers cr ON cr.id = cp.register_id
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount, sp.register_id
+      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount / 100.0, sp.register_id
       FROM supplier_payments sp
       LEFT JOIN suppliers s ON s.id = sp.supplier_id
       LEFT JOIN cash_registers cr ON cr.id = sp.register_id
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount, ex.register_id
+      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount / 100.0, ex.register_id
       FROM expenses ex
       LEFT JOIN cash_registers cr ON cr.id = ex.register_id
       WHERE date >= ? AND date <= ? AND ${registerScope.clause}
@@ -84,14 +84,14 @@ export class FinancialReportsService {
     ]);
     const invoiceRows = this.db.query<any>(`
       SELECT date, si.created_at AS createdAt, 'وارد' AS direction, 'تحصيل فاتورة' AS source,
-        invoice_number AS document, c.name AS party, paid_amount AS amount, NULL AS registerId
+        invoice_number AS document, c.name AS party, paid_amount / 100.0 AS amount, NULL AS registerId
       FROM sales_invoices si LEFT JOIN customers c ON c.id = si.customer_id
-      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND invoice_status != 'VOID' AND ${sales.clause}
+      WHERE date >= ? AND date <= ? AND paid_amount > 1 AND invoice_status != 'VOID' AND ${sales.clause}
 
       UNION ALL
-      SELECT date, pi.created_at, 'منصرف', 'سداد فاتورة شراء', invoice_number, s.name, paid_amount, NULL
+      SELECT date, pi.created_at, 'منصرف', 'سداد فاتورة شراء', invoice_number, s.name, paid_amount / 100.0, NULL
       FROM purchase_invoices pi LEFT JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND ${purchases.clause}
+      WHERE date >= ? AND date <= ? AND paid_amount > 1 AND ${purchases.clause}
     `, [from, to, ...sales.params, from, to, ...purchases.params]);
     const rows = [...paymentRows, ...(registerId ? [] : invoiceRows)]
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
@@ -103,7 +103,7 @@ export class FinancialReportsService {
     });
     const inflow = round2(result.filter((row) => row.direction === 'وارد').reduce((total, row) => total + row.amount, 0));
     const outflow = round2(result.filter((row) => row.direction === 'منصرف').reduce((total, row) => total + row.amount, 0));
-    const registerList = this.db.query<any>(`SELECT id, name, current_balance AS balance FROM cash_registers WHERE ${registerListScope.clause} ORDER BY name`, registerListScope.params);
+    const registerList = this.db.query<any>(`SELECT id, name, current_balance / 100.0 AS balance FROM cash_registers WHERE ${registerListScope.clause} ORDER BY name`, registerListScope.params);
     return {
       kpis: [
         { label: 'إجمالي الورود', value: inflow, tone: 'success' },
@@ -127,12 +127,12 @@ export class FinancialReportsService {
     const sales = this.salesScope();
     const purchases = this.purchaseScope();
     const salesRows = this.db.query<any>(`
-      SELECT SUM(si.total_amount) AS totalSales, SUM(si.paid_amount) AS collectedSales
+      SELECT SUM(si.total_amount) / 100.0 AS totalSales, SUM(si.paid_amount) / 100.0 AS collectedSales
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${sales.clause}
     `, [from, to, ...sales.params]);
     const purchaseRows = this.db.query<any>(`
-      SELECT SUM(pi.total_amount) AS totalPurchases, SUM(pi.paid_amount) AS paidPurchases
+      SELECT SUM(pi.total_amount) / 100.0 AS totalPurchases, SUM(pi.paid_amount) / 100.0 AS paidPurchases
       FROM purchase_invoices pi
       WHERE pi.date >= ? AND pi.date <= ? AND ${purchases.clause}
     `, [from, to, ...purchases.params]);
@@ -161,21 +161,21 @@ export class FinancialReportsService {
     const scope = this.tableScope('b.branch_id');
     const rows = this.db.query<any>(`
       SELECT 'أصول' AS category, 'الأصول المتداولة' AS subCategory,
-        SUM(COALESCE(cr.current_balance, 0)) AS amount
+        SUM(COALESCE(cr.current_balance, 0)) / 100.0 AS amount
       FROM cash_registers cr
       WHERE 1=1 AND ${scope.clause}
 
       UNION ALL
 
       SELECT 'أصول' AS category, 'ذمم مدينة' AS subCategory,
-        SUM(COALESCE(c.current_balance, 0)) AS amount
+        SUM(COALESCE(c.current_balance, 0)) / 100.0 AS amount
       FROM customers c
       WHERE 1=1 AND ${scope.clause}
 
       UNION ALL
 
       SELECT 'خصوم' AS category, 'ذمم دائنة' AS subCategory,
-        SUM(COALESCE(s.current_balance, 0)) AS amount
+        SUM(COALESCE(s.current_balance, 0)) / 100.0 AS amount
       FROM suppliers s
       WHERE 1=1 AND ${scope.clause}
     `, [...scope.params]);

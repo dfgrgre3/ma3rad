@@ -30,9 +30,7 @@ private claimJoins(): string {
     `;
   }
 
-public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaimRow[] {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.purchases.invoices.view');
+  private buildClaimsQuery(actor: ReturnType<typeof AuthService.requireAuth>, search: string, status: string, supplierId: string): { sql: string; params: any[] } {
     const scope = this.claimScope(actor);
     let sql = `
       SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
@@ -58,7 +56,40 @@ public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaim
       params.push(term, term, term);
     }
     sql += ` ORDER BY c.created_at DESC`;
+    return { sql, params };
+  }
+
+public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaimRow[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
+    const { sql, params } = this.buildClaimsQuery(actor, search, status, supplierId);
     return this.db.query<SupplierClaimRow>(sql, params);
+  }
+
+  public async getAllClaimsAsync(search = '', status = 'ALL', supplierId = ''): Promise<SupplierClaimRow[]> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
+    const { sql, params } = this.buildClaimsQuery(actor, search, status, supplierId);
+    return this.db.queryAsync<SupplierClaimRow>(sql, params);
+  }
+
+  private buildClaimByIdQueries(id: string, actor: ReturnType<typeof AuthService.requireAuth>): { rowSql: string; rowParams: any[]; itemsSql: string; itemsParams: any[] } {
+    const scope = this.claimScope(actor);
+    return {
+      rowSql: `
+      SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
+        COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id) AS branchId,
+        pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
+      FROM supplier_claims c
+      JOIN suppliers s ON s.id = c.supplier_id
+      ${this.claimJoins()}
+      LEFT JOIN users u ON u.id = c.created_by
+      WHERE c.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
+    `,
+      rowParams: [id, ...scope.branch.params, ...scope.company.params],
+      itemsSql: `SELECT * FROM supplier_claim_items WHERE claim_id = ?`,
+      itemsParams: [id],
+    };
   }
 
 public getClaimById(id: string): (SupplierClaimRow & { items: SupplierClaimItem[] }) | null {
@@ -70,26 +101,29 @@ public getClaimById(id: string): (SupplierClaimRow & { items: SupplierClaimItem[
     return result;
   }
 
+  public async getClaimByIdAsync(id: string): Promise<(SupplierClaimRow & { items: SupplierClaimItem[] }) | null> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
+    const { rowSql, rowParams, itemsSql, itemsParams } = this.buildClaimByIdQueries(id, actor);
+    const [rows, items] = await Promise.all([
+      this.db.queryAsync<SupplierClaimRow & { branchId: string | null }>(rowSql, rowParams),
+      this.db.queryAsync<SupplierClaimItem>(itemsSql, itemsParams),
+    ]);
+    const row = rows[0];
+    if (!row) return null;
+    const { branchId: _branchId, ...result } = { ...row, items };
+    return result;
+  }
+
 protected readClaimById(
     id: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): (SupplierClaimRow & { items: SupplierClaimItem[]; branchId: string | null }) | null {
-    const scope = this.claimScope(actor);
-    const row = this.db.query<SupplierClaimRow>(`
-      SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
-        COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id) AS branchId,
-        pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
-      FROM supplier_claims c
-      JOIN suppliers s ON s.id = c.supplier_id
-      ${this.claimJoins()}
-      LEFT JOIN users u ON u.id = c.created_by
-      WHERE c.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
-    `, [id, ...scope.branch.params, ...scope.company.params])[0] as (SupplierClaimRow & { branchId: string | null }) | undefined;
+    const { rowSql, rowParams, itemsSql, itemsParams } = this.buildClaimByIdQueries(id, actor);
+    const row = this.db.query<SupplierClaimRow>(rowSql, rowParams)[0] as (SupplierClaimRow & { branchId: string | null }) | undefined;
     if (!row) return null;
 
-    const items = this.db.query<SupplierClaimItem>(`
-      SELECT * FROM supplier_claim_items WHERE claim_id = ?
-    `, [id]);
+    const items = this.db.query<SupplierClaimItem>(itemsSql, itemsParams);
 
     return { ...row, items };
   }
@@ -114,7 +148,7 @@ public settleClaim(
       if (resolutionType === 'DEBIT_NOTE' && value > 0) {
         db.run(`
           UPDATE suppliers
-          SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP
+          SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `, [value, claim.supplierId]);
 
@@ -136,7 +170,7 @@ public settleClaim(
       if (resolutionType === 'REFUND' && value > 0) {
         if (!claim.branchId) throw new Error('لا يمكن تحديد فرع المطالبة لتسجيل المبلغ المسترد.');
         const registerId = this.claimBranchAccess.getDefaultRegisterId(claim.branchId, actor);
-        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, registerId]);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?`, [value, registerId]);
         postLedgerEntry(db.getDatabase(), {
           date: today,
           description: `Cash refund for Supplier Claim ${claim.claimNumber}`,
@@ -152,7 +186,7 @@ public settleClaim(
 
       db.run(`
         UPDATE supplier_claims
-        SET status = 'SETTLED', resolution_type = ?, agreed_amount = ?, notes = COALESCE(?, notes)
+        SET status = 'SETTLED', resolution_type = ?, agreed_amount = ROUND(?*100), notes = COALESCE(?, notes)
         WHERE id = ?
       `, [resolutionType, value, notes || null, claimId]);
     });

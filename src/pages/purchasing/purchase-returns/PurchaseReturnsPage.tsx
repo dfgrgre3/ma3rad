@@ -87,20 +87,26 @@ export const PurchaseReturnsPage: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    try {
-      const currentRows = service.getAllReturns(search, dateFrom || undefined, dateTo || undefined);
-      setOperationalFields(fieldService.getDefinitions('purchase_returns'));
-      const fieldValues = fieldService.getRecordValuesForRecords('purchase_returns', currentRows.map((row) => row.id));
-      setValuesByReturn(fieldValues);
-      setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
-      setStats(service.getStats());
-      setTopReasons(service.getTopReturnReasons(4));
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل مرتجعات الشراء.');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const [currentRows, statsResult, reasons] = await Promise.all([
+          service.getAllReturnsAsync(search, dateFrom || undefined, dateTo || undefined),
+          service.getStatsAsync(),
+          service.getTopReturnReasonsAsync(4),
+        ]);
+        setOperationalFields(fieldService.getDefinitions('purchase_returns'));
+        const fieldValues = fieldService.getRecordValuesForRecords('purchase_returns', currentRows.map((row) => row.id));
+        setValuesByReturn(fieldValues);
+        setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
+        setStats(statsResult);
+        setTopReasons(reasons);
+        setError(null);
+      } catch (e: any) {
+        setError(e?.message || 'تعذر تحميل مرتجعات الشراء.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [service, fieldService, search, dateFrom, dateTo, fieldFilters, setLoading, setOperationalFields, setValuesByReturn, setRows, setStats, setTopReasons, setError]);
 
   useEffect(() => { load(); }, [load]);
@@ -110,15 +116,17 @@ export const PurchaseReturnsPage: React.FC = () => {
   const pageItems = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const openModal = () => {
-    try {
-      setPurchases(purchaseService.getAllPurchases());
-      setPurchaseId('');
-      setLines([]);
-      setReason('');
-      setRefundMethod('BALANCE');
-      setOperationalFieldValues({});
-      setModalOpen(true);
-    } catch (e: any) { toast.error(e?.message || 'تعذر تحميل فواتير الشراء.'); }
+    (async () => {
+      try {
+        setPurchases(await purchaseService.getAllPurchasesAsync());
+        setPurchaseId('');
+        setLines([]);
+        setReason('');
+        setRefundMethod('BALANCE');
+        setOperationalFieldValues({});
+        setModalOpen(true);
+      } catch (e: any) { toast.error(e?.message || 'تعذر تحميل فواتير الشراء.'); }
+    })();
   };
 
   const pickPurchase = (id: string) => {

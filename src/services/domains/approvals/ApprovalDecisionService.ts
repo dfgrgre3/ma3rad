@@ -46,8 +46,10 @@ export class ApprovalDecisionService {
     }
     if (row.payload) {
       const payload = JSON.parse(row.payload) as { operationCode?: string; policy?: { approverRoles?: string[]; allowSelfApproval?: boolean } };
-      if (payload.operationCode && payload.operationCode !== 'inventory.adjustment.create') {
-        throw new Error(`لا يمكن اعتماد هذا الطلب؛ تنفيذ العملية ${payload.operationCode} غير موصول بعد.`);
+      if (payload.operationCode
+        && payload.operationCode !== 'inventory.adjustment.create'
+        && !new ApprovalPolicyService().isOperation(payload.operationCode)) {
+        throw new Error(`لا يمكن اعتماد هذا الطلب؛ عملية الموافقة ${payload.operationCode} غير معروفة.`);
       }
       if (approved && payload.policy?.approverRoles?.length && !payload.policy.approverRoles.includes(actor.role) && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
         throw new Error('دور المستخدم غير مخول لاعتماد هذا الطلب.');
@@ -149,12 +151,12 @@ export class ApprovalDecisionService {
 
     if (row.requestType === 'CREDIT_LIMIT') {
       const customer = db.query<{ id: string; credit_limit: number | string | null }>(
-        `SELECT id, credit_limit FROM customers WHERE id = ?`,
+        `SELECT id, credit_limit / 100.0 AS credit_limit FROM customers WHERE id = ?`,
         [row.referenceId]
       )[0];
       if (!customer) return null;
       db.run(
-        `UPDATE customers SET credit_limit = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE customers SET credit_limit = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [value, row.referenceId]
       );
       return `تم تحديث حد الائتمان من ${Number(customer.credit_limit) || 0} إلى ${value}`;
@@ -162,12 +164,12 @@ export class ApprovalDecisionService {
 
     if (row.requestType === 'PRICE_CHANGE') {
       const product = db.query<{ id: string; selling_price_m2: number | string | null }>(
-        `SELECT id, selling_price_m2 FROM products WHERE id = ?`,
+        `SELECT id, selling_price_m2 / 100.0 AS selling_price_m2 FROM products WHERE id = ?`,
         [row.referenceId]
       )[0];
       if (!product) return null;
       db.run(
-        `UPDATE products SET selling_price_m2 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE products SET selling_price_m2 = ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [value, row.referenceId]
       );
       return `تم تحديث سعر البيع من ${Number(product.selling_price_m2) || 0} إلى ${value}`;

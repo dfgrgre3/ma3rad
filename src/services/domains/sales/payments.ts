@@ -12,6 +12,9 @@ import type { CustomerPayment, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
 import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
 import { CashShiftPolicyService } from '../finance/CashShiftPolicyService';
+import { unscaleMoneyRow } from '../../../utils/money';
+
+const CUSTOMER_PAYMENT_MONEY_FIELDS = ['amount'] as const;
 
 export type InvoicePaymentComponent = {
   paymentType: Exclude<PaymentType, 'CREDIT' | 'MIXED'>;
@@ -80,7 +83,7 @@ export function recordInvoicePaymentEntry(
       const prior = db.query<CustomerPayment>(
         `SELECT * FROM customer_payments WHERE idempotency_key = ?`,
         [idempotencyKey]
-      )[0];
+      ).map((row) => unscaleMoneyRow(row, CUSTOMER_PAYMENT_MONEY_FIELDS))[0];
       if (prior) {
         if (prior.invoiceId !== invoiceId || round2(Number(prior.amount)) !== value || prior.paymentType !== paymentType ||
             ((prior as any).bankAccountId || null) !== (bankAccountId || null)) {
@@ -93,7 +96,7 @@ export function recordInvoicePaymentEntry(
       id: string; customerId: string; invoiceNumber: string; paidAmount: number;
       remainingAmount: number; invoiceStatus: string;
     }>(`SELECT id, customer_id AS customerId, invoice_number AS invoiceNumber,
-               paid_amount AS paidAmount, remaining_amount AS remainingAmount,
+               paid_amount / 100.0 AS paidAmount, remaining_amount / 100.0 AS remainingAmount,
                invoice_status AS invoiceStatus
         FROM sales_invoices WHERE id = ?`, [invoiceId])[0];
     if (!currentInvoice || currentInvoice.invoiceStatus === 'VOID') throw new Error('الفاتورة غير متاحة للتحصيل.');
@@ -101,6 +104,13 @@ export function recordInvoicePaymentEntry(
     if (value - round2(Number(currentInvoice.remainingAmount)) > 0.009) {
       throw new Error(`مبلغ التحصيل (${value.toFixed(2)}) يتجاوز المتبقي على الفاتورة (${round2(Number(currentInvoice.remainingAmount)).toFixed(2)}).`);
     }
+    // بُعدا المبلغ والنطاق داخل المعاملة — استهلاك اعتماد المبلغ ذرّي
+    // مع قيد سند القبض.
+    PermissionService.require(actor, 'ui.customers.detail.payment', undefined, {
+      branchId,
+      amount: value,
+      operation: 'ui.customers.detail.payment',
+    });
     const receiptNumber = db.nextNumber('REC');
     const newPaid = round2(Number(currentInvoice.paidAmount) + value);
     const newRemaining = round2(Math.max(0, Number(currentInvoice.remainingAmount) - value));
@@ -109,7 +119,7 @@ export function recordInvoicePaymentEntry(
       `INSERT INTO customer_payments (
          id, receipt_number, customer_id, invoice_id, amount, payment_type, date, branch_id,
          register_id, shift_id, notes, performed_by, idempotency_key, bank_account_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         paymentId, receiptNumber, currentInvoice.customerId, invoiceId, value, paymentType, today, branchId,
         register, resolvedShiftId || null,
@@ -119,24 +129,24 @@ export function recordInvoicePaymentEntry(
         bankAccountId || null,
       ]
     );
-    db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+    db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
       [`cpa_${uuidv4().substring(0, 8)}`, paymentId, invoiceId, value]);
 
     db.run(
-      `UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE customers SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [value, currentInvoice.customerId]
     );
 
     db.run(
-      `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
+      `UPDATE sales_invoices SET paid_amount = ROUND(? * 100), remaining_amount = ROUND(? * 100), payment_status = ?,
        updated_at = CURRENT_TIMESTAMP WHERE id = ? AND invoice_status != 'VOID'
-       AND remaining_amount >= ?`,
+       AND remaining_amount >= ROUND(? * 100)`,
       [newPaid, newRemaining, status, invoiceId, value]
     );
     if (db.getDatabase().getRowsModified() !== 1) throw new Error('تغير رصيد الفاتورة أثناء التحصيل؛ أعد المحاولة.');
 
     if (paymentType === 'CASH') {
-      db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, register]);
+      db.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?`, [value, register]);
     }
     const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(db, bankAccountId) : null;
     if (bank) updateBankBalance(db, bank.id, value);
@@ -175,7 +185,7 @@ export function recordInvoicePaymentEntry(
     defaultEffectEngine.run({ db, actorId: actor.id, actorName: actor.fullName }, effects);
 
     if (paymentType === 'CASH' && resolvedShiftId) {
-      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, resolvedShiftId]);
+      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ROUND(?*100) WHERE id = ?`, [value, resolvedShiftId]);
     }
 
     return {
@@ -278,7 +288,7 @@ export function recordCustomerPaymentAllocationsEntry(
       registerId: string | null; shiftId: string | null; notes: string | null;
       bankAccountId: string | null;
     }>(
-      `SELECT receipt_number AS receiptNumber, amount, branch_id AS branchId,
+      `SELECT receipt_number AS receiptNumber, amount / 100.0 AS amount, branch_id AS branchId,
               customer_id AS customerId, invoice_id AS invoiceId, payment_type AS paymentType,
               date, register_id AS registerId, shift_id AS shiftId, notes, bank_account_id AS bankAccountId
        FROM customer_payments WHERE payment_group_id = ? ORDER BY created_at`,
@@ -300,12 +310,19 @@ export function recordCustomerPaymentAllocationsEntry(
       if (!requestMatches) throw new Error('The idempotency key was already used for a different customer payment request.');
       return { groupId, total: round2(prior.reduce((sum,row)=>sum+Number(row.amount),0)), receipts: prior.map(row=>row.receiptNumber) };
     }
+    // بُعدا المبلغ والنطاق داخل المعاملة على إجمالي السند الموزع —
+    // استهلاك اعتماد المبلغ ذرّي مع قيود التحصيل كلها.
+    PermissionService.require(actor, 'ui.customers.detail.payment', undefined, {
+      branchId,
+      amount: round2(entries.reduce((sum, entry) => sum + entry.amount, 0)),
+      operation: 'ui.customers.detail.payment',
+    });
     const customer = db.query<{ id: string }>('SELECT id FROM customers WHERE id=?', [customerId])[0];
     if (!customer) throw new Error('العميل غير موجود.');
     const receipts: string[] = [];
     let total = 0;
     for (const allocation of entries) {
-      const invoice = db.query<any>(`SELECT id,invoice_number AS invoiceNumber,customer_id AS customerId,paid_amount AS paidAmount,remaining_amount AS remainingAmount,invoice_status AS invoiceStatus FROM sales_invoices WHERE id=?`, [allocation.invoiceId])[0];
+      const invoice = db.query<any>(`SELECT id,invoice_number AS invoiceNumber,customer_id AS customerId,paid_amount / 100.0 AS paidAmount,remaining_amount / 100.0 AS remainingAmount,invoice_status AS invoiceStatus FROM sales_invoices WHERE id=?`, [allocation.invoiceId])[0];
       const amount = round2(Number(allocation.amount));
       if (!invoice || invoice.customerId !== customerId || invoice.invoiceStatus === 'VOID') throw new Error('إحدى الفواتير المحددة غير صالحة لهذا العميل.');
       if (amount <= 0 || amount > Number(invoice.remainingAmount) + 0.009) throw new Error(`المبلغ يتجاوز المتبقي في الفاتورة ${invoice.invoiceNumber}.`);
@@ -315,16 +332,16 @@ export function recordCustomerPaymentAllocationsEntry(
       const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
       const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
       db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by,bank_account_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, resolvedRegisterId, resolvedShiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
-      db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+        VALUES (?,?,?,ROUND(?*100),?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, resolvedRegisterId, resolvedShiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
+      db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
-      db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+      db.run(`UPDATE sales_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
         [newPaid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', allocation.invoiceId]);
       new BusinessRecordSyncService(db).capture(db, 'customer_payment', paymentId, 'CREATE');
       receipts.push(receiptNumber); total = round2(total + amount);
     }
-    db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
-    if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, resolvedRegisterId]);
+    db.run(`UPDATE customers SET current_balance=current_balance-ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
+    if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id=?`, [total, resolvedRegisterId]);
     const bank = paymentType === 'BANK_TRANSFER' ? getActiveBankAccount(db, bankAccountId) : null;
     if (bank) updateBankBalance(db, bank.id, total);
     postLedgerEntry(db.getDatabase(), {
@@ -338,7 +355,7 @@ export function recordCustomerPaymentAllocationsEntry(
         { accountCode: '1103', debit: 0, credit: total },
       ],
     });
-    if (paymentType === 'CASH' && resolvedShiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?`, [total, resolvedShiftId]);
+    if (paymentType === 'CASH' && resolvedShiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+ROUND(?*100) WHERE id=?`, [total, resolvedShiftId]);
     db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
       [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'تحصيل دفعة موزعة على فواتير', 'SALES', groupId, JSON.stringify({ customerId, allocations: entries, total, date, reference, receipts })]);
     return { groupId, total, receipts };
@@ -388,7 +405,7 @@ function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], acto
         referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${row.id}:${uuidv4()}`, createdBy: actor.id,
       });
       const invoice = db.query<any>(
-        `SELECT id,customer_id,paid_amount,total_amount,remaining_amount,invoice_status FROM sales_invoices WHERE id=?`,
+        `SELECT id,customer_id,paid_amount / 100.0 AS paid_amount,total_amount / 100.0 AS total_amount,remaining_amount / 100.0 AS remaining_amount,invoice_status FROM sales_invoices WHERE id=?`,
         [row.invoiceId]
       )[0];
       if (!invoice || invoice.invoiceStatus === 'VOID') throw new Error('تعذر عكس الدفعة المرتبطة بفاتورة غير متاحة.');
@@ -396,18 +413,18 @@ function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], acto
       const paid = round2(Math.max(0, invoice.paidAmount - value));
       const remaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + value));
       db.run(
-        `UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        `UPDATE sales_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
         [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]
       );
-      db.run(`UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value, invoice.customerId]);
+      db.run(`UPDATE customers SET current_balance=current_balance+ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value, invoice.customerId]);
       if (row.paymentType === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?`, [value, row.registerId || 'cr_main']);
+        db.run(`UPDATE cash_registers SET current_balance=current_balance-ROUND(?*100) WHERE id=?`, [value, row.registerId || 'cr_main']);
       }
       if (row.paymentType === 'BANK_TRANSFER' && row.bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance=current_balance-? WHERE id=?', [value, row.bankAccountId]);
+        db.run('UPDATE bank_accounts SET current_balance=current_balance-ROUND(?*100) WHERE id=?', [value, row.bankAccountId]);
       }
       if (row.paymentType === 'CASH' && row.shiftId) {
-        db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
+        db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-ROUND(?*100) WHERE id=?`, [value, row.shiftId]);
       }
     }
     db.run(`DELETE FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
@@ -443,22 +460,22 @@ function reverseSingleInvoicePayment(
       referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${paymentId}:${uuidv4()}`, createdBy: actor.id,
     });
     db.run(
-      `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
+      `UPDATE sales_invoices SET paid_amount = ROUND(? * 100), remaining_amount = ROUND(? * 100), payment_status = ?,
        updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [newPaid, newRemaining, status, invoice.id]
     );
     db.run(
-      `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE customers SET current_balance = current_balance + ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [amount, invoice.customerId]
     );
     if (payment.paymentType === 'CASH') {
-      db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
+      db.run(`UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
     }
     if (payment.paymentType === 'BANK_TRANSFER' && payment.bankAccountId) {
-      db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, payment.bankAccountId]);
+      db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [amount, payment.bankAccountId]);
     }
     if (payment.paymentType === 'CASH' && payment.shiftId) {
-      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
+      db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ROUND(?*100) WHERE id = ?`, [amount, payment.shiftId]);
     }
     db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
     db.run(
@@ -477,7 +494,7 @@ export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string):
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'customers.payment.reverse');
   const payment = ctx.db.query<any>(
-    `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id, bank_account_id AS bankAccountId
+    `SELECT id, receipt_number, invoice_id, customer_id, amount / 100.0 AS amount, payment_type, register_id, shift_id, payment_group_id, branch_id, bank_account_id AS bankAccountId
      FROM customer_payments WHERE id = ?`,
     [paymentId]
   )[0];
@@ -491,7 +508,7 @@ export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string):
     const group = ctx.db.query<any>(
       `SELECT * FROM customer_payments WHERE payment_group_id=? AND branch_id=?`,
       [payment.paymentGroupId, payment.branchId]
-    );
+    ).map((row) => unscaleMoneyRow(row, CUSTOMER_PAYMENT_MONEY_FIELDS));
     validatePaymentGroup(ctx, group);
     reversePaymentGroup(ctx, payment, group, actor);
     return;

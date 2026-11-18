@@ -5,7 +5,7 @@ import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
 import { platformAnalyticsService } from './PlatformAnalyticsService';
-import {
+import type {
   PlatformComprehensiveHealth,
   PlatformTechnicalHealthMetrics,
   PlatformHealthDashboardData,
@@ -453,7 +453,7 @@ export class PlatformHealthService {
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
   private getBusinessHealthMetrics() {
-    const revenue = this.db.query<any>("SELECT COALESCE(SUM(total), 0) AS total FROM platform_invoices WHERE status = 'PAID' AND paid_at > datetime('now', '-30 days')")[0]?.total ?? 0;
+    const revenue = this.db.query<any>("SELECT COALESCE(SUM(total) / 100.0, 0) AS total FROM platform_invoices WHERE status = 'PAID' AND paid_at > datetime('now', '-30 days')")[0]?.total ?? 0;
     const newTenants = this.db.query<any>("SELECT COUNT(*) AS c FROM platform_tenants WHERE created_at > datetime('now', '-30 days')")[0]?.c ?? 0;
     const churnedTenants = this.db.query<any>("SELECT COUNT(*) AS c FROM platform_tenants WHERE status = 'CANCELLED' AND updated_at > datetime('now', '-30 days')")[0]?.c ?? 0;
 
@@ -675,9 +675,9 @@ export class PlatformHealthService {
     const now = nowIso();
 
     this.db.run(
-      `INSERT INTO platform_op_approvals (id, op_type, op_payload, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'PENDING', ?, ?)`,
-      [id, input.opType, JSON.stringify(input.opPayload ?? {}), now, now]
+      `INSERT INTO platform_op_approvals (id, op_type, op_payload, requested_by, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
+      [id, input.opType, JSON.stringify(input.opPayload ?? {}), AuthService.getCurrentUser()?.id ?? 'system', now, now]
     );
 
     this.audit('طلب موافقة تشغيل', 'OP_APPROVAL', id, { opType: input.opType });

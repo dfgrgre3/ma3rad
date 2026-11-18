@@ -75,7 +75,7 @@ export class HrDisciplineService {
   static createPenalty(input: { employeeId: string; violationId?: string | null; penaltyType?: string; amount?: number; notes?: string }): HrPenalty {
     const actor = this.requireManage();
     const id = `pen_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO hr_penalties (id, employee_id, violation_id, penalty_type, amount, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO hr_penalties (id, employee_id, violation_id, penalty_type, amount, notes, created_by) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?)`,
       [id, input.employeeId, input.violationId || null, input.penaltyType || 'FINANCIAL', Math.max(0, Number(input.amount) || 0), input.notes?.trim() || null, actor.id]);
     this.audit(actor, 'إنشاء جزاء', id, input);
     return this.getPenalties(input.employeeId).find((p) => p.id === id)!;
@@ -94,7 +94,7 @@ export class HrDisciplineService {
   static requestPenaltyApproval(penaltyId: string): string {
     const actor = this.requireManage();
     const penalty = this.db.query<{ employeeId: string; amount: number; notes: string | null }>(
-      'SELECT employee_id AS employeeId, amount, notes FROM hr_penalties WHERE id = ?', [penaltyId]
+      'SELECT employee_id AS employeeId, amount / 100.0 AS amount, notes FROM hr_penalties WHERE id = ?', [penaltyId]
     )[0];
     if (!penalty) throw new Error('الجزاء غير موجود.');
     const approval = new ApprovalService().createRequest({
@@ -113,7 +113,7 @@ export class HrDisciplineService {
   static approvePenalty(penaltyId: string): void {
     const actor = this.requireManage();
     const penalty = this.db.query<{ employeeId: string; amount: number; status: string; notes: string | null }>(
-      'SELECT employee_id AS employeeId, amount, status, notes FROM hr_penalties WHERE id = ?', [penaltyId]
+      'SELECT employee_id AS employeeId, amount / 100.0 AS amount, status, notes FROM hr_penalties WHERE id = ?', [penaltyId]
     )[0];
     if (!penalty) throw new Error('الجزاء غير موجود.');
     if (penalty.status !== 'DRAFT' && penalty.status !== 'APPROVED') throw new Error('الجزاء غير قابل للاعتماد.');
@@ -127,7 +127,7 @@ export class HrDisciplineService {
         const today = localDateString();
         db.run(
           `INSERT INTO payroll_transactions (id, employee_id, type, amount, date, notes, created_by, branch_id, payment_status)
-           VALUES (?, ?, 'DEDUCTION', ?, ?, ?, ?, ?, 'PAID')`,
+           VALUES (?, ?, 'DEDUCTION', ROUND(?*100), ?, ?, ?, ?, 'PAID')`,
           [txId, penalty.employeeId, amount, today, `جزاء معتمد: ${penalty.notes || ''}`, actor.id,
            this.branchAccess.getCurrentBranchId(actor)]
         );

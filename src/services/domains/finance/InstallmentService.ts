@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { v4 as uuidv4 } from 'uuid';
 import { localDateString } from '../../../utils/shared/date';
+import { unscaleMoneyRow } from '../../../utils/money';
 
 function addLocalMonths(dateString: string, months: number): string {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -32,20 +33,20 @@ export class InstallmentService {
     const planScope = this.branchAccess.sqlScope('ip.branch_id', undefined, actor);
     const db = this.db.getDatabase();
     const invoiceRows = db.exec(
-      `SELECT si.id,si.invoice_number,si.customer_id,si.remaining_amount FROM sales_invoices si
-       WHERE si.invoice_status!='VOID' AND si.remaining_amount>0.009 AND ${invoiceScope.clause}
+      `SELECT si.id,si.invoice_number,si.customer_id,si.remaining_amount / 100.0 AS remaining_amount FROM sales_invoices si
+       WHERE si.invoice_status!='VOID' AND si.remaining_amount>1 AND ${invoiceScope.clause}
        ORDER BY si.date DESC,si.created_at DESC`, invoiceScope.params
     )[0]?.values || [];
     const planRows = db.exec(`
       SELECT ip.id, ip.plan_number, ip.customer_id, c.name as customer_name,
-        ip.total_amount, ip.down_payment, ip.financed_amount, ip.installments_count,
-        ip.installment_amount, ip.paid_amount, ip.remaining_amount, ip.status, ip.start_date
+        ip.total_amount / 100.0, ip.down_payment / 100.0, ip.financed_amount / 100.0, ip.installments_count,
+        ip.installment_amount / 100.0, ip.paid_amount / 100.0, ip.remaining_amount / 100.0, ip.status, ip.start_date
       FROM installment_plans ip LEFT JOIN customers c ON ip.customer_id = c.id
       WHERE ${planScope.clause} ORDER BY ip.created_at DESC
     `, planScope.params)[0]?.values || [];
     const installmentRows = db.exec(`
       SELECT i.id, i.plan_id, ip.plan_number, i.sequence_number, ip.installments_count,
-        ip.customer_id, c.name, c.phone, i.amount, i.paid_amount, i.due_date, i.paid_at, i.status
+        ip.customer_id, c.name, c.phone, i.amount / 100.0, i.paid_amount / 100.0, i.due_date, i.paid_at, i.status
       FROM installments i JOIN installment_plans ip ON i.plan_id = ip.id
       LEFT JOIN customers c ON ip.customer_id = c.id
       WHERE ip.status != 'CANCELLED' AND ${planScope.clause} ORDER BY i.due_date ASC
@@ -76,7 +77,7 @@ export class InstallmentService {
     const monthlyAmount = Math.round((financed / installmentsCount) * 100) / 100;
     const planId = uuidv4();
     return this.db.executeFinancialTransaction((db) => {
-      const invoice = db.query<any>(`SELECT id,customerId,invoiceNumber,remainingAmount,invoiceStatus FROM sales_invoices WHERE id=?`, [invoiceId])[0];
+      const invoice = db.query<any>(`SELECT id,customerId,invoiceNumber,remaining_amount / 100.0 AS remainingAmount,invoiceStatus FROM sales_invoices WHERE id=?`, [invoiceId])[0];
       if (!invoice || invoice.customerId !== customerId || invoice.invoiceStatus === 'VOID') throw new Error('Select a valid invoice for this customer.');
       if (Math.abs(Number(invoice.remainingAmount) - totalAmount) > 0.009 || Number(invoice.remainingAmount) <= 0) throw new Error('The invoice balance changed. Reload the invoice and try again.');
       const existingPlan = db.query<any>(`SELECT id FROM installment_plans WHERE invoice_id=? AND status IN ('ACTIVE','DEFAULTED') LIMIT 1`, [invoiceId])[0];
@@ -91,24 +92,24 @@ export class InstallmentService {
         downPaymentReceipt = db.nextNumber('RCP-INST-DP');
         const today = localDateString();
         db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,register_id,shift_id,branch_id,notes,performed_by)
-          VALUES (?,?,?,?,?,'CASH',?,?,?,?,?,?)`, [downPaymentId, downPaymentReceipt, customerId, invoiceId, downPayment, today, register.id, shift?.id || null, invoiceScope.branchId, `Down payment for installment plan on ${invoice.invoiceNumber}`, actor.id]);
-        db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+          VALUES (?,?,?,?,ROUND(?*100),'CASH',?,?,?,?,?,?)`, [downPaymentId, downPaymentReceipt, customerId, invoiceId, downPayment, today, register.id, shift?.id || null, invoiceScope.branchId, `Down payment for installment plan on ${invoice.invoiceNumber}`, actor.id]);
+        db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
           [`cpa_${uuidv4().substring(0, 8)}`, downPaymentId, invoiceId, downPayment]);
-        db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),payment_status=CASE WHEN remaining_amount-?<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [downPayment, downPayment, downPayment, invoiceId]);
-        db.run('UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?', [downPayment, customerId]);
-        db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [downPayment, register.id]);
-        if (shift?.id) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?', [downPayment, shift.id]);
+        db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+ROUND(?*100),remaining_amount=MAX(0,remaining_amount-ROUND(?*100)),payment_status=CASE WHEN remaining_amount-ROUND(?*100)<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [downPayment, downPayment, downPayment, invoiceId]);
+        db.run('UPDATE customers SET current_balance=current_balance-ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?', [downPayment, customerId]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id=?', [downPayment, register.id]);
+        if (shift?.id) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments+ROUND(?*100) WHERE id=?', [downPayment, shift.id]);
         postLedgerEntry(db.getDatabase(), { date: today, description: `Installment plan down payment ${downPaymentReceipt}`, referenceType: 'CUSTOMER_PAYMENT', referenceId: downPaymentId, createdBy: actor.id,
           lines: [{ accountCode: paymentAccountCode('CASH'), debit: downPayment, credit: 0 }, { accountCode: '1103', debit: 0, credit: downPayment }] });
       }
       const planNumber = db.nextNumber('PLN');
       db.run(`INSERT INTO installment_plans (id,plan_number,customer_id,invoice_id,branch_id,total_amount,down_payment,financed_amount,installments_count,installment_amount,start_date,down_payment_payment_id,paid_amount,remaining_amount,status,created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,'ACTIVE',?)`, [planId, planNumber, customerId, invoiceId, invoiceScope.branchId, totalAmount, downPayment, financed, installmentsCount, monthlyAmount, startDate, downPaymentId, financed, actor.id]);
+        VALUES (?,?,?,?,?,ROUND(?*100),ROUND(?*100),ROUND(?*100),?,ROUND(?*100),?,?,0,ROUND(?*100),'ACTIVE',?)`, [planId, planNumber, customerId, invoiceId, invoiceScope.branchId, totalAmount, downPayment, financed, installmentsCount, monthlyAmount, startDate, downPaymentId, financed, actor.id]);
       let allocated = 0;
       for (let i = 1; i <= installmentsCount; i++) {
         const amount = i === installmentsCount ? Math.round((financed - allocated) * 100) / 100 : monthlyAmount;
         allocated += amount;
-        db.run(`INSERT INTO installments (id,plan_id,sequence_number,due_date,amount,paid_amount,remaining_amount,status) VALUES (?,?,?,?,?,0,?,'UPCOMING')`,
+        db.run(`INSERT INTO installments (id,plan_id,sequence_number,due_date,amount,paid_amount,remaining_amount,status) VALUES (?,?,?,?,ROUND(?*100),0,ROUND(?*100),'UPCOMING')`,
           [uuidv4(), planId, i, addLocalMonths(startDate, i - 1), amount, amount]);
       }
       db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
@@ -129,7 +130,7 @@ export class InstallmentService {
     this.branchAccess.requireBranchAccess(installment.branchId, actor);
     const registerId = this.branchAccess.getDefaultRegisterId(installment.branchId, actor);
     return this.db.executeFinancialTransaction((db) => {
-      const inst = db.query<any>(`SELECT i.*,p.plan_number,p.installments_count,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
+      const inst = unscaleMoneyRow(db.query<any>(`SELECT i.*,p.plan_number,p.installments_count,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0], ['amount', 'paid_amount', 'remaining_amount']);
       if (!inst) throw new Error('Installment not found.');
       if (inst.status === 'PAID' || inst.status === 'WAIVED') throw new Error('Installment is already paid or waived.');
       const dueAmount = Number(inst.remainingAmount);
@@ -153,19 +154,19 @@ export class InstallmentService {
         `Installment payment ${inst.sequenceNumber}/${inst.installmentsCount} for plan ${inst.planNumber}`,
         notes.trim(),
       ].filter(Boolean).join(' · ');
-      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,notes,performed_by,register_id,shift_id,branch_id) VALUES (?,?,?,?,?,'CASH',?,?,?,?,?,?)`,
+      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,notes,performed_by,register_id,shift_id,branch_id) VALUES (?,?,?,ROUND(?*100),'CASH',?,?,?,?,?,?)`,
         [paymentId, receiptNumber, inst.customerId, inst.invoiceId || null, amount, today, paymentNotes, actor.id, register.id, shift?.id || null, installment.branchId]);
-      if (inst.invoiceId) db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+      if (inst.invoiceId) db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, inst.invoiceId, amount]);
       if (inst.invoiceId) {
-        db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),payment_status=CASE WHEN remaining_amount-?<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [amount, amount, amount, inst.invoiceId]);
+        db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+ROUND(?*100),remaining_amount=MAX(0,remaining_amount-ROUND(?*100)),payment_status=CASE WHEN remaining_amount-ROUND(?*100)<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [amount, amount, amount, inst.invoiceId]);
       }
-      db.run(`UPDATE installments SET status=?,paid_amount=paid_amount+?,remaining_amount=?,paid_at=?,payment_id=? WHERE id=?`,
+      db.run(`UPDATE installments SET status=?,paid_amount=paid_amount+ROUND(?*100),remaining_amount=ROUND(?*100),paid_at=?,payment_id=? WHERE id=?`,
         [fullyPaid ? 'PAID' : 'PARTIAL', amount, fullyPaid ? 0 : remainingAmount, fullyPaid ? `${today}T${new Date().toTimeString().slice(0, 8)}` : null, paymentId, installmentId]);
-      db.run('UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?', [amount, inst.customerId]);
-      db.run(`UPDATE installment_plans SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),status=CASE WHEN remaining_amount-?<=0 THEN 'COMPLETED' ELSE status END WHERE id=?`, [amount, amount, amount, inst.planId]);
-      db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [amount, register.id]);
-      if (shift?.id) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?', [amount, shift.id]);
+      db.run('UPDATE customers SET current_balance=current_balance-ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?', [amount, inst.customerId]);
+      db.run(`UPDATE installment_plans SET paid_amount=paid_amount+ROUND(?*100),remaining_amount=MAX(0,remaining_amount-ROUND(?*100)),status=CASE WHEN remaining_amount-ROUND(?*100)<=0 THEN 'COMPLETED' ELSE status END WHERE id=?`, [amount, amount, amount, inst.planId]);
+      db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id=?', [amount, register.id]);
+      if (shift?.id) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments+ROUND(?*100) WHERE id=?', [amount, shift.id]);
       postLedgerEntry(db.getDatabase(), { date: today, description: `Installment receipt ${receiptNumber}`, referenceType: 'CUSTOMER_PAYMENT', referenceId: paymentId, createdBy: actor.id,
         lines: [{ accountCode: paymentAccountCode('CASH'), debit: amount, credit: 0 }, { accountCode: '1103', debit: 0, credit: amount }] });
       db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
@@ -187,7 +188,7 @@ export class InstallmentService {
     return this.db.executeFinancialTransaction((db) => {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst || inst.status !== 'PAID' || !inst.paymentId) throw new Error('This installment has no payment to reverse.');
-      const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [inst.paymentId])[0];
+      const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [inst.paymentId]).map((row) => ({ ...row, amount: Number(row.amount) / 100 }))[0];
       if (!payment) throw new Error('The installment receipt is missing.');
       this.branchAccess.requireRegisterAccess(payment.registerId, actor, installment.branchId);
       const amount = Number(payment.amount);
@@ -198,13 +199,13 @@ export class InstallmentService {
         referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${payment.id}:${uuidv4()}`, createdBy: actor.id,
       });
       if (inst.invoiceId) {
-        db.run(`UPDATE sales_invoices SET paid_amount=MAX(0,paid_amount-?),remaining_amount=MIN(total_amount,remaining_amount+?),payment_status=CASE WHEN paid_amount-?<=0 THEN 'UNPAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [amount, amount, amount, inst.invoiceId]);
+        db.run(`UPDATE sales_invoices SET paid_amount=MAX(0,paid_amount-ROUND(?*100)),remaining_amount=MIN(total_amount,remaining_amount+ROUND(?*100)),payment_status=CASE WHEN paid_amount-ROUND(?*100)<=0 THEN 'UNPAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [amount, amount, amount, inst.invoiceId]);
       }
-      db.run('UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?', [amount, inst.customerId]);
-      if (payment.paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, payment.registerId || 'cr_main']);
-      if (payment.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?', [amount, payment.shiftId]);
-      db.run(`UPDATE installments SET status=CASE WHEN due_date<? THEN 'OVERDUE' ELSE 'UPCOMING' END,paid_amount=0,remaining_amount=amount,paid_at=NULL,payment_id=NULL WHERE id=?`, [today, installmentId]);
-      db.run(`UPDATE installment_plans SET paid_amount=MAX(0,paid_amount-?),remaining_amount=MIN(financed_amount,remaining_amount+?),status='ACTIVE' WHERE id=?`, [amount, amount, inst.planId]);
+      db.run('UPDATE customers SET current_balance=current_balance+ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?', [amount, inst.customerId]);
+      if (payment.paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id=?', [amount, payment.registerId || 'cr_main']);
+      if (payment.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments-ROUND(?*100) WHERE id=?', [amount, payment.shiftId]);
+      db.run(`UPDATE installments SET status=CASE WHEN due_date<? THEN 'OVERDUE' ELSE 'UPCOMING' END,paid_amount=0,remaining_amount=ROUND(?*100),paid_at=NULL,payment_id=NULL WHERE id=?`, [today, amount, installmentId]);
+      db.run(`UPDATE installment_plans SET paid_amount=MAX(0,paid_amount-ROUND(?*100)),remaining_amount=MIN(financed_amount,remaining_amount+ROUND(?*100)),status='ACTIVE' WHERE id=?`, [amount, amount, inst.planId]);
       db.run('DELETE FROM customer_payments WHERE id=?', [payment.id]);
       db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,old_values) VALUES (?,?,?,?,?,?,?)`,
         [uuidv4(), actor.id, actor.fullName, 'Reverse installment payment', 'FINANCE', installmentId,
@@ -228,7 +229,7 @@ export class InstallmentService {
       const paid = db.query<any>(`SELECT COUNT(*) AS count FROM installments WHERE plan_id=? AND status='PAID'`, [planId])[0]?.count || 0;
       if (paid) throw new Error('Reverse all collected installments before cancelling the plan.');
       if (plan.downPaymentPaymentId) {
-        const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [plan.downPaymentPaymentId])[0];
+        const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [plan.downPaymentPaymentId]).map((row) => ({ ...row, amount: Number(row.amount) / 100 }))[0];
         if (!payment) throw new Error('The down payment receipt is missing; reconcile it before cancelling the plan.');
         const entry = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [payment.id])[0];
         if (entry) reverseLedgerEntry(db.getDatabase(), entry.id, {
@@ -236,11 +237,11 @@ export class InstallmentService {
           referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${payment.id}:${uuidv4()}`, createdBy: actor.id,
         });
         if (plan.invoiceId) {
-          db.run(`UPDATE sales_invoices SET paid_amount=MAX(0,paid_amount-?),remaining_amount=MIN(total_amount,remaining_amount+?),payment_status=CASE WHEN paid_amount-?<=0 THEN 'UNPAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [payment.amount, payment.amount, payment.amount, plan.invoiceId]);
+          db.run(`UPDATE sales_invoices SET paid_amount=MAX(0,paid_amount-ROUND(?*100)),remaining_amount=MIN(total_amount,remaining_amount+ROUND(?*100)),payment_status=CASE WHEN paid_amount-ROUND(?*100)<=0 THEN 'UNPAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [payment.amount, payment.amount, payment.amount, plan.invoiceId]);
         }
-        db.run('UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?', [payment.amount, plan.customerId]);
-        if (payment.paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [payment.amount, payment.registerId || 'cr_main']);
-        if (payment.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?', [payment.amount, payment.shiftId]);
+        db.run('UPDATE customers SET current_balance=current_balance+ROUND(?*100),updated_at=CURRENT_TIMESTAMP WHERE id=?', [payment.amount, plan.customerId]);
+        if (payment.paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id=?', [payment.amount, payment.registerId || 'cr_main']);
+        if (payment.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments=total_customer_payments-ROUND(?*100) WHERE id=?', [payment.amount, payment.shiftId]);
         db.run('DELETE FROM customer_payments WHERE id=?', [payment.id]);
       }
       db.run(`UPDATE installments SET status='WAIVED',remaining_amount=0 WHERE plan_id=?`, [planId]);

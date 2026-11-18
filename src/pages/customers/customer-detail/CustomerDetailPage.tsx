@@ -213,21 +213,21 @@ export const CustomerDetailPage: React.FC = () => {
           WHERE si.customer_id = ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
           ORDER BY si.date DESC LIMIT 100`, [id, ...invoiceScope.params]);
       }
-      if (can('quotations.view')) availableLists.quotations = db.query<CustomerDetailRow>(`SELECT q.quotation_number AS n1, q.date, q.total_amount AS amount, q.status,
+      if (can('quotations.view')) availableLists.quotations = db.query<CustomerDetailRow>(`SELECT q.quotation_number AS n1, q.date, q.total_amount / 100.0 AS amount, q.status,
           q.valid_until AS extra FROM quotations q
           WHERE q.customer_id = ? AND ${quotationClause} ORDER BY q.date DESC`, [id, ...quotationScope.params]);
-      if (can('orders.view')) availableLists.orders = db.query<CustomerDetailRow>(`SELECT o.order_number AS n1, o.date, o.total_amount AS amount, o.status,
+      if (can('orders.view')) availableLists.orders = db.query<CustomerDetailRow>(`SELECT o.order_number AS n1, o.date, o.total_amount / 100.0 AS amount, o.status,
           o.expected_delivery_date AS extra FROM orders o
           WHERE o.customer_id = ? AND ${orderScope.clause} ORDER BY o.date DESC`, [id, ...orderScope.params]);
-      if (can('finance.debts.view')) availableLists.payments = db.query<CustomerDetailRow>(`SELECT cp.receipt_number AS n1, cp.date, cp.amount, cp.payment_type AS kind,
+      if (can('finance.debts.view')) availableLists.payments = db.query<CustomerDetailRow>(`SELECT cp.receipt_number AS n1, cp.date, cp.amount / 100.0 AS amount, cp.payment_type AS kind,
           COALESCE(cp.notes, '') AS notes FROM customer_payments cp
           WHERE cp.customer_id = ? AND ${paymentScope.clause} ORDER BY cp.date DESC`, [id, ...paymentScope.params]);
       if (can('returns.view')) availableLists.returns = db.query<CustomerDetailRow>(`SELECT sr.return_number AS n1, sr.date,
-          sr.total_amount AS amount, sr.return_tax_amount AS returnTaxAmount, sr.reason AS notes
+          sr.total_amount / 100.0 AS amount, sr.return_tax_amount / 100.0 AS returnTaxAmount, sr.reason AS notes
           FROM sales_returns sr
           LEFT JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.customer_id = ? AND ${invoiceScope.clause} ORDER BY sr.date DESC`, [id, ...invoiceScope.params]);
-      if (can('projects.view')) availableLists.projects = db.query<CustomerDetailRow>(`SELECT pr.code AS n1, pr.name, pr.contract_value AS amount, pr.status
+      if (can('projects.view')) availableLists.projects = db.query<CustomerDetailRow>(`SELECT pr.code AS n1, pr.name, pr.contract_value / 100.0 AS amount, pr.status
           FROM projects pr WHERE pr.customer_id = ? AND ${projectClause}
           ORDER BY pr.created_at DESC`, [id, ...projectScope.params]);
       if (can('crm.view')) availableLists.activities = db.query<CustomerDetailRow>(`SELECT activity.subject AS n1, activity.activity_type AS kind,

@@ -10,6 +10,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { AttendanceService } from './AttendanceService';
 import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { AttendanceTimeService } from './AttendanceTimeService';
+import { unscaleMoneyRow } from '../../../utils/money';
 import { PayrollTaxService } from './PayrollTaxService';
 import { PayrollSocialInsuranceService } from './PayrollSocialInsuranceService';
 import type { PayrollTaxBasis, PayrollTaxBreakdownLine, PayrollTaxSource } from './PayrollTaxService';
@@ -447,7 +448,7 @@ export class EmployeeService {
     const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
     const canSeePrivateProfile = PermissionService.can(actor, 'employees.profile.view');
     const salaryColumns = canSeeFinancials
-      ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
+      ? 'e.base_salary / 100.0 AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const privateProfileColumns = canSeePrivateProfile
       ? `e.national_id AS nationalId, e.birth_date AS birthDate, e.gender, e.phone2 AS phone2,
@@ -487,7 +488,7 @@ export class EmployeeService {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const financialColumns = canSeeFinancials
-      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount AS taxExemptionAmount, e.tax_dependents AS taxDependents'
+      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount / 100.0 AS taxExemptionAmount, e.tax_dependents AS taxDependents'
       : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS walletProvider, NULL AS walletNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber, 0 AS taxExempt, 0 AS taxExemptionAmount, 0 AS taxDependents";
     const sql = `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
                         COALESCE(e.name, e.full_name) AS name, ${privateProfileColumns},
@@ -516,7 +517,7 @@ export class EmployeeService {
     const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
     const canSeePrivateProfile = PermissionService.can(actor, 'employees.profile.view');
     const salaryColumns = canSeeFinancials
-      ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
+      ? 'e.base_salary / 100.0 AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const privateProfileColumns = canSeePrivateProfile
       ? `e.national_id AS nationalId, e.birth_date AS birthDate, e.gender, e.phone2,
@@ -529,7 +530,7 @@ export class EmployeeService {
          NULL AS education, NULL AS previousExperience,
          NULL AS probationStartDate, NULL AS probationEndDate`;
     const financialColumns = canSeeFinancials
-      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount AS taxExemptionAmount, e.tax_dependents AS taxDependents'
+      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount / 100.0 AS taxExemptionAmount, e.tax_dependents AS taxDependents'
       : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS walletProvider, NULL AS walletNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber, 0 AS taxExempt, 0 AS taxExemptionAmount, 0 AS taxDependents";
     const rows = this.db.query<Employee>(
       `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
@@ -580,7 +581,7 @@ export class EmployeeService {
            national_id, phone2, address, birth_date, gender, emergency_contact_name, emergency_contact_phone,
            department_id, manager_employee_id, probation_start_date, probation_end_date, bank_account_number,
            bank_name, wallet_provider, wallet_number, salary_payment_method, social_insurance_number, tax_file_number, tax_exempt, tax_exemption_amount, tax_dependents, education, previous_experience
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
         [id, code, data.name.trim(), data.name.trim(), this.normalizePhone(data.phone), data.email?.trim() || null, data.role.trim(), data.role.trim(),
          data.location?.trim() || '', branchId, data.employmentType || 'FULL_TIME', joinedDate, joinedDate, data.baseSalary,
          data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes?.trim() || null,
@@ -628,7 +629,7 @@ export class EmployeeService {
       throw new Error('سجّل الاستقالة أو إنهاء الخدمة من دورة إنهاء العقد لضمان التسوية وسجل الحالة.');
     }
     const stored = this.db.query<{ status: EmployeeStatus; baseSalary: number; salaryType: SalaryType }>(
-      'SELECT status, base_salary AS baseSalary, salary_type AS salaryType FROM employees WHERE id = ?',
+      'SELECT status, base_salary / 100.0 AS baseSalary, salary_type AS salaryType FROM employees WHERE id = ?',
       [id]
     )[0];
     this.validateEmployeeOrganization(data, data.branchId || existing.branchId || '', id, actor);
@@ -645,7 +646,7 @@ export class EmployeeService {
          job_title = COALESCE(?, job_title),
          phone = COALESCE(?, phone),
          email = COALESCE(?, email),
-         base_salary = COALESCE(?, base_salary),
+         base_salary = COALESCE(ROUND(?*100), base_salary),
          salary_type = COALESCE(?, salary_type),
          status = ?,
          is_active = ?,
@@ -692,7 +693,7 @@ export class EmployeeService {
     const profileUpdates = profileFields.filter(([key]) => data[key] !== undefined);
     if (profileUpdates.length) {
       db.run(
-        `UPDATE employees SET ${profileUpdates.map(([, column]) => `${column} = ?`).join(', ')},
+        `UPDATE employees SET ${profileUpdates.map(([, column]) => column === 'tax_exemption_amount' ? 'tax_exemption_amount = ROUND(?*100)' : `${column} = ?`).join(', ')},
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [...profileUpdates.map(([key, , normalize]) => normalize(data[key])), id]
       );
@@ -913,7 +914,7 @@ export class EmployeeService {
     if (runAccrual) return;
 
     const employee = db.query<{ name: string; baseSalary: number; salaryType: SalaryType }>(
-      'SELECT name,base_salary AS baseSalary,salary_type AS salaryType FROM employees WHERE id=?',
+      'SELECT name,base_salary / 100.0 AS baseSalary,salary_type AS salaryType FROM employees WHERE id=?',
       [employeeId]
     )[0];
     const salary = Math.round((Number(employee?.baseSalary || 0) * (employee?.salaryType === 'DAILY' ? 26 : 1)) * 100) / 100;
@@ -944,7 +945,7 @@ export class EmployeeService {
     if (applied) return;
 
     const advances = Number(db.query<{ amount: number }>(
-      `SELECT COALESCE(SUM(amount),0) AS amount FROM payroll_transactions WHERE employee_id=? AND type='ADVANCE' AND substr(date,1,7)=?`,
+      `SELECT COALESCE(SUM(amount),0) / 100.0 AS amount FROM payroll_transactions WHERE employee_id=? AND type='ADVANCE' AND substr(date,1,7)=?`,
       [employeeId, period]
     )[0]?.amount || 0);
     if (advances <= 0) return;
@@ -962,7 +963,7 @@ export class EmployeeService {
   private static getPayrollPayable(db: DatabaseManager, employeeId: string, date: string): number {
     const period = date.slice(0, 7);
     return Number(db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(l.credit-l.debit),0) AS amount
+      SELECT COALESCE(SUM(l.credit-l.debit),0) / 100.0 AS amount
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id=l.entry_id AND e.is_posted=1
       JOIN chart_of_accounts a ON a.id=l.account_id
@@ -1110,7 +1111,7 @@ export class EmployeeService {
       `INSERT INTO payroll_transactions
          (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id,
           payment_method,bank_account_id,wallet_provider,wallet_number,reference_number,proof_reference,payment_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,ROUND(?*100),?,?,?,?,?,?,?,?,?,?,?,?)`,
       [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, payment.registerId,
         branchId, payment.method, payment.bankAccountId, payment.walletProvider, payment.walletNumber,
         payment.referenceNumber, payment.proofReference, 'PAID']
@@ -1142,9 +1143,9 @@ export class EmployeeService {
 
     if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
       if (payment.method === 'CASH' && payment.registerId) {
-        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, payment.registerId]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id=?', [amount, payment.registerId]);
       } else if (payment.method === 'BANK_TRANSFER' && payment.bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
           [amount, payment.bankAccountId]);
       }
     }
@@ -1227,7 +1228,7 @@ export class EmployeeService {
                 SELECT sh.previous_salary FROM employee_salary_history sh
                 WHERE sh.employee_id = e.id AND sh.effective_date > ?
                 ORDER BY sh.effective_date, sh.created_at LIMIT 1
-              ), e.base_salary) AS baseSalary,
+              ), e.base_salary / 100.0) AS baseSalary,
               e.salary_type AS salaryType,
               e.joined_date AS joinedDate, e.terminated_at AS terminatedAt,
               ec.salary AS contractSalary, ec.start_date AS contractStartDate, ec.end_date AS contractEndDate,
@@ -1366,22 +1367,22 @@ export class EmployeeService {
   private static readPayrollRun(run: any): PayrollRun {
     const items = this.db.query<any>(
       `SELECT id, employee_id AS employeeId, branch_id AS branchId, employee_name AS employeeName,
-              salary_type AS salaryType, base_salary AS baseSalary, expected_workdays AS expectedWorkdays,
+              salary_type AS salaryType, base_salary / 100.0 AS baseSalary, expected_workdays AS expectedWorkdays,
               absent_days AS absentDays, unpaid_leave_days AS unpaidLeaveDays,
               late_minutes AS lateMinutes, overtime_minutes AS overtimeMinutes,
-              base_amount AS baseAmount, overtime_amount AS overtimeAmount,
-              bonus_amount AS bonusAmount, commission_amount AS commissionAmount,
-              allowance_amount AS allowanceAmount, loan_deduction_amount AS loanDeductionAmount,
-              advance_amount AS advanceAmount, manual_deduction_amount AS manualDeductionAmount,
-              attendance_deduction_amount AS attendanceDeductionAmount, tax_amount AS taxAmount,
-              social_insurance_base AS socialInsuranceBase,
-              social_insurance_employee_share AS socialInsuranceEmployeeShare,
-              social_insurance_employer_share AS socialInsuranceEmployerShare,
-              social_insurance_total AS socialInsuranceTotal,
-              gross_amount AS grossAmount, net_amount AS netAmount, warning_json AS warningJson,
+              base_amount / 100.0 AS baseAmount, overtime_amount / 100.0 AS overtimeAmount,
+              bonus_amount / 100.0 AS bonusAmount, commission_amount / 100.0 AS commissionAmount,
+              allowance_amount / 100.0 AS allowanceAmount, loan_deduction_amount / 100.0 AS loanDeductionAmount,
+              advance_amount / 100.0 AS advanceAmount, manual_deduction_amount / 100.0 AS manualDeductionAmount,
+              attendance_deduction_amount / 100.0 AS attendanceDeductionAmount, tax_amount / 100.0 AS taxAmount,
+              social_insurance_base / 100.0 AS socialInsuranceBase,
+              social_insurance_employee_share / 100.0 AS socialInsuranceEmployeeShare,
+              social_insurance_employer_share / 100.0 AS socialInsuranceEmployerShare,
+              social_insurance_total / 100.0 AS socialInsuranceTotal,
+              gross_amount / 100.0 AS grossAmount, net_amount / 100.0 AS netAmount, warning_json AS warningJson,
               detail_json AS detailJson, payout_transaction_id AS payoutTransactionId,
               payment_method AS paymentMethod, payment_reference AS paymentReference,
-              payment_proof AS paymentProof, paid_amount AS paidAmount, payout_status AS payoutStatus
+              payment_proof AS paymentProof, paid_amount / 100.0 AS paidAmount, payout_status AS payoutStatus
        FROM payroll_run_items WHERE payroll_run_id = ? ORDER BY employee_name`,
       [run.id]
     ).map((row): PayrollRunItem => ({
@@ -1410,7 +1411,7 @@ export class EmployeeService {
                 SELECT sh.previous_salary FROM employee_salary_history sh
                 WHERE sh.employee_id = e.id AND sh.effective_date > ?
                 ORDER BY sh.effective_date, sh.created_at LIMIT 1
-              ), e.base_salary) AS baseSalary,
+              ), e.base_salary / 100.0) AS baseSalary,
               e.joined_date AS joinedDate,
               e.terminated_at AS terminatedAt,
               c.salary AS contractSalary, c.start_date AS contractStartDate, c.end_date AS contractEndDate,
@@ -1470,7 +1471,7 @@ export class EmployeeService {
       [branchId, periodEnd, periodStart]
     );
     const transactionRows = this.db.query<any>(
-      `SELECT employee_id AS employeeId, type, SUM(amount) AS amount
+      `SELECT employee_id AS employeeId, type, SUM(amount) / 100.0 AS amount
        FROM payroll_transactions
        WHERE branch_id = ? AND date BETWEEN ? AND ?
        GROUP BY employee_id, type
@@ -1478,7 +1479,7 @@ export class EmployeeService {
       [branchId, periodStart, periodEnd]
     );
     const commissionRows = this.db.query<any>(
-      `SELECT id, employee_id AS employeeId, commission_amount AS amount, status
+      `SELECT id, employee_id AS employeeId, commission_amount / 100.0 AS amount, status
        FROM commissions
        WHERE branch_id = ? AND period_month = ? AND status IN ('APPROVED', 'PENDING')
        ORDER BY employee_id, id`,
@@ -1619,13 +1620,13 @@ export class EmployeeService {
       const approvedCommissions = commissions.filter((row) => row.status === 'APPROVED');
       const commissionAmount = roundMoney(approvedCommissions.reduce((sum, row) => sum + Number(row.amount || 0), 0));
       const allowanceAmount = roundMoney(Number(this.db.query<{ amount: number }>(
-        `SELECT COALESCE(SUM(amount), 0) AS amount FROM hr_allowances
+        `SELECT COALESCE(SUM(amount), 0) / 100.0 AS amount FROM hr_allowances
          WHERE employee_id = ? AND is_active = 1 AND frequency = 'MONTHLY'
            AND effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)`,
         [employee.id, periodEnd, periodStart]
       )[0]?.amount) || 0);
       const dueLoanInstallments = this.db.query<{ id: string; amount: number }>(
-        `SELECT i.id, i.amount FROM hr_loan_installments i
+        `SELECT i.id, i.amount / 100.0 AS amount FROM hr_loan_installments i
          JOIN hr_loans l ON l.id = i.loan_id
          WHERE l.employee_id = ? AND l.status = 'ACTIVE' AND i.status = 'PENDING' AND i.due_date <= ?`,
         [employee.id, periodEnd]
@@ -1766,7 +1767,7 @@ export class EmployeeService {
              manual_deduction_amount, attendance_deduction_amount, tax_amount,
              social_insurance_base, social_insurance_employee_share, social_insurance_employer_share, social_insurance_total,
              gross_amount, net_amount, warning_json, detail_json, payment_method, payout_status
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?)`,
           [
             item.id, existingRunId, item.employeeId, item.branchId, item.employeeName, item.salaryType,
             item.baseSalary, item.expectedWorkdays, item.absentDays, item.unpaidLeaveDays, item.lateMinutes,
@@ -1819,7 +1820,7 @@ export class EmployeeService {
         const wages = roundMoney(item.baseAmount + item.overtimeAmount + item.allowanceAmount);
         const legacyAmount = legacyAccrual
           ? Number(db.query<{ amount: number }>(
-            `SELECT COALESCE(SUM(l.credit - l.debit), 0) AS amount
+            `SELECT COALESCE(SUM(l.credit - l.debit), 0) / 100.0 AS amount
              FROM journal_entry_lines l
              JOIN chart_of_accounts a ON a.id = l.account_id
              WHERE l.entry_id = ? AND a.code = '2104'`,
@@ -1915,7 +1916,7 @@ export class EmployeeService {
         }
         if (item.allowanceAmount > 0) {
           const currentAllowances = roundMoney(Number(db.query<{ amount: number }>(
-            `SELECT COALESCE(SUM(amount), 0) AS amount FROM hr_allowances
+            `SELECT COALESCE(SUM(amount), 0) / 100.0 AS amount FROM hr_allowances
              WHERE employee_id = ? AND is_active = 1 AND frequency = 'MONTHLY'
                AND effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)`,
             [item.employeeId, `${run.period}-31`, `${run.period}-01`]
@@ -2012,7 +2013,7 @@ export class EmployeeService {
         db.run(
           `UPDATE payroll_run_items SET payout_transaction_id = ?, payment_method = ?,
              bank_account_id = ?, wallet_provider = ?, wallet_number = ?, payment_reference = ?,
-             payment_proof = ?, paid_amount = ?, payout_status = 'PAID'
+             payment_proof = ?, paid_amount = ROUND(?*100), payout_status = 'PAID'
            WHERE id = ?`,
           [txId, payment.method, payment.bankAccountId, payment.walletProvider, payment.walletNumber,
             payment.referenceNumber, payment.proofReference, item.netAmount, item.id]
@@ -2053,7 +2054,7 @@ export class EmployeeService {
       }
       db.run(
         `UPDATE payroll_runs SET status = 'PAID', paid_by = ?, paid_at = ?,
-           payment_batch_reference = ?, paid_total = ?
+           payment_batch_reference = ?, paid_total = ROUND(?*100)
          WHERE id = ? AND status = 'APPROVED'`,
         [actor.id, new Date().toISOString(), batchReference, paidTotal, id]
       );
@@ -2143,14 +2144,14 @@ export class EmployeeService {
     this.branchAccess.requireBranchAccess(branchId, actor);
     const bankAccounts = this.db.query<any>(
       `SELECT id, account_name AS accountName, bank_name AS bankName,
-              account_number AS accountNumber, COALESCE(current_balance, 0) AS currentBalance
+              account_number AS accountNumber, COALESCE(current_balance, 0) / 100.0 AS currentBalance
        FROM bank_accounts
        WHERE is_active = 1 AND (branch_id = ? OR branch_id IS NULL)
        ORDER BY branch_id IS NULL, account_name`,
       [branchId]
     ).map((row) => ({ ...row, currentBalance: Number(row.currentBalance) || 0 }));
     const registers = this.db.query<any>(
-      `SELECT id, name, COALESCE(current_balance, 0) AS currentBalance
+      `SELECT id, name, COALESCE(current_balance, 0) / 100.0 AS currentBalance
        FROM cash_registers WHERE branch_id = ? AND is_active = 1
        ORDER BY is_default DESC, name`,
       [branchId]
@@ -2224,7 +2225,8 @@ export class EmployeeService {
       SELECT pt.*, COALESCE(pt.branch_id, e.branch_id) AS effective_branch_id FROM payroll_transactions pt
       LEFT JOIN employees e ON e.id = pt.employee_id
       WHERE pt.id = ? AND ${scope.clause} AND ${departmentScope.clause}
-    `, [id, ...scope.params, ...departmentScope.params])[0];
+    `, [id, ...scope.params, ...departmentScope.params])
+      .map((r) => unscaleMoneyRow(r, ['amount']))[0];
     if (!row) throw new Error('عملية الرواتب غير موجودة ضمن نطاق فروعك.');
     this.assertPayrollPeriodEditable(row.effective_branch_id, row.date);
     this.db.executeTransaction((db) => {
@@ -2234,7 +2236,7 @@ export class EmployeeService {
         referenceType: 'PAYROLL_REVERSAL', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
       });
       if (row.type === 'ADVANCE' || row.type === 'SALARY_PAYOUT') {
-        db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [row.amount, row.register_id || 'cr_main']);
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id=?', [row.amount, row.register_id || 'cr_main']);
       }
       db.run('DELETE FROM payroll_transactions WHERE id=?', [id]);
     });
@@ -2249,7 +2251,7 @@ export class EmployeeService {
     const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const rows = this.db.query<{ type: PayrollTxType; total: number }>(
-      `SELECT pt.type, SUM(pt.amount) AS total
+      `SELECT pt.type, SUM(pt.amount) / 100.0 AS total
        FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
        WHERE pt.employee_id = ? AND substr(pt.date, 1, 7) = ? AND ${scope.clause}
          AND ${departmentScope.clause} GROUP BY pt.type`,
@@ -2336,7 +2338,7 @@ export class EmployeeService {
     const actor = this.requireFinancialView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const rows = this.db.query<{ salaryType: string; baseSalary: number }>(
-      `SELECT e.salary_type AS salaryType, e.base_salary AS baseSalary FROM employees e
+      `SELECT e.salary_type AS salaryType, e.base_salary / 100.0 AS baseSalary FROM employees e
        WHERE e.status = 'ACTIVE' AND ${scope.clause}`,
       scope.params
     );

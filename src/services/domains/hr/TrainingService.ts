@@ -40,14 +40,14 @@ export class TrainingService {
   static createCourse(input: { name: string; description?: string; trainerId?: string | null; startDate?: string | null; endDate?: string | null; cost?: number; status?: string }): TrainingCourse {
     const actor = this.requireManage();
     const id = `crs_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    this.db.run(`INSERT INTO training_courses (id, name, description, trainer_id, start_date, end_date, cost, status, created_by, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    this.db.run(`INSERT INTO training_courses (id, name, description, trainer_id, start_date, end_date, cost, status, created_by, branch_id) VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?)`,
       [id, input.name.trim(), input.description?.trim() || null, input.trainerId || null, input.startDate || null, input.endDate || null, Math.max(0, Number(input.cost) || 0), input.status || 'PLANNED', actor.id, this.branchAccess.getCurrentBranchId(actor)]);
     this.audit(actor, 'إضافة دورة تدريبية', id, input);
     return this.getCourses().find((r) => r.id === id)!;
   }
   static getCourses(): TrainingCourse[] {
     this.requireView();
-    return this.db.query<any>(`SELECT * FROM training_courses ORDER BY created_at DESC`).map((r) => ({ id: r.id, name: r.name, description: r.description || null, trainerId: r.trainer_id || null, startDate: r.start_date || null, endDate: r.end_date || null, cost: Number(r.cost) || 0, status: r.status, createdBy: r.created_by || null, createdAt: r.created_at }));
+    return this.db.query<any>(`SELECT * FROM training_courses ORDER BY created_at DESC`).map((r) => ({ id: r.id, name: r.name, description: r.description || null, trainerId: r.trainer_id || null, startDate: r.start_date || null, endDate: r.end_date || null, cost: Number(r.cost) / 100 || 0, status: r.status, createdBy: r.created_by || null, createdAt: r.created_at }));
   }
   static updateCourseStatus(id: string, status: string): void { const actor = this.requireManage(); this.db.run('UPDATE training_courses SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [status, id]); if (status === 'COMPLETED') { try { this.postCourseCost(id); } catch { /* already posted or zero cost */ } } this.audit(actor, 'تحديث حالة دورة', id, { status }); }
 
@@ -192,7 +192,7 @@ export class TrainingService {
     this.db.executeTransaction((db) => {
       db.run(
         `INSERT INTO training_expenses (id, course_id, employee_id, amount, expense_date, description, payment_method, register_id, bank_account_id, ledger_reference_id, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)`,
         [id, input.courseId || null, input.employeeId || null, amount, input.expenseDate, input.description?.trim() || null, paymentMethod, registerId, bankAccountId, ledgerRef, actor.id]
       );
       postLedgerEntry(db.getDatabase(), {
@@ -207,9 +207,9 @@ export class TrainingService {
         ],
       });
       if (paymentMethod === 'CASH' && registerId) {
-        db.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [amount, registerId]);
+        db.run('UPDATE cash_registers SET current_balance = current_balance - ROUND(?*100) WHERE id = ?', [amount, registerId]);
       } else if (paymentMethod === 'BANK_TRANSFER' && bankAccountId) {
-        db.run('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [amount, bankAccountId]);
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ROUND(?*100), updated_at = CURRENT_TIMESTAMP WHERE id = ?', [amount, bankAccountId]);
       }
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -246,7 +246,7 @@ export class TrainingService {
   static postCourseCost(courseId: string): void {
     const actor = this.requireManage();
     const course = this.db.query<{ name: string; cost: number }>(
-      'SELECT name, cost FROM training_courses WHERE id = ?', [courseId]
+      'SELECT name, cost / 100.0 AS cost FROM training_courses WHERE id = ?', [courseId]
     )[0];
     if (!course) throw new Error('الدورة غير موجودة.');
     const cost = Number(course.cost) || 0;
@@ -268,7 +268,7 @@ export class TrainingService {
   static getTotalExpenses(courseId?: string): number {
     this.requireView();
     const row = this.db.query<{ total: number }>(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM training_expenses ${courseId ? 'WHERE course_id = ?' : ''}`,
+      `SELECT COALESCE(SUM(amount), 0) / 100.0 AS total FROM training_expenses ${courseId ? 'WHERE course_id = ?' : ''}`,
       courseId ? [courseId] : []
     )[0];
     return Number(row?.total) || 0;
