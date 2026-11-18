@@ -422,7 +422,19 @@ export class ProductService {
 
     // ── Approval gate: إضافة منتج قد تتطلب موافقة حسب سياسة العملية ──
     const gate = new OperationApprovalGate(this.db);
-    const createMatchDetails = { productSku: product.sku, productBarcode: product.barcode };
+    const createMatchDetails = {
+      productSku: product.sku,
+      productBarcode: product.barcode,
+      productName: product.name,
+      productType: product.productType || defaultProductType,
+      costPrice: product.costPrice ?? 0,
+      sellingPriceM2: product.sellingPriceM2 ?? 0,
+      sellingPriceBox: product.sellingPriceBox ?? 0,
+      wholesalePriceM2: product.wholesalePriceM2 ?? 0,
+      minSellingPriceM2: product.minSellingPriceM2 ?? 0,
+      baseUnit: product.baseUnit || defaultUnit,
+      sellUnit: product.sellUnit || defaultUnit,
+    };
     const { policy: createPolicy, required: createApprovalRequired } = gate.evaluate('products.create');
     let createApprovalId: string | null = null;
     if (createApprovalRequired) {
@@ -439,7 +451,6 @@ export class ProductService {
           description: `الكود: ${product.sku} — الباركود: ${product.barcode}`,
           details: {
             ...createMatchDetails,
-            productName: product.name ?? null,
             dedupeKey: `create:product:${product.sku}`,
             policy: createPolicy,
           },
@@ -534,7 +545,17 @@ export class ProductService {
       (field) => updates[field] !== undefined && updates[field] !== null
     );
     const gate = new OperationApprovalGate(this.db);
-    const updateMatchDetails = { productId: id };
+    const updateMatchDetails = {
+      productId: id,
+      productName: updates.name ?? existing.name,
+      productSku: updates.sku ?? existing.sku,
+      productBarcode: updates.barcode ?? existing.barcode,
+      costPrice: updates.costPrice ?? existing.costPrice,
+      sellingPriceM2: updates.sellingPriceM2 ?? existing.sellingPriceM2,
+      sellingPriceBox: updates.sellingPriceBox ?? existing.sellingPriceBox,
+      wholesalePriceM2: updates.wholesalePriceM2 ?? existing.wholesalePriceM2,
+      minSellingPriceM2: updates.minSellingPriceM2 ?? existing.minSellingPriceM2,
+    };
     const { policy: updatePolicy, required: updateApprovalRequired } = gate.evaluate('products.update');
     let updateApprovalId: string | null = null;
     if (updateApprovalRequired && !touchesPriceFields) {

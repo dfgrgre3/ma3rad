@@ -2,6 +2,7 @@ import { DatabaseManager } from '../../../../database/repositories/databaseManag
 import { writeAuditLog } from '../../security/auditWriter';
 import { AuthService } from '../AuthService';
 import { PermissionService } from '../PermissionService';
+import { AuthorizationService } from '../authorization/AuthorizationService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface AmountLimit {
@@ -145,6 +146,7 @@ export class AuthorizationAdminService {
         );
       }
     });
+    AuthorizationService.invalidate(userId);
     this.audit('تعديل منح مخازن المستخدم', userId, before, warehouseIds);
   }
 

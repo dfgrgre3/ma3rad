@@ -13,6 +13,7 @@ import { PurchaseReturnService } from '../src/services/domains/purchases/Purchas
 import { ProcurementService } from '../src/services/domains/procurement/ProcurementService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { ReservationService } from '../src/services/domains/sales/ReservationService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { MIGRATIONS } from '../src/database/migrations/index.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import type { User } from '../src/types/auth/identity.ts';
@@ -28,7 +29,15 @@ async function boot(): Promise<DatabaseManager> {
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   await PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  const user = AuthService.login('admin', 'admin123');
+  user.mustChangePassword = false;
+  user.securityKeySetupRequired = false;
+  AuthService.setCurrentUser(user);
+  // حركات الكاش تتطلب وردية كاشير مفتوحة على فرع العملية (CashShiftPolicyService).
+  const openShift = DatabaseManager.getInstance().query<{ id: string }>(
+    `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [user.id]
+  )[0];
+  if (!openShift) new CashierService().openShift('cr_main', user.id, 0);
   return manager;
 }
 
@@ -99,9 +108,10 @@ function assertLedgerDocument(referenceType: string, referenceId: string): void 
   }
 }
 
+/** مبالغ الدفتر تُخزَّن بالقروش (وحدات صغرى) — نُرجعها بالوحدات الكبرى. */
 function ledgerDebit(referenceType: string, referenceId: string, accountCode: string): number {
   return Number(one<{ amount: number }>(
-    `SELECT COALESCE(SUM(l.debit), 0) AS amount
+    `SELECT COALESCE(SUM(l.debit), 0) / 100.0 AS amount
      FROM journal_entry_lines l
      JOIN journal_entries e ON e.id = l.entry_id
      JOIN chart_of_accounts a ON a.id = l.account_id
@@ -112,7 +122,7 @@ function ledgerDebit(referenceType: string, referenceId: string, accountCode: st
 
 function ledgerCredit(referenceType: string, referenceId: string, accountCode: string): number {
   return Number(one<{ amount: number }>(
-    `SELECT COALESCE(SUM(l.credit), 0) AS amount
+    `SELECT COALESCE(SUM(l.credit), 0) / 100.0 AS amount
      FROM journal_entry_lines l
      JOIN journal_entries e ON e.id = l.entry_id
      JOIN chart_of_accounts a ON a.id = l.account_id
@@ -182,7 +192,7 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   assert.equal(ledgerCredit('SALES_INVOICE', invoice.id, '4101'), 3000, 'sales revenue must be credited in full');
 
   // ── Customer balance tracks the invoice remainder ─────────────────────────
-  const customerAfterSale = one<{ balance: number }>(`SELECT current_balance AS balance FROM customers WHERE id = ?`, [customer.id]);
+  const customerAfterSale = one<{ balance: number }>(`SELECT current_balance / 100.0 AS balance FROM customers WHERE id = ?`, [customer.id]);
   assert.equal(customerAfterSale.balance, 2000);
 
   // ── Receipt: numbered, allocated, balanced, balance re-derived ────────────
@@ -190,16 +200,16 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   const paidInvoice = sales.getInvoiceById(invoice.id)!;
   assert.equal(paidInvoice.paidAmount, 1500);
   assert.equal(paidInvoice.remainingAmount, 1500);
-  assert.equal(one<{ balance: number }>(`SELECT current_balance AS balance FROM customers WHERE id = ?`, [customer.id]).balance, 1500);
+  assert.equal(one<{ balance: number }>(`SELECT current_balance / 100.0 AS balance FROM customers WHERE id = ?`, [customer.id]).balance, 1500);
 
   const receipt = one<{ id: string; number: string; amount: number }>(
-    `SELECT id, receipt_number AS number, amount FROM customer_payments WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+    `SELECT id, receipt_number AS number, amount / 100.0 AS amount FROM customer_payments WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`,
     [customer.id]
   );
   assertDocumentNumber('REC', receipt.number);
   assert.equal(receipt.amount, 500);
   assert.equal(
-    one<{ amount: number }>(`SELECT amount FROM customer_payment_allocations WHERE payment_id = ? AND sales_invoice_id = ?`, [receipt.id, invoice.id])?.amount,
+    one<{ amount: number }>(`SELECT amount / 100.0 AS amount FROM customer_payment_allocations WHERE payment_id = ? AND sales_invoice_id = ?`, [receipt.id, invoice.id])?.amount,
     500
   );
   assertLedgerDocument('CUSTOMER_PAYMENT', receipt.id);
@@ -249,7 +259,7 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   assert.equal(saleReturn.refundedAmount, 600, 'cash refund follows the paid ratio');
   assert.equal(ledgerCredit('SALES_RETURN', saleReturn.id, '1103'), 600, 'unpaid share reduces AR, never cash');
   assert.equal(ledgerCredit('SALES_RETURN', saleReturn.id, '1101'), 600);
-  assert.equal(one<{ balance: number }>(`SELECT current_balance AS balance FROM customers WHERE id = ?`, [customer.id]).balance, 900);
+  assert.equal(one<{ balance: number }>(`SELECT current_balance / 100.0 AS balance FROM customers WHERE id = ?`, [customer.id]).balance, 900);
 
   // ── Returning more than remains sold is rejected and writes nothing ──────
   const stockBeforeRejectedReturn = stockOf(productId);
@@ -348,7 +358,7 @@ test('purchase cycle audit: PO, GRN, invoice and three-way matching agree', asyn
   }>(`
     SELECT source_transaction_id AS sourceTransactionId, goods_receipt_id AS goodsReceiptId,
       purchase_invoice_id AS purchaseInvoiceId, batch_id AS batchId, supplier_id AS supplierId,
-      unit_cost AS unitCost, quantity_received AS quantityReceived
+      unit_cost / 100.0 AS unitCost, quantity_received AS quantityReceived
     FROM inventory_cost_layers WHERE source_transaction_id = ?
   `, [grnTransaction.id]);
   assert.equal(receivedLayer.sourceTransactionId, grnTransaction.id);
@@ -401,7 +411,7 @@ test('purchase cycle audit: PO, GRN, invoice and three-way matching agree', asyn
   assert.equal(linkedLayer.sourceId, purchase.id);
   assert.equal(linkedLayer.goodsReceiptId, receipt.grn.id);
   assert.equal(linkedLayer.purchaseInvoiceId, purchase.id);
-  assert.equal(one<{ balance: number }>(`SELECT current_balance AS balance FROM suppliers WHERE id = ?`, [supplier.id]).balance, 500);
+  assert.equal(one<{ balance: number }>(`SELECT current_balance / 100.0 AS balance FROM suppliers WHERE id = ?`, [supplier.id]).balance, 500);
 
   assertLedgerDocument('PURCHASE_INVOICE', purchase.id);
   assert.equal(ledgerDebit('PURCHASE_INVOICE', purchase.id, '2101'), 0);
@@ -514,7 +524,7 @@ test('legacy GRN FIFO backfill restores only provably unconsumed receipt layers'
   }>(`
     SELECT source_type AS sourceType, source_id AS sourceId, source_transaction_id AS sourceTransactionId,
       goods_receipt_id AS goodsReceiptId, purchase_invoice_id AS purchaseInvoiceId,
-      batch_id AS batchId, supplier_id AS supplierId, unit_cost AS unitCost,
+      batch_id AS batchId, supplier_id AS supplierId, unit_cost / 100.0 AS unitCost,
       quantity_received AS quantity
     FROM inventory_cost_layers WHERE source_transaction_id = ?
   `, [transaction.id]);

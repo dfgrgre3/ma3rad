@@ -703,7 +703,9 @@ export class PlatformSubscriptionService {
   private generateLicenseKey(): string {
     const segments = [];
     for (let i = 0; i < 4; i++) {
-      segments.push(Math.random().toString(36).substring(2, 6).toUpperCase());
+      const bytes = crypto.randomBytes(2);
+      const value = bytes.readUInt16BE(0);
+      segments.push((value % 10000).toString().padStart(4, '0'));
     }
     return `CS-${segments.join('-')}`;
   }

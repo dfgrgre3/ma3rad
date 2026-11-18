@@ -92,7 +92,11 @@ export function generateLicenseActivationCode(): string {
 // central-admin migration replaces this with Ed25519 server-side signing
 // (issued by /api/v1/admin/licenses/issue). Local issuance is dev-only and
 // must be gated behind `platform.localIssuance === true` before production.
+// SECURITY WARNING: This is NOT a cryptographic signature. Do not use in production.
 export function signCertificate(payload: Record<string, unknown>): string {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Local certificate signing is not allowed in production. Use central server signing instead.');
+  }
   const secret = 'ceramisys-platform-certificate-secret';
   const body = JSON.stringify(payload);
   const signature = btoa(`${secret}:${body}`).replace(/=+$/, '');

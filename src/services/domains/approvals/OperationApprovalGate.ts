@@ -140,14 +140,18 @@ export class OperationApprovalGate {
     db: DatabaseManager = this.db
   ): string | null {
     const actor = AuthService.requireAuth();
-    const rows = db.query<{ id: string; payload: string | null }>(
-      `SELECT id, payload FROM approval_requests
+    const rows = db.query<{ id: string; payload: string | null; expiresAt: string | null }>(
+      `SELECT id, payload, expires_at FROM approval_requests
        WHERE request_type = ? AND status = 'APPROVED' AND requested_by = ?
          AND reference_type IS NULL
        ORDER BY decided_at DESC, created_at DESC`,
       [requestType, actor.id]
     );
+    const now = new Date().toISOString();
     for (const row of rows) {
+      // Check expiration
+      if (row.expiresAt && row.expiresAt < now) continue;
+
       let payload: { operationCode?: string; details?: Record<string, unknown> } = {};
       try { payload = row.payload ? JSON.parse(row.payload) : {}; } catch { continue; }
       if (payload.operationCode !== operationCode) continue;
@@ -173,9 +177,9 @@ export class OperationApprovalGate {
     const actor = AuthService.requireAuth();
     const row = db.query<{
       id: string; status: string; requestType: string; requestedBy: string;
-      referenceType: string | null; payload: string | null;
+      referenceType: string | null; payload: string | null; expiresAt: string | null;
     }>(
-      `SELECT id, status, request_type, requested_by, reference_type, payload
+      `SELECT id, status, request_type, requested_by, reference_type, payload, expires_at
        FROM approval_requests WHERE id = ?`,
       [approvalId]
     )[0];
@@ -183,6 +187,10 @@ export class OperationApprovalGate {
     if (row.status !== 'APPROVED') throw new Error('طلب الموافقة غير معتمد بعد.');
     if (row.referenceType != null) throw new Error('تم استهلاك طلب الموافقة هذا من قبل.');
     if (row.requestedBy !== actor.id) throw new Error('طلب الموافقة لا يخص المستخدم الحالي.');
+    // Check expiration
+    if (row.expiresAt && row.expiresAt < new Date().toISOString()) {
+      throw new Error('طلب الموافقة منتهي الصلاحية.');
+    }
     let payload: { operationCode?: string; details?: Record<string, unknown> } = {};
     try { payload = row.payload ? JSON.parse(row.payload) : {}; } catch { payload = {}; }
     if (payload.operationCode !== operationCode) {

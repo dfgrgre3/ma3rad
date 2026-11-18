@@ -823,15 +823,16 @@ export class PlatformStaffService {
     const existing = this.db.query<any>('SELECT * FROM platform_signing_keys WHERE alias = ?', [keyAlias])[0];
     const now = nowIso();
 
-    // Generate new Ed25519 key pair (simplified - would use proper crypto in production)
-    const privateKey = randomToken(64, 'abcdefghijklmnopqrstuvwxyz0123456789');
-    const publicKey = randomToken(64, 'abcdefghijklmnopqrstuvwxyz0123456789');
-    const fingerprint = `sha256:${randomToken(32, 'abcdef0123456789')}`;
+    // Generate Ed25519 key pair using crypto
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
+    const privateKeyHex = privateKey.export({ type: 'pkcs8', format: 'der' }).toString('hex');
+    const publicKeyHex = publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
+    const fingerprint = `sha256:${crypto.createHash('sha256').update(publicKeyHex).digest('hex').substring(0, 32)}`;
 
     if (existing) {
       this.db.run(
         'UPDATE platform_signing_keys SET private_key = ?, public_key = ?, fingerprint = ?, rotated_at = ?, is_current = 1, updated_at = ? WHERE id = ?',
-        [privateKey, publicKey, fingerprint, now, now, existing.id]
+        [privateKeyHex, publicKeyHex, fingerprint, now, now, existing.id]
       );
       this.db.run('UPDATE platform_signing_keys SET is_current = 0 WHERE alias = ? AND id <> ?', [keyAlias, existing.id]);
     } else {
@@ -839,7 +840,7 @@ export class PlatformStaffService {
       this.db.run(
         `INSERT INTO platform_signing_keys (id, alias, private_key, public_key, fingerprint, is_current, rotated_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-        [id, keyAlias, privateKey, publicKey, fingerprint, now, now, now]
+        [id, keyAlias, privateKeyHex, publicKeyHex, fingerprint, now, now, now]
       );
     }
 

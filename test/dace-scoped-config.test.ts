@@ -12,6 +12,7 @@ test('scoped configuration resolves by scope precedence and tracks origin', asyn
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  admin.mustChangePassword = false;
   AppConfigService.reset(admin);
   AppConfigService.setActiveContext(null);
 
@@ -39,6 +40,7 @@ test('scoped configuration rejects platform and security overrides at lower scop
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  admin.mustChangePassword = false;
 
   assert.throws(
     () => AppConfigService.saveScopeEntry('platform', 'platform', {
@@ -59,6 +61,7 @@ test('dynamic actions enforce permission even when visible', async () => {
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  admin.mustChangePassword = false;
   const resolved = ActionRegistryService.resolve('products.delete', admin);
   assert.equal(typeof resolved.visible, 'boolean');
 
@@ -80,6 +83,7 @@ test('feature entitlements separate availability, entitlement and permission', a
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  admin.mustChangePassword = false;
 
   const before = FeatureService.resolve('feature.pos.offline', admin);
   assert.equal(before.available, true);

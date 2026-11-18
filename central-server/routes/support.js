@@ -313,6 +313,7 @@ router.post(
       const db = getDb();
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
       const { requested, durationMinutes = 60 } = req.body || {};
       const now = nowIso();
       await db.run(
@@ -334,6 +335,7 @@ router.post(
       const db = getDb();
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
       const { approved } = req.body || {};
       const now = nowIso();
       await db.run(
@@ -355,6 +357,7 @@ router.post(
       const db = getDb();
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
       if (!ticket.remote_access_approved) {
         return res.status(400).json({ error: 'Remote access must be approved first' });
       }
@@ -380,14 +383,17 @@ router.post(
     try {
       const db = getDb();
       const { sessionId } = req.params;
+      const session = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
+      if (!session) return res.status(404).json({ error: 'Session not found' });
+      if (!(await assertTenantAccess(req, res, session.tenant_id))) return;
       const { summary } = req.body || {};
       const now = nowIso();
       await db.run(
         `UPDATE platform_remote_sessions SET status = 'ENDED', ended_at = ?, summary = ? WHERE id = ?`,
         [now, summary || null, sessionId]
       );
-      const session = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
-      res.json({ data: session, requestId: req.requestId });
+      const updated = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
+      res.json({ data: updated, requestId: req.requestId });
     } catch (err) { next(err); }
   }
 );
@@ -399,6 +405,9 @@ router.get(
   async (req, res, next) => {
     try {
       const db = getDb();
+      const ticket = await getTicketOr404(db, req.params.id);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
       const sessions = await db.all(
         'SELECT * FROM platform_remote_sessions WHERE ticket_id = ? ORDER BY started_at DESC',
         [req.params.id]

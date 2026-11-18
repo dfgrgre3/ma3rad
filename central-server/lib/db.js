@@ -889,6 +889,12 @@ async function createTables() {
     ['restore_error', 'restore_error TEXT'],
     ['restore_completed_at', 'restore_completed_at TEXT'],
   ]);
+  await ensureColumns('platform_support_tickets', [
+    ['remote_access_requested', 'remote_access_requested INTEGER NOT NULL DEFAULT 0'],
+    ['remote_access_approved', 'remote_access_approved INTEGER NOT NULL DEFAULT 0'],
+    ['remote_access_requested_at', 'remote_access_requested_at TEXT'],
+    ['remote_access_approved_at', 'remote_access_approved_at TEXT'],
+  ]);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at)');

@@ -98,10 +98,15 @@ public createTransferRequest(input: {
 
     // ── Approval gate: نقل المخزون قد يتطلب موافقة حسب سياسة العملية ──
     const gate = new OperationApprovalGate(this.db);
+    const itemsKey = input.items
+      .map(item => `${item.productId}:${Number(item.quantityM2) || 0}`)
+      .sort()
+      .join('|');
     const transferMatchDetails = {
       fromWarehouseId: input.fromWarehouseId,
       toWarehouseId: input.toWarehouseId,
       totalQuantity: Math.round(input.items.reduce((sum, item) => sum + (Number(item.quantityM2) || 0), 0) * 1000) / 1000,
+      itemsKey,
     };
     const { policy: transferPolicy, required: transferApprovalRequired } = gate.evaluate('inventory.transfer.create');
     let transferApprovalId: string | null = null;
@@ -121,7 +126,7 @@ public createTransferRequest(input: {
           details: {
             ...transferMatchDetails,
             itemsCount: input.items.length,
-            dedupeKey: `transfer:${input.fromWarehouseId}:${input.toWarehouseId}:${transferMatchDetails.totalQuantity}`,
+            dedupeKey: `transfer:${input.fromWarehouseId}:${input.toWarehouseId}:${itemsKey}`,
             policy: transferPolicy,
           },
         });

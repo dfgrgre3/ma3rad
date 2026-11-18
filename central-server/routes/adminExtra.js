@@ -4,7 +4,12 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../lib/db');
 const { recordAuditEvent } = require('../lib/audit');
-const { authenticatePlatformUser, requirePlatformPermission } = require('../middleware/auth');
+const {
+  authenticatePlatformUser,
+  requirePlatformPermission,
+  getScopedTenantIds,
+  assertTenantAccess,
+} = require('../middleware/auth');
 const { nowIso } = require('../lib/time');
 
 const router = express.Router();
@@ -68,10 +73,10 @@ router.get(
       const [recentTenants, expiringLicenses, expiringSubs, recentPayments, moduleUsage, revenueByPlan, alerts] = await Promise.all([
         db.all('SELECT * FROM platform_tenants ORDER BY created_at DESC LIMIT 5'),
         db.all("SELECT * FROM platform_licenses WHERE status = 'ACTIVE' AND expires_at < datetime('now', '+30 days') ORDER BY expires_at ASC LIMIT 5"),
-        db.all("SELECT * FROM platform_subscriptions WHERE status = 'ACTIVE' AND ends_at < datetime('now', '+30 days') ORDER BY ends_at ASC LIMIT 5"),
+        db.all("SELECT * FROM platform_subscriptions WHERE status = 'ACTIVE' AND end_date < datetime('now', '+30 days') ORDER BY end_date ASC LIMIT 5"),
         db.all('SELECT * FROM platform_payments ORDER BY created_at DESC LIMIT 5'),
         db.all('SELECT module_code, COUNT(*) as licenseCount FROM platform_plan_modules GROUP BY module_code'),
-        db.all("SELECT p.name as planName, SUM(s.amount) as revenue, COUNT(*) as tenants FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' GROUP BY p.name"),
+        db.all("SELECT p.name as planName, SUM(s.price) as revenue, COUNT(*) as tenants FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' GROUP BY p.name"),
         db.all("SELECT * FROM platform_emergency_events WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 10"),
       ]);
 
@@ -115,63 +120,6 @@ router.get(
         },
         requestId: req.requestId,
       });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// ── Billing Payments ───────────────────────────────────────────────────────
-router.get(
-  '/admin/billing/payments',
-  authenticatePlatformUser,
-  requirePlatformPermission(['platform.billing.view', 'platform.billing.manage']),
-  async (req, res, next) => {
-    try {
-      const db = getDb();
-      const payments = await db.all(
-        `SELECT p.*, t.name as tenant_name, i.number as invoice_number
-         FROM platform_payments p
-         LEFT JOIN platform_tenants t ON t.id = p.tenant_id
-         LEFT JOIN platform_invoices i ON i.id = p.invoice_id
-         ORDER BY p.created_at DESC`
-      );
-      res.json({ data: payments, meta: { total: payments.length }, requestId: req.requestId });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-router.post(
-  '/admin/billing/payments',
-  authenticatePlatformUser,
-  requirePlatformPermission(['platform.billing.create', 'platform.billing.manage']),
-  async (req, res, next) => {
-    try {
-      const db = getDb();
-      const { tenantId, invoiceId, amount, method, reference, notes } = req.body || {};
-      if (!tenantId || !amount) {
-        return res.status(400).json({ error: 'tenantId and amount are required' });
-      }
-      const id = `pay_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-      await db.run(
-        `INSERT INTO platform_payments (id, tenant_id, invoice_id, amount, method, reference, notes, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, tenantId, invoiceId || null, Number(amount), method || 'BANK', reference || null, notes || null, req.platformUser?.id, nowIso()]
-      );
-      const payment = await db.get('SELECT * FROM platform_payments WHERE id = ?', [id]);
-      await recordAuditEvent({
-        actorId: req.platformUser?.id,
-        actorName: req.platformUser?.full_name,
-        tenantId,
-        action: 'PAYMENT_CREATED',
-        resourceType: 'platform_payments',
-        resourceId: id,
-        afterData: { amount, method },
-        ipAddress: req.ip,
-      });
-      res.status(201).json({ data: payment, requestId: req.requestId });
     } catch (err) {
       next(err);
     }
@@ -1249,6 +1197,7 @@ router.get(
   requirePlatformPermission(['platform.branding.view', 'platform.branding.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const branding = await db.get(
         'SELECT * FROM platform_tenant_branding WHERE tenant_id = ? ORDER BY version DESC LIMIT 1',
@@ -1278,6 +1227,7 @@ router.put(
   requirePlatformPermission(['platform.branding.update', 'platform.branding.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId } = req.params;
       const b = req.body || {};
@@ -1302,6 +1252,7 @@ router.get(
   requirePlatformPermission(['platform.branding.view', 'platform.branding.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const versions = await db.all(
         'SELECT id, version, created_at, updated_at, updated_by FROM platform_tenant_branding WHERE tenant_id = ? ORDER BY version DESC',
@@ -1318,6 +1269,7 @@ router.post(
   requirePlatformPermission(['platform.branding.update', 'platform.branding.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId, version } = req.params;
       const source = await db.get('SELECT * FROM platform_tenant_branding WHERE tenant_id = ? AND version = ?', [tenantId, Number(version)]);
@@ -1356,6 +1308,7 @@ router.get(
   requirePlatformPermission(['platform.customization.view', 'platform.customization.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const ui = await db.get(
         'SELECT * FROM platform_tenant_ui_customization WHERE tenant_id = ? ORDER BY version DESC LIMIT 1',
@@ -1372,6 +1325,7 @@ router.put(
   requirePlatformPermission(['platform.customization.update', 'platform.customization.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId } = req.params;
       const { profileId, hiddenPages, hiddenActions, customLabels, formFieldRules } = req.body || {};
@@ -1395,6 +1349,7 @@ router.get(
   requirePlatformPermission(['platform.customization.view', 'platform.customization.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const versions = await db.all(
         'SELECT id, version, created_at, updated_at, updated_by FROM platform_tenant_ui_customization WHERE tenant_id = ? ORDER BY version DESC',
@@ -1411,6 +1366,7 @@ router.post(
   requirePlatformPermission(['platform.customization.update', 'platform.customization.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId, version } = req.params;
       const source = await db.get('SELECT * FROM platform_tenant_ui_customization WHERE tenant_id = ? AND version = ?', [tenantId, Number(version)]);
@@ -1497,6 +1453,7 @@ router.get(
   requirePlatformPermission(['platform.appconfig.view', 'platform.appconfig.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const config = await db.get(
         'SELECT * FROM platform_tenant_config WHERE tenant_id = ? ORDER BY version DESC LIMIT 1',
@@ -1513,6 +1470,7 @@ router.put(
   requirePlatformPermission(['platform.appconfig.update', 'platform.appconfig.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId } = req.params;
       const { templateId, configPayload } = req.body || {};
@@ -1536,6 +1494,7 @@ router.get(
   requirePlatformPermission(['platform.appconfig.view', 'platform.appconfig.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const versions = await db.all(
         'SELECT id, version, template_id, created_at, updated_at, updated_by FROM platform_tenant_config WHERE tenant_id = ? ORDER BY version DESC',
@@ -1552,6 +1511,7 @@ router.post(
   requirePlatformPermission(['platform.appconfig.update', 'platform.appconfig.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId, version } = req.params;
       const source = await db.get('SELECT * FROM platform_tenant_config WHERE tenant_id = ? AND version = ?', [tenantId, Number(version)]);
@@ -1590,6 +1550,7 @@ router.get(
   requirePlatformPermission(['platform.activity.view', 'platform.activity.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const activity = await db.get(
         'SELECT * FROM platform_tenant_activity WHERE tenant_id = ? ORDER BY version DESC LIMIT 1',
@@ -1606,6 +1567,7 @@ router.put(
   requirePlatformPermission(['platform.activity.update', 'platform.activity.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId } = req.params;
       const { activityId, enabledModules, customTerminology } = req.body || {};
@@ -1629,6 +1591,7 @@ router.get(
   requirePlatformPermission(['platform.activity.view', 'platform.activity.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const versions = await db.all(
         'SELECT id, version, activity_id, created_at, updated_at, updated_by FROM platform_tenant_activity WHERE tenant_id = ? ORDER BY version DESC',
@@ -1645,6 +1608,7 @@ router.post(
   requirePlatformPermission(['platform.activity.update', 'platform.activity.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId, version } = req.params;
       const source = await db.get('SELECT * FROM platform_tenant_activity WHERE tenant_id = ? AND version = ?', [tenantId, Number(version)]);
@@ -1771,6 +1735,7 @@ router.get(
   requirePlatformPermission(['platform.admincontrol.view', 'platform.admincontrol.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const users = await db.all('SELECT * FROM platform_tenant_users WHERE tenant_id = ? ORDER BY created_at DESC', [req.params.tenantId]);
       res.json({ data: users, requestId: req.requestId });
@@ -1784,6 +1749,7 @@ router.post(
   requirePlatformPermission(['platform.admincontrol.create', 'platform.admincontrol.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId } = req.params;
       const { username, fullName, email, phone, role } = req.body || {};
@@ -1806,6 +1772,7 @@ router.put(
   requirePlatformPermission(['platform.admincontrol.update', 'platform.admincontrol.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       const { tenantId, userId } = req.params;
       const { fullName, email, phone, role, isActive } = req.body || {};
@@ -1831,6 +1798,7 @@ router.delete(
   requirePlatformPermission(['platform.admincontrol.delete', 'platform.admincontrol.manage']),
   async (req, res, next) => {
     try {
+      if (!(await assertTenantAccess(req, res, req.params.tenantId))) return;
       const db = getDb();
       await db.run('DELETE FROM platform_tenant_users WHERE tenant_id = ? AND id = ?', [req.params.tenantId, req.params.userId]);
       res.json({ data: { deleted: true }, requestId: req.requestId });

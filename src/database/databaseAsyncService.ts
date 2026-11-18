@@ -165,25 +165,37 @@ async function ensureWorkerInitialized(): Promise<void> {
  * يصدّر قاعدة البيانات من الخيط الرئيسي ويدفعها إلى العامل (Transferable،
  * بدون نسخ). يُستدعى فقط عند وجود تغييرات لم يصلها العامل بعد.
  */
-async function pushMainToWorker(): Promise<Uint8Array> {
+async function pushMainToWorker(retainBytes = false): Promise<Uint8Array | null> {
   const db = DatabaseManager.getInstance();
   const bytes = db.exportDatabaseBytes();
+  if (retainBytes) {
+    // The import below transfers (detaches) its buffer, which would leave
+    // `bytes` empty on this thread. Hand the worker a transferred copy and
+    // keep the original so callers (e.g. snapshot export) can reuse it
+    // instead of paying for a second full serialization.
+    const workerBytes = bytes.slice();
+    await post<void>({ type: 'import', bytes: workerBytes }, [workerBytes.buffer as ArrayBuffer]);
+    lastSyncedSeq = db.getMutationSeq();
+    workerDirty = false;
+    return bytes;
+  }
   await post<void>({ type: 'import', bytes }, [bytes.buffer as ArrayBuffer]);
   lastSyncedSeq = db.getMutationSeq();
   workerDirty = false;
-  return bytes;
+  return null;
 }  
 
 /**
  * يضمن أن العامل لديه أحدث حالة لقاعدة البيانات. تكلفته صفرية عندما لا
  * تكون هناك تغييرات على الخيط الرئيسي منذ آخر مزامنة.
  */
-async function ensureWorkerInSync(): Promise<void> {
+async function ensureWorkerInSync(retainSnapshot = false): Promise<Uint8Array | null> {
   await ensureWorkerInitialized();
   const db = DatabaseManager.getInstance();
   if (workerDirty || db.getMutationSeq() !== lastSyncedSeq) {
-    await pushMainToWorker();
+    return pushMainToWorker(retainSnapshot);
   }
+  return null;
 }
 
 /**
@@ -244,6 +256,21 @@ export async function initDatabaseAsync(): Promise<void> {
 }
 
 /**
+ * يجهّز العامل (تحميل محرك sql.js داخل الخيط الخلفي) دون مزامنة اللقطة.
+ * يُستدعى مبكرًا عند الإقلاع ليتداخل تجميع WASM الخاص بالعامل مع تهيئة
+ * الخيط الرئيسي؛ المزامنة الفعلية للبيانات تتم عند أول عملية حقيقية
+ * عبر ensureWorkerInSync كالمعتاد.
+ */
+export function prewarmDatabaseWorker(): void {
+  registerMutationForwarder();
+  void enqueue(async () => {
+    await ensureWorkerInitialized();
+  }).catch((error) => {
+    console.error('Database worker prewarm failed:', error);
+  });
+}
+
+/**
  * تنفيذ استعلام SELECT غير متزامن في العامل.
  * يعيد مصفوفة من الكائنات بمفاتيح camelCase (نفس سلوك DatabaseManager.query).
  * لا يسحب أي لقطة من العامل لأن القراءة لا تغيّر حالة قاعدة البيانات.
@@ -285,7 +312,11 @@ export async function execAsync(sql: string): Promise<void> {
  */
 export async function exportDatabaseAsync(): Promise<Uint8Array> {
   return enqueue(async () => {
-    await ensureWorkerInSync();
+    // If the worker was out of sync, ensureWorkerInSync already exported the
+    // main database to push it — reuse those bytes instead of paying for a
+    // second full db.export() inside the worker.
+    const pushed = await ensureWorkerInSync(true);
+    if (pushed) return pushed;
     return post<Uint8Array>({ type: 'export' });
   });
 }

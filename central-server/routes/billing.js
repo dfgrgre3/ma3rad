@@ -219,44 +219,52 @@ router.post(
       const id = `inv_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       const now = nowIso();
 
-      await db.run(
-        `INSERT INTO platform_invoices
-          (id, number, tenant_id, subscription_id, issue_date, due_date, status, currency,
-           subtotal, discount, tax, total, paid_amount, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
-        [
-          id,
-          String(number).trim(),
-          tenantId,
-          subscriptionId ?? null,
-          body.issueDate || now.split('T')[0],
-          body.dueDate || null,
-          status,
-          currency || 'EGP',
-          subtotal,
-          discount,
-          tax,
-          total,
-          notes ?? null,
-          now,
-          now,
-        ]
-      );
-
-      for (const item of items) {
+      await db.run('BEGIN TRANSACTION');
+      try {
         await db.run(
-          `INSERT INTO platform_invoice_items (id, invoice_id, description, quantity, unit_price, total, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO platform_invoices
+            (id, number, tenant_id, subscription_id, issue_date, due_date, status, currency,
+             subtotal, discount, tax, total, paid_amount, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
           [
-            `ivi_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
             id,
-            item.description,
-            item.quantity,
-            item.unitPrice,
-            round2(item.quantity * item.unitPrice),
+            String(number).trim(),
+            tenantId,
+            subscriptionId ?? null,
+            body.issueDate || now.split('T')[0],
+            body.dueDate || null,
+            status,
+            currency || 'EGP',
+            subtotal,
+            discount,
+            tax,
+            total,
+            notes ?? null,
+            now,
             now,
           ]
         );
+
+        for (const item of items) {
+          await db.run(
+            `INSERT INTO platform_invoice_items (id, invoice_id, description, quantity, unit_price, total, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              `ivi_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+              id,
+              item.description,
+              item.quantity,
+              item.unitPrice,
+              round2(item.quantity * item.unitPrice),
+              now,
+            ]
+          );
+        }
+
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
       }
 
       await recordAuditEvent({
@@ -295,8 +303,18 @@ router.post(
         return res.status(403).json({ error: 'Tenant is outside your data scope' });
       }
 
+      // Prevent VOID via status change - use dedicated void endpoint
+      if (status === 'VOID') {
+        return res.status(400).json({ error: 'Use the dedicated /void endpoint to void invoices' });
+      }
+
+      // Prevent PAID via status change without actual payment
+      if (status === 'PAID') {
+        return res.status(400).json({ error: 'Cannot set status to PAID without recording a payment. Use /payments endpoint instead.' });
+      }
+
       const now = nowIso();
-      const paidAmount = status === 'PAID' ? Number(invoice.total) || 0 : Number(invoice.paid_amount) || 0;
+      const paidAmount = Number(invoice.paid_amount) || 0;
       await db.run(
         'UPDATE platform_invoices SET status = ?, paid_amount = ?, updated_at = ? WHERE id = ?',
         [status, paidAmount, now, req.params.id]
@@ -439,18 +457,26 @@ router.post(
       const paymentId = `pay_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       const now = nowIso();
 
-      await db.run(
-        `INSERT INTO platform_payments (id, invoice_id, tenant_id, amount, method, reference, notes, paid_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentId, invoiceId ?? null, tenantId, amount, method || 'CASH', reference ?? null, notes ?? null, paidAt || now, now]
-      );
-
-      if (invoice) {
-        const paidAmount = round2((Number(invoice.paid_amount) || 0) + amount);
+      await db.run('BEGIN TRANSACTION');
+      try {
         await db.run(
-          'UPDATE platform_invoices SET paid_amount = ?, status = ?, updated_at = ? WHERE id = ?',
-          [paidAmount, deriveInvoiceStatus(invoice, paidAmount), now, invoice.id]
+          `INSERT INTO platform_payments (id, invoice_id, tenant_id, amount, method, reference, notes, paid_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [paymentId, invoiceId ?? null, tenantId, amount, method || 'CASH', reference ?? null, notes ?? null, paidAt || now, now]
         );
+
+        if (invoice) {
+          const paidAmount = round2((Number(invoice.paid_amount) || 0) + amount);
+          await db.run(
+            'UPDATE platform_invoices SET paid_amount = ?, status = ?, updated_at = ? WHERE id = ?',
+            [paidAmount, deriveInvoiceStatus(invoice, paidAmount), now, invoice.id]
+          );
+        }
+
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
       }
 
       await recordAuditEvent({
@@ -496,17 +522,25 @@ router.delete(
       }
 
       const now = nowIso();
-      await db.run('DELETE FROM platform_payments WHERE id = ?', [req.params.id]);
+      await db.run('BEGIN TRANSACTION');
+      try {
+        await db.run('DELETE FROM platform_payments WHERE id = ?', [req.params.id]);
 
-      if (payment.invoice_id) {
-        const invoice = await db.get('SELECT * FROM platform_invoices WHERE id = ?', [payment.invoice_id]);
-        if (invoice) {
-          const paidAmount = Math.max(0, round2((Number(invoice.paid_amount) || 0) - (Number(payment.amount) || 0)));
-          await db.run(
-            'UPDATE platform_invoices SET paid_amount = ?, status = ?, updated_at = ? WHERE id = ?',
-            [paidAmount, deriveInvoiceStatus(invoice, paidAmount), now, invoice.id]
-          );
+        if (payment.invoice_id) {
+          const invoice = await db.get('SELECT * FROM platform_invoices WHERE id = ?', [payment.invoice_id]);
+          if (invoice) {
+            const paidAmount = Math.max(0, round2((Number(invoice.paid_amount) || 0) - (Number(payment.amount) || 0)));
+            await db.run(
+              'UPDATE platform_invoices SET paid_amount = ?, status = ?, updated_at = ? WHERE id = ?',
+              [paidAmount, deriveInvoiceStatus(invoice, paidAmount), now, invoice.id]
+            );
+          }
         }
+
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
       }
 
       await recordAuditEvent({

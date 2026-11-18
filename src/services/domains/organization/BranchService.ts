@@ -5,6 +5,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
+import { AuthorizationService } from '../auth/authorization/AuthorizationService';
 
 export class BranchService {
   private db = DatabaseManager.getInstance();
@@ -308,6 +309,10 @@ export class BranchService {
         );
       }
     });
+    // Invalidate authorization cache for affected users
+    for (const userId of selectedIds) {
+      AuthorizationService.invalidate(userId);
+    }
   }
 
   public assignWarehouseToBranch(branchId: string, warehouseId: string, isPrimary = false): BranchWarehouse {
@@ -411,6 +416,7 @@ export class BranchService {
       INSERT OR IGNORE INTO users_branches (user_id, branch_id)
       VALUES (?, ?)
     `, [userId, branchId]);
+    AuthorizationService.invalidate(userId);
   }
 
   public removeUserFromBranch(userId: string, branchId: string): void {
@@ -418,6 +424,7 @@ export class BranchService {
     PermissionService.require(actor, 'ui.branches.branches.manage_users');
     this.access.requireBranchAccess(branchId, actor);
     this.db.run('DELETE FROM users_branches WHERE user_id = ? AND branch_id = ?', [userId, branchId]);
+    AuthorizationService.invalidate(userId);
   }
 
   public setUserBranchScope(userId: string, scope: 'ASSIGNED' | 'ALL'): void {
@@ -442,6 +449,7 @@ export class BranchService {
       throw new Error('لا يمكن تقييد النطاق قبل مراجعة جميع الفروع المسندة للمستخدم.');
     }
     this.db.run('UPDATE users SET branch_scope = ? WHERE id = ?', [scope, userId]);
+    AuthorizationService.invalidate(userId);
   }
 
   public updateUserBranchAccess(userId: string, scope: 'ASSIGNED' | 'ALL', branchIds: string[]): void {
@@ -490,6 +498,7 @@ export class BranchService {
       }
       db.run('UPDATE users SET branch_scope = ? WHERE id = ?', [scope, userId]);
     });
+    AuthorizationService.invalidate(userId);
   }
 
   public getBranchStats(): Array<{ branchId: string; branchName: string; totalSales: number; totalOrders: number }> {
