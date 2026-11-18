@@ -167,6 +167,9 @@ async function ensureWorkerInitialized(): Promise<void> {
  */
 async function pushMainToWorker(retainBytes = false): Promise<Uint8Array | null> {
   const db = DatabaseManager.getInstance();
+  // Snapshot the seq synchronously with the export: a mutation landing during
+  // the postMessage await must NOT be marked as synced — the worker never saw it.
+  const seq = db.getMutationSeq();
   const bytes = db.exportDatabaseBytes();
   if (retainBytes) {
     // The import below transfers (detaches) its buffer, which would leave
@@ -175,12 +178,12 @@ async function pushMainToWorker(retainBytes = false): Promise<Uint8Array | null>
     // instead of paying for a second full serialization.
     const workerBytes = bytes.slice();
     await post<void>({ type: 'import', bytes: workerBytes }, [workerBytes.buffer as ArrayBuffer]);
-    lastSyncedSeq = db.getMutationSeq();
+    lastSyncedSeq = seq;
     workerDirty = false;
     return bytes;
   }
   await post<void>({ type: 'import', bytes }, [bytes.buffer as ArrayBuffer]);
-  lastSyncedSeq = db.getMutationSeq();
+  lastSyncedSeq = seq;
   workerDirty = false;
   return null;
 }  

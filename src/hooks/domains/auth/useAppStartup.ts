@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { initializeDatabaseAsync } from '../database/useDatabaseAsync';
+import { prewarmDatabaseWorker } from '../../../database/databaseAsyncService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
@@ -32,6 +33,9 @@ export function useAppStartup() {
   const initDb = () => {
     setInitError(null);
     setRecoveryRequired(false);
+    // Start the worker's sql.js WASM compile in parallel with the main-thread
+    // database init instead of serially inside the first save/export.
+    prewarmDatabaseWorker();
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
