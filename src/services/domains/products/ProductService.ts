@@ -16,6 +16,27 @@ import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
 import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 
+/** Deterministic JSON serialization (sorted keys) for approval payload matching. */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.keys(value as Record<string, unknown>)
+    .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`);
+  return `{${entries.join(',')}}`;
+}
+
+/** Deterministic non-cryptographic hash (FNV-1a) safe to embed in dedupeKey strings. */
+function stableHash(value: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
 export interface ProductQueryOptions {
   brandId?: string;
   grade?: string;
@@ -550,6 +571,7 @@ export class ProductService {
       productName: updates.name ?? existing.name,
       productSku: updates.sku ?? existing.sku,
       productBarcode: updates.barcode ?? existing.barcode,
+      updatePayload: stableStringify(updates),
       costPrice: updates.costPrice ?? existing.costPrice,
       sellingPriceM2: updates.sellingPriceM2 ?? existing.sellingPriceM2,
       sellingPriceBox: updates.sellingPriceBox ?? existing.sellingPriceBox,
@@ -572,8 +594,7 @@ export class ProductService {
           description: `الحقول: ${Object.keys(updates).join('، ')}`,
           details: {
             ...updateMatchDetails,
-            productName: existing.name ?? null,
-            dedupeKey: `update:product:${id}`,
+            dedupeKey: `update:product:${id}:${stableHash(stableStringify(updates))}`,
             policy: updatePolicy,
           },
         });
@@ -604,10 +625,11 @@ export class ProductService {
       pricePolicy = evalResult.policy;
       priceApprovalRequired = evalResult.required;
       if (priceApprovalRequired) {
+        const priceMatchDetails = { productId: id, changes: priceChanges };
         resolvedApprovalId = options.approvalId
-          ?? gate.findApproved('products.price.update', 'PRICE_CHANGE', { productId: id });
+          ?? gate.findApproved('products.price.update', 'PRICE_CHANGE', priceMatchDetails);
         if (options.approvalId) {
-          gate.assertApproved(options.approvalId, 'products.price.update', { productId: id });
+          gate.assertApproved(options.approvalId, 'products.price.update', priceMatchDetails);
         }
         if (!resolvedApprovalId) {
           const productName = existing.name ?? id;
@@ -618,7 +640,7 @@ export class ProductService {
             description: Object.entries(priceChanges).map(([f, c]) => `${f}: ${c.from} → ${c.to}`).join('، '),
             requestedValue: maxPriceDelta,
             currentValue: null,
-            details: { productId: id, changes: priceChanges, dedupeKey: `price:${id}:${JSON.stringify(priceChanges)}`, policy: pricePolicy },
+            details: { productId: id, changes: priceChanges, dedupeKey: `price:${id}:${stableHash(stableStringify(priceChanges))}`, policy: pricePolicy },
           });
           gate.throwRequested(approvalId);
         }

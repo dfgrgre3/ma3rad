@@ -9,6 +9,7 @@ const {
   requirePlatformPermission,
   getScopedTenantIds,
   assertTenantAccess,
+  tenantScopePredicate,
 } = require('../middleware/auth');
 const { nowIso } = require('../lib/time');
 
@@ -22,12 +23,20 @@ router.get(
   async (req, res, next) => {
     try {
       const db = getDb();
+      const scoped = await getScopedTenantIds(req);
+      // LIMITED staff with no assigned tenants get empty aggregates (fail closed).
+      const scope = (column) => {
+        const p = tenantScopePredicate(column, scoped);
+        return p.deny ? { clause: ' AND 1=0', params: [] } : { clause: p.clause, params: p.params };
+      };
+      const tenantScope = scope('id');
+      const tenantIdScope = scope('tenant_id');
       const [tenants, licenses, subscriptions, invoices, payments, releases] = await Promise.all([
-        db.all('SELECT status, COUNT(*) as count FROM platform_tenants GROUP BY status'),
-        db.all('SELECT status, COUNT(*) as count FROM platform_licenses GROUP BY status'),
-        db.all('SELECT status, COUNT(*) as count FROM platform_subscriptions GROUP BY status'),
-        db.all('SELECT status, COUNT(*) as count, SUM(total) as total FROM platform_invoices GROUP BY status'),
-        db.all('SELECT method, COUNT(*) as count, SUM(amount) as total FROM platform_payments GROUP BY method'),
+        db.all(`SELECT status, COUNT(*) as count FROM platform_tenants WHERE 1=1${tenantScope.clause} GROUP BY status`, tenantScope.params),
+        db.all(`SELECT status, COUNT(*) as count FROM platform_licenses WHERE 1=1${tenantIdScope.clause} GROUP BY status`, tenantIdScope.params),
+        db.all(`SELECT status, COUNT(*) as count FROM platform_subscriptions WHERE 1=1${tenantIdScope.clause} GROUP BY status`, tenantIdScope.params),
+        db.all(`SELECT status, COUNT(*) as count, SUM(total) as total FROM platform_invoices WHERE 1=1${tenantIdScope.clause} GROUP BY status`, tenantIdScope.params),
+        db.all(`SELECT method, COUNT(*) as count, SUM(amount) as total FROM platform_payments WHERE 1=1${tenantIdScope.clause} GROUP BY method`, tenantIdScope.params),
         db.all('SELECT channel, status, version, released_at, created_at FROM platform_releases ORDER BY created_at DESC LIMIT 5'),
       ]);
 
@@ -41,26 +50,32 @@ router.get(
         else if (row.status === 'CANCELLED') tenantStats.cancelled = row.count;
       }
 
-      const licenseStats = { total: 0, active: 0, revoked: 0 };
+      const licenseStats = { total: 0, active: 0, revoked: 0, expired: 0, suspended: 0 };
       for (const row of licenses) {
         licenseStats.total += row.count;
-        if (row.status === 'ACTIVE') licenseStats.active = row.count;
-        else if (row.status === 'REVOKED') licenseStats.revoked = row.count;
+        if (row.status === 'ACTIVE' || row.status === 'ISSUED' || row.status === 'TRIAL') licenseStats.active += row.count;
+        else if (row.status === 'REVOKED') licenseStats.revoked += row.count;
+        else if (row.status === 'EXPIRED') licenseStats.expired += row.count;
+        else if (row.status === 'SUSPENDED') licenseStats.suspended += row.count;
       }
 
-      const subscriptionStats = { total: 0, active: 0, cancelled: 0 };
+      const subscriptionStats = { total: 0, active: 0, cancelled: 0, trial: 0, expired: 0, suspended: 0 };
       for (const row of subscriptions) {
         subscriptionStats.total += row.count;
         if (row.status === 'ACTIVE') subscriptionStats.active = row.count;
         else if (row.status === 'CANCELLED') subscriptionStats.cancelled = row.count;
+        else if (row.status === 'TRIAL') subscriptionStats.trial = row.count;
+        else if (row.status === 'EXPIRED') subscriptionStats.expired = row.count;
+        else if (row.status === 'SUSPENDED') subscriptionStats.suspended = row.count;
       }
 
-      const invoiceStats = { total: 0, paid: 0, pending: 0, overdue: 0, revenue: 0 };
+      const invoiceStats = { total: 0, paid: 0, pending: 0, overdue: 0, revenue: 0, draft: 0 };
       for (const row of invoices) {
         invoiceStats.total += row.count || 0;
         if (row.status === 'PAID') { invoiceStats.paid += row.count; invoiceStats.revenue += row.total || 0; }
         else if (row.status === 'SENT' || row.status === 'PARTIAL') invoiceStats.pending += row.count;
         else if (row.status === 'OVERDUE') invoiceStats.overdue += row.count;
+        else if (row.status === 'DRAFT') invoiceStats.draft += row.count;
       }
 
       const paymentStats = { total: 0, byMethod: {} };
@@ -70,40 +85,62 @@ router.get(
       }
 
       // Enhanced overview data for SuperAdminDashboard
-      const [recentTenants, expiringLicenses, expiringSubs, recentPayments, moduleUsage, revenueByPlan, alerts] = await Promise.all([
-        db.all('SELECT * FROM platform_tenants ORDER BY created_at DESC LIMIT 5'),
-        db.all("SELECT * FROM platform_licenses WHERE status = 'ACTIVE' AND expires_at < datetime('now', '+30 days') ORDER BY expires_at ASC LIMIT 5"),
-        db.all("SELECT * FROM platform_subscriptions WHERE status = 'ACTIVE' AND end_date < datetime('now', '+30 days') ORDER BY end_date ASC LIMIT 5"),
-        db.all('SELECT * FROM platform_payments ORDER BY created_at DESC LIMIT 5'),
+      const revenueScope = scope('s.tenant_id');
+      const [recentTenants, expiringLicenses, expiringSubs, recentPayments, moduleUsage, revenueByPlan, alerts, revenueThisMonthRow, mrrRow, expiringTenantsRow] = await Promise.all([
+        db.all(`SELECT * FROM platform_tenants WHERE 1=1${tenantScope.clause} ORDER BY created_at DESC LIMIT 5`, tenantScope.params),
+        db.all(`SELECT * FROM platform_licenses WHERE status = 'ACTIVE' AND expires_at < datetime('now', '+30 days')${tenantIdScope.clause} ORDER BY expires_at ASC LIMIT 5`, tenantIdScope.params),
+        db.all(`SELECT * FROM platform_subscriptions WHERE status = 'ACTIVE' AND end_date < datetime('now', '+30 days')${tenantIdScope.clause} ORDER BY end_date ASC LIMIT 5`, tenantIdScope.params),
+        db.all(`SELECT * FROM platform_payments WHERE 1=1${tenantIdScope.clause} ORDER BY created_at DESC LIMIT 5`, tenantIdScope.params),
         db.all('SELECT module_code, COUNT(*) as licenseCount FROM platform_plan_modules GROUP BY module_code'),
-        db.all("SELECT p.name as planName, SUM(s.price) as revenue, COUNT(*) as tenants FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' GROUP BY p.name"),
+        db.all(`SELECT p.name as planName, SUM(s.price) as revenue, COUNT(*) as tenants FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE'${revenueScope.clause} GROUP BY p.name`, revenueScope.params),
         db.all("SELECT * FROM platform_emergency_events WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 10"),
+        db.get(`SELECT COALESCE(SUM(amount), 0) AS total FROM platform_payments WHERE substr(paid_at, 1, 7) = strftime('%Y-%m', 'now')${tenantIdScope.clause}`, tenantIdScope.params),
+        db.get(`SELECT COALESCE(SUM(CASE s.billing_cycle
+            WHEN 'MONTHLY' THEN s.price
+            WHEN 'QUARTERLY' THEN s.price / 3.0
+            WHEN 'YEARLY' THEN s.price / 12.0
+            ELSE 0 END), 0) AS mrr
+          FROM platform_subscriptions s
+          WHERE s.status = 'ACTIVE'${revenueScope.clause}`, revenueScope.params),
+        db.get(`SELECT COUNT(*) AS c FROM platform_tenants WHERE subscription_expires_at IS NOT NULL AND subscription_expires_at < datetime('now', '+30 days') AND subscription_expires_at > datetime('now')${tenantScope.clause}`, tenantScope.params),
       ]);
+
+      // Emergency events may name affected tenants — limited-scope staff only
+      // see events that affect their tenants (or platform-wide events).
+      const visibleAlerts = Array.isArray(scoped)
+        ? alerts.filter((a) => {
+            let affected = [];
+            try { affected = JSON.parse(a.affected_tenants || '[]'); } catch { affected = []; }
+            if (!Array.isArray(affected) || affected.length === 0) return true;
+            const allowed = new Set(scoped.map(String));
+            return affected.some((t) => allowed.has(String(t)));
+          })
+        : alerts;
 
       const billing = {
         revenueTotal: invoiceStats.revenue,
-        revenueThisMonth: 0,
+        revenueThisMonth: Number(revenueThisMonthRow?.total) || 0,
         invoicedTotal: invoiceStats.total,
         outstanding: invoiceStats.pending,
         overdueInvoices: invoiceStats.overdue,
-        mrr: subscriptionStats.active * 100, // simplified
+        mrr: Number(mrrRow?.mrr) || 0,
         invoicesTotal: invoiceStats.total,
         paidInvoices: invoiceStats.paid,
-        draftInvoices: 0,
+        draftInvoices: invoiceStats.draft,
       };
 
       res.json({
         data: {
-          tenants: { ...tenantStats, expiringSoon: 0 },
-          licenses: { ...licenseStats, expiringSoon: expiringLicenses.length, expired: 0, suspended: 0 },
-          subscriptions: { ...subscriptionStats, trial: 0, expired: 0, expiringSoon: expiringSubs.length },
+          tenants: { ...tenantStats, expiringSoon: Number(expiringTenantsRow?.c) || 0 },
+          licenses: { ...licenseStats, expiringSoon: expiringLicenses.length, expired: licenseStats.expired, suspended: licenseStats.suspended },
+          subscriptions: { ...subscriptionStats, trial: subscriptionStats.trial, expired: subscriptionStats.expired, expiringSoon: expiringSubs.length },
           billing,
           devices: { boundLicenses: licenseStats.active, unboundLicenses: 0, devicesLimit: 0 },
           branches: { totalLimit: 0, installationBranches: 0 },
           releases,
           moduleUsage: moduleUsage.map(m => ({ moduleCode: m.module_code, licenseCount: m.licenseCount })),
           revenueByPlan,
-          alerts: alerts.map(a => ({ id: a.id, type: a.event_type, message: a.title, severity: a.severity, createdAt: a.created_at })),
+          alerts: visibleAlerts.map(a => ({ id: a.id, type: a.event_type, message: a.title, severity: a.severity, createdAt: a.created_at })),
           recentTenants,
           expiringLicenses,
           expiringSubscriptions: expiringSubs,
@@ -115,7 +152,7 @@ router.get(
           subscriptionMetrics: {},
           licenseMetrics: {},
           operationsMetrics: {},
-          alertDetails: alerts,
+          alertDetails: visibleAlerts,
           generatedAt: nowIso(),
         },
         requestId: req.requestId,
@@ -575,6 +612,50 @@ router.delete(
         ipAddress: req.ip,
       });
       res.json({ data: { revoked: true }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── Signing Keys ───────────────────────────────────────────────────────────
+router.get(
+  '/admin/security/signing-keys',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.security.view', 'platform.security.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { getKeyId } = require('../lib/signing');
+      const keys = await db.all(
+        'SELECT id, key_id AS keyId, is_active AS isActive, created_at AS createdAt, expires_at AS expiresAt FROM platform_signing_keys ORDER BY created_at DESC'
+      );
+      res.json({ data: { keys, currentKeyId: getKeyId() }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/admin/security/signing-keys/rotate',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.security.update', 'platform.security.manage']),
+  async (req, res, next) => {
+    try {
+      const { rotateSigningKey, getKeyId } = require('../lib/signing');
+      const rotated = await rotateSigningKey();
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        action: 'SIGNING_KEY_ROTATED',
+        resourceType: 'platform_signing_keys',
+        resourceId: rotated.keyId,
+        afterData: { keyId: rotated.keyId, publicKey: rotated.publicKey },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ data: { keyId: rotated.keyId, currentKeyId: getKeyId() }, requestId: req.requestId });
     } catch (err) {
       next(err);
     }

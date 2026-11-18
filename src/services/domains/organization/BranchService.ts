@@ -300,6 +300,11 @@ export class BranchService {
       }
     }
 
+    const previousUserIds = this.db.query<{ userId: string }>(
+      'SELECT DISTINCT user_id AS userId FROM users_branches WHERE branch_id = ?',
+      [branchId]
+    ).map((row) => row.userId);
+
     this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run('DELETE FROM users_branches WHERE branch_id = ?', [branchId]);
       for (const userId of selectedIds) {
@@ -309,8 +314,9 @@ export class BranchService {
         );
       }
     });
-    // Invalidate authorization cache for affected users
-    for (const userId of selectedIds) {
+    // Invalidate authorization cache for everyone affected — both newly
+    // assigned users and users removed from this branch.
+    for (const userId of new Set([...previousUserIds, ...selectedIds])) {
       AuthorizationService.invalidate(userId);
     }
   }

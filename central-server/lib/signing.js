@@ -35,6 +35,39 @@ async function initSigningKeys() {
   console.log('Public key (base64):', currentVerifyingKey.toString('base64'));
 }
 
+/**
+ * Rotates the active Ed25519 signing key: deactivates the current key and
+ * installs a freshly generated pair. Previous keys stay in the table
+ * (is_active = 0) so historical certificates remain auditable.
+ */
+async function rotateSigningKey() {
+  const db = getDb();
+  const keyPair = ed25519.generateKeyPair();
+  const newKeyId = `key_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+  const now = new Date().toISOString();
+
+  await db.run('BEGIN TRANSACTION');
+  try {
+    await db.run(
+      'UPDATE platform_signing_keys SET is_active = 0, expires_at = ? WHERE is_active = 1',
+      [now]
+    );
+    await db.run(
+      'INSERT INTO platform_signing_keys (id, key_id, private_key, public_key, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+      [newKeyId, newKeyId, keyPair.privateKey.toString('base64'), keyPair.publicKey.toString('base64'), now]
+    );
+    await db.exec('COMMIT');
+  } catch (err) {
+    await db.exec('ROLLBACK');
+    throw err;
+  }
+
+  currentKeyId = newKeyId;
+  currentSigningKey = keyPair.privateKey;
+  currentVerifyingKey = keyPair.publicKey;
+  return { keyId: newKeyId, publicKey: keyPair.publicKey.toString('base64') };
+}
+
 function getVerifyingKey() {
   return currentVerifyingKey;
 }
@@ -75,6 +108,7 @@ function generateActivationCode() {
 
 module.exports = {
   initSigningKeys,
+  rotateSigningKey,
   getVerifyingKey,
   getKeyId,
   signString,

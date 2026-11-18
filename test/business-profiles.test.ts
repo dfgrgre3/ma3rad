@@ -76,30 +76,25 @@ test('activation bypass is disabled unless a local build flavor is injected', ()
 
 test('all catalog activities resolve to validated shared profile templates', () => {
   assert.equal(BUSINESS_PROFILES.length, 25);
-  assert.equal(BUSINESS_ACTIVITY_CATALOG.length, 149);
+  assert.equal(BUSINESS_ACTIVITY_CATALOG.length, 25);
   assert.equal(new Set(BUSINESS_ACTIVITY_CATALOG.map((activity) => activity.id)).size, BUSINESS_ACTIVITY_CATALOG.length);
   assert.equal(new Set(BUSINESS_TYPES.map((activity) => activity.id)).size, BUSINESS_TYPES.length);
-  assert.equal(BUSINESS_ACTIVITY_FAMILY_OPTIONS.length, 14);
+  assert.equal(BUSINESS_ACTIVITY_FAMILY_OPTIONS.length, 9);
   assert.deepEqual(
     Object.fromEntries(BUSINESS_ACTIVITY_FAMILY_OPTIONS.map((family) => [
       family.id,
       BUSINESS_ACTIVITY_CATALOG.filter((activity) => activity.familyId === family.id).length,
     ])),
     {
-      retail: 20,
-      distribution: 11,
-      manufacturing: 13,
-      construction: 10,
-      transport: 11,
-      hospitality: 10,
-      healthcare: 11,
-      education: 8,
-      professional_services: 17,
-      beauty_sports: 9,
-      tourism_events: 8,
-      finance: 8,
-      nonprofit: 7,
-      agriculture: 6,
+      retail: 13,
+      distribution: 2,
+      manufacturing: 1,
+      construction: 1,
+      transport: 1,
+      hospitality: 2,
+      healthcare: 1,
+      education: 1,
+      professional_services: 3,
     },
   );
   for (const activity of BUSINESS_ACTIVITY_CATALOG) {
@@ -441,9 +436,9 @@ test('business terminology resolves Arabic organization overrides before profile
     language: 'ar',
   }), 'الخدمات');
   assert.equal(resolveBusinessTerm(key, {
-    businessType: 'ceramics_distribution',
+    businessType: 'removed_activity',
     language: 'ar',
-  }), 'الأصناف');
+  }), 'المنتجات');
   assert.equal(resolveBusinessTerm(key, {
     businessType: 'ceramics',
     language: 'ar',

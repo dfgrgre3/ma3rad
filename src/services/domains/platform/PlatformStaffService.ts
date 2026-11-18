@@ -8,6 +8,7 @@ import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { deletePlatformStaffTwoFactorRow, platformStaffTwoFactorAuth } from '../auth/twoFactorAuth';
 import { PlatformAuthorizationService, PLATFORM_ROLE_DEFINITIONS, PLATFORM_PERMISSION_SECTIONS_FOR_UI as PLATFORM_PERMISSION_SECTIONS } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
+import { platformAdminApiClient } from './PlatformAdminApiClient';
 import type {
   PlatformStaff,
   PlatformStaffInput,
@@ -817,36 +818,58 @@ export class PlatformStaffService {
     return rows.map(this.mapSigningKey);
   }
 
-  public rotatePlatformSigningKey(keyAlias: string): PlatformSigningKey {
+  public async rotatePlatformSigningKey(keyAlias: string): Promise<PlatformSigningKey> {
     PlatformStaffService.requirePlatformAccess('security', 'platform.security.keys');
 
-    const existing = this.db.query<any>('SELECT * FROM platform_signing_keys WHERE alias = ?', [keyAlias])[0];
+    // In central mode the authoritative Ed25519 key lives on the central
+    // server — rotate it there instead of only touching local metadata.
+    if (this.setting('platform.dataSource', 'local') === 'central') {
+      if (!platformAdminApiClient.isAvailable()) {
+        throw new Error('مصدر البيانات مركزي لكن جسر الاتصال بالسيرفر المركزي غير متاح.');
+      }
+      const rotated = await platformAdminApiClient.rotateCentralSigningKey();
+      const now = nowIso();
+      this.audit('تدوير مفتاح توقيع مركزي', 'SIGNING_KEY', rotated.keyId, { keyAlias, keyId: rotated.keyId });
+      return {
+        id: rotated.keyId,
+        alias: keyAlias,
+        keyAlias,
+        algorithm: 'Ed25519',
+        version: 1,
+        status: 'ACTIVE',
+        isCurrent: true,
+        createdAt: now,
+      };
+    }
+
+    const existing = this.db.query<any>(
+      `SELECT * FROM platform_signing_keys WHERE key_alias = ? ORDER BY version DESC LIMIT 1`,
+      [keyAlias]
+    )[0];
     const now = nowIso();
+    const nextVersion = existing ? toNumber(existing.version, 1) + 1 : 1;
 
-    // Generate Ed25519 key pair using crypto
-    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
-    const privateKeyHex = privateKey.export({ type: 'pkcs8', format: 'der' }).toString('hex');
-    const publicKeyHex = publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
-    const fingerprint = `sha256:${crypto.createHash('sha256').update(publicKeyHex).digest('hex').substring(0, 32)}`;
-
-    if (existing) {
-      this.db.run(
-        'UPDATE platform_signing_keys SET private_key = ?, public_key = ?, fingerprint = ?, rotated_at = ?, is_current = 1, updated_at = ? WHERE id = ?',
-        [privateKeyHex, publicKeyHex, fingerprint, now, now, existing.id]
-      );
-      this.db.run('UPDATE platform_signing_keys SET is_current = 0 WHERE alias = ? AND id <> ?', [keyAlias, existing.id]);
-    } else {
+    this.db.executeTransaction(() => {
+      if (existing) {
+        this.db.run(
+          `UPDATE platform_signing_keys SET status = 'ROTATED', rotated_at = ? WHERE key_alias = ? AND status = 'ACTIVE'`,
+          [now, keyAlias]
+        );
+      }
       const id = `sk_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       this.db.run(
-        `INSERT INTO platform_signing_keys (id, alias, private_key, public_key, fingerprint, is_current, rotated_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-        [id, keyAlias, privateKeyHex, publicKeyHex, fingerprint, now, now, now]
+        `INSERT INTO platform_signing_keys (id, key_alias, algorithm, version, status, rotated_at, created_at)
+         VALUES (?, ?, 'Ed25519', ?, 'ACTIVE', ?, ?)`,
+        [id, keyAlias, nextVersion, existing ? now : null, now]
       );
-    }
+    });
 
     this.audit('تدوير مفتاح توقيع', 'SIGNING_KEY', null, { keyAlias });
 
-    const updated = this.db.query<any>('SELECT * FROM platform_signing_keys WHERE alias = ? AND is_current = 1', [keyAlias])[0];
+    const updated = this.db.query<any>(
+      `SELECT * FROM platform_signing_keys WHERE key_alias = ? AND status = 'ACTIVE' ORDER BY version DESC LIMIT 1`,
+      [keyAlias]
+    )[0];
     return this.mapSigningKey(updated);
   }
 
@@ -1104,7 +1127,7 @@ export class PlatformStaffService {
   private mapSigningKey(row: any): PlatformSigningKey {
     return {
       id: String(row.id),
-      alias: String(row.alias),
+      alias: String(row.key_alias ?? row.alias ?? ''),
       keyAlias: row.key_alias ?? row.alias,
       privateKey: row.private_key ?? null,
       publicKey: row.public_key ?? null,
@@ -1222,19 +1245,30 @@ export class PlatformStaffService {
     const activeSessions = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_staff_sessions WHERE expires_at > datetime(\'now\')')[0]?.c ?? 0;
     const trustedDevices = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_trusted_devices')[0]?.c ?? 0;
     const signingKeys = this.listPlatformSigningKeys();
+    const failedLogins24h = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_staff_logins WHERE success = 0 AND created_at > datetime(\'now\', \'-24 hours\')')[0]?.c ?? 0;
+    const openIncidents = incidents.filter((i) => i.status === 'OPEN').length;
+
+    // Heuristic score: MFA coverage dominates, then failed logins and open incidents.
+    let securityScore = 100;
+    if (mfaCompliance.total > 0) {
+      securityScore -= Math.round((1 - mfaCompliance.enabled / mfaCompliance.total) * 30);
+    }
+    securityScore -= Math.min(20, toNumber(failedLogins24h, 0) * 2);
+    securityScore -= Math.min(30, openIncidents * 10);
+    securityScore = Math.max(0, Math.min(100, securityScore));
 
     return {
-      securityScore: 100,
+      securityScore,
       twoFactorEnforcement: {
         enabled: true,
         compliantStaffCount: mfaCompliance.enabled,
         totalStaffCount: mfaCompliance.total,
       },
       activeStaffSessionsCount: toNumber(activeSessions, 0),
-      failedLogins24hCount: this.db.query<any>('SELECT COUNT(*) AS c FROM platform_staff_logins WHERE success = 0 AND created_at > datetime(\'now\', \'-24 hours\')')[0]?.c ?? 0,
-      activeIncidentsCount: incidents.filter(i => i.status === 'OPEN').length,
+      failedLogins24hCount: toNumber(failedLogins24h, 0),
+      activeIncidentsCount: openIncidents,
       signingKeysCount: signingKeys.length,
-      trustedDevicesCount: toNumber(signingKeys.length, 0),
+      trustedDevicesCount: toNumber(trustedDevices, 0),
       sessions: this.listStaffSessions().slice(0, 50),
       recentLogins: recentLogins.slice(0, 50),
       incidents: incidents.slice(0, 50),

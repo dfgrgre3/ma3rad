@@ -313,8 +313,24 @@ router.post(
         return res.status(400).json({ error: 'Cannot set status to PAID without recording a payment. Use /payments endpoint instead.' });
       }
 
-      const now = nowIso();
+      // Manual status changes must stay consistent with recorded payments and
+      // must not resurrect terminal invoices.
+      if (invoice.status === 'VOID' || invoice.status === 'PAID') {
+        return res.status(409).json({ error: 'Cannot change the status of a VOID or PAID invoice' });
+      }
       const paidAmount = Number(invoice.paid_amount) || 0;
+      const derived = deriveInvoiceStatus(invoice, paidAmount);
+      const allowedTargets = paidAmount > 0
+        ? new Set([derived, 'OVERDUE'])
+        : new Set(['DRAFT', 'SENT', 'OVERDUE']);
+      if (!allowedTargets.has(status)) {
+        return res.status(409).json({ error: `Status ${status} is inconsistent with the recorded payments` });
+      }
+      if (status === 'PARTIAL' && paidAmount <= 0) {
+        return res.status(409).json({ error: 'Cannot mark an invoice PARTIAL without recorded payments' });
+      }
+
+      const now = nowIso();
       await db.run(
         'UPDATE platform_invoices SET status = ?, paid_amount = ?, updated_at = ? WHERE id = ?',
         [status, paidAmount, now, req.params.id]
@@ -353,15 +369,24 @@ router.post(
       if (Array.isArray(scoped) && !scoped.includes(String(invoice.tenant_id))) {
         return res.status(403).json({ error: 'Tenant is outside your data scope' });
       }
-      if ((Number(invoice.paid_amount) || 0) > 0) {
-        return res.status(409).json({ error: 'Cannot void an invoice that already has payments' });
+      await db.run('BEGIN TRANSACTION');
+      try {
+        // Re-read inside the transaction so a concurrent payment cannot slip in.
+        const fresh = await db.get('SELECT paid_amount FROM platform_invoices WHERE id = ?', [req.params.id]);
+        if (!fresh || (Number(fresh.paid_amount) || 0) > 0) {
+          await db.exec('ROLLBACK');
+          return res.status(409).json({ error: 'Cannot void an invoice that already has payments' });
+        }
+        await db.run('UPDATE platform_invoices SET status = ?, updated_at = ? WHERE id = ?', [
+          'VOID',
+          nowIso(),
+          req.params.id,
+        ]);
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
       }
-
-      await db.run('UPDATE platform_invoices SET status = ?, updated_at = ? WHERE id = ?', [
-        'VOID',
-        nowIso(),
-        req.params.id,
-      ]);
 
       await recordAuditEvent({
         actorId: req.platformUser?.id,
@@ -459,23 +484,42 @@ router.post(
 
       await db.run('BEGIN TRANSACTION');
       try {
+        // The INSERT acquires the write lock first, so the invoice re-read
+        // below sees a consistent snapshot and concurrent payments serialize.
         await db.run(
           `INSERT INTO platform_payments (id, invoice_id, tenant_id, amount, method, reference, notes, paid_at, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [paymentId, invoiceId ?? null, tenantId, amount, method || 'CASH', reference ?? null, notes ?? null, paidAt || now, now]
         );
 
-        if (invoice) {
-          const paidAmount = round2((Number(invoice.paid_amount) || 0) + amount);
+        if (invoiceId) {
+          const fresh = await db.get('SELECT * FROM platform_invoices WHERE id = ? AND tenant_id = ?', [invoiceId, tenantId]);
+          if (!fresh) {
+            const e = new Error('INVOICE_NOT_FOUND'); e.billingStatus = 404; throw e;
+          }
+          if (fresh.status === 'VOID') {
+            const e = new Error('Cannot record a payment on a VOID invoice'); e.billingStatus = 409; throw e;
+          }
+          const total = Number(fresh.total) || 0;
+          const paid = Number(fresh.paid_amount) || 0;
+          const remaining = round2(total - paid);
+          if (total > 0 && amount - remaining > 0.0001) {
+            const e = new Error(`Payment amount exceeds the invoice balance (remaining: ${remaining})`);
+            e.billingStatus = 409; throw e;
+          }
+          const paidAmount = round2(paid + amount);
           await db.run(
             'UPDATE platform_invoices SET paid_amount = ?, status = ?, updated_at = ? WHERE id = ?',
-            [paidAmount, deriveInvoiceStatus(invoice, paidAmount), now, invoice.id]
+            [paidAmount, deriveInvoiceStatus(fresh, paidAmount), now, fresh.id]
           );
         }
 
         await db.exec('COMMIT');
       } catch (err) {
         await db.exec('ROLLBACK');
+        if (err && err.billingStatus) {
+          return res.status(err.billingStatus).json({ error: err.message });
+        }
         throw err;
       }
 
@@ -524,7 +568,11 @@ router.delete(
       const now = nowIso();
       await db.run('BEGIN TRANSACTION');
       try {
-        await db.run('DELETE FROM platform_payments WHERE id = ?', [req.params.id]);
+        const del = await db.run('DELETE FROM platform_payments WHERE id = ?', [req.params.id]);
+        if (!del || Number(del.changes) === 0) {
+          await db.exec('ROLLBACK');
+          return res.status(404).json({ error: 'Payment not found' });
+        }
 
         if (payment.invoice_id) {
           const invoice = await db.get('SELECT * FROM platform_invoices WHERE id = ?', [payment.invoice_id]);

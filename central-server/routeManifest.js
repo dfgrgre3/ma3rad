@@ -420,6 +420,12 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/security/api-keys/:id', ['DELETE'], {
     DELETE: ['platform.security.delete', 'platform.security.manage'],
   }),
+  route('/api/v1/admin/security/signing-keys', ['GET'], {
+    GET: ['platform.security.view', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/security/signing-keys/rotate', ['POST'], {
+    POST: ['platform.security.update', 'platform.security.manage'],
+  }),
   route('/api/v1/admin/analytics/events', ['GET'], {
     GET: ['platform.analytics.view', 'platform.analytics.manage'],
   }),

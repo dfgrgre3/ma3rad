@@ -159,10 +159,10 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   };
 
   // Rotate Signing Key
-  const handleRotateKey = (keyAlias: string) => {
+  const handleRotateKey = async (keyAlias: string) => {
     if (!confirm(`هل أنت متأكد من تدوير مفتاح التوقيع (${keyAlias})؟`)) return;
     try {
-      platformAdminService.rotatePlatformSigningKey(keyAlias);
+      await platformAdminService.rotatePlatformSigningKey(keyAlias);
       loadSecurity();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذر تدوير المفتاح.');

@@ -942,7 +942,7 @@ export class PlatformAdminService {
     const overview = platformStaffService.getPlatformSecurityOverview ? platformStaffService.getPlatformSecurityOverview() : null;
     if (overview) return overview;
     return {
-      securityScore: 100,
+      securityScore: 0,
       twoFactorEnforcement: { enabled: false, compliantStaffCount: 0, totalStaffCount: 0 },
       activeStaffSessionsCount: 0,
       failedLogins24hCount: 0,
@@ -1010,7 +1010,7 @@ export class PlatformAdminService {
     return platformStaffService.listPlatformSigningKeys();
   }
 
-  public rotatePlatformSigningKey(keyAlias: string): PlatformSigningKey {
+  public rotatePlatformSigningKey(keyAlias: string): Promise<PlatformSigningKey> {
     return platformStaffService.rotatePlatformSigningKey(keyAlias);
   }
 

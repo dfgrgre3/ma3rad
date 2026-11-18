@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
@@ -165,48 +166,52 @@ export class PlatformSubscriptionService {
     const start = new Date(input.startDate ?? now);
     const end = input.endDate ? new Date(input.endDate) : addMonths(start, 12);
 
-    this.db.run(
-      `INSERT INTO platform_subscriptions
-        (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
-      [
-        id, input.tenantId, input.planId,
-        input.status ?? 'ACTIVE',
-        start.toISOString(), end.toISOString(),
-        toNumber(input.seats, plan.seatsLimit),
-        toNumber(input.price, plan.price),
-        plan.billingCycle,
-        toNumber(input.branchesLimit, plan.branchesLimit),
-      ]
-    );
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `INSERT INTO platform_subscriptions
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
+        [
+          id, input.tenantId, input.planId,
+          input.status ?? 'ACTIVE',
+          start.toISOString(), end.toISOString(),
+          toNumber(input.seats, plan.seatsLimit),
+          toNumber(input.price, plan.price),
+          plan.billingCycle,
+          toNumber(input.branchesLimit, plan.branchesLimit),
+        ]
+      );
 
-    // Create license
-    const licenseId = `lic_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const licenseKey = this.generateLicenseKey();
-    const activationCode = generateLicenseActivationCode();
-    const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: end.toISOString(), deviceLimit: toNumber(plan.devicesLimit, 1), seats: toNumber(input.seats, plan.seatsLimit) });
+      // Create license
+      const licenseId = `lic_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      const licenseKey = this.generateLicenseKey();
+      const activationCode = generateLicenseActivationCode();
+      const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: end.toISOString(), deviceLimit: toNumber(plan.devicesLimit, 1), seats: toNumber(input.seats, plan.seatsLimit) });
 
-    this.db.run(
-      `INSERT INTO platform_licenses
-        (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
-         seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        licenseId, input.tenantId, id, input.planId, licenseKey,
-        'ACTIVE', start.toISOString(), start.toISOString(), end.toISOString(),
-        toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
-        JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
-        toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'اشتراك جديد',
-      ]
-    );
+      this.db.run(
+        `INSERT INTO platform_licenses
+          (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
+           seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          licenseId, input.tenantId, id, input.planId, licenseKey,
+          'ACTIVE', start.toISOString(), start.toISOString(), end.toISOString(),
+          toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
+          JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
+          toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'اشتراك جديد',
+        ]
+      );
 
-    // Update tenant
-    this.db.run(
-      `UPDATE platform_tenants SET plan_id = ?, subscription_started_at = ?, subscription_expires_at = ?,
-         seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
-       WHERE id = ?`,
-      [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
-    );
+      // Update tenant
+      this.db.run(
+        `UPDATE platform_tenants SET plan_id = ?, subscription_started_at = ?, subscription_expires_at = ?,
+           seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
+         WHERE id = ?`,
+        [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
+      );
+    });
+
+
 
     this.audit('إنشاء اشتراك', 'SUBSCRIPTION', id, { tenantId: input.tenantId, planId: input.planId });
 
@@ -230,47 +235,51 @@ export class PlatformSubscriptionService {
     const start = new Date();
     const end = addMonths(start, plan.trialDays);
 
-    this.db.run(
-      `INSERT INTO platform_subscriptions
-        (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-       VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, 1, ?)`,
-      [
-        id, input.tenantId, input.planId,
-        start.toISOString(), end.toISOString(),
-        toNumber(input.seats, plan.seatsLimit),
-        0, // trial price
-        plan.billingCycle,
-        toNumber(input.branchesLimit, plan.branchesLimit),
-      ]
-    );
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `INSERT INTO platform_subscriptions
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
+         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, 1, ?)`,
+        [
+          id, input.tenantId, input.planId,
+          start.toISOString(), end.toISOString(),
+          toNumber(input.seats, plan.seatsLimit),
+          0, // trial price
+          plan.billingCycle,
+          toNumber(input.branchesLimit, plan.branchesLimit),
+        ]
+      );
 
-    // Create trial license
-    const licenseId = `lic_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const licenseKey = this.generateLicenseKey();
-    const activationCode = generateLicenseActivationCode();
-    const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: end.toISOString(), deviceLimit: toNumber(plan.devicesLimit, 1), seats: toNumber(input.seats, plan.seatsLimit) });
+      // Create trial license
+      const licenseId = `lic_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      const licenseKey = this.generateLicenseKey();
+      const activationCode = generateLicenseActivationCode();
+      const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: end.toISOString(), deviceLimit: toNumber(plan.devicesLimit, 1), seats: toNumber(input.seats, plan.seatsLimit) });
 
-    this.db.run(
-      `INSERT INTO platform_licenses
-        (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
-         seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes)
-       VALUES (?, ?, ?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        licenseId, input.tenantId, id, input.planId, licenseKey,
-        start.toISOString(), start.toISOString(), end.toISOString(),
-        toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
-        JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
-        toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'تجريبي',
-      ]
-    );
+      this.db.run(
+        `INSERT INTO platform_licenses
+          (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
+           seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes)
+         VALUES (?, ?, ?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          licenseId, input.tenantId, id, input.planId, licenseKey,
+          start.toISOString(), start.toISOString(), end.toISOString(),
+          toNumber(input.seats, plan.seatsLimit), toNumber(plan.devicesLimit, 1), toNumber(input.branchesLimit, plan.branchesLimit),
+          JSON.stringify(plan.includedModules), JSON.stringify(plan.features), activationCode, JSON.stringify(certificate),
+          toNumber(plan.offlineGracePeriodDays, 14), 'FULL', 'تجريبي',
+        ]
+      );
 
-    // Update tenant
-    this.db.run(
-      `UPDATE platform_tenants SET plan_id = ?, subscription_started_at = ?, subscription_expires_at = ?,
-         seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
-       WHERE id = ?`,
-      [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
-    );
+      // Update tenant
+      this.db.run(
+        `UPDATE platform_tenants SET plan_id = ?, subscription_started_at = ?, subscription_expires_at = ?,
+           seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
+         WHERE id = ?`,
+        [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
+      );
+    });
+
+
 
     this.audit('إنشاء اشتراك تجريبي', 'SUBSCRIPTION', id, { tenantId: input.tenantId, planId: input.planId });
 
@@ -701,13 +710,11 @@ export class PlatformSubscriptionService {
   }
 
   private generateLicenseKey(): string {
-    const segments = [];
-    for (let i = 0; i < 4; i++) {
-      const bytes = crypto.randomBytes(2);
-      const value = bytes.readUInt16BE(0);
-      segments.push((value % 10000).toString().padStart(4, '0'));
-    }
-    return `CS-${segments.join('-')}`;
+    // 128-bit key. randomBytes works in both Node (Buffer) and the browser
+    // bundle (Uint8Array from the crypto shim), so index bytes directly.
+    const bytes = randomBytes(16);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    return `CS-${hex.slice(0, 8)}-${hex.slice(8, 16)}-${hex.slice(16, 24)}-${hex.slice(24, 32)}`;
   }
 
   private enqueueTenantOutboxEvent(tenantId: string, eventType: string, payload: unknown): void {

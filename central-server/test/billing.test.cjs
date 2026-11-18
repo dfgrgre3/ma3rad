@@ -174,6 +174,81 @@ test('central payments update paid amounts and reverse them on deletion', async 
   assert.equal(blockedVoid.status, 409);
 });
 
+test('payments cannot exceed the invoice balance and status stays consistent', async () => {
+  const tenantId = await createTenant('Billing Guard', 'BILLGUARD');
+  const created = await api(server.base, '/api/v1/admin/billing/invoices', {
+    method: 'POST', token,
+    body: invoiceBody(tenantId, 'INV-GUARD-1', [{ description: 'License', quantity: 1, unitPrice: 300 }], {
+      status: 'SENT',
+    }),
+  });
+  assert.equal(created.status, 201, created.text);
+  const invoiceId = created.body.data.id;
+
+  // Overpayment must be rejected and leave paid_amount untouched.
+  const overpay = await api(server.base, '/api/v1/admin/billing/payments', {
+    method: 'POST', token, body: { tenantId, invoiceId, amount: 500, method: 'CASH' },
+  });
+  assert.equal(overpay.status, 409, overpay.text);
+  let refreshed = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}`, { token });
+  assert.equal(refreshed.body.data.paidAmount, 0);
+  assert.equal(refreshed.body.data.status, 'SENT');
+
+  const partial = await api(server.base, '/api/v1/admin/billing/payments', {
+    method: 'POST', token, body: { tenantId, invoiceId, amount: 100, method: 'CASH' },
+  });
+  assert.equal(partial.status, 201, partial.text);
+  refreshed = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}`, { token });
+  assert.equal(refreshed.body.data.status, 'PARTIAL');
+
+  // A partially paid invoice cannot be pushed back to SENT.
+  const badTransition = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}/status`, {
+    method: 'POST', token, body: { status: 'SENT' },
+  });
+  assert.equal(badTransition.status, 409);
+
+  // Paying the remaining balance succeeds; a further payment is rejected.
+  const remainder = await api(server.base, '/api/v1/admin/billing/payments', {
+    method: 'POST', token, body: { tenantId, invoiceId, amount: 200, method: 'BANK' },
+  });
+  assert.equal(remainder.status, 201, remainder.text);
+  refreshed = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}`, { token });
+  assert.equal(refreshed.body.data.status, 'PAID');
+  assert.equal(refreshed.body.data.paidAmount, 300);
+
+  const extra = await api(server.base, '/api/v1/admin/billing/payments', {
+    method: 'POST', token, body: { tenantId, invoiceId, amount: 1, method: 'CASH' },
+  });
+  assert.equal(extra.status, 409);
+
+  // A PAID invoice cannot be voided or have its status changed manually.
+  const voidPaid = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}/void`, {
+    method: 'POST', token,
+  });
+  assert.equal(voidPaid.status, 409);
+  const paidTransition = await api(server.base, `/api/v1/admin/billing/invoices/${invoiceId}/status`, {
+    method: 'POST', token, body: { status: 'OVERDUE' },
+  });
+  assert.equal(paidTransition.status, 409);
+
+  // A VOID invoice rejects new payments.
+  const voidedInvoice = await api(server.base, '/api/v1/admin/billing/invoices', {
+    method: 'POST', token,
+    body: invoiceBody(tenantId, 'INV-GUARD-2', [{ description: 'X', quantity: 1, unitPrice: 50 }], {
+      status: 'SENT',
+    }),
+  });
+  const voidId = voidedInvoice.body.data.id;
+  const voided = await api(server.base, `/api/v1/admin/billing/invoices/${voidId}/void`, {
+    method: 'POST', token,
+  });
+  assert.equal(voided.status, 200, voided.text);
+  const payVoid = await api(server.base, '/api/v1/admin/billing/payments', {
+    method: 'POST', token, body: { tenantId, invoiceId: voidId, amount: 10, method: 'CASH' },
+  });
+  assert.equal(payVoid.status, 409);
+});
+
 test('limited platform staff only sees invoices and payments inside their tenant scope', async () => {
   const allowedTenant = await createTenant('Billing Scoped', 'BILLSCOPED');
   const deniedTenant = await createTenant('Billing Other', 'BILLOTHER');

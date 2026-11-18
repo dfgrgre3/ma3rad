@@ -622,6 +622,11 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                     الشاشات المدعومة تقرأ من السيرفر المركزي
                   </span>
                 )}
+                {dataSource === 'local' && !import.meta.env.DEV && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10.5px] font-bold text-amber-700 border border-amber-200">
+                    تنبيه: في نسخة الإنتاج لا يمكن إصدار التراخيص محلياً — اضبط المصدر على «مركزي» قبل إصدار التراخيص والاشتراكات.
+                  </span>
+                )}
               </div>
             </div>
           </div>

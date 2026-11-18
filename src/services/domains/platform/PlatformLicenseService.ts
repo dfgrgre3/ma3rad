@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
@@ -163,38 +164,42 @@ export class PlatformLicenseService {
     const expires = addMonths(start, months);
 
     const subscriptionId = `sub_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    this.db.run(
-      `INSERT INTO platform_subscriptions
-        (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
-      [subscriptionId, input.tenantId, input.planId, allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), expires.toISOString(),
-       seats, plan.price, plan.billingCycle, branchesLimit]
-    );
-
     const licenseId = `lic_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const licenseKey = this.generateLicenseKey();
-    const activationCode = generateLicenseActivationCode();
-    const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: expires.toISOString(), deviceLimit, seats });
-
-    this.db.run(
-      `INSERT INTO platform_licenses
-        (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
-         seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes, hardware_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [licenseId, input.tenantId, subscriptionId, input.planId, licenseKey,
-       allowLocal ? 'ACTIVE' : 'ISSUED', start.toISOString(), start.toISOString(), expires.toISOString(),
-       seats, deviceLimit, branchesLimit, JSON.stringify(modules), JSON.stringify(features), activationCode, JSON.stringify(certificate),
-       plan.offlineGracePeriodDays, couplingMode, input.notes ?? 'ترخيص جديد', input.hardwareId ?? null]
-    );
-
-    if (allowLocal) {
+    this.db.executeTransaction(() => {
       this.db.run(
-        `UPDATE platform_tenants SET status = 'ACTIVE', plan_id = ?, subscription_started_at = ?,
-           subscription_expires_at = ?, seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
-         WHERE id = ?`,
-        [input.planId, start.toISOString(), expires.toISOString(), seats, branchesLimit, deviceLimit, now, input.tenantId]
+        `INSERT INTO platform_subscriptions
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
+        [subscriptionId, input.tenantId, input.planId, allowLocal ? 'ACTIVE' : 'ACTIVE', start.toISOString(), expires.toISOString(),
+         seats, plan.price, plan.billingCycle, branchesLimit]
       );
-    }
+
+      const licenseKey = this.generateLicenseKey();
+      const activationCode = generateLicenseActivationCode();
+      const certificate = signCertificate({ licenseKey, tenantId: input.tenantId, planId: input.planId, issuedAt: start.toISOString(), expiresAt: expires.toISOString(), deviceLimit, seats });
+
+      this.db.run(
+        `INSERT INTO platform_licenses
+          (id, tenant_id, subscription_id, plan_id, license_key, status, issued_at, starts_at, expires_at,
+           seats, device_limit, branches_limit, modules, features, activation_code, certificate, offline_grace_period_days, coupling_mode, notes, hardware_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [licenseId, input.tenantId, subscriptionId, input.planId, licenseKey,
+         allowLocal ? 'ACTIVE' : 'ISSUED', start.toISOString(), start.toISOString(), expires.toISOString(),
+         seats, deviceLimit, branchesLimit, JSON.stringify(modules), JSON.stringify(features), activationCode, JSON.stringify(certificate),
+         plan.offlineGracePeriodDays, couplingMode, input.notes ?? 'ترخيص جديد', input.hardwareId ?? null]
+      );
+
+      if (allowLocal) {
+        this.db.run(
+          `UPDATE platform_tenants SET status = 'ACTIVE', plan_id = ?, subscription_started_at = ?,
+             subscription_expires_at = ?, seats_limit = ?, branches_limit = ?, devices_limit = ?, updated_at = ?
+           WHERE id = ?`,
+          [input.planId, start.toISOString(), expires.toISOString(), seats, branchesLimit, deviceLimit, now, input.tenantId]
+        );
+      }
+    });
+
+
 
     this.audit('إصدار ترخيص', 'LICENSE', licenseId, { tenantId: input.tenantId, planId: input.planId });
 
@@ -654,13 +659,11 @@ export class PlatformLicenseService {
   }
 
   private generateLicenseKey(): string {
-    const segments = [];
-    for (let i = 0; i < 4; i++) {
-      const bytes = crypto.randomBytes(2);
-      const value = bytes.readUInt16BE(0);
-      segments.push((value % 10000).toString().padStart(4, '0'));
-    }
-    return `CS-${segments.join('-')}`;
+    // 128-bit key. randomBytes works in both Node (Buffer) and the browser
+    // bundle (Uint8Array from the crypto shim), so index bytes directly.
+    const bytes = randomBytes(16);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    return `CS-${hex.slice(0, 8)}-${hex.slice(8, 16)}-${hex.slice(16, 24)}-${hex.slice(24, 32)}`;
   }
 
   private mapLicense(row: any): PlatformLicense {

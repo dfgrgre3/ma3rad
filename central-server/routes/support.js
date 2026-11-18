@@ -35,6 +35,11 @@ function mapTicketRow(row) {
     assigneeName: row.assignee_name ?? null,
     messageCount: row.message_count ?? 0,
     lastMessageAt: row.last_message_at ?? null,
+    remoteAccessRequested: Boolean(row.remote_access_requested),
+    remoteAccessApproved: Boolean(row.remote_access_approved),
+    remoteAccessRequestedAt: row.remote_access_requested_at ?? null,
+    remoteAccessApprovedAt: row.remote_access_approved_at ?? null,
+    remoteAccessDurationMinutes: row.remote_access_duration_minutes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -314,12 +319,34 @@ router.post(
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
       if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
-      const { requested, durationMinutes = 60 } = req.body || {};
+      const { requested, durationMinutes } = req.body || {};
+      const parsedDuration = Number(durationMinutes);
+      const duration = Number.isFinite(parsedDuration) && parsedDuration > 0
+        ? Math.min(480, Math.max(1, Math.round(parsedDuration)))
+        : 60;
       const now = nowIso();
-      await db.run(
-        `UPDATE platform_support_tickets SET remote_access_requested = ?, remote_access_requested_at = ?, updated_at = ? WHERE id = ?`,
-        [requested ? 1 : 0, now, now, ticket.id]
-      );
+      if (requested) {
+        await db.run(
+          `UPDATE platform_support_tickets SET remote_access_requested = 1, remote_access_requested_at = ?,
+             remote_access_duration_minutes = ?, updated_at = ? WHERE id = ?`,
+          [now, duration, now, ticket.id]
+        );
+      } else {
+        // Cancelling the request must revoke any previously granted approval.
+        await db.run(
+          `UPDATE platform_support_tickets SET remote_access_requested = 0, remote_access_requested_at = ?,
+             remote_access_approved = 0, remote_access_approved_at = NULL,
+             remote_access_duration_minutes = NULL, updated_at = ? WHERE id = ?`,
+          [now, now, ticket.id]
+        );
+      }
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: ticket.tenant_id,
+        action: requested ? 'REMOTE_ACCESS_REQUESTED' : 'REMOTE_ACCESS_REQUEST_CANCELLED',
+        resourceType: 'platform_support_tickets', resourceId: ticket.id,
+        afterData: { requested: !!requested, durationMinutes: requested ? duration : null },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
       const updated = await db.get('SELECT * FROM platform_support_tickets WHERE id = ?', [ticket.id]);
       res.json({ data: updated, requestId: req.requestId });
     } catch (err) { next(err); }
@@ -337,11 +364,21 @@ router.post(
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
       if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
       const { approved } = req.body || {};
+      if (approved && !ticket.remote_access_requested) {
+        return res.status(400).json({ error: 'Cannot approve remote access without a pending request' });
+      }
       const now = nowIso();
       await db.run(
         `UPDATE platform_support_tickets SET remote_access_approved = ?, remote_access_approved_at = ?, updated_at = ? WHERE id = ?`,
         [approved ? 1 : 0, now, now, ticket.id]
       );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: ticket.tenant_id,
+        action: approved ? 'REMOTE_ACCESS_APPROVED' : 'REMOTE_ACCESS_APPROVAL_REVOKED',
+        resourceType: 'platform_support_tickets', resourceId: ticket.id,
+        afterData: { approved: !!approved },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
       const updated = await db.get('SELECT * FROM platform_support_tickets WHERE id = ?', [ticket.id]);
       res.json({ data: updated, requestId: req.requestId });
     } catch (err) { next(err); }
@@ -358,17 +395,32 @@ router.post(
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
       if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
-      if (!ticket.remote_access_approved) {
-        return res.status(400).json({ error: 'Remote access must be approved first' });
+      if (!ticket.remote_access_requested || !ticket.remote_access_approved) {
+        return res.status(400).json({ error: 'Remote access requires an approved, still-active request' });
       }
-      const { technicianName, durationMinutes = 60 } = req.body || {};
+      const { technicianName, durationMinutes } = req.body || {};
+      const requestedDuration = Number(ticket.remote_access_duration_minutes);
+      const parsedDuration = Number(durationMinutes);
+      const duration = Number.isFinite(parsedDuration) && parsedDuration > 0
+        ? Math.min(480, Math.max(1, Math.round(parsedDuration)))
+        : (Number.isFinite(requestedDuration) && requestedDuration > 0
+            ? Math.min(480, Math.max(1, Math.round(requestedDuration)))
+            : 60);
       const sessionId = `rs_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
       const now = nowIso();
+      const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
       await db.run(
-        `INSERT INTO platform_remote_sessions (id, ticket_id, tenant_id, staff_id, technician_name, status, started_at, duration_minutes)
-         VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`,
-        [sessionId, ticket.id, ticket.tenant_id, req.platformUser?.id || null, technicianName || 'Unknown', now, durationMinutes]
+        `INSERT INTO platform_remote_sessions (id, ticket_id, tenant_id, staff_id, technician_name, status, started_at, duration_minutes, expires_at)
+         VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
+        [sessionId, ticket.id, ticket.tenant_id, req.platformUser?.id || null, technicianName || 'Unknown', now, duration, expiresAt]
       );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: ticket.tenant_id,
+        action: 'REMOTE_SESSION_STARTED',
+        resourceType: 'platform_remote_sessions', resourceId: sessionId,
+        afterData: { ticketId: ticket.id, technicianName: technicianName || 'Unknown', durationMinutes: duration, expiresAt },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
       const session = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
       res.status(201).json({ data: session, requestId: req.requestId });
     } catch (err) { next(err); }
@@ -389,9 +441,16 @@ router.post(
       const { summary } = req.body || {};
       const now = nowIso();
       await db.run(
-        `UPDATE platform_remote_sessions SET status = 'ENDED', ended_at = ?, summary = ? WHERE id = ?`,
-        [now, summary || null, sessionId]
+        `UPDATE platform_remote_sessions SET status = CASE WHEN status = 'ACTIVE' AND expires_at IS NOT NULL AND expires_at < ? THEN 'EXPIRED' ELSE 'ENDED' END, ended_at = ?, summary = ? WHERE id = ?`,
+        [now, now, summary || null, sessionId]
       );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: session.tenant_id,
+        action: 'REMOTE_SESSION_ENDED',
+        resourceType: 'platform_remote_sessions', resourceId: sessionId,
+        afterData: { ticketId: session.ticket_id, summary: summary || null },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
       const updated = await db.get('SELECT * FROM platform_remote_sessions WHERE id = ?', [sessionId]);
       res.json({ data: updated, requestId: req.requestId });
     } catch (err) { next(err); }
@@ -408,6 +467,12 @@ router.get(
       const ticket = await getTicketOr404(db, req.params.id);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
       if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
+      const listNow = nowIso();
+      await db.run(
+        `UPDATE platform_remote_sessions SET status = 'EXPIRED', ended_at = COALESCE(ended_at, ?)
+         WHERE ticket_id = ? AND status = 'ACTIVE' AND expires_at IS NOT NULL AND expires_at < ?`,
+        [listNow, req.params.id, listNow]
+      );
       const sessions = await db.all(
         'SELECT * FROM platform_remote_sessions WHERE ticket_id = ? ORDER BY started_at DESC',
         [req.params.id]

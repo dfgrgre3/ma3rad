@@ -184,6 +184,120 @@ test('support tickets support create, message and status flow', async () => {
   assert.ok(list.body.data.some((t) => t.id === ticketId));
 });
 
+test('remote access approval is revoked on cancel and sessions expire', async () => {
+  const created = await api(server.base, '/api/v1/admin/support', {
+    method: 'POST', token,
+    body: {
+      tenantId, subject: 'دعم عن بعد', category: 'GENERAL', priority: 'NORMAL',
+      requesterName: 'سارة', body: 'أحتاج مساعدة عن بعد.',
+    },
+  });
+  assert.equal(created.status, 201, created.text);
+  const ticketId = created.body.data.id;
+
+  // Starting without any request must fail.
+  const earlyStart = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/start`, {
+    method: 'POST', token, body: { technicianName: 'tech' },
+  });
+  assert.equal(earlyStart.status, 400);
+
+  // Approving without a pending request must fail.
+  const earlyApprove = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/approve`, {
+    method: 'POST', token, body: { approved: true },
+  });
+  assert.equal(earlyApprove.status, 400);
+
+  // Request with a duration, approve, then the customer cancels.
+  const request = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/request`, {
+    method: 'POST', token, body: { requested: true, durationMinutes: 30 },
+  });
+  assert.equal(request.status, 200, request.text);
+  assert.equal(request.body.data.remote_access_duration_minutes, 30);
+
+  const approve = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/approve`, {
+    method: 'POST', token, body: { approved: true },
+  });
+  assert.equal(approve.status, 200, approve.text);
+  assert.equal(approve.body.data.remote_access_approved, 1);
+
+  const cancel = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/request`, {
+    method: 'POST', token, body: { requested: false },
+  });
+  assert.equal(cancel.status, 200, cancel.text);
+  assert.equal(cancel.body.data.remote_access_requested, 0);
+  assert.equal(cancel.body.data.remote_access_approved, 0, 'cancelling must revoke approval');
+
+  // The stale approval must not allow a session to start.
+  const staleStart = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/start`, {
+    method: 'POST', token, body: { technicianName: 'tech' },
+  });
+  assert.equal(staleStart.status, 400);
+
+  // A fresh request + approval allows a session with an expiry timestamp.
+  await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/request`, {
+    method: 'POST', token, body: { requested: true, durationMinutes: 45 },
+  });
+  await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/approve`, {
+    method: 'POST', token, body: { approved: true },
+  });
+  const start = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-access/start`, {
+    method: 'POST', token, body: { technicianName: 'tech-1' },
+  });
+  assert.equal(start.status, 201, start.text);
+  assert.equal(start.body.data.status, 'ACTIVE');
+  assert.equal(start.body.data.duration_minutes, 45);
+  assert.ok(start.body.data.expires_at, 'session carries an expiry timestamp');
+  const sessionId = start.body.data.id;
+
+  // Force the session past its expiry; listing must mark it EXPIRED.
+  const db = getDb();
+  await db.run(`UPDATE platform_remote_sessions SET expires_at = ? WHERE id = ?`, ['2000-01-01T00:00:00.000Z', sessionId]);
+  const sessions = await api(server.base, `/api/v1/admin/support/${ticketId}/remote-sessions`, { token });
+  assert.equal(sessions.status, 200, sessions.text);
+  const row = sessions.body.data.find((s) => s.id === sessionId);
+  assert.equal(row.status, 'EXPIRED');
+
+  // Audit events were recorded for the remote-access lifecycle.
+  const audits = await db.all(
+    `SELECT action FROM platform_audit_events WHERE resource_id IN (?, ?) ORDER BY created_at`,
+    [ticketId, sessionId]
+  );
+  const actions = audits.map((a) => a.action);
+  assert.ok(actions.includes('REMOTE_ACCESS_REQUESTED'));
+  assert.ok(actions.includes('REMOTE_ACCESS_APPROVED'));
+  assert.ok(actions.includes('REMOTE_ACCESS_REQUEST_CANCELLED'));
+  assert.ok(actions.includes('REMOTE_SESSION_STARTED'));
+});
+
+test('signing key rotation installs a new active Ed25519 key', async () => {
+  const beforeKey = await api(server.base, '/api/v1/admin/security/signing-keys', { token });
+  assert.equal(beforeKey.status, 200, beforeKey.text);
+  const previousKeyId = beforeKey.body.data.currentKeyId;
+  assert.ok(previousKeyId);
+
+  const publicBefore = await api(server.base, '/api/v1/configuration/public-key', { token });
+  assert.equal(publicBefore.status, 200, publicBefore.text);
+
+  const rotated = await api(server.base, '/api/v1/admin/security/signing-keys/rotate', {
+    method: 'POST', token,
+  });
+  assert.equal(rotated.status, 200, rotated.text);
+  const newKeyId = rotated.body.data.keyId;
+  assert.ok(newKeyId);
+  assert.notEqual(newKeyId, previousKeyId);
+
+  const afterKey = await api(server.base, '/api/v1/admin/security/signing-keys', { token });
+  assert.equal(afterKey.body.data.currentKeyId, newKeyId);
+  const oldRow = afterKey.body.data.keys.find((k) => k.keyId === previousKeyId);
+  const newRow = afterKey.body.data.keys.find((k) => k.keyId === newKeyId);
+  assert.equal(Number(oldRow.isActive), 0);
+  assert.equal(Number(newRow.isActive), 1);
+
+  const publicAfter = await api(server.base, '/api/v1/configuration/public-key', { token });
+  assert.equal(publicAfter.body.data.keyId, newKeyId);
+  assert.notEqual(publicAfter.body.data.publicKey, publicBefore.body.data.publicKey);
+});
+
 test('telemetry ingest is deduplicated by fingerprint and manageable', async () => {
   const payload = {
     title: 'TypeError: cannot read property', issueType: 'error', severity: 'high',

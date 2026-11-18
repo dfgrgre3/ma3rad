@@ -768,6 +768,7 @@ async function createTables() {
       started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       ended_at TEXT,
       duration_minutes INTEGER,
+      expires_at TEXT,
       summary TEXT,
       FOREIGN KEY (ticket_id) REFERENCES platform_support_tickets(id) ON DELETE CASCADE,
       FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
@@ -894,6 +895,10 @@ async function createTables() {
     ['remote_access_approved', 'remote_access_approved INTEGER NOT NULL DEFAULT 0'],
     ['remote_access_requested_at', 'remote_access_requested_at TEXT'],
     ['remote_access_approved_at', 'remote_access_approved_at TEXT'],
+    ['remote_access_duration_minutes', 'remote_access_duration_minutes INTEGER'],
+  ]);
+  await ensureColumns('platform_remote_sessions', [
+    ['expires_at', 'expires_at TEXT'],
   ]);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');

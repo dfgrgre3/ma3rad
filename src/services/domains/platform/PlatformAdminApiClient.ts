@@ -605,6 +605,30 @@ export class PlatformAdminApiClient {
     }
   }
 
+  async listCentralSigningKeys(): Promise<{ keys: Array<{ id: string; keyId: string; isActive: boolean; createdAt: string; expiresAt: string | null }>; currentKeyId: string | null }> {
+    const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/security/signing-keys', method: 'GET' });
+    if (envelope.success === false) {
+      throw new CentralApiError({ status: 0, envelope });
+    }
+    const data = (envelope.data as any) || {};
+    return {
+      keys: Array.isArray(data.keys) ? data.keys : [],
+      currentKeyId: data.currentKeyId ?? null,
+    };
+  }
+
+  async rotateCentralSigningKey(): Promise<{ keyId: string; currentKeyId: string | null }> {
+    const envelope = await this.requestEnvelope<any>({
+      path: '/api/v1/admin/security/signing-keys/rotate',
+      method: 'POST',
+    });
+    if (envelope.success === false) {
+      throw new CentralApiError({ status: 0, envelope });
+    }
+    const data = (envelope.data as any) || {};
+    return { keyId: String(data.keyId || ''), currentKeyId: data.currentKeyId ?? null };
+  }
+
   async testWebhook(id: string): Promise<{ webhookId: string; url: string; status: string; httpStatus?: number | null; error?: string | null; sentAt: string }> {
     const envelope = await this.requestEnvelope<any>({
       path: `/api/v1/admin/integrations/webhooks/${encodeURIComponent(id)}/test`,
