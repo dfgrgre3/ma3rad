@@ -19,8 +19,10 @@ function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
 test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const adminUser = queryOne<{ id: string }>(`SELECT id FROM users WHERE username = 'admin'`);
   assert.ok(adminUser?.id, 'Admin user must exist');
@@ -594,6 +596,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   rejectedItems[0].countedQuantityM2 = rejectedItems[0].systemQuantityM2;
   submitCountSession(rejectedSession!, rejectedItems);
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   rejectCountSession(rejectedSession!, 'Recount required');
   const rejectedState = queryOne<{ status: string; approvalStatus: string; rejectionReason: string }>('SELECT status, approval_status AS approvalStatus, rejection_reason AS rejectionReason FROM stock_counts WHERE id = ?', [rejectedSession!.id]);
   assert.equal(rejectedState?.status, 'COUNTING');
@@ -601,6 +604,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   assert.equal(rejectedState?.rejectionReason, 'Recount required');
 
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   for (const countType of ['FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND'] as const) {
     const notes = `supported count type: ${countType}`;
     startCountSession({
@@ -638,6 +642,7 @@ test('inventory adjustments require independent approval before stock and ledger
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const suffix = randomUUID().replace(/-/g, '');
   const warehouseId = `wh_adjust_${suffix}`;
@@ -761,6 +766,7 @@ test('batch receipt posts stock movement and FIFO layer atomically', async () =>
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const suffix = randomUUID().replace(/-/g, '');
   const warehouseId = `wh_batch_${suffix}`;
@@ -815,6 +821,7 @@ test('inventory count posts real-time variance, rejects service products, and en
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 8);
   const warehouseId = `wh_count_rt_${suffix}`;
@@ -909,6 +916,7 @@ test('inventory count posts real-time variance, rejects service products, and en
   // Put 50 on shelf BIN-01, warehouse reserved is 45, counted is 30 -> resulting warehouse = 90 - 20 = 70 >= 45 (allowed)
   // But if warehouse reserved is 80, resulting warehouse = 90 - 20 = 70 < 80 -> MUST throw error!
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   db.run(`INSERT INTO product_location_stock (id, location_id, product_id, quantity_m2)
     VALUES (?, ?, ?, 50)`, [`pls_cnt_${suffix}`, locationId, prodTrackedId]);
   db.run('UPDATE warehouse_stock SET reserved_m2 = 80 WHERE warehouse_id = ? AND product_id = ?',

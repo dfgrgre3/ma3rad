@@ -10,7 +10,8 @@ test('debug penalty', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   await PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
   const employee = EmployeeService.create({ name: 'موظف جزاء', location: 'اختبار', role: 'موظف', phone: '0109000077', email: '', baseSalary: 1000, salaryType: 'MONTHLY', status: 'ACTIVE', joinedDate: '2020-08-01' });
   const penalty = HrDisciplineService.createPenalty({ employeeId: employee.id, amount: 50, notes: 'اختبار' });
   HrDisciplineService.approvePenalty(penalty.id);

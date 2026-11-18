@@ -53,6 +53,7 @@ test('app configuration persists visibility, labels, text, policies and versions
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   AppConfigService.reset(admin);
 
   AppConfigService.saveConfig({
@@ -128,6 +129,7 @@ test('app configuration overrides printed document titles and footers', async ()
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   AppConfigService.reset(admin);
   AppConfigService.saveConfig({
     entries: [
@@ -270,4 +272,5 @@ test('app configuration rejects writes without permission', async () => {
     /غير مصرح|تسجيل الدخول/,
   );
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 });

@@ -10,6 +10,7 @@ test('notification preferences are self-service and filter in-app notifications'
   const db = DatabaseManager.getInstance();
   await db.initialize();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const userId = AuthService.requireAuth().id;
   db.run('DELETE FROM notifications WHERE user_id = ?', [userId]);
 

@@ -507,6 +507,7 @@ test('restaurant tickets consume recipe ingredients and issue one linked invoice
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const settingKeys = ['businessType', 'businessProfileConfig', 'enabledModules'];
   const previousSettings = new Map(settingKeys.map((key) => [
@@ -647,6 +648,7 @@ test('activity configuration versions are permission-checked, deduplicated, vali
   await manager.initialize();
   await PermissionService.seed();
   const actor = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const keys = ['businessType', 'businessTypeLabel', 'businessProfileConfig', 'businessTerminologyOverrides'];
   const previous = new Map(keys.map((key) => [
     key,

@@ -18,6 +18,7 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   const db = manager;
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   db.run('DELETE FROM promotion_usage');
   db.run('DELETE FROM promotion_targets');
   db.run('DELETE FROM promotions');
@@ -101,6 +102,7 @@ test('POS totals match persisted invoice for stacked discounts, tax, and shippin
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const customer = new CustomerService().createCustomer({
     name: 'POS totals parity customer', phone: '01088776655', customerType: 'RETAIL', creditLimit: 0,
   });
@@ -202,6 +204,7 @@ test('POS customer pages search and filter real customers by type and active sta
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const customerService = new CustomerService();
   const suffix = Date.now().toString();
@@ -245,6 +248,7 @@ test('sales reject POS discounts that exceed the net item subtotal', async () =>
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const customer = new CustomerService().createCustomer({
     name: 'عميل حد خصم نقطة البيع',
@@ -299,6 +303,7 @@ test('sale creation validates numeric inputs and matches promotion and loyalty d
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const customer = new CustomerService().createCustomer({
     name: 'Sale integrity customer', phone: '01099887766', customerType: 'RETAIL', creditLimit: 0,
   });

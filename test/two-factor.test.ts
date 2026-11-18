@@ -56,11 +56,13 @@ test('base32 round-trips arbitrary bytes', () => {
 test('security keys are stored as hashes and support standalone login', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`);
   const previousFailedAttempts = db.query<{ value: string }>(
     `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
   )[0]?.value || '5';
   db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const auth = new AuthService();
   const user = auth.createUser({
     username: 'security_key_login_test',
@@ -232,6 +234,7 @@ test('login PIN changes stay pending until a manager approves them', async () =>
   db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
   db.run(`UPDATE system_settings SET value = '4' WHERE key = 'loginPinLength'`);
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const auth = new AuthService();
   const previousCeramisys = window.ceramisys;
   window.ceramisys = {
@@ -294,6 +297,7 @@ test('account switching is limited to active users selected by a manager', async
   )[0]?.value || '5';
   db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const auth = new AuthService();
   const user = auth.createUser({
     username: 'switch_user_test',
@@ -322,6 +326,7 @@ test('active users cannot share a PIN', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const auth = new AuthService();
   const firstId = 'usr_pin_unique_a';
   const secondId = 'usr_pin_unique_b';

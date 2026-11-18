@@ -7,12 +7,20 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { WarrantyClaimService } from '../src/services/domains/sales/WarrantyClaimService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 test('legacy warranty and return allocations use the same invoice-line order', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
 
   const customer = new CustomerService().createCustomer({
     name: 'عميل توزيع المطالبات التاريخية', phone: '0123333344', customerType: 'RETAIL', creditLimit: 0,

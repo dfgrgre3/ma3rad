@@ -47,8 +47,8 @@ test('electron startup: an unpackaged launch without a dev URL loads the built r
   assert.match(fs.readFileSync(path.join(root, 'scripts', 'electron-dev.mjs'), 'utf8'), /VITE_DEV_SERVER_URL: devUrl/);
 });
 
-test('electron startup: software rasterization remains available when hardware acceleration is disabled', () => {
-  assert.match(mainSource, /app\.disableHardwareAcceleration\(\)/);
+test('electron startup: GPU acceleration stays enabled for rendering performance', () => {
+  assert.doesNotMatch(mainSource, /app\.disableHardwareAcceleration\(\)/);
   assert.doesNotMatch(mainSource, /disable-software-rasterizer/);
 });
 

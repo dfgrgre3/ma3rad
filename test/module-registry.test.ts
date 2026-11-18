@@ -158,6 +158,7 @@ test('module nav state migrates old combined settings and preserves manual hides
   const db = DatabaseManager.getInstance();
   await db.initialize();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const enabled = ['sales', 'customers', 'finance', 'reports'];
   db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['enabledModules', JSON.stringify(enabled)]);
   db.run('DELETE FROM system_settings WHERE key = ?', ['nav.hidden.manual']);

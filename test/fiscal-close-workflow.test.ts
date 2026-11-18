@@ -16,6 +16,7 @@ test('fiscal close workflow: years, periods, checks, tasks, adjustments, opening
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const service = new FinanceEnterpriseService();
 

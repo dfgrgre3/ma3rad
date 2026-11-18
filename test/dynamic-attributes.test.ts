@@ -50,6 +50,7 @@ test('dynamic product attributes enforce definitions and persist normalized valu
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const suffix = Date.now().toString();
   const attributeService = new AttributeService();

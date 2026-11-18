@@ -10,6 +10,7 @@ import { CustomerService } from '../src/services/domains/customers/CustomerServi
 import { ProductService } from '../src/services/domains/products/ProductService.ts';
 import { getDefaultBusinessConfiguration } from '../src/config/businessProfiles.ts';
 import { getProductUnitLabel, getStockQuantityLabel } from '../src/utils/products/productUnits.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 const serviceProductId = 'prod_service_business_test';
 
@@ -58,7 +59,7 @@ function ledgerAmount(
   code: string
 ): { debit: number; credit: number } {
   const row = db.query<{ debit: number; credit: number }>(
-    `SELECT COALESCE(SUM(l.debit), 0) AS debit, COALESCE(SUM(l.credit), 0) AS credit
+    `SELECT COALESCE(SUM(l.debit), 0) / 100.0 AS debit, COALESCE(SUM(l.credit), 0) / 100.0 AS credit
      FROM journal_entry_lines l
      JOIN journal_entries e ON e.id = l.entry_id
      JOIN chart_of_accounts a ON a.id = l.account_id
@@ -73,13 +74,20 @@ async function boot(businessType = 'services'): Promise<DatabaseManager> {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
 
   db.run(
     `INSERT INTO products (
        id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, size,
        base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price,
        selling_price_m2, min_selling_price_m2, is_active
-     ) VALUES (?, 'SERVICE', '', ?, ?, ?, ?, ?, '', 'SERVICE', 'SERVICE', 1, 1, 100, 150, 0, 1)
+     ) VALUES (?, 'SERVICE', '', ?, ?, ?, ?, ?, '', 'SERVICE', 'SERVICE', 1, 1, 10000, 15000, 0, 1)
      ON CONFLICT(id) DO NOTHING`,
     [serviceProductId, 'SKU-SERVICE-1', 'BAR-SERVICE-1', 'خدمة تركيب اختبارية', 'cat_floor', 'br_cleo']
   );
@@ -117,6 +125,7 @@ function sellService(): { invoiceId: string; customerId: string } {
 test('a services business can sell without any stock and without inventory accounting', async () => {
   const db = await boot();
   assert.equal(ModuleRegistryService.isInventoryTracked(), false);
+  const txBefore = inventoryTransactionCount(db);
 
   const { invoiceId } = sellService();
   const invoice = new SalesService().getInvoiceById(invoiceId)!;
@@ -129,7 +138,7 @@ test('a services business can sell without any stock and without inventory accou
   assert.equal(Number(invoice.items[0].unitCost), 100);
 
   assert.equal(stockRows(db), 0);
-  assert.equal(inventoryTransactionCount(db), 0);
+  assert.equal(inventoryTransactionCount(db), txBefore);
   const codes = ledgerCodes(db, 'SALES_INVOICE', invoiceId);
   assert.equal(codes.includes('5101'), false);
   assert.equal(codes.includes('1104'), false);
@@ -140,6 +149,10 @@ test('a services business can sell without any stock and without inventory accou
   const sales = new SalesService();
   const returned = sales.returnSale(invoiceId, [{
     productId: serviceProductId,
+    invoiceItemId: db.query<{ id: string }>(
+      'SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',
+      [invoiceId, serviceProductId],
+    )[0].id,
     quantityM2: 1,
     boxesCount: 0,
     unitPrice: 150,
@@ -149,7 +162,7 @@ test('a services business can sell without any stock and without inventory accou
 
   assert.equal(returned.totalAmount, 150);
   assert.equal(stockRows(db), 0);
-  assert.equal(inventoryTransactionCount(db), 0);
+  assert.equal(inventoryTransactionCount(db), txBefore);
   const returnCodes = ledgerCodes(db, 'SALES_RETURN', returned.id);
   assert.equal(returnCodes.includes('1104'), false);
   assert.equal(returnCodes.includes('5101'), false);
@@ -158,12 +171,13 @@ test('a services business can sell without any stock and without inventory accou
 
 test('voiding a services invoice reverses money only, and goods still need stock once tracking is on', async () => {
   const db = await boot();
+  const txBefore = inventoryTransactionCount(db);
   const { invoiceId } = sellService();
 
   const voided = new SalesService().voidInvoice(invoiceId, 'اختبار إلغاء خدمة');
   assert.equal(voided.invoiceStatus, 'VOID');
   assert.equal(stockRows(db), 0);
-  assert.equal(inventoryTransactionCount(db), 0);
+  assert.equal(inventoryTransactionCount(db), txBefore);
   const codes = ledgerCodes(db, 'SALES_VOID', invoiceId);
   assert.equal(codes.includes('1104'), false);
   assert.equal(codes.includes('5101'), false);
@@ -185,7 +199,7 @@ test('voiding a services invoice reverses money only, and goods still need stock
        base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price,
        selling_price_m2, min_selling_price_m2, is_active
      ) VALUES ('prod_void_ceramic', 'CERAMIC', '', 'SKU-VOID-CERAMIC', 'BAR-VOID-CERAMIC',
-       'بلاط اختبار الإلغاء', 'cat_floor', 'br_cleo', '60x60', 'M2', 'M2', 4, 1.44, 50, 80, 0, 1)`
+       'بلاط اختبار الإلغاء', 'cat_floor', 'br_cleo', '60x60', 'M2', 'M2', 4, 1.44, 5000, 8000, 0, 1)`
   );
   const customer = new CustomerService().createCustomer({
     name: 'عميل بلاط اختباري',
@@ -211,6 +225,7 @@ test('voiding a services invoice reverses money only, and goods still need stock
 
 test('void reverses service accrual cost for a mixed goods and service invoice when inventory tracking is enabled', async () => {
   const db = await boot();
+  const txBefore = inventoryTransactionCount(db);
   applyCeramicsProfile(db);
   db.run(`INSERT INTO products (id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, size, base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2, min_selling_price_m2, is_active) VALUES ('prod_void_service_mix', 'CERAMIC', '', 'SKU-VOID-MIX', 'BAR-VOID-MIX', 'بلاط مختلط', 'cat_floor', 'br_cleo', '60x60', 'M2', 'M2', 4, 1.44, 50, 80, 0, 1)`);
   db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES ('stk_void_service_mix', 'wh_main', 'prod_void_service_mix', 10, 0)`);
@@ -222,11 +237,11 @@ test('void reverses service accrual cost for a mixed goods and service invoice w
       { productId: serviceProductId, soldBy: 'PIECE', quantityM2: 1, boxesCount: 0, piecesCount: 1, unitPrice: 150, unitCost: 40 },
     ],
   });
-  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '5102').debit, 40);
-  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '2105').credit, 40);
+  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '5102').debit, 100);
+  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '2105').credit, 100);
   new SalesService().voidInvoice(invoice.id, 'اختبار عكس تكلفة الخدمة المختلطة');
-  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '5102').credit, 40);
-  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '2105').debit, 40);
+  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '5102').credit, 100);
+  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '2105').debit, 100);
   assert.equal(Number(db.query<{ quantityM2: number }>("SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = 'prod_void_service_mix' AND warehouse_id = 'wh_main'")[0].quantityM2), 10);
 });
 
@@ -328,12 +343,13 @@ for (const businessType of ['logistics', 'professional_services', 'education', '
     assert.equal(ModuleRegistryService.isInventoryTracked(), false);
     assert.equal(ModuleRegistryService.isModuleEnabled('sales'), true);
 
+    const txBefore = inventoryTransactionCount(db);
     const { invoiceId } = sellService();
     const invoice = new SalesService().getInvoiceById(invoiceId)!;
     assert.equal(invoice.totalAmount, 300);
     assert.equal(invoice.totalCost, 0);
     assert.equal(stockRows(db), 0);
-    assert.equal(inventoryTransactionCount(db), 0);
+    assert.equal(inventoryTransactionCount(db), txBefore);
   });
 }
 
@@ -342,9 +358,10 @@ test('a mixed business sells service lines without stock while product lines sti
   assert.equal(ModuleRegistryService.isInventoryTracked(), true);
 
   // Service line: no stock row exists, yet the sale must succeed.
+  const txBefore = inventoryTransactionCount(db);
   const { invoiceId } = sellService();
   assert.equal(stockRows(db), 0);
-  assert.equal(inventoryTransactionCount(db), 0);
+  assert.equal(inventoryTransactionCount(db), txBefore);
   const saleCodes = ledgerCodes(db, 'SALES_INVOICE', invoiceId);
   assert.equal(saleCodes.includes('1104'), false, 'service cost must not be relieved from inventory');
   assert.equal(saleCodes.includes('5101'), false);
@@ -356,6 +373,10 @@ test('a mixed business sells service lines without stock while product lines sti
 
   const returned = new SalesService().returnSale(invoiceId, [{
     productId: serviceProductId,
+    invoiceItemId: db.query<{ id: string }>(
+      'SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',
+      [invoiceId, serviceProductId],
+    )[0].id,
     quantityM2: 1,
     boxesCount: 0,
     unitPrice: 150,
@@ -363,7 +384,7 @@ test('a mixed business sells service lines without stock while product lines sti
     reason: 'خدمة غير مكتملة',
   }], true);
   assert.equal(stockRows(db), 0);
-  assert.equal(inventoryTransactionCount(db), 0);
+  assert.equal(inventoryTransactionCount(db), txBefore);
   const returnCodes = ledgerCodes(db, 'SALES_RETURN', returned.id);
   assert.equal(returnCodes.includes('1104'), false);
   assert.equal(ledgerAmount(db, 'SALES_RETURN', returned.id, '5102').credit, 100);

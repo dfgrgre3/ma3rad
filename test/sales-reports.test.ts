@@ -12,21 +12,38 @@ import { loadReport } from '../src/pages/reports/sales-reports/SalesReportsPage.
 import { runReport } from '../src/pages/reports/reports-hub/reportCatalog.ts';
 import { SalesFinancialReconciliationService } from '../src/services/domains/sales/SalesFinancialReconciliationService.ts';
 import { ReportCenterService } from '../src/services/domains/reports/ReportCenterService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { HistoricalReturnReconciliationService } from '../src/services/domains/sales/HistoricalReturnReconciliationService.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+
+
+function invoiceLineId(db: DatabaseManager, invoiceId: string, productId: string): string {
+  return db.query<{ id: string }>(
+    'SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',
+    [invoiceId, productId],
+  )[0].id;
+}
+
+function ensureOpenShift(db: DatabaseManager, userId: string): void {
+  const open = db.query<{ id: string }>(
+    `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [userId],
+  )[0];
+  if (!open) new CashierService().openShift('cr_main', userId, 0);
+}
 
 test('sales reports net sales, profit and daily revenue against returns by return date', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
 
   const productId = 'sales_report_return_product';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
     min_stock_level,is_active)
-    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`,
+    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 0, 1)`,
     [productId, productId, productId, 'Sales report return product']);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
     VALUES (?, 'wh_main', ?, 20, 0)`, [`stock_${productId}`, productId]);
@@ -48,13 +65,14 @@ test('sales reports net sales, profit and daily revenue against returns by retur
     shippingCost: 50,
   });
   const analyticsService = new AnalyticsService();
-  const dashboardBefore = analyticsService.getDashboardMetrics();
+  const dashboardBefore = await analyticsService.getDashboardMetrics();
   const salesReturn = new SalesService().returnSale(invoice.id, [{
-    productId, quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'report test',
+    productId, invoiceItemId: invoiceLineId(db, invoice.id, productId),
+    quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'report test',
   }]);
   const expectedNetSales = invoice.subtotal - invoice.discountAmount - salesReturn.totalAmount;
-  const dashboardAfter = analyticsService.getDashboardMetrics();
-  const dashboardSales = (metrics: ReturnType<typeof analyticsService.getDashboardMetrics>, name: string) =>
+  const dashboardAfter = await analyticsService.getDashboardMetrics();
+  const dashboardSales = (metrics: Awaited<ReturnType<typeof analyticsService.getDashboardMetrics>>, name: string) =>
     metrics.find((metric) => metric.name === name)!.value;
   assert.equal(
     dashboardSales(dashboardAfter, 'المبيعات اليوم') - dashboardSales(dashboardBefore, 'المبيعات اليوم'),
@@ -68,7 +86,7 @@ test('sales reports net sales, profit and daily revenue against returns by retur
   const today = localDateString();
   const returnDate = '2099-01-02';
   db.run('UPDATE sales_returns SET date = ? WHERE original_invoice_id = ?', [returnDate, invoice.id]);
-  const analytics = analyticsService.getSalesAnalytics(invoice.date, returnDate);
+  const analytics = await analyticsService.getSalesAnalytics(invoice.date, returnDate);
   assert.equal(analytics.totalSales, expectedNetSales);
   assert.equal(analytics.totalOrders, 1);
   assert.equal(analytics.averageOrderValue, expectedNetSales);
@@ -150,13 +168,14 @@ test('product reports subtract the stored pre-tax return amounts by item', async
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const productIds = ['sales_report_tax_product_a', 'sales_report_tax_product_b'];
   for (const productId of productIds) {
     db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
       pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
       min_stock_level,is_active)
-      VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`,
+      VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 0, 1)`,
       [productId, productId, productId, productId]);
     db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
       VALUES (?, 'wh_main', ?, 20, 0)`, [`stock_${productId}`, productId]);
@@ -181,8 +200,8 @@ test('product reports subtract the stored pre-tax return amounts by item', async
     shippingCost: 50,
   });
   new SalesService().returnSale(invoice.id, [
-    { productId: productIds[0], quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'tax allocation test' },
-    { productId: productIds[1], quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'tax allocation test' },
+    { productId: productIds[0], invoiceItemId: invoiceLineId(db, invoice.id, productIds[0]), quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'tax allocation test' },
+    { productId: productIds[1], invoiceItemId: invoiceLineId(db, invoice.id, productIds[1]), quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'tax allocation test' },
   ]);
 
   const today = localDateString();
@@ -206,7 +225,7 @@ test('product reports subtract the stored pre-tax return amounts by item', async
     .map((check) => [check.key, 'فرق سابق في بيانات الاختبار']));
   const closure = reconciliation.closeReconciliation(today, today, reasons);
   assert.equal(closure.dateFrom, today);
-  assert.equal(closure.checks.length, 6);
+  assert.equal(closure.checks.length, 7);
   assert.equal(reconciliation.getLatestClosure(today, today)?.id, closure.id);
 });
 
@@ -215,12 +234,13 @@ test('branch performance subtracts returns and restores returned inventory cost 
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const productId = 'branch_performance_return_product';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
     min_stock_level,is_active)
-    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`,
+    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 0, 1)`,
     [productId, productId, productId, 'Branch performance return product']);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
     VALUES (?, 'wh_main', ?, 20, 0)`, [`stock_${productId}`, productId]);
@@ -238,14 +258,15 @@ test('branch performance subtracts returns and restores returned inventory cost 
     paymentType: 'CREDIT',
   });
   const salesReturn = new SalesService().returnSale(invoice.id, [{
-    productId, quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'branch performance report test',
+    productId, invoiceItemId: invoiceLineId(db, invoice.id, productId),
+    quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'branch performance report test',
   }]);
 
   const reportDate = '2099-01-03';
   db.run('UPDATE sales_invoices SET date = ? WHERE id = ?', [reportDate, invoice.id]);
   db.run('UPDATE sales_returns SET date = ? WHERE original_invoice_id = ?', [reportDate, invoice.id]);
   ReportCenterService.clearCache();
-  const report = new ReportCenterService().branchPerformance({ from: reportDate, to: reportDate });
+  const report = await new ReportCenterService().branchPerformance({ from: reportDate, to: reportDate });
   const branchName = db.query<{ name: string }>(
     'SELECT b.name FROM warehouses w JOIN branches b ON b.id = w.branch_id WHERE w.id = ?',
     ['wh_main'],
@@ -265,6 +286,7 @@ test('historical return reconciliation requires verified values and leaves histo
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const productId = 'historical_return_reconcile_product';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
@@ -288,13 +310,13 @@ test('historical return reconciliation requires verified values and leaves histo
     taxAmount: 15,
   });
   db.run(
-    `UPDATE sales_invoices SET subtotal = 100, discount_amount = 0, tax_amount = 15,
-     total_amount = 115, returned_amount = 100, remaining_amount = 100, payment_status = 'UNPAID'
+    `UPDATE sales_invoices SET subtotal = 10000, discount_amount = 0, tax_amount = 1500,
+     total_amount = 11500, returned_amount = 10000, remaining_amount = 10000, payment_status = 'UNPAID'
      WHERE id = ?`,
     [invoice.id],
   );
   db.run(
-    'UPDATE customers SET current_balance = 200, total_purchases = 500 WHERE id = ?',
+    'UPDATE customers SET current_balance = 20000, total_purchases = 50000 WHERE id = ?',
     [customer.id],
   );
   const returnId = 'ret_historical_reconcile_test';
@@ -303,7 +325,7 @@ test('historical return reconciliation requires verified values and leaves histo
        id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
        date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
        refund_method, created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, 100, NULL, 0, 100, 'legacy return', 'BALANCE', ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 10000, NULL, 0, 10000, 'legacy return', 'BALANCE', ?)`,
     [returnId, 'RET-HIST-RECONCILE', invoice.id, invoice.invoiceNumber, customer.id, 'wh_main',
       localDateString(), 'usr_admin'],
   );
@@ -314,9 +336,9 @@ test('historical return reconciliation requires verified values and leaves histo
     referenceId: returnId,
     createdBy: 'usr_admin',
     lines: [
-      { accountCode: '4101', debit: 85, credit: 0 },
-      { accountCode: '2102', debit: 15, credit: 0 },
-      { accountCode: '1103', debit: 0, credit: 100 },
+      { accountCode: '4101', debit: 8500, credit: 0 },
+      { accountCode: '2102', debit: 1500, credit: 0 },
+      { accountCode: '1103', debit: 0, credit: 10000 },
     ],
   });
   const legacyV4ReturnId = 'ret_historical_reconcile_v4_test';
@@ -325,7 +347,7 @@ test('historical return reconciliation requires verified values and leaves histo
        id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
        date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
        refund_method, created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, 50, NULL, 0, 50, 'legacy v4 return', 'BALANCE', ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 5000, NULL, 0, 5000, 'legacy v4 return', 'BALANCE', ?)`,
     [legacyV4ReturnId, 'RET-HIST-RECONCILE-V4', invoice.id, invoice.invoiceNumber, customer.id, 'wh_main',
       localDateString(), 'usr_admin'],
   );
@@ -336,8 +358,8 @@ test('historical return reconciliation requires verified values and leaves histo
     referenceId: legacyV4ReturnId,
     createdBy: 'usr_admin',
     lines: [
-      { accountCode: '4101', debit: 50, credit: 0 },
-      { accountCode: '1103', debit: 0, credit: 50 },
+      { accountCode: '4101', debit: 5000, credit: 0 },
+      { accountCode: '1103', debit: 0, credit: 5000 },
     ],
   });
 
@@ -381,10 +403,10 @@ test('historical return reconciliation requires verified values and leaves histo
      FROM sales_returns WHERE id = ?`,
     [returnId],
   )[0];
-  assert.deepEqual(correctedReturn, { tax: 15, cash: 0, balance: 115 });
-  assert.equal(db.query<{ balance: number }>('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 185);
-  assert.equal(db.query<{ purchases: number }>('SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id])[0].purchases, 500);
-  assert.equal(db.query<{ remaining: number }>('SELECT remaining_amount AS remaining FROM sales_invoices WHERE id = ?', [invoice.id])[0].remaining, 85);
+  assert.deepEqual(correctedReturn, { tax: 1500, cash: 0, balance: 11500 });
+  assert.equal(db.query<{ balance: number }>('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 18500);
+  assert.equal(db.query<{ purchases: number }>('SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id])[0].purchases, 50000);
+  assert.equal(db.query<{ remaining: number }>('SELECT remaining_amount AS remaining FROM sales_invoices WHERE id = ?', [invoice.id])[0].remaining, 8500);
   assert.equal(db.query<{ count: number }>(
     'SELECT COUNT(*) AS count FROM sales_return_reconciliations WHERE return_id = ?', [returnId]
   )[0].count, 1);
@@ -405,10 +427,10 @@ test('historical return reconciliation requires verified values and leaves histo
   });
   assert.equal(db.query<{ purchases: number }>(
     'SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id]
-  )[0].purchases, 492.5);
+  )[0].purchases, 49250);
   assert.equal(db.query<{ remaining: number }>(
     'SELECT remaining_amount AS remaining FROM sales_invoices WHERE id = ?', [invoice.id]
-  )[0].remaining, 77.5);
+  )[0].remaining, 7750);
   assert.equal(db.query<{ usedAt: string | null }>(
     'SELECT used_at AS usedAt FROM sales_return_reconciliation_reviews WHERE id = ?', [reviewId]
   )[0].usedAt, null);
@@ -426,12 +448,14 @@ test('report-center operation reports open without SQL branch scope errors', asy
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  const __opsUser = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  ensureOpenShift(db, __opsUser.id);
   const productId = 'report_center_ops_product';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
     min_stock_level,is_active)
-    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`,
+    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 0, 1)`,
     [productId, productId, productId, 'Operations report product']);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
     VALUES (?, 'wh_main', ?, 50, 0)`, [`stock_${productId}`, productId]);
@@ -452,7 +476,7 @@ test('report-center operation reports open without SQL branch scope errors', asy
   });
 
   for (const id of ['operations-log', 'user-activity', 'daily-movements', 'exceptions', 'approvals', 'received-reports', 'alerts']) {
-    assert.doesNotThrow(() => runReport(id, { from: '2000-01-01', to: '2099-12-31' }));
+    await assert.doesNotReject(runReport(id, { from: '2000-01-01', to: '2099-12-31' }));
   }
 });
 
@@ -461,6 +485,8 @@ test('report-center cash and sales-rep reports use current tables and check perm
   await db.initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  ensureOpenShift(db, admin.id);
   const service = new ReportCenterService();
   ReportCenterService.clearCache();
   const params = { from: '2000-01-01', to: '2099-12-31' };
@@ -477,31 +503,31 @@ test('report-center cash and sales-rep reports use current tables and check perm
     payment_type, payment_status, invoice_status, total_cost, gross_profit, created_by
   ) VALUES (
     'aging_report_historical_invoice', 'AGING-REPORT-HISTORICAL', '2099-01-01', '2099-01-10',
-    ?, 'wh_main', 'br_main', 'cmp_main', 1000, 0, 0, 1000, 1000, 0,
-    'CREDIT', 'PAID', 'COMPLETED', 0, 1000, ?
+    ?, 'wh_main', 'br_main', 'cmp_main', 100000, 0, 0, 100000, 100000, 0,
+    'CREDIT', 'PAID', 'COMPLETED', 0, 100000, ?
   )`, [customer.id, admin.id]);
   db.run(`INSERT INTO customer_payments (
     id, receipt_number, customer_id, invoice_id, amount, payment_type, date, performed_by
   ) VALUES (
     'aging_report_future_payment', 'AGING-REPORT-FUTURE-PAYMENT', ?,
-    'aging_report_historical_invoice', 1000, 'CASH', '2099-02-01', ?
+    'aging_report_historical_invoice', 100000, 'CASH', '2099-02-01', ?
   )`, [customer.id, admin.id]);
   db.run(`INSERT INTO customer_payment_allocations (id, payment_id, sales_invoice_id, amount)
     VALUES ('aging_report_future_allocation', 'aging_report_future_payment',
-      'aging_report_historical_invoice', 1000)`);
+      'aging_report_historical_invoice', 100000)`);
 
-  const aging = service.arAging({ from: '2099-01-30', to: '2099-01-30' });
+  const aging = await service.arAging({ from: '2099-01-30', to: '2099-01-30' });
   const historicalAgingRow = aging.rows.find((row) => row.customerId === customer.id);
   assert.ok(historicalAgingRow);
   assert.equal(historicalAgingRow.total, 1000, 'future payment must not reduce the historical receivable');
   assert.equal(historicalAgingRow.bucket0, 1000, 'aging should use the contractual due date');
   assert.equal(historicalAgingRow.dueDate, '2099-01-10');
 
-  const sales = service.salesRepPerformance(params);
+  const sales = await service.salesRepPerformance(params);
   assert.ok(Array.isArray(sales.rows));
   assert.ok(sales.columns.some((column) => column.key === 'totalSales'));
 
-  const cash = service.cashFlowDetailed(params);
+  const cash = await service.cashFlowDetailed(params);
   assert.ok(Array.isArray(cash.rows));
   assert.ok(cash.columns.some((column) => column.key === 'inflow'));
 
@@ -518,8 +544,8 @@ test('report-center cash and sales-rep reports use current tables and check perm
   };
   try {
     AuthService.setCurrentUser(limited);
-    assert.throws(() => service.salesRepPerformance(params), /غير مصرح/);
-    assert.throws(() => service.cashFlowDetailed(params), /غير مصرح/);
+    await assert.rejects(() => service.salesRepPerformance(params), /غير مصرح/);
+    await assert.rejects(() => service.cashFlowDetailed(params), /غير مصرح/);
   } finally {
     AuthService.setCurrentUser(admin);
     PermissionService.invalidate(limited);

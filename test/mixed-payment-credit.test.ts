@@ -30,7 +30,7 @@ function seedProduct(db: any, id: string): void {
 
 const ledgerLinesFor = (referenceType: string, invoiceId: string): Array<{ code: string; debit: number; credit: number }> =>
   q(
-    `SELECT coa.code AS code, SUM(jel.debit) AS debit, SUM(jel.credit) AS credit
+    `SELECT coa.code AS code, SUM(jel.debit) / 100.0 AS debit, SUM(jel.credit) / 100.0 AS credit
      FROM journal_entries je
      JOIN journal_entry_lines jel ON jel.entry_id = je.id
      JOIN chart_of_accounts coa ON coa.id = jel.account_id
@@ -43,7 +43,14 @@ test('mixed payment: نقدي + بطاقة + آجل (مثال 1000 + 2000 + 1000
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
   const salesService = new SalesService();
   const customer = new CustomerService().createCustomer({
     name: 'عميل اختبار الدفع المختلط', phone: '0133333333', customerType: 'RETAIL', creditLimit: 50000,
@@ -73,7 +80,7 @@ test('mixed payment: نقدي + بطاقة + آجل (مثال 1000 + 2000 + 1000
 
   // كل وسيلة دفع مسجلة بصورة مستقلة
   const paymentRows = q(
-    'SELECT method, SUM(amount) AS amount FROM sales_invoice_payments WHERE invoice_id = ? GROUP BY method ORDER BY method',
+    'SELECT method, SUM(amount) / 100.0 AS amount FROM sales_invoice_payments WHERE invoice_id = ? GROUP BY method ORDER BY method',
     [invoice.id]
   ) as any[];
   assert.deepEqual(
@@ -82,7 +89,7 @@ test('mixed payment: نقدي + بطاقة + آجل (مثال 1000 + 2000 + 1000
   );
 
   // المتبقي الآجل يُضاف على رصيد العميل
-  const customerRow = q('SELECT current_balance AS currentBalance FROM customers WHERE id = ?', [customer.id])[0] as any;
+  const customerRow = q('SELECT current_balance / 100.0 AS currentBalance FROM customers WHERE id = ?', [customer.id])[0] as any;
   assert.equal(Number(customerRow.currentBalance), 1000);
 
   // القيد المحاسبي: 1101 مدين 2000، 1102 مدين 3000، 1103 مدين 1000 (الآجل)
@@ -101,7 +108,7 @@ test('mixed payment: نقدي + بطاقة + آجل (مثال 1000 + 2000 + 1000
   assert.equal(Number(voidByCode.get('1103')?.credit ?? 0), 1000);
 
   // بعد الإلغاء يعود رصيد العميل كما كان
-  const afterVoid = q('SELECT current_balance AS currentBalance FROM customers WHERE id = ?', [customer.id])[0] as any;
+  const afterVoid = q('SELECT current_balance / 100.0 AS currentBalance FROM customers WHERE id = ?', [customer.id])[0] as any;
   assert.equal(Number(afterVoid.currentBalance), 0);
 });
 
@@ -109,9 +116,24 @@ test('void reverses split tender totals on the invoice shift and cash from its n
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
   const registerId = 'cr_void_nondefault';
-  db.run(`INSERT OR REPLACE INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, 100, 0, 1, 'br_main')`, [registerId, 'Register Void Nondefault']);
+  db.run(`INSERT OR REPLACE INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, 10000, 0, 1, 'br_main')`, [registerId, 'Register Void Nondefault']);
+  const bankGl = q(`SELECT id FROM chart_of_accounts WHERE code = '1102'`)[0];
+  assert.ok(bankGl, 'bank clearing account 1102 must exist');
+  db.run(`INSERT OR REPLACE INTO bank_accounts (id, account_name, bank_name, account_number, gl_account_id, branch_id, is_active, current_balance)
+    VALUES ('bank_void_test', 'بنك اختبار الإلغاء', 'بنك الاختبار', 'BANK-VOID-1', ?, 'br_main', 1, 0)`, [bankGl.id]);
+  // usr_admin already has an OPEN shift on cr_main from the bootstrap — a user
+  // can hold only one open shift, so close it before opening the register's.
+  const priorShift = q(`SELECT id, expected_ending_cash / 100.0 AS expected FROM cash_shifts WHERE user_id = 'usr_admin' AND status = 'OPEN'`)[0];
+  if (priorShift) new CashierService().closeShift(priorShift.id, Number(priorShift.expected), 'إغلاق تمهيدي للاختبار');
   const shift = new CashierService().openShift(registerId, 'usr_admin', 100);
   const customer = new CustomerService().createCustomer({
     name: `عميل إلغاء وردية ${Date.now()}`, phone: `015${String(Date.now()).slice(-8)}`, customerType: 'RETAIL', creditLimit: 50000,
@@ -121,25 +143,33 @@ test('void reverses split tender totals on the invoice shift and cash from its n
     customerId: customer.id, warehouseId: 'wh_main', shiftId: shift.id,
     items: [{ productId: 'prod_void_shift_multi', soldBy: 'M2', quantityM2: 20, boxesCount: 14, piecesCount: 0, unitPrice: 300 }],
     paidAmount: 4000, paymentType: 'MIXED',
-    payments: [{ method: 'CASH', amount: 1000 }, { method: 'CARD', amount: 1500 }, { method: 'BANK_TRANSFER', amount: 1500 }],
+    payments: [{ method: 'CASH', amount: 1000 }, { method: 'CARD', amount: 1500 }, { method: 'BANK_TRANSFER', amount: 1500, bankAccountId: 'bank_void_test' }],
   });
-  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 1100);
-  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
-  assert.deepEqual(Object.values(q('SELECT total_sales_cash AS cash, total_sales_card AS card, total_sales_transfer AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [1000, 1500, 1500]);
+  assert.equal(Number(q('SELECT current_balance / 100.0 AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 1100);
+  assert.equal(Number(q('SELECT current_balance / 100.0 AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
+  assert.deepEqual(Object.values(q('SELECT total_sales_cash / 100.0 AS cash, total_sales_card / 100.0 AS card, total_sales_transfer / 100.0 AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [1000, 1500, 1500]);
 
   new SalesService().voidInvoice(invoice.id, 'اختبار عكس وردية وخزينة');
-  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 100);
-  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
-  assert.deepEqual(Object.values(q('SELECT total_sales_cash AS cash, total_sales_card AS card, total_sales_transfer AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [0, 0, 0]);
+  assert.equal(Number(q('SELECT current_balance / 100.0 AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 100);
+  assert.equal(Number(q('SELECT current_balance / 100.0 AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
+  assert.deepEqual(Object.values(q('SELECT total_sales_cash / 100.0 AS cash, total_sales_card / 100.0 AS card, total_sales_transfer / 100.0 AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [0, 0, 0]);
   db.run('DELETE FROM cash_shifts WHERE id = ?', [shift.id]);
   db.run('DELETE FROM cash_registers WHERE id = ?', [registerId]);
+  db.run('DELETE FROM bank_accounts WHERE id = ?', ['bank_void_test']);
 });
 
 test('mixed payment: إطار آجل يصل في payments لا يُسجَّل كدفعة (يبقى متبقياً على العميل)', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
   const salesService = new SalesService();
   const customer = new CustomerService().createCustomer({
     name: 'عميل اختبار الآجل المختلط', phone: '0144444444', customerType: 'RETAIL', creditLimit: 50000,
@@ -162,7 +192,7 @@ test('mixed payment: إطار آجل يصل في payments لا يُسجَّل ك
 
   // إطار CREDIT مُرشّح — يُسجَّل فقط إطار الدفع الفعلي (CASH 2000 = paidAmount)
   const paymentRows = q(
-    'SELECT method, SUM(amount) AS amount FROM sales_invoice_payments WHERE invoice_id = ? GROUP BY method',
+    'SELECT method, SUM(amount) / 100.0 AS amount FROM sales_invoice_payments WHERE invoice_id = ? GROUP BY method',
     [invoice.id]
   ) as any[];
   assert.ok(paymentRows.every((row) => row.method !== 'CREDIT'));

@@ -7,12 +7,20 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 test('discounted special stock is inspected, priced, sold, and linked to its source', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10);
   const warehouseId = `wh_sp_sale_${suffix}`;
@@ -28,13 +36,13 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
     id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
     pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
     min_selling_price_m2, min_stock_level, is_active
-  ) VALUES (?, ?, ?, ?, ?, ?, 'GRADE_1', '1x1', 'M2', 'M2', 1, 1, 10, 30, 25, 20, 0, 1)`,
+  ) VALUES (?, ?, ?, ?, ?, ?, 'GRADE_1', '1x1', 'M2', 'M2', 1, 1, 1000, 3000, 2500, 2000, 0, 1)`,
   [productId, `SKU-${suffix}`, `BAR-${suffix}`, 'Test special stock product', categoryId, brandId]);
   db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
     VALUES (?, ?, ?, 10, 0)`, [`stock_${suffix}`, warehouseId, productId]);
   db.run(`INSERT INTO inventory_cost_layers (
     id, product_id, warehouse_id, source_type, received_at, quantity_received, quantity_remaining, unit_cost
-  ) VALUES (?, ?, ?, 'TEST', date('now'), 10, 10, 10)`, [`layer_${suffix}`, productId, warehouseId]);
+  ) VALUES (?, ?, ?, 'TEST', date('now'), 10, 10, 1000)`, [`layer_${suffix}`, productId, warehouseId]);
 
   const inventory = new InventoryService();
   const source = inventory.recordSpecialStock({
@@ -81,7 +89,7 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
   });
 
   const invoiceItem = db.query<any>(
-    `SELECT id, special_stock_id AS specialStockId, unit_price AS unitPrice, unit_cost AS unitCost
+    `SELECT id, special_stock_id AS specialStockId, unit_price / 100.0 AS unitPrice, unit_cost / 100.0 AS unitCost
      FROM sales_invoice_items WHERE invoice_id = ?`,
     [invoice.id]
   )[0];
@@ -90,7 +98,7 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
   assert.equal(invoiceItem.unitCost, 10);
   const movement = db.query<any>(`
     SELECT reference_type AS referenceType, reference_id AS referenceId,
-      quantity_m2 AS quantityM2, unit_cost AS unitCost
+      quantity_m2 AS quantityM2, unit_cost / 100.0 AS unitCost
     FROM inventory_transactions WHERE reference_type = 'SPECIAL_STOCK_SALE' AND reference_id = ?
   `, [invoiceItem.id])[0];
   assert.equal(movement.quantityM2, -2);
@@ -140,7 +148,7 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
   });
   const returnedSaleItem = db.query<any>('SELECT id FROM sales_invoice_items WHERE invoice_id=?', [returnedSale.id])[0];
   const returned = sales.returnSale(returnedSale.id, [{
-    productId, quantityM2: 1, boxesCount: 1, unitPrice: 15, unitCost: 10,
+    productId, invoiceItemId: returnedSaleItem.id, quantityM2: 1, boxesCount: 1, unitPrice: 15, unitCost: 10,
     reason: 'Return to discounted source', specialStockId: source.id, disposition: 'SPECIAL_STOCK',
   }], false);
   assert.equal(returned.totalAmount, 15);

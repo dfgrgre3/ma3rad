@@ -11,6 +11,7 @@ async function bootstrap() {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   return db;
 }
 
@@ -18,7 +19,7 @@ test('hr report center methods return report results', async () => {
   await bootstrap();
   const service = new ReportCenterService();
   for (const method of ['hrPayrollSummary', 'hrPayrollPayouts', 'hrAttendanceSummary', 'hrLeaveSummary', 'hrTaxSummary'] as const) {
-    const result = service[method]({ from: '2020-08-01', to: '2020-08-31' });
+    const result = await service[method]({ from: '2020-08-01', to: '2020-08-31' });
     assert.ok(Array.isArray(result.columns));
     assert.ok(Array.isArray(result.rows));
     assert.ok(Array.isArray(result.kpis));

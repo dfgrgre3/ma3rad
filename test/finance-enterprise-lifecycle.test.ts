@@ -18,6 +18,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const adminUser = queryOne<{ id: string }>(`SELECT id FROM users WHERE username = 'admin'`);
   assert.ok(adminUser?.id, 'Admin user must exist');
@@ -566,6 +567,7 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const service = new FinanceExtrasService();
   const today = new Date().toISOString().slice(0, 10);
   const branchId = service.getFixedAssetCurrentBranch();

@@ -8,6 +8,7 @@ import { ProductFormPreferencesService } from '../src/services/domains/products/
 test('product form defaults and tone choices persist in the database and can be cleared', async () => {
   await DatabaseManager.getInstance().initialize();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const service = new ProductFormPreferencesService();
   const tone = `test-tone-${Date.now()}`;

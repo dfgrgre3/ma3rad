@@ -236,6 +236,10 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   // ── Return: numbered, restores stock, reverses revenue, reduces debt ──────
   const saleReturn = sales.returnSale(invoice.id, [{
     productId,
+    invoiceItemId: one<{ id: string }>(
+      `SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1`,
+      [invoice.id, productId]
+    ).id,
     quantityM2: 4,
     boxesCount: 3,
     unitPrice: 300,
@@ -265,6 +269,10 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   const stockBeforeRejectedReturn = stockOf(productId);
   assert.throws(() => sales.returnSale(invoice.id, [{
     productId,
+    invoiceItemId: one<{ id: string }>(
+      `SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1`,
+      [invoice.id, productId]
+    ).id,
     quantityM2: 7,
     boxesCount: 5,
     unitPrice: 300,
@@ -290,7 +298,8 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
   );
 
   // A direct invoice payment is capped at the outstanding amount: a receipt can
-  // never take more money than the invoice still owes.
+  // never take more money than the invoice still owes. Over-collection is
+  // rejected outright rather than silently capped.
   const creditInvoice = sales.createSale({
     customerId: customer.id,
     warehouseId: 'wh_main',
@@ -298,12 +307,13 @@ test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', as
     paidAmount: 0,
     paymentType: 'CREDIT',
   });
-  sales.recordInvoicePayment(creditInvoice.id, 5000);
+  assert.throws(() => sales.recordInvoicePayment(creditInvoice.id, 5000), /يتجاوز المتبقي/);
+  sales.recordInvoicePayment(creditInvoice.id, 300);
   const capped = sales.getInvoiceById(creditInvoice.id)!;
   assert.equal(capped.paidAmount, 300);
   assert.equal(capped.remainingAmount, 0);
   assert.equal(
-    one<{ amount: number }>(`SELECT amount FROM customer_payments WHERE invoice_id = ?`, [creditInvoice.id]).amount,
+    one<{ amount: number }>(`SELECT amount / 100.0 AS amount FROM customer_payments WHERE invoice_id = ?`, [creditInvoice.id]).amount,
     300,
     'the stored receipt must equal the amount actually applied'
   );

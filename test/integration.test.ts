@@ -18,6 +18,7 @@ import { localDateString } from '../src/utils/shared/date.ts';
 import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
 import { FacilityManagementService } from '../src/services/domains/operations/FacilityManagementService.ts';
 import type { User } from '../src/types/auth/identity.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -52,6 +53,13 @@ test('facility work orders link branch expenses and generate due preventive work
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   const actor = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   const service = new FacilityManagementService();
   const branch = service.getBranches()[0];
   assert.ok(branch);
@@ -111,6 +119,7 @@ test('accounting policy migration reclassifications balance and reruns safely', 
     description: 'Legacy fixed asset acquisition',
     referenceType: 'ASSET_ACQUISITION',
     referenceId: assetId,
+    branchId: 'br_main',
     createdBy: actorId,
     lines: [
       { accountCode: '1601', debit: 500, credit: 0 },
@@ -128,6 +137,7 @@ test('accounting policy migration reclassifications balance and reruns safely', 
     description: 'Legacy inventory adjustment',
     referenceType: 'INVENTORY_ADJUSTMENT',
     referenceId: adjustmentId,
+    branchId: 'br_main',
     createdBy: actorId,
     lines: [
       { accountCode: '1104', debit: 100, credit: 0 },
@@ -168,6 +178,13 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   const db = manager;
   const productId = 'prod_fifo_sale_test';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
@@ -194,7 +211,7 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
   ]);
   assert.equal(invoice.totalCost,90);
   const issue = q(`SELECT id FROM inventory_transactions WHERE reference_type='INVOICE' AND reference_id=? AND type='SALE'`,[invoice.id])[0];
-  sales.returnSale(invoice.id,[{productId,quantityM2:2,boxesCount:1,unitPrice:100,unitCost:15,reason:'FIFO test'}],false);
+  sales.returnSale(invoice.id,[{productId,invoiceItemId:q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',[invoice.id,productId])[0].id,quantityM2:2,boxesCount:1,unitPrice:100,unitCost:15,reason:'FIFO test'}],false);
   assert.deepEqual(q(`SELECT id, quantity_remaining_m2 AS remaining FROM product_batches WHERE id IN ('pb_fifo_first','pb_fifo_second') ORDER BY id`), [
     { id: 'pb_fifo_first', remaining: 2 },
     { id: 'pb_fifo_second', remaining: 3 },
@@ -215,6 +232,13 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
 
   const pid = 'prod_test_1';
   db.run(
@@ -223,7 +247,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
        wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
     [pid, 'SKU-T1', 'BAR-T1', 'بلاطة اختبار', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60',
-     'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 10]
+     'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 10]
   );
   db.run(
     `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
@@ -263,7 +287,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
     [demand.id]
   )[0];
   assert.equal(allocatedDemand.quantityReceived, 20, 'purchase receipt allocates customer demand as part of posting');
-  const avgCost = q('SELECT cost_price FROM products WHERE id=?', [pid])[0].costPrice;
+  const avgCost = q('SELECT cost_price / 100.0 AS costPrice FROM products WHERE id=?', [pid])[0].costPrice;
   assert.equal(avgCost, 133.33, 'weighted average cost should be 133.33');
 
   // --- Credit sale (paid 0) then full return ---
@@ -279,7 +303,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
 
   const return1 = new SalesService().returnSale(
     sale1.id,
-    [{ productId: pid, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }],
+    [{ productId: pid, invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1', [sale1.id, pid])[0].id, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }],
     true
   );
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'balance back to 0 after unpaid return');
@@ -336,7 +360,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'fully-paid sale does not increase balance');
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 15000, 'cash register received 15000');
 
-  new SalesService().returnSale(sale2.id, [{ productId: pid, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }], true);
+  new SalesService().returnSale(sale2.id, [{ productId: pid, invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1', [sale2.id, pid])[0].id, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }], true);
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'balance unchanged after paid return');
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 0, 'cash register refunded to 0');
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 300, 'stock restored to 300 after paid return');
@@ -414,7 +438,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   // --- Refund to customer balance instead of cash ---
   const balanceReturn = new SalesService().returnSale(
     orderInvoice.id,
-    [{ productId: pid, quantityM2: 20, boxesCount: box(20), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع كامل' }],
+    [{ productId: pid, invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1', [orderInvoice.id, pid])[0].id, quantityM2: 20, boxesCount: box(20), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع كامل' }],
     true,
     undefined,
     { refundMethod: 'BALANCE' }

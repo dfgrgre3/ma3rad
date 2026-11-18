@@ -41,6 +41,7 @@ test('transfers preserve batches and cost layers through a transit warehouse', a
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
 
   const adminId = queryOne<{ id: string }>(`SELECT id FROM users WHERE username = 'admin'`)!.id;

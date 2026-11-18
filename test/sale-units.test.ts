@@ -8,6 +8,7 @@ import { InventoryService } from '../src/services/domains/inventory/InventorySer
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import {
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
   basePriceFromUnitPrice,
   getSellableUnits,
   pricePerUnit,
@@ -18,6 +19,13 @@ async function boot(): Promise<DatabaseManager> {
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   return manager;
 }
 
@@ -303,6 +311,10 @@ test('returning a quantity in a selling unit converts to base units and refunds 
     invoice.id,
     [{
       productId,
+      invoiceItemId: manager.query<{ id: string }>(
+        'SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',
+        [invoice.id, productId],
+      )[0].id,
       quantityM2: 0,
       uom: 'BOX',
       quantity: 1,
@@ -362,6 +374,10 @@ test('returning an impossible unit is rejected and changes nothing', async () =>
     invoice.id,
     [{
       productId,
+      invoiceItemId: manager.query<{ id: string }>(
+        'SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1',
+        [invoice.id, productId],
+      )[0].id,
       quantityM2: 0,
       uom: 'BOX',
       quantity: 1,

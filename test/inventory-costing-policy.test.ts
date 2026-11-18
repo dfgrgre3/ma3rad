@@ -21,6 +21,7 @@ test('inventory valuation follows the configured costing method', async () => {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const warehouseId = 'wh_policy_test';
   const productId = 'prod_policy_test';
@@ -29,7 +30,7 @@ test('inventory valuation follows the configured costing method', async () => {
   db.run(`INSERT OR IGNORE INTO brands (id, name) VALUES ('brand_policy', 'ماركة سياسة التكلفة')`);
   db.run(`INSERT OR IGNORE INTO products (
     id, sku, barcode, name, category_id, brand_id, size, base_unit, sell_unit, cost_price, selling_price_m2, is_active
-  ) VALUES (?, 'SKU-POL', 'BAR-POL', 'صنف سياسة التكلفة', 'cat_policy', 'brand_policy', '60x60', 'M2', 'M2', 100, 150, 1)`, [productId]);
+  ) VALUES (?, 'SKU-POL', 'BAR-POL', 'صنف سياسة التكلفة', 'cat_policy', 'brand_policy', '60x60', 'M2', 'M2', 10000, 15000, 1)`, [productId]);
   db.run(`DELETE FROM warehouse_stock WHERE product_id = ?`, [productId]);
   db.run(`DELETE FROM inventory_cost_layers WHERE product_id = ?`, [productId]);
   db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES ('stk_policy', ?, ?, 10, 0)`, [warehouseId, productId]);
@@ -37,16 +38,16 @@ test('inventory valuation follows the configured costing method', async () => {
   db.run(`INSERT INTO inventory_cost_layers (
     id, product_id, warehouse_id, source_type, received_at,
     quantity_received, quantity_remaining, unit_cost
-  ) VALUES ('icl_policy', ?, ?, 'OPENING_ESTIMATE', '2026-01-01', 10, 10, 200)`, [productId, warehouseId]);
+  ) VALUES ('icl_policy', ?, ?, 'OPENING_ESTIMATE', '2026-01-01', 10, 10, 20000)`, [productId, warehouseId]);
 
   const valuation = new InventoryValuationService();
 
   setCostingMethod('AVERAGE_COST');
-  const averageKpi = valuation.getKpi();
+  const averageKpi = await valuation.getKpi();
   assert.equal(averageKpi.totalValue, 1000, 'Average cost must value physical stock at the current product cost');
 
   setCostingMethod('FIFO');
-  const fifoKpi = valuation.getKpi();
+  const fifoKpi = await valuation.getKpi();
   assert.equal(fifoKpi.totalValue, 2000, 'FIFO must value the remaining cost layers');
 });
 
@@ -54,6 +55,7 @@ test('warehouse movements keep bin-level stock in sync', async () => {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const inventory = new InventoryService();
   const warehouseId = 'wh_bin_test';
@@ -63,7 +65,7 @@ test('warehouse movements keep bin-level stock in sync', async () => {
   db.run(`INSERT OR IGNORE INTO brands (id, name) VALUES ('brand_bin', 'ماركة مواقع التخزين')`);
   db.run(`INSERT OR IGNORE INTO products (
     id, sku, barcode, name, category_id, brand_id, size, base_unit, sell_unit, cost_price, selling_price_m2, is_active
-  ) VALUES (?, 'SKU-BIN', 'BAR-BIN', 'صنف المواقع', 'cat_bin', 'brand_bin', '60x60', 'M2', 'M2', 100, 150, 1)`, [productId]);
+  ) VALUES (?, 'SKU-BIN', 'BAR-BIN', 'صنف المواقع', 'cat_bin', 'brand_bin', '60x60', 'M2', 'M2', 10000, 15000, 1)`, [productId]);
   db.run(`DELETE FROM warehouse_stock WHERE product_id = ?`, [productId]);
   db.run(`DELETE FROM product_location_stock WHERE product_id = ?`, [productId]);
   db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES ('stk_bin', ?, ?, 100, 0)`, [warehouseId, productId]);

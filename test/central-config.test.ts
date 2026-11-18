@@ -120,6 +120,7 @@ test('central feature permissions are enforced by both UI and service-layer chec
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   // Default admin credentials are gated by the fail-closed setup policy; the
   // service layer must refuse calls until the forced password change completes.
   new AuthService().changeOwnPassword(admin.id, 'admin123', 'AdminTest@2026');

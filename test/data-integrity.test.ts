@@ -14,6 +14,7 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
   await manager.initialize();
   await PermissionService.seed();
   const actor = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const db = manager.getDatabase();
   const statements = new FinancialStatementsService();
   const expected = DATA_INTEGRITY_BASELINE.balanceReconciliation;

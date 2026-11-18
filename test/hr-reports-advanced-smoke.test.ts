@@ -15,6 +15,7 @@ test('advanced hr/performance/production/sales reports return structured results
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const employee = EmployeeService.create({
     name: 'مندوب التقارير', phone: '0110000999', location: 'الفرع', role: 'بائع', email: '',
@@ -22,7 +23,7 @@ test('advanced hr/performance/production/sales reports return structured results
   });
   const employeeId = employee.id;
   // حقول المندوب تُضبط مباشرة (create لا يقبلها).
-  db.run('UPDATE employees SET is_sales_rep = 1, commission_percentage = 3, monthly_target = 10000 WHERE id = ?', [employeeId]);
+  db.run('UPDATE employees SET is_sales_rep = 1, commission_percentage = 3, monthly_target = 1000000 WHERE id = ?', [employeeId]);
 
   // أداء: دورة + تقييم + هدف + خطة تحسين
   q(`INSERT INTO performance_cycles (id, name, period_type, start_date, end_date, status)
@@ -53,34 +54,34 @@ test('advanced hr/performance/production/sales reports return structured results
 
   const service = new ReportCenterService();
 
-  const evaluations = service.hrPerformanceEvaluations({ from: '2021-01-01', to: '2021-12-31' });
+  const evaluations = await service.hrPerformanceEvaluations({ from: '2021-01-01', to: '2021-12-31' });
   assert.equal(evaluations.rows.length, 1);
   assert.equal(evaluations.rows[0].employeeName, 'مندوب التقارير');
   assert.equal(evaluations.rows[0].score, 4.7);
   assert.ok(evaluations.kpis.some((k) => k.label === 'متوسط الدرجة' && k.value === 4.7));
 
-  const goals = service.hrPerformanceGoals({ from: '2021-01-01', to: '2021-12-31' });
+  const goals = await service.hrPerformanceGoals({ from: '2021-01-01', to: '2021-12-31' });
   assert.equal(goals.rows.length, 1);
   assert.equal(goals.rows[0].progress, 120, '120% achievement');
   assert.ok(goals.kpis.some((k) => k.label === 'متجاوزة للمستهدف' && k.value === 1));
 
-  const pips = service.hrPerformancePips({ from: '2021-01-01', to: '2021-12-31' });
+  const pips = await service.hrPerformancePips({ from: '2021-01-01', to: '2021-12-31' });
   assert.equal(pips.rows.length, 1);
   assert.equal(pips.rows[0].status, 'COMPLETED');
 
-  const trainingExpenses = service.hrTrainingExpenses({ from: '2021-01-01', to: '2021-12-31' });
+  const trainingExpenses = await service.hrTrainingExpenses({ from: '2021-01-01', to: '2021-12-31' });
   assert.equal(trainingExpenses.rows.length, 1);
   assert.equal(trainingExpenses.rows[0].amount, 300);
   assert.equal(trainingExpenses.rows[0].courseName, 'دورة تقارير');
 
-  const production = service.mfgProductionKpis({ from: '2021-01-01', to: '2021-12-31' });
+  const production = await service.mfgProductionKpis({ from: '2021-01-01', to: '2021-12-31' });
   assert.equal(production.rows.length, 1);
   assert.equal(production.rows[0].lateFlag, 1, 'completed after due date is late');
   assert.equal(production.rows[0].acceptedQty, 45);
   assert.ok(production.kpis.some((k) => k.label === 'نسبة الجودة' && k.value === 90));
 
   // أهداف المبيعات: المندوب له مستهدف شهري 10000؛ الفترة يوليو (31 يومًا) → مستهدف الفترة ≈ 10333
-  const salesTargets = service.salesTargetKpis({ from: '2021-07-01', to: '2021-07-31' });
+  const salesTargets = await service.salesTargetKpis({ from: '2021-07-01', to: '2021-07-31' });
   const repRow = salesTargets.rows.find((r) => r.repName === 'مندوب التقارير');
   assert.ok(repRow, 'sales rep appears in the target report');
   assert.equal(repRow.proratedTarget, 10333.33);
@@ -94,7 +95,7 @@ test('new report catalog entries run through runReport and resolve definitions',
   for (const id of ids) {
     const definition = REPORT_DEFINITIONS.find((r) => r.id === id);
     assert.ok(definition, `${id} is registered in the catalog`);
-    const result = runReport(id, { from: '2021-01-01', to: '2021-12-31' });
+    const result = await runReport(id, { from: '2021-01-01', to: '2021-12-31' });
     assert.ok(Array.isArray(result.columns) && result.columns.length > 0, `${id} defines columns`);
     assert.ok(Array.isArray(result.kpis), `${id} defines kpis`);
     assert.ok(Array.isArray(result.rows), `${id} defines rows`);

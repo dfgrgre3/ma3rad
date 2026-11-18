@@ -119,7 +119,7 @@ export function recordInvoicePaymentEntry(
       `INSERT INTO customer_payments (
          id, receipt_number, customer_id, invoice_id, amount, payment_type, date, branch_id,
          register_id, shift_id, notes, performed_by, idempotency_key, bank_account_id
-       ) VALUES (?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         paymentId, receiptNumber, currentInvoice.customerId, invoiceId, value, paymentType, today, branchId,
         register, resolvedShiftId || null,
@@ -332,7 +332,7 @@ export function recordCustomerPaymentAllocationsEntry(
       const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
       const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
       db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by,bank_account_id)
-        VALUES (?,?,?,ROUND(?*100),?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, resolvedRegisterId, resolvedShiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
+        VALUES (?,?,?, ?,ROUND(?*100),?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, resolvedRegisterId, resolvedShiftId || null, branchId, paymentNotes, actor.id, bankAccountId || null]);
       db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,ROUND(?*100))`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
       db.run(`UPDATE sales_invoices SET paid_amount=ROUND(?*100),remaining_amount=ROUND(?*100),payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,

@@ -36,6 +36,7 @@ test('financial statements screen filters cash flow and ledger and exports the b
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const actorId = manager.query<{ id: string }>('SELECT id FROM users ORDER BY created_at, id LIMIT 1')[0]?.id;
   assert.ok(actorId);

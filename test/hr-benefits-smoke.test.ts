@@ -16,6 +16,7 @@ test('hr benefits service manages allowances, benefits, loans, installments and 
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const employee = EmployeeService.create({
     name: 'موظف مزايا', location: 'اختبار', role: 'موظف', phone: '0109011001', email: '',
     baseSalary: 1000, salaryType: 'MONTHLY', status: 'ACTIVE', joinedDate: '2020-09-01',

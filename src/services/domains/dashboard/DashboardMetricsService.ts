@@ -71,7 +71,11 @@ export interface PartialDataError {
 }
 
 export class DashboardMetricsService {
-  private db = DatabaseManager.getInstance().getDatabase();
+  // Lazy: the module-level singleton must not touch the database at import
+  // time — tests and early startup construct it before initialize() runs.
+  private get db() {
+    return DatabaseManager.getInstance().getDatabase();
+  }
   private branchAccess = new BranchAccessService();
   private accountingService = new AccountingService();
   private partialErrors: PartialDataError[] = [];

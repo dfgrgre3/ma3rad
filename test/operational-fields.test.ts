@@ -14,7 +14,8 @@ test('operational field definitions validate, persist, export, and protect store
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
 
   const service = new OperationalFieldService();
   const code = `TEST_${Date.now()}`;
@@ -67,7 +68,8 @@ test('purchase order export values are labeled for direct list reports', async (
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
 
   const service = new OperationalFieldService();
   const fieldId = service.addDefinition({
@@ -90,7 +92,8 @@ test('product grade choices can be configured and new grade values remain persis
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
   const service = new OperationalFieldService();
   const original = service.getProductGradeOptions(true).find((option) => option.value === 'GRADE_1');
   assert.ok(original);
@@ -128,7 +131,8 @@ test('operational field changes use the configured master-data sync policy', asy
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
   MasterDataSyncService.configure({
     tenantId: `tenant-${Date.now()}`,
     branchId: 'branch-main',
@@ -162,7 +166,8 @@ test('record deletion clears custom fields and configured grade parsing preserve
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; };
   const fields = new OperationalFieldService();
   const fieldId = fields.addDefinition({
     entityType: 'leads',

@@ -12,13 +12,21 @@ import { CustomerService } from '../src/services/domains/customers/CustomerServi
 import { evaluateManualDiscountPolicy } from '../src/services/domains/sales/discountPolicy.ts';
 import { basePriceFromUnitPrice, toBaseQuantity } from '../src/utils/products/uom.ts';
 import type { User } from '../src/types/auth/identity.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 const db = DatabaseManager.getInstance();
 
 async function bootAdmin(): Promise<void> {
   await db.initialize();
   await PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
 }
 
 function q<T = any>(sql: string, params: any[] = []): T[] {
@@ -137,7 +145,14 @@ test('a manual discount above threshold needs an approved DISCOUNT request and c
   });
 
   // 3. Manager approves.
-  AuthService.login('admin', 'admin123');
+  AuthService.login('admin', 'admin123')
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = DatabaseManager.getInstance().query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } };
   PermissionService.invalidate(AuthService.getCurrentUser()!);
   approvalService.decide(request.id, true);
 

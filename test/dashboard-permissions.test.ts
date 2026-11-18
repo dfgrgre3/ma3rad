@@ -13,6 +13,7 @@ test('dashboard.view alone cannot read embedded sales, finance or CRM data', asy
   await db.initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const role = PermissionService.createRole({ code: 'dashboard_only_test', name: 'Dashboard only test' }, admin);
   PermissionService.setRolePermissions(role.code, ['dashboard.view'], admin);
   const id = 'usr_dashboard_only_test';

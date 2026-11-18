@@ -246,6 +246,9 @@ function handleMainMutation(kind: 'run' | 'exec' | 'reset', sql: string, params:
  */
 export async function initDatabaseAsync(): Promise<void> {
   registerMutationForwarder();
+  // Node/test environments have no Web Worker — every async operation falls
+  // back to the main-thread DatabaseManager, so there is nothing to initialize.
+  if (typeof Worker === 'undefined') return;
   if (initPromise) return initPromise;
   const initialization = enqueue(async () => {
     await ensureWorkerInSync();
@@ -266,6 +269,7 @@ export async function initDatabaseAsync(): Promise<void> {
  */
 export function prewarmDatabaseWorker(): void {
   registerMutationForwarder();
+  if (typeof Worker === 'undefined') return;
   void enqueue(async () => {
     await ensureWorkerInitialized();
   }).catch((error) => {
@@ -279,6 +283,11 @@ export function prewarmDatabaseWorker(): void {
  * لا يسحب أي لقطة من العامل لأن القراءة لا تغيّر حالة قاعدة البيانات.
  */
 export async function queryAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+  // بيئات بلا Web Worker (اختبارات Node، عمليات غير متصفح) تنفّذ على الخيط
+  // الرئيسي بنفس الدلالات — القراءة لا تتغير، فقط لا تُنقل إلى عامل.
+  if (typeof Worker === 'undefined') {
+    return DatabaseManager.getInstance().query<T>(sql, params);
+  }
   return enqueue(async () => {
     await ensureWorkerInSync();
     return post<T[]>({ type: 'query', sql, params });
@@ -314,6 +323,9 @@ export async function execAsync(sql: string): Promise<void> {
  * db.export() المتزامنة متعددة الميغابايتات.
  */
 export async function exportDatabaseAsync(): Promise<Uint8Array> {
+  if (typeof Worker === 'undefined') {
+    return DatabaseManager.getInstance().exportDatabaseBytes();
+  }
   return enqueue(async () => {
     // If the worker was out of sync, ensureWorkerInSync already exported the
     // main database to push it — reuse those bytes instead of paying for a
@@ -335,6 +347,10 @@ async function importDatabaseToWorkerAsync(bytes: Uint8Array): Promise<void> {
  * استيراد قاعدة بيانات ثنائية إلى الخيط الرئيسي والعامل معًا.
  */
 export async function importDatabaseAsync(bytes: Uint8Array): Promise<void> {
+  if (typeof Worker === 'undefined') {
+    DatabaseManager.getInstance().importDatabaseBytes(bytes);
+    return;
+  }
   return enqueue(async () => {
     // تحديث النسخة في الخيط الرئيسي أولًا، ثم العامل. نُسجّل عدّاد الطفرات
     // بعد الاستيراد حتى تعتبر الحالة مزامَنة ولا يُدفع شيء لاحقًا.
@@ -358,6 +374,7 @@ export function registerMutationForwarder(): void {
  * إغلاق العامل وحفظ لقطة قاعدة البيانات.
  */
 export async function closeDatabaseAsync(): Promise<void> {
+  if (typeof Worker === 'undefined') return;
   try {
     await enqueue(async () => {
       await post<void>({ type: 'close' });

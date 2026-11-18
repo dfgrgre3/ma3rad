@@ -136,6 +136,7 @@ test('3.5: dashboard metrics date upper-bounding and accurate overdue debt aging
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const accounting = new AccountingService();
 

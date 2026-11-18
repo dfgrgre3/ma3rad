@@ -93,6 +93,7 @@ test('dashboard sales and gross profit reconcile invoice returns and same-period
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const today = localDateString();
   const [year, month, day] = today.split('-').map(Number);
   const previousMonth = new Date(year, month - 2, 1);
@@ -144,6 +145,7 @@ test('dashboard trend and monthly comparison batch invoice and return totals cor
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const today = localDateString();
   const [year, month, day] = today.split('-').map(Number);
@@ -209,6 +211,7 @@ test('dashboard FIFO inventory valuation uses remaining layer cost', async () =>
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const originalMethod = q(`SELECT value FROM system_settings WHERE key = 'costingMethod'`)[0]?.value || 'AVERAGE_COST';
   db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
   const before = new AccountingService().getDashboardMetrics();
@@ -288,6 +291,7 @@ test('scheduled shift closure records the expected till balance for the next ope
   await manager.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const service = new CashierService();
   const previousSchedule = service.getShiftAutoCloseSchedule();
   let shiftId: string | null = null;
@@ -323,6 +327,7 @@ test('customer supply demand accumulates quantity and total value across added q
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const customer = new CustomerService().createCustomer({
     name: 'Customer supply total test',
     phone: '0199000042',
@@ -350,6 +355,7 @@ test('customer supply demand accumulates quantity and total value across added q
   db.run('DELETE FROM customer_supply_requests WHERE invoice_id = ?', [base.invoiceId]);
   db.run('DELETE FROM customers WHERE id = ?', [customer.id]);
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 });
 
 test('customer codes skip existing values when generated during creation', async () => {
@@ -357,6 +363,7 @@ test('customer codes skip existing values when generated during creation', async
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const nextNumber = (db.query<{ value: number }>(
     'SELECT value FROM sequence_counters WHERE name = ?',
@@ -392,6 +399,7 @@ test('profit and loss reconciles merchandise gross profit with invoices and sepa
   await manager.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const db = manager.getDatabase();
   const today = localDateString();
   let report: ReturnType<AccountingService['getProfitAndLossReport']>;
@@ -453,6 +461,7 @@ test('navigation layout setting accepts only header or sidebar and persists', as
   const db = DatabaseManager.getInstance();
   await db.initialize();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   assert.throws(
     () => SettingsService.update({ navigationLayout: 'floating' }),
@@ -470,6 +479,7 @@ test('navigation layout setting accepts only header or sidebar and persists', as
 test('appearance settings validate and persist workspace colors and control styles', async () => {
   await DatabaseManager.getInstance().initialize();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const before = SettingsService.getSettings();
 
   assert.equal(before.interfaceDirection, 'rtl');
@@ -528,6 +538,7 @@ test('enabling FIFO refuses destructive conversion when cost history exists', as
   const db = DatabaseManager.getInstance();
   await db.initialize();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
   const layersBefore = q('SELECT COUNT(*) AS count FROM inventory_cost_layers')[0].count;
   const allocationsBefore = q('SELECT COUNT(*) AS count FROM inventory_cost_allocations')[0].count;
@@ -554,6 +565,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const pid = 'prod_stmt_1';
   db.run(
@@ -666,6 +678,7 @@ test('commissions and stock reservations lifecycle', async () => {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const customer = q(`SELECT id FROM customers WHERE phone = '0111111111'`)[0];
 
   db.run(
@@ -798,6 +811,7 @@ test('supplier lifecycle supports edit, archive, reactivation, payments and stat
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const service = new SupplierService();
   const supplier = service.createSupplier({
@@ -878,6 +892,7 @@ test('monthly payroll accrual is idempotent and settles advances before salary p
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const period = localDateString().slice(0, 7);
   const employee = EmployeeService.create({
     name: 'موظف اختبار الرواتب',
@@ -920,6 +935,7 @@ test('payroll run snapshots period attendance, contract pay and policy deduction
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const employee = EmployeeService.create({
     name: 'موظف دورة رواتب',
     location: 'اختبار',
@@ -1038,6 +1054,7 @@ test('time attendance uses assigned shifts, approves corrections and gates overt
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const employee = EmployeeService.create({
     name: 'موظف اختبار البصمة',
     location: 'اختبار',
@@ -1121,6 +1138,7 @@ test('punch workflow records breaks and permits next-day checkout for overnight 
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const employee = EmployeeService.create({
     name: 'موظف اختبار تسجيل الوقت',
     location: 'اختبار',
@@ -1180,6 +1198,7 @@ test('fixed asset acquisition uses the approved clearing liability by default', 
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const registerBefore = q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance;
   const service = new FinanceExtrasService();
   service.saveFixedAsset({

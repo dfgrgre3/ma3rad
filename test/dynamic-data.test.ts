@@ -11,6 +11,7 @@ test('dynamic data: an unseen type is inferred, reused, searched, edited, export
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   const service = new DynamicDataService();
   const typeName = `Cal Matrix ${Date.now()}`;

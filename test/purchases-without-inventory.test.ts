@@ -43,6 +43,7 @@ async function boot(): Promise<DatabaseManager> {
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
 
   db.run(
     `INSERT OR IGNORE INTO suppliers (id, code, name, phone, payment_terms_days, is_active)

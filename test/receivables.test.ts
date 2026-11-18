@@ -12,6 +12,7 @@ import { DATA_INTEGRITY_BASELINE } from './fixtures/data-integrity-baseline.ts';
 
 test('purchase order partial and full receipts post only received stock and preserve history', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const pid = 'prod_receivable_test'; const sid = 'sup_receivable_test';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
     [pid,'SKU-RCV','BAR-RCV','وحدة اختبار','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,20,30,25,0,0]);
@@ -39,6 +40,7 @@ test('purchase order partial and full receipts post only received stock and pres
 
 test('one customer receipt allocates across several invoices atomically', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const bankAccountId = 'bank_receivable_test';
   const bankGlId = db.query<any>(`SELECT id FROM chart_of_accounts WHERE code='1102'`)[0].id;
   db.run(`INSERT INTO bank_accounts (id,account_name,bank_name,account_number,opening_balance,current_balance,gl_account_id,branch_id,is_active)
@@ -84,6 +86,7 @@ test('one customer receipt allocates across several invoices atomically', async 
 
 test('supplier payment retry with the same idempotency key posts once and rejects key reuse', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const supplierId = 'sup_payment_retry_test';
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases) VALUES (?,?,?,?,?,0)`,
     [supplierId,'SUP-RETRY','مورد إعادة المحاولة','01000000009',DATA_INTEGRITY_BASELINE.supplierPaymentRetry.initialBalance]);
@@ -99,6 +102,7 @@ test('supplier payment retry with the same idempotency key posts once and reject
 
 test('supplier payment reallocation preserves prior paid amounts and enforces invoice and payment caps', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const supplierId = 'sup_reallocate_caps_test';
   const branchId = db.query<any>(`SELECT branch_id FROM warehouses WHERE id='wh_main'`)[0].branchId;
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases,company_id)

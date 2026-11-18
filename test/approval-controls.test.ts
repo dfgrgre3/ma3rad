@@ -330,7 +330,8 @@ test('product price change and delete go through the approval gate', async () =>
   AuthService.setCurrentUser(editor);
   PermissionService.invalidate(editor);
   products.updateProduct(productId, { sellingPriceM2: 20 }, 'usr_x', { approvalId: priceRequest.id });
-  assert.equal(Number(db.query<{ p: number }>('SELECT selling_price_m2 AS p FROM products WHERE id = ?', [productId])[0].p), 20);
+  // Money columns are stored in minor units (x100); reads unscale them.
+  assert.equal(Number(db.query<{ p: number }>('SELECT selling_price_m2 AS p FROM products WHERE id = ?', [productId])[0].p), 2000);
   assert.equal(db.query<{ t: string | null }>('SELECT reference_type AS t FROM approval_requests WHERE id = ?', [priceRequest.id])[0].t, 'PRICE_CHANGE');
 
   // Delete always requires approval for non-admin + reason.

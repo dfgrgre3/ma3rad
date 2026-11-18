@@ -24,6 +24,7 @@ async function boot(): Promise<DatabaseManager> {
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   return manager;
 }
 

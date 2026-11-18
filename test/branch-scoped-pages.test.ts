@@ -47,8 +47,8 @@ test('inventory, report and party pages only expose data from accessible branche
   );
   db.run(
     `INSERT OR IGNORE INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
-     VALUES ('cr_page_a', 'Page Register A', 100, 1, 1, 'br_page_a'),
-            ('cr_page_b', 'Page Register B', 900, 1, 1, 'br_page_b')`
+     VALUES ('cr_page_a', 'Page Register A', 10000, 1, 1, 'br_page_a'),
+            ('cr_page_b', 'Page Register B', 90000, 1, 1, 'br_page_b')`
   );
   db.run(
     `INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
@@ -81,8 +81,8 @@ test('inventory, report and party pages only expose data from accessible branche
   db.run(
     `INSERT INTO sales_invoices (id, invoice_number, date, customer_id, warehouse_id, branch_id,
        subtotal, discount_amount, total_amount, created_by, remaining_amount)
-     VALUES ('si_page_a', 'PAGE-SI-A', ?, 'cust_page_a', 'wh_page_a', 'br_page_a', 500, 0, 500, 'usr_page_scope', 50),
-            ('si_page_b', 'PAGE-SI-B', ?, 'cust_page_b', 'wh_page_b', 'br_page_b', 900, 0, 900, 'usr_page_scope', 90)`,
+     VALUES ('si_page_a', 'PAGE-SI-A', ?, 'cust_page_a', 'wh_page_a', 'br_page_a', 50000, 0, 50000, 'usr_page_scope', 5000),
+            ('si_page_b', 'PAGE-SI-B', ?, 'cust_page_b', 'wh_page_b', 'br_page_b', 90000, 0, 90000, 'usr_page_scope', 9000)`,
     [today, today]
   );
   db.run(
@@ -102,7 +102,7 @@ test('inventory, report and party pages only expose data from accessible branche
        base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
        wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
      VALUES ('prod_page', 'PAGE-PROD', 'PAGE-PROD', 'Page Product', 'cat_floor', 'br_cleo', 'GRADE_1',
-       '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`
+       '60x60', 'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 0, 1)`
   );
   db.run(
     `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
@@ -125,59 +125,59 @@ test('inventory, report and party pages only expose data from accessible branche
   db.run(
     `INSERT OR REPLACE INTO inventory_cost_layers
        (id, product_id, warehouse_id, source_type, received_at, quantity_received, quantity_remaining, unit_cost)
-     VALUES ('icl_page_a_1', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 4, 4, 100),
-            ('icl_page_a_2', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 6, 6, 150),
-            ('icl_page_b', 'prod_page', 'wh_page_b', 'PURCHASE', ?, 5, 5, 100),
-            ('icl_page_inactive', 'prod_page_inactive', 'wh_page_a', 'PURCHASE', ?, 2, 2, 10000)`,
+     VALUES ('icl_page_a_1', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 4, 4, 10000),
+            ('icl_page_a_2', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 6, 6, 15000),
+            ('icl_page_b', 'prod_page', 'wh_page_b', 'PURCHASE', ?, 5, 5, 10000),
+            ('icl_page_inactive', 'prod_page_inactive', 'wh_page_a', 'PURCHASE', ?, 2, 2, 1000000)`,
     [today, today, today, today]
   );
   db.run(
     `INSERT INTO purchase_invoices (id, invoice_number, date, supplier_id, warehouse_id, branch_id,
        subtotal, total_amount, created_by, remaining_amount)
-     VALUES ('pi_page_a', 'PAGE-PI-A', ?, 'sup_page', 'wh_page_a', 'br_page_a', 200, 200, 'usr_page_scope', 20),
-            ('pi_page_b', 'PAGE-PI-B', ?, 'sup_page', 'wh_page_b', 'br_page_b', 300, 300, 'usr_page_scope', 30)`,
+     VALUES ('pi_page_a', 'PAGE-PI-A', ?, 'sup_page', 'wh_page_a', 'br_page_a', 20000, 20000, 'usr_page_scope', 2000),
+            ('pi_page_b', 'PAGE-PI-B', ?, 'sup_page', 'wh_page_b', 'br_page_b', 30000, 30000, 'usr_page_scope', 3000)`,
     [today, today]
   );
   db.run(
     `INSERT INTO purchase_invoice_items (id, purchase_id, product_id, product_name, grade,
        quantity_m2, boxes_count, unit_cost, total_cost, meters_per_box, pieces_per_box)
-     VALUES ('pii_page_a', 'pi_page_a', 'prod_page', 'Page Product', 'GRADE_1', 2, 1, 100, 200, 1.44, 4),
-            ('pii_page_b', 'pi_page_b', 'prod_page', 'Page Product', 'GRADE_1', 3, 1, 100, 300, 1.44, 4)`
+     VALUES ('pii_page_a', 'pi_page_a', 'prod_page', 'Page Product', 'GRADE_1', 2, 1, 10000, 20000, 1.44, 4),
+            ('pii_page_b', 'pi_page_b', 'prod_page', 'Page Product', 'GRADE_1', 3, 1, 10000, 30000, 1.44, 4)`
   );
   db.run(
     `INSERT INTO purchase_orders (id, order_number, date, supplier_id, warehouse_id, total_amount, status, created_by)
-     VALUES ('po_page_a', 'PAGE-PO-A', ?, 'sup_page', 'wh_page_a', 200, 'RECEIVED', 'usr_page_scope'),
-            ('po_page_b', 'PAGE-PO-B', ?, 'sup_page', 'wh_page_b', 300, 'RECEIVED', 'usr_page_scope')`,
+     VALUES ('po_page_a', 'PAGE-PO-A', ?, 'sup_page', 'wh_page_a', 20000, 'RECEIVED', 'usr_page_scope'),
+            ('po_page_b', 'PAGE-PO-B', ?, 'sup_page', 'wh_page_b', 30000, 'RECEIVED', 'usr_page_scope')`,
     [today, today]
   );
   db.run(
     `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date,
        register_id, branch_id, performed_by)
-     VALUES ('sp_page_a', 'PAGE-SP-A', 'sup_page', 50, 'CASH', ?, 'cr_page_a', 'br_page_a', 'usr_page_scope')`,
+     VALUES ('sp_page_a', 'PAGE-SP-A', 'sup_page', 5000, 'CASH', ?, 'cr_page_a', 'br_page_a', 'usr_page_scope')`,
     [today]
   );
   db.run(
     `INSERT INTO expenses (id, category, amount, register_id, date, description, performed_by, branch_id)
-     VALUES ('exp_page_a', 'Page A', 40, 'cr_page_a', ?, 'Page A expense', 'usr_page_scope', 'br_page_a'),
-            ('exp_page_b', 'Page B', 90, 'cr_page_b', ?, 'Page B expense', 'usr_page_scope', 'br_page_b')`,
+     VALUES ('exp_page_a', 'Page A', 4000, 'cr_page_a', ?, 'Page A expense', 'usr_page_scope', 'br_page_a'),
+            ('exp_page_b', 'Page B', 9000, 'cr_page_b', ?, 'Page B expense', 'usr_page_scope', 'br_page_b')`,
     [today, today]
   );
   db.run(
     `INSERT INTO installment_plans (id, plan_number, customer_id, invoice_id, total_amount, financed_amount,
        installments_count, installment_amount, start_date, remaining_amount, created_by, branch_id)
-     VALUES ('plan_page_a', 'PAGE-PLAN-A', 'cust_page_a', 'si_page_a', 50, 50, 1, 50, ?, 50, 'usr_page_scope', 'br_page_a'),
-            ('plan_page_b', 'PAGE-PLAN-B', 'cust_page_b', 'si_page_b', 90, 90, 1, 90, ?, 90, 'usr_page_scope', 'br_page_b')`,
+     VALUES ('plan_page_a', 'PAGE-PLAN-A', 'cust_page_a', 'si_page_a', 5000, 5000, 1, 5000, ?, 5000, 'usr_page_scope', 'br_page_a'),
+            ('plan_page_b', 'PAGE-PLAN-B', 'cust_page_b', 'si_page_b', 9000, 9000, 1, 9000, ?, 9000, 'usr_page_scope', 'br_page_b')`,
     [today, today]
   );
   db.run(
     `INSERT INTO installments (id, plan_id, sequence_number, due_date, amount, remaining_amount)
-     VALUES ('inst_page_a', 'plan_page_a', 1, ?, 50, 50), ('inst_page_b', 'plan_page_b', 1, ?, 90, 90)`,
+     VALUES ('inst_page_a', 'plan_page_a', 1, ?, 5000, 5000), ('inst_page_b', 'plan_page_b', 1, ?, 9000, 9000)`,
     [today, today]
   );
 
   AuthService.setCurrentUser(assignedUser);
 
-  const executive = runExecutiveQueries(today, today)!;
+  const executive = await runExecutiveQueries(today, today);
   assert.equal(executive.total, 500, 'executive sales KPI excludes branch B');
   assert.equal(executive.totalPurchases, 200, 'executive purchasing KPI excludes branch B');
   assert.equal(executive.totalDebt, 50, 'executive receivables exclude branch B');
@@ -193,12 +193,12 @@ test('inventory, report and party pages only expose data from accessible branche
   assert.deepEqual(new DebtService().getTotals(), { receivable: 50, payable: 20, net: 30 });
   assert.ok(new DebtService().getDebts().every((debt) => debt.amount === 50 || debt.amount === 20));
   const valuation = new InventoryValuationService();
-  const warehouseValuations = valuation.getByWarehouse();
+  const warehouseValuations = await valuation.getByWarehouse();
   assert.deepEqual(warehouseValuations.map((warehouse) => warehouse.name), ['Page Warehouse A']);
   assert.equal(warehouseValuations[0].costValue, 21300, 'warehouse valuation includes remaining FIFO costs for inactive stock');
   assert.equal(warehouseValuations[0].itemsCount, 2, 'warehouse valuation includes inactive products with stock');
   assert.equal(warehouseValuations[0].quantitiesByUnit.reduce((sum, row) => sum + row.quantity, 0), 12);
-  const valuationKpi = valuation.getKpi();
+  const valuationKpi = await valuation.getKpi();
   assert.equal(valuationKpi.totalValue, 21300);
   assert.equal(valuationKpi.totalSkus, 2);
   assert.deepEqual(valuationKpi.topValueItems.map((item) => item.name), ['Inactive Page Product', 'Page Product']);
@@ -215,15 +215,15 @@ test('inventory, report and party pages only expose data from accessible branche
   assert.deepEqual(salesRows.map(row => row.label), ['Page Customer A']);
   assert.equal(salesRows[0].revenue, 500);
 
-  const analytics = new AnalyticsService().getSalesAnalytics(today, today);
+  const analytics = await new AnalyticsService().getSalesAnalytics(today, today);
   assert.equal(analytics.totalSales, 500);
   assert.deepEqual(analytics.topCustomers.map(row => row.customerName), ['Page Customer A']);
 
-  const purchaseKpi = loadPurchaseKpi(today, today);
+  const purchaseKpi = await loadPurchaseKpi(today, today);
   assert.equal(purchaseKpi.totalInvoices, 1);
   assert.equal(purchaseKpi.totalPurchases, 200);
 
-  const inventoryKpi = loadInventoryKpi();
+  const inventoryKpi = await loadInventoryKpi();
   assert.equal(inventoryKpi.totalSkus, 2);
   assert.equal(inventoryKpi.totalValue, 21300);
 
@@ -263,19 +263,19 @@ test('inventory, report and party pages only expose data from accessible branche
   AuthService.setCurrentUser(admin);
   const branchAccess = new BranchAccessService();
   branchAccess.setCurrentBranchId('br_page_a', admin);
-  assert.equal(loadInventoryKpi().totalValue, 21300);
-  assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 500);
+  assert.equal((await loadInventoryKpi()).totalValue, 21300);
+  assert.equal((await new AnalyticsService().getSalesAnalytics(today, today)).totalSales, 500);
   assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_a']);
-  assert.equal(loadPurchaseKpi(today, today).totalPurchases, 200);
+  assert.equal((await loadPurchaseKpi(today, today)).totalPurchases, 200);
   assert.deepEqual(loadBranchCountSessions().map(row => row.id), ['cnt_page_a']);
   assert.deepEqual(new SupplierService().getInvoicesWithAllocations('sup_page').map(row => row.id), ['pi_page_a']);
   assert.equal(new ProcurementService().getSupplierScorecard('sup_page').totalOrders, 1);
 
   branchAccess.setCurrentBranchId('br_page_b', admin);
-  assert.equal(loadInventoryKpi().totalValue, 500);
-  assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 900);
+  assert.equal((await loadInventoryKpi()).totalValue, 500);
+  assert.equal((await new AnalyticsService().getSalesAnalytics(today, today)).totalSales, 900);
   assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_b']);
-  assert.equal(loadPurchaseKpi(today, today).totalPurchases, 300);
+  assert.equal((await loadPurchaseKpi(today, today)).totalPurchases, 300);
   assert.deepEqual(loadBranchCountSessions().map(row => row.id), ['cnt_page_b']);
   assert.deepEqual(new SupplierService().getInvoicesWithAllocations('sup_page').map(row => row.id), ['pi_page_b']);
   assert.equal(new ProcurementService().getSupplierScorecard('sup_page').totalOrders, 1);

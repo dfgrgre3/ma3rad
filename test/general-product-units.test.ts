@@ -3,18 +3,32 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { InventoryValuationService } from '../src/services/domains/inventory/InventoryValuationService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 
+function ensureCashShift() {
+  const user = AuthService.getCurrentUser();
+  if (!user) return;
+  const open = DatabaseManager.getInstance().query<{ id: string }>(
+    "SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1",
+    [user.id]
+  )[0];
+  if (!open) new CashierService().openShift('cr_main', user.id, 0);
+}
+
+
 test('general product sales decrement stock using the selected unit', async () => {
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const db = manager.getDatabase();
+  ensureCashShift();
 
   const productId = 'prod_unit_box_test';
   db.run(
@@ -65,7 +79,9 @@ test('general product sales preserve non-box base units on invoice rows', async 
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const db = manager.getDatabase();
+  ensureCashShift();
 
   const productId = 'prod_unit_kg_test';
   db.run(
@@ -116,7 +132,9 @@ test('inactive products with remaining stock stay visible in inventory and valua
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const db = manager.getDatabase();
+  ensureCashShift();
   const productId = 'prod_inactive_stock_visibility_test';
   const stockId = 'stk_inactive_stock_visibility_test';
   const costLayerId = 'icl_inactive_stock_visibility_test';
@@ -129,15 +147,15 @@ test('inactive products with remaining stock stay visible in inventory and valua
   db.run('DELETE FROM products WHERE id = ?', [productId]);
 
   try {
-    const before = valuation.getByWarehouse().find((row) => row.id === 'wh_main');
-    const kpiBefore = valuation.getKpi();
+    const before = (await valuation.getByWarehouse()).find((row) => row.id === 'wh_main');
+    const kpiBefore = await valuation.getKpi();
     const reconciliationBefore = inventory.reconcileInventoryWithGL('wh_main');
     db.run(
       `INSERT INTO products (
          id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, size,
          base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price,
          selling_price_m2, is_active
-       ) VALUES (?, 'GENERAL', '', ?, ?, ?, ?, ?, '', 'KG', 'KG', 1, 1, 20, 30, 1)`,
+       ) VALUES (?, 'GENERAL', '', ?, ?, ?, ?, ?, '', 'KG', 'KG', 1, 1, 2000, 3000, 1)`,
       [productId, 'SKU-INACTIVE-STOCK', 'BAR-INACTIVE-STOCK', 'صنف معطل برصيد', 'cat_floor', 'br_cleo'],
     );
     db.run(
@@ -149,7 +167,7 @@ test('inactive products with remaining stock stay visible in inventory and valua
       `INSERT INTO inventory_cost_layers (
          id, product_id, warehouse_id, source_type, received_at, quantity_received,
          quantity_remaining, unit_cost, is_estimated
-       ) VALUES (?, ?, 'wh_main', 'OPENING_ESTIMATE', date('now'), 7, 7, 20, 1)`,
+       ) VALUES (?, ?, 'wh_main', 'OPENING_ESTIMATE', date('now'), 7, 7, 2000, 1)`,
       [costLayerId, productId],
     );
 
@@ -157,8 +175,8 @@ test('inactive products with remaining stock stay visible in inventory and valua
     db.run('UPDATE products SET is_active = 0 WHERE id = ?', [productId]);
     assert.equal(inventory.getWarehouseStock('wh_main').some((row) => row.productId === productId), false);
     assert.equal(inventory.getInactiveWarehouseStock('wh_main').find((row) => row.productId === productId)?.quantityM2, 7);
-    const after = valuation.getByWarehouse().find((row) => row.id === 'wh_main');
-    const kpiAfter = valuation.getKpi();
+    const after = (await valuation.getByWarehouse()).find((row) => row.id === 'wh_main');
+    const kpiAfter = await valuation.getKpi();
     const reconciliationAfter = inventory.reconcileInventoryWithGL('wh_main');
     assert.ok(before && after);
     assert.ok(
@@ -171,8 +189,8 @@ test('inactive products with remaining stock stay visible in inventory and valua
     transferId = inventory.requestWarehouseStockTransfer('wh_main', 'wh_ext', 'اختبار نقل رصيد الصنف المعطل');
     const transferItem = manager.query<{ productId: string; quantityM2: number }>(`
       SELECT product_id AS productId, quantity_m2 AS quantityM2
-      FROM stock_transfer_items WHERE transfer_id = ?
-    `, [transferId])[0];
+      FROM stock_transfer_items WHERE transfer_id = ? AND product_id = ?
+    `, [transferId, productId])[0];
     assert.deepEqual(transferItem, { productId, quantityM2: 7 });
   } finally {
     if (transferId) {

@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { WarrantyClaimService } from '../src/services/domains/sales/WarrantyClaimService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 function seedProduct(db: any, id: string): void {
   db.run(
@@ -28,7 +29,10 @@ test('customer warranty claims: eligibility, lifecycle, quantity accounting and 
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
-  AuthService.login('admin', 'admin123');
+  const __user = AuthService.login('admin', 'admin123');
+  { const __u = AuthService.getCurrentUser(); if (__u) { __u.mustChangePassword = false; __u.securityKeySetupRequired = false; } }
+  const __openShift = db.query<{ id: string }>(`SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__user.id])[0];
+  if (!__openShift) new CashierService().openShift('cr_main', __user.id, 0);
 
   const customer = new CustomerService().createCustomer({
     name: 'عميل اختبار الضمان', phone: '0123333333', customerType: 'RETAIL', creditLimit: 0,

@@ -579,7 +579,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   placeholder="https://api.ceramisys.app/v1"
                 />
               </Field>
-              <Field label="عنوان خادم المزامنة الحية (WebSockets / Sync Endpoint)">
+              <Field label="عنوان خادم المزامنة الحية (Sync Endpoint)">
                 <input
                   type="text"
                   value={settings.syncServerEndpoint || ''}
