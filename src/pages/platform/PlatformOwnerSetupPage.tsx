@@ -71,7 +71,7 @@ export const PlatformOwnerSetupPage: React.FC<PlatformOwnerSetupPageProps> = ({ 
 
   if (alreadyBootstrapped) {
     return (
-      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
         <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-white p-8 text-center shadow-2xl">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
             <ShieldCheck className="h-7 w-7" />
@@ -86,7 +86,7 @@ export const PlatformOwnerSetupPage: React.FC<PlatformOwnerSetupPageProps> = ({ 
   }
 
   return (
-    <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
       <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-white p-8 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">

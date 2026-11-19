@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   ShieldCheck,
   Save,
@@ -16,9 +17,9 @@ import type { PlatformRoleMatrix, PlatformStaffRole } from '../../services/domai
 import { PLATFORM_ROLE_DEFINITIONS } from '../../services/domains/platform/PlatformAuthorizationService';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { useToast } from '../../components/ui/Toast';
 import { EmptyState } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const ROLE_ORDER: PlatformStaffRole[] = [
   'SUPER_ADMIN',
   'PLATFORM_ADMIN',
@@ -292,47 +293,44 @@ export const PlatformRolesPage: React.FC = () => {
           )}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-right text-xs">
-            <thead>
-              <tr className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                <th className="px-4 py-2.5 sticky right-0 bg-slate-950/80">القسم / العملية</th>
-                {ROLE_ORDER.map((role) => (
-                  <th key={role} className="px-2 py-2.5 text-center">{roleTitle(role).split('(')[0]}</th>
-                ))}
-                <th className="px-3 py-2.5 text-[10px]">الرموز</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {matrix.sections.filter((section) => section.standardActions.length > 0).map((section) => (
-                <tr key={section.module} className="hover:bg-slate-800/20">
-                  <td className="px-4 py-2.5 sticky right-0 bg-slate-900/95">
-                    <span className="font-bold text-slate-200">{section.title}</span>
-                  </td>
-                  {ROLE_ORDER.map((role) => (
-                    <td key={role} className="px-2 py-2.5">
-                      <div className="grid grid-cols-6 gap-1">
-                        {ACTION_ORDER.map((action) => {
-                          if (!section.standardActions.includes(action)) {
-                            return <span key={action} className="text-center text-slate-800 select-none">—</span>;
-                          }
-                          const code = permissionByModuleAction.get(`${section.module}.${action}`)?.code;
-                          return (
-                            <div key={action} className="flex flex-col items-center">
-                              {renderCheckbox(role, code, `${section.title} — ${actionLabel(action)} (${roleTitle(role)})`)}
-                              <span className="mt-0.5 text-[8px] font-bold text-slate-600">{actionLabel(action)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  ))}
-                  <td className="px-3 py-2.5 align-middle">
-                    <code className="block max-w-[190px] truncate text-[8px] text-slate-600" dir="ltr">platform.{section.module}.*</code>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="مصفوفة الصلاحيات"
+            rows={matrix.sections.filter((section) => section.standardActions.length > 0)}
+            rowKey={(section) => section.module}
+            minWidth={980}
+            dense
+            tableClassName="text-xs"
+            rowClassName={() => 'hover:bg-slate-800/20'}
+            columns={[
+              {
+                key: 'section', header: 'القسم / العملية',
+                render: (section) => <span className="font-bold text-slate-200">{section.title}</span>,
+              },
+              ...ROLE_ORDER.map((role) => ({
+                key: `role-${role}`, header: roleTitle(role).split('(')[0], align: 'center' as const,
+                render: (section: (typeof matrix.sections)[number]) => (
+                  <div className="grid grid-cols-6 gap-1">
+                    {ACTION_ORDER.map((action) => {
+                      if (!section.standardActions.includes(action)) {
+                        return <span key={action} className="text-center text-slate-800 select-none">—</span>;
+                      }
+                      const code = permissionByModuleAction.get(`${section.module}.${action}`)?.code;
+                      return (
+                        <div key={action} className="flex flex-col items-center">
+                          {renderCheckbox(role, code, `${section.title} — ${actionLabel(action)} (${roleTitle(role)})`)}
+                          <span className="mt-0.5 text-[8px] font-bold text-slate-600">{actionLabel(action)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ),
+              })),
+              {
+                key: 'code', header: 'الرموز',
+                render: (section) => <code className="block max-w-[190px] truncate text-[8px] text-slate-600" dir="ltr">platform.{section.module}.*</code>,
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -343,35 +341,34 @@ export const PlatformRolesPage: React.FC = () => {
           <p className="text-[9.5px] text-slate-500">تعليق عميل، إعادة تعيين كلمة المرور، نقل الصلاحيات، تغيير السياسة... لا يمكن منحها عبر المصفوفة الأساسية.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-right text-xs">
-            <thead>
-              <tr className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                <th className="px-4 py-2.5">العملية الخاصة</th>
-                {ROLE_ORDER.map((role) => (
-                  <th key={role} className="px-2 py-2.5 text-center">{roleTitle(role).split('(')[0]}</th>
-                ))}
-                <th className="px-3 py-2.5 text-[10px]">الرمز</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {specialPermissions.map((permission) => (
-                <tr key={permission.code} className="hover:bg-slate-800/20">
-                  <td className="px-4 py-2.5">
+          <DataTable
+            ariaLabel="العمليات الخاصة"
+            rows={specialPermissions}
+            rowKey={(permission) => permission.code}
+            minWidth={880}
+            dense
+            tableClassName="text-xs"
+            rowClassName={() => 'hover:bg-slate-800/20'}
+            columns={[
+              {
+                key: 'perm', header: 'العملية الخاصة',
+                render: (permission) => (
+                  <span>
                     <span className="font-semibold text-slate-300">{permission.name}</span>
                     <span className="mr-2 text-[9px] text-slate-600">({permission.sectionTitle})</span>
-                  </td>
-                  {ROLE_ORDER.map((role) => (
-                    <td key={role} className="px-2 py-2.5 text-center">
-                      {renderCheckbox(role, permission.code, `${permission.name} (${roleTitle(role)})`)}
-                    </td>
-                  ))}
-                  <td className="px-3 py-2.5">
-                    <code className="block max-w-[220px] truncate text-[8.5px] text-slate-600" dir="ltr">{permission.code}</code>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                ),
+              },
+              ...ROLE_ORDER.map((role) => ({
+                key: `role-${role}`, header: roleTitle(role).split('(')[0], align: 'center' as const,
+                render: (permission: (typeof specialPermissions)[number]) => renderCheckbox(role, permission.code, `${permission.name} (${roleTitle(role)})`),
+              })),
+              {
+                key: 'code', header: 'الرمز',
+                render: (permission) => <code className="block max-w-[220px] truncate text-[8.5px] text-slate-600" dir="ltr">{permission.code}</code>,
+              },
+            ]}
+          />
         </div>
       </div>
 

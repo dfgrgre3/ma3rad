@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Download, Printer } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { SupplierStatement } from '../../../types/purchasing/supplierDetailPage';
@@ -117,55 +118,32 @@ export const StatementTab: React.FC<StatementTabProps> = ({
 
         {/* Transactions Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-right min-w-[700px]">
-            <thead className="bg-slate-100 text-slate-700 font-bold">
-              <tr>
-                <th className="p-3">التاريخ</th>
-                <th className="p-3">النوع</th>
-                <th className="p-3">رقم المستند</th>
-                <th className="p-3">البيان والتفاصيل</th>
-                <th className="p-3 text-emerald-700">مدين (سداد)</th>
-                <th className="p-3 text-rose-700">دائن (توريد)</th>
-                <th className="p-3">الرصيد بعد الحركة</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {statement.transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50">
-                  <td className="p-3 text-slate-600 font-mono">{tx.date}</td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        tx.type === 'PURCHASE'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'bg-emerald-50 text-emerald-700'
-                      }`}
-                    >
-                      {tx.type === 'PURCHASE' ? 'فاتورة شراء' : 'سداد دفعة'}
-                    </span>
-                  </td>
-                  <td className="p-3 font-mono font-bold text-slate-900">{tx.docNumber}</td>
-                  <td className="p-3 text-slate-700">{tx.description}</td>
-                  <td className="p-3 font-black text-emerald-700">
-                    {tx.debit > 0 ? CeramicMath.formatCurrency(tx.debit) : '—'}
-                  </td>
-                  <td className="p-3 font-black text-rose-700">
-                    {tx.credit > 0 ? CeramicMath.formatCurrency(tx.credit) : '—'}
-                  </td>
-                  <td className="p-3 font-black text-slate-900 font-mono">
-                    {CeramicMath.formatCurrency(tx.balanceAfter)}
-                  </td>
-                </tr>
-              ))}
-              {statement.transactions.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    لا توجد حركات في الفترة المحددة.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="كشف حساب المورد"
+            rows={statement.transactions}
+            rowKey={(tx: any) => String(tx.id)}
+            minWidth={700}
+            dense
+            tableClassName="text-xs"
+            rowClassName={() => 'transition hover:bg-slate-50'}
+            columns={[
+              { key: 'date', header: 'التاريخ', render: (tx: any) => <span className="font-mono text-slate-600">{tx.date}</span> },
+              {
+                key: 'type', header: 'النوع',
+                render: (tx: any) => (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tx.type === 'PURCHASE' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                    {tx.type === 'PURCHASE' ? 'فاتورة شراء' : 'سداد دفعة'}
+                  </span>
+                ),
+              },
+              { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="font-mono font-bold text-slate-900">{tx.docNumber}</span> },
+              { key: 'desc', header: 'البيان والتفاصيل', render: (tx: any) => <span className="text-slate-700">{tx.description}</span> },
+              { key: 'debit', header: 'مدين (سداد)', headerClassName: 'text-emerald-700', render: (tx: any) => <span className="font-black text-emerald-700">{tx.debit > 0 ? CeramicMath.formatCurrency(tx.debit) : '—'}</span> },
+              { key: 'credit', header: 'دائن (توريد)', headerClassName: 'text-rose-700', render: (tx: any) => <span className="font-black text-rose-700">{tx.credit > 0 ? CeramicMath.formatCurrency(tx.credit) : '—'}</span> },
+              { key: 'bal', header: 'الرصيد بعد الحركة', render: (tx: any) => <span className="font-mono font-black text-slate-900">{CeramicMath.formatCurrency(tx.balanceAfter)}</span> },
+            ]}
+            emptyTitle="لا توجد حركات في الفترة المحددة."
+          />
         </div>
       </div>
     </div>

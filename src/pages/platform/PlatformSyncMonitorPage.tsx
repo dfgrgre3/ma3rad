@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   RefreshCw,
   Server,
@@ -30,7 +31,9 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformSyncMonitorPage: React.FC = () => {
+  const toast = useToast();
   const [logs, setLogs] = useState<PlatformSyncLogEntry[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -74,13 +77,13 @@ export const PlatformSyncMonitorPage: React.FC = () => {
   const handleRunSync = async (tenantId?: string) => {
     const sync = typeof window !== 'undefined' ? window.ceramisys?.sync : undefined;
     if (!sync?.pullEvents) {
-      alert('تنفيذ المزامنة يتطلب تطبيق سطح المكتب مع عميل مزامنة مهيأ.');
+      toast.warning('تنفيذ المزامنة يتطلب تطبيق سطح المكتب مع عميل مزامنة مهيأ.');
       return;
     }
     try {
       const status = await sync.status?.();
       if (!status?.clientConfigured) {
-        alert('لا يوجد عميل مزامنة مهيأ على هذا الجهاز. أعد تهيئة المزامنة من إعدادات المزامنة أولاً.');
+        toast.warning('لا يوجد عميل مزامنة مهيأ على هذا الجهاز. أعد تهيئة المزامنة من إعدادات المزامنة أولاً.');
         return;
       }
       const result = await sync.pullEvents('all', null, 100);
@@ -91,7 +94,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
         status: 'SUCCESS',
         recordsSynced: pulledCount,
       });
-      alert(`تم تنفيذ المزامنة وسحب ${pulledCount} حدثاً.`);
+      toast.success(`تم تنفيذ المزامنة وسحب ${pulledCount} حدثاً.`);
       loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'فشلت المزامنة.';
@@ -106,7 +109,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
       } catch {
         // Logging can fail when the platform console is not in an owner session.
       }
-      alert(message);
+      toast.warning(message);
       loadData();
     }
   };
@@ -212,100 +215,66 @@ export const PlatformSyncMonitorPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-right text-xs">
-              <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">العميل / الجهاز</th>
-                  <th className="px-4 py-3">نوع المزامنة</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3">السجلات المنقولة</th>
-                  <th className="px-4 py-3">تفاصيل أو أخطاء</th>
-                  <th className="px-4 py-3">التوقيت</th>
-                  <th className="px-4 py-3 text-center">إجراء</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {filteredLogs.map((log) => {
-                  const tenantObj = tenants.find((t) => t.id === log.tenantId);
-                  return (
-                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-bold text-slate-100">
-                          {tenantObj ? tenantObj.name : log.tenantId ? log.tenantId : 'عام للمنصة'}
-                        </div>
+            <DataTable
+              ariaLabel="سجل المزامنة"
+              rows={filteredLogs}
+              rowKey={(log: any) => String(log.id)}
+              minWidth={900}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              columns={[
+                {
+                  key: 'tenant', header: 'العميل / الجهاز',
+                  render: (log: any) => {
+                    const tenantObj = tenants.find((t: any) => t.id === log.tenantId);
+                    return (
+                      <span className="block">
+                        <span className="block font-bold text-slate-100">{tenantObj ? tenantObj.name : log.tenantId ? log.tenantId : 'عام للمنصة'}</span>
                         {log.deviceId && (
-                          <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
+                          <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-slate-400">
                             <Smartphone className="h-3 w-3" />
                             {log.deviceId}
-                          </div>
+                          </span>
                         )}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-slate-300 bg-slate-800 px-2 py-0.5 rounded text-[10px]">
-                          {log.syncType}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={`font-bold inline-flex items-center gap-1 ${
-                            log.status === 'SUCCESS'
-                              ? 'text-emerald-400'
-                              : log.status === 'FAIL'
-                              ? 'text-rose-400'
-                              : log.status === 'PARTIAL'
-                              ? 'text-amber-400 font-black'
-                              : 'text-sky-400'
-                          }`}
-                        >
-                          {log.status === 'SUCCESS' ? (
-                            <>
-                              <CheckCircle2 className="h-3 w-3" /> نجاح
-                            </>
-                          ) : log.status === 'FAIL' ? (
-                            <>
-                              <XCircle className="h-3 w-3" /> فشل
-                            </>
-                          ) : log.status === 'PARTIAL' ? (
-                            <>
-                              <AlertTriangle className="h-3 w-3" /> تعارض بيانات
-                            </>
-                          ) : (
-                            log.status
-                          )}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold text-slate-200">
-                        {formatNumber(log.recordsSynced)} سجل
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-400 max-w-xs truncate">
-                        {log.errorDetail ? (
-                          <span className="text-rose-400 font-mono text-[11px]">{log.errorDetail}</span>
-                        ) : (
-                          'مزامنة سليمة تماماً'
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-400">{formatDateTime(log.createdAt)}</td>
-
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => void handleRunSync(log.tenantId)}
-                          className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1 mx-auto"
-                          title="إعادة المزامنة فوراً"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          إعادة
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'type', header: 'نوع المزامنة',
+                  render: (log: any) => <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-300">{log.syncType}</span>,
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (log: any) => (
+                    <span className={`inline-flex items-center gap-1 font-bold ${log.status === 'SUCCESS' ? 'text-emerald-400' : log.status === 'FAIL' ? 'text-rose-400' : log.status === 'PARTIAL' ? 'font-black text-amber-400' : 'text-sky-400'}`}>
+                      {log.status === 'SUCCESS' ? (<><CheckCircle2 className="h-3 w-3" /> نجاح</>)
+                        : log.status === 'FAIL' ? (<><XCircle className="h-3 w-3" /> فشل</>)
+                        : log.status === 'PARTIAL' ? (<><AlertTriangle className="h-3 w-3" /> تعارض بيانات</>)
+                        : log.status}
+                    </span>
+                  ),
+                },
+                { key: 'records', header: 'السجلات المنقولة', render: (log: any) => <span className="font-semibold text-slate-200">{formatNumber(log.recordsSynced)} سجل</span> },
+                {
+                  key: 'detail', header: 'تفاصيل أو أخطاء',
+                  render: (log: any) => log.errorDetail ? (
+                    <span className="block max-w-xs truncate font-mono text-[11px] text-rose-400">{log.errorDetail}</span>
+                  ) : <span className="text-slate-400">مزامنة سليمة تماماً</span>,
+                },
+                { key: 'time', header: 'التوقيت', render: (log: any) => <span className="text-slate-400">{formatDateTime(log.createdAt)}</span> },
+                {
+                  key: 'action', header: 'إجراء', align: 'center',
+                  render: (log: any) => (
+                    <button onClick={() => void handleRunSync(log.tenantId)} className="mx-auto flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="إعادة المزامنة فوراً">
+                      <RotateCcw className="h-3 w-3" />
+                      إعادة
+                    </button>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </div>

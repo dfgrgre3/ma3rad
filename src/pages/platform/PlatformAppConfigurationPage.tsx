@@ -40,9 +40,12 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
 
+import { DataTable } from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 type ConfigTab = 'editor' | 'templates' | 'rollout' | 'diff' | 'history' | 'telemetry';
 
 export const PlatformAppConfigurationPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<ConfigTab>('editor');
   const canManageAppConfig = canPlatform('app-configuration');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
@@ -145,7 +148,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Save & Sign
   const handleSaveConfig = async () => {
-    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
+    if (!canManageAppConfig) { toast.warning('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
@@ -179,7 +182,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       setTimeout(() => setSavedSuccess(false), 3000);
       loadTenantConfig(selectedTenantId);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -187,7 +190,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Apply Template
   const handleApplyTemplate = (tmpl: PlatformConfigTemplate) => {
-    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
+    if (!canManageAppConfig) { toast.warning('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!confirm(`هل تريد تطبيق قالب "${tmpl.name}" على هذا العميل؟ سيتم استبدال التكوين الحالي وإعادة توقيعه.`)) return;
     setJsonText(JSON.stringify(tmpl.configPayload, null, 2));
     setJsonError(null);
@@ -195,7 +198,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
   // Handle Rollback
   const handleRollback = async (ver: number) => {
-    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
+    if (!canManageAppConfig) { toast.warning('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع التكوين للإصدار #${ver} وتطبيقه فورياً؟`)) return;
     const centralState = getCentralDataSourceState();
     try {
@@ -205,16 +208,16 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         platformAdminService.rollbackTenantConfig(selectedTenantId, ver);
       }
       loadTenantConfig(selectedTenantId);
-      alert(`تم استرجاع الإصدار #${ver} وتوقيعه بنجاح.`);
+      toast.success(`تم استرجاع الإصدار #${ver} وتوقيعه بنجاح.`);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
   // Handle Create Rollout
   const handleCreateRollout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManageAppConfig) { alert('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
+    if (!canManageAppConfig) { toast.warning('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
     if (!rolloutTitle || !rolloutTemplateId) return;
     const centralState = getCentralDataSourceState();
     try {
@@ -241,7 +244,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       loadBootstrap();
       if (selectedTenantId) loadTenantConfig(selectedTenantId);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
@@ -269,7 +272,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   }, [versions, diffVersionA, diffVersionB]);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
         title="محرك التكوين الديناميكي والنشر المركزي (App Configuration)"
@@ -552,42 +555,20 @@ export const PlatformAppConfigurationPage: React.FC = () => {
           {/* Past Rollouts Table */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold text-zinc-300">سجل حملات النشر التدريجي:</h4>
-            <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-              <table className="w-full text-right text-sm">
-                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                  <tr>
-                    <th className="py-3 px-4">عنوان الحملة</th>
-                    <th className="py-3 px-4">النوع</th>
-                    <th className="py-3 px-4">الحالة</th>
-                    <th className="py-3 px-4">العملاء المستهدفين</th>
-                    <th className="py-3 px-4">تاريخ الإطلاق</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/60">
-                  {rollouts.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center">
-                        <EmptyState title="لا توجد حملات نشر سابقة" />
-                      </td>
-                    </tr>
-                  ) : (
-                    rollouts.map((ro) => (
-                      <tr key={ro.id} className="hover:bg-zinc-800/20 transition-colors">
-                        <td className="py-3 px-4 font-medium text-zinc-200">{ro.title}</td>
-                        <td className="py-3 px-4 text-xs font-mono text-zinc-400">{ro.targetType}</td>
-                        <td className="py-3 px-4">
-                          <span className="px-2.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {ro.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-zinc-200 font-semibold">{ro.totalTenants} عميل</td>
-                        <td className="py-3 px-4 text-xs text-zinc-400">{formatDateTime(ro.createdAt)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                          ariaLabel="سجل حملات النشر"
+                          rows={rollouts}
+                          rowKey={(ro) => ro.id}
+                          emptyTitle="لا توجد حملات نشر سابقة"
+                          columns={[
+                            { key: 'title', header: 'عنوان الحملة', render: (ro) => <span className="font-medium text-zinc-200">{ro.title}</span> },
+                            { key: 'type', header: 'النوع', render: (ro) => <span className="text-xs font-mono text-zinc-400">{ro.targetType}</span> },
+                            { key: 'status', header: 'الحالة', render: (ro) => <span className="px-2.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ro.status}</span> },
+                            { key: 'tenants', header: 'العملاء المستهدفين', render: (ro) => <span className="text-zinc-200 font-semibold">{ro.totalTenants} عميل</span> },
+                            { key: 'created', header: 'تاريخ الإطلاق', render: (ro) => <span className="text-xs text-zinc-400">{formatDateTime(ro.createdAt)}</span> },
+                          ]}
+                        />
+
           </div>
         </div>
       )}
@@ -629,39 +610,26 @@ export const PlatformAppConfigurationPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800 font-mono">
-                <tr>
-                  <th className="py-3 px-4">مفتاح التكوين (Key)</th>
-                  <th className="py-3 px-4">إصدار #{diffVersionA}</th>
-                  <th className="py-3 px-4">إصدار #{diffVersionB}</th>
-                  <th className="py-3 px-4 text-center">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60 font-mono">
-                {diffDisplay?.map((row) => (
-                  <tr
-                    key={row.key}
-                    className={row.changed ? 'bg-amber-950/20 text-amber-200' : 'text-zinc-300'}
-                  >
-                    <td className="py-2.5 px-4 font-semibold">{row.key}</td>
-                    <td className="py-2.5 px-4 max-w-xs truncate">{row.valA}</td>
-                    <td className="py-2.5 px-4 max-w-xs truncate">{row.valB}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      {row.changed ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          مُعدل
-                        </span>
-                      ) : (
-                        <span className="text-zinc-600 text-[10px]">متطابق</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="مقارنة إصدارات التكوين"
+                      rows={diffDisplay ?? []}
+                      rowKey={(row) => row.key}
+                      dense
+                      tableClassName="font-mono"
+                      rowClassName={(row) => row.changed ? 'bg-amber-950/20 text-amber-200' : 'text-zinc-300'}
+                      columns={[
+                        { key: 'key', header: 'مفتاح التكوين (Key)', render: (row) => <span className="font-semibold">{row.key}</span> },
+                        { key: 'a', header: `إصدار #${diffVersionA}`, render: (row) => <span className="block max-w-xs truncate">{row.valA}</span> },
+                        { key: 'b', header: `إصدار #${diffVersionB}`, render: (row) => <span className="block max-w-xs truncate">{row.valB}</span> },
+                        {
+                          key: 'status', header: 'الحالة', align: 'center',
+                          render: (row) => row.changed ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">مُعدل</span>
+                          ) : <span className="text-zinc-600 text-[10px]">متطابق</span>,
+                        },
+                      ]}
+                    />
+
         </div>
       )}
 
@@ -718,56 +686,35 @@ export const PlatformAppConfigurationPage: React.FC = () => {
             تأكيدات الاستلام والتطبيق الحية الواردة من أجهزة هذا العميل:
           </div>
 
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                <tr>
-                  <th className="py-3 px-4">معرف الجهاز</th>
-                  <th className="py-3 px-4">رقم الإصدار</th>
-                  <th className="py-3 px-4">الحالة</th>
-                  <th className="py-3 px-4">توقيت الاستلام</th>
-                  <th className="py-3 px-4">ملاحظات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {acks.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center">
-                      <EmptyState title="لا توجد تأكيدات استلام مسجلة حتى الآن" />
-                    </td>
-                  </tr>
-                ) : (
-                  acks.map((ack) => (
-                    <tr key={ack.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4 font-mono text-xs text-zinc-300">
-                        {ack.deviceId ? ack.deviceId.substring(0, 16) + '...' : 'الجهاز الرئيسي'}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-zinc-200">#{ack.version}</td>
-                      <td className="py-3 px-4">
-                        {ack.status === 'APPLIED' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            تم التطبيق
-                          </span>
-                        )}
-                        {ack.status === 'RECEIVED' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            تم الاستلام
-                          </span>
-                        )}
-                        {ack.status === 'FAILED' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                            فشل
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">{formatDateTime(ack.acknowledgedAt)}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">{ack.errorMessage || '—'}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="تأكيدات الأجهزة"
+                      rows={acks}
+                      rowKey={(ack) => ack.id}
+                      emptyTitle="لا توجد تأكيدات استلام مسجلة حتى الآن"
+                      columns={[
+                        { key: 'device', header: 'معرف الجهاز', render: (ack) => <span className="font-mono text-xs text-zinc-300">{ack.deviceId ? ack.deviceId.substring(0, 16) + '...' : 'الجهاز الرئيسي'}</span> },
+                        { key: 'version', header: 'رقم الإصدار', render: (ack) => <span className="font-semibold text-zinc-200">#{ack.version}</span> },
+                        {
+                          key: 'status', header: 'الحالة',
+                          render: (ack) => (
+                            <>
+                              {ack.status === 'APPLIED' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">تم التطبيق</span>
+                              )}
+                              {ack.status === 'RECEIVED' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20">تم الاستلام</span>
+                              )}
+                              {ack.status === 'FAILED' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">فشل</span>
+                              )}
+                            </>
+                          ),
+                        },
+                        { key: 'time', header: 'توقيت الاستلام', render: (ack) => <span className="text-xs text-zinc-400">{formatDateTime(ack.acknowledgedAt)}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (ack) => <span className="text-xs text-zinc-400">{ack.errorMessage || '—'}</span> },
+                      ]}
+                    />
+
         </div>
       )}
     </div>

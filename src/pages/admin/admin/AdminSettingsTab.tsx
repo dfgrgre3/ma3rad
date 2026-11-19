@@ -1867,7 +1867,6 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               createPortal(
                 <div
                   className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
-                  dir="rtl"
                   role="dialog"
                   aria-modal="true"
                   aria-label="معاينة حيّة للفورم والمقاسات"

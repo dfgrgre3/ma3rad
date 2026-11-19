@@ -37,7 +37,11 @@ import {
   parseGrade, pickCell, round, unitLabelFor, setConfiguredGradeLabels,
   type FormState, type OpeningStockRow, type ProductEntryFormState, type TabId, type VariantDraft,
 } from './productFormModel';
-import { Field, ListPagination, StatCard } from './ProductUi';
+import { Field, ListPagination } from './ProductUi';
+import { PageHeader } from '../ui/PageHeader';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+import { StatCard as ErpStatCard } from '../ui/Card';
 import { ProductFormModal } from './ProductFormModal';
 import { ProductsTable } from './ProductsTable';
 import { ProductsCards } from './ProductsCards';
@@ -380,9 +384,9 @@ export const ProductsView: React.FC = () => {
 
   const stockTone = (p: Product) => {
     const { m2 } = stockOf(p);
-    if (m2 <= 0) return 'bg-rose-500/10 text-rose-600';
-    if (m2 <= p.minStockLevel) return 'bg-amber-500/10 text-amber-600';
-    return 'bg-emerald-500/10 text-emerald-600';
+    if (m2 <= 0) return 'erp-badge--danger';
+    if (m2 <= p.minStockLevel) return 'erp-badge--warning';
+    return 'erp-badge--success';
   };
 
   const defaultOpeningRow = (warehouseId: string): OpeningStockRow => ({ warehouseId, boxes: 0, pieces: 0, meters: 0 });
@@ -394,7 +398,7 @@ export const ProductsView: React.FC = () => {
         : productService.generateNextBarcode(currentValue);
       setFormData((current) => ({ ...current, [field]: value }));
     } catch (error) {
-      alert(`تعذر توليد ${field === 'sku' ? 'كود الصنف' : 'الباركود'}: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`تعذر توليد ${field === 'sku' ? 'كود الصنف' : 'الباركود'}: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -411,7 +415,7 @@ export const ProductsView: React.FC = () => {
       };
     } catch (error) {
       console.error('تعذر تحميل بيانات نموذج الصنف المحفوظة:', error);
-      alert(`تعذر تجهيز نموذج الصنف: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`تعذر تجهيز نموذج الصنف: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
     setEditingProduct(null);
@@ -593,7 +597,7 @@ export const ProductsView: React.FC = () => {
       setNewCategory('');
       setShowNewCategory(false);
     } catch (err: any) {
-      alert(`تعذر إضافة النوع: ${err?.message || err}`);
+      toast.error(`تعذر إضافة النوع: ${err?.message || err}`);
     }
   };
 
@@ -607,7 +611,7 @@ export const ProductsView: React.FC = () => {
       setNewBrand('');
       setShowNewBrand(false);
     } catch (err: any) {
-      alert(`تعذر إضافة الماركة: ${err?.message || err}`);
+      toast.error(`تعذر إضافة الماركة: ${err?.message || err}`);
     }
   };
 
@@ -627,7 +631,7 @@ export const ProductsView: React.FC = () => {
               productService.updateProduct(editingProduct.id, { imagePath: dataUrl });
             }
           } catch (err: any) {
-            alert(`تعذر رفع الصورة: ${err?.message || err}`);
+            toast.error(`تعذر رفع الصورة: ${err?.message || err}`);
           }
         } else {
           setPendingImages((prev) => [...prev, dataUrl]);
@@ -685,16 +689,16 @@ export const ProductsView: React.FC = () => {
   };
 
   const isProductFormValid = () => {
-    if (!formData.productType) { alert('اختر نوع الصنف.'); return false; }
-    if (!formData.name.trim()) { alert('أدخل اسم الصنف.'); return false; }
-    if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return false; }
-    if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return false; }
-    if (!formData.baseUnit || !formData.sellUnit) { alert('اختر وحدة الأساس ووحدة البيع.'); return false; }
+    if (!formData.productType) { toast.warning('اختر نوع الصنف.'); return false; }
+    if (!formData.name.trim()) { toast.warning('أدخل اسم الصنف.'); return false; }
+    if (!formData.categoryId) { toast.warning('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return false; }
+    if (formData.productType === 'CERAMIC' && !formData.brandId) { toast.warning('اختر الماركة أو أضف ماركة جديدة.'); return false; }
+    if (!formData.baseUnit || !formData.sellUnit) { toast.warning('اختر وحدة الأساس ووحدة البيع.'); return false; }
     if (formData.productType === 'CERAMIC' && (!formData.grade || !formData.surfaceLocation)) {
-      alert('اختر درجة الصنف والاستخدام / السطح.');
+      toast.warning('اختر درجة الصنف والاستخدام / السطح.');
       return false;
     }
-    if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return false; }
+    if (!formData.barcode.trim() || !formData.sku.trim()) { toast.error('الباركود وكود الصنف مطلوبان.'); return false; }
     const applicableAttributes = attributes.filter(
       (attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId,
     );
@@ -706,7 +710,7 @@ export const ProductsView: React.FC = () => {
         normalizeDynamicAttributeValue(field, operationalFieldValues[field.id]);
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'راجع قيم الخصائص الإضافية.');
+      toast.error(error instanceof Error ? error.message : 'راجع قيم الخصائص الإضافية.');
       return false;
     }
     return true;
@@ -821,7 +825,7 @@ export const ProductsView: React.FC = () => {
       setRememberedFields(nextPreferences);
       return true;
     } catch (err) {
-      alert(`تعذر حفظ اختيارات الخانات: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`تعذر حفظ اختيارات الخانات: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
   };
@@ -836,7 +840,7 @@ export const ProductsView: React.FC = () => {
       setFormData((current) => ({ ...current, tone: savedTone }));
       return true;
     } catch (error) {
-      alert(`تعذر إضافة التون: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`تعذر إضافة التون: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   };
@@ -855,7 +859,7 @@ export const ProductsView: React.FC = () => {
       });
       setFormData((current) => current.tone === tone ? { ...current, tone: '' } : current);
     } catch (error) {
-      alert(`تعذر حذف التون: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`تعذر حذف التون: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -900,10 +904,10 @@ export const ProductsView: React.FC = () => {
       loadStats();
       loadLookups();
       if (openingStockRequests > 0) {
-        alert(`تم إنشاء ${openingStockRequests} طلب رصيد افتتاحي، ويظهر في المخزون بعد اعتماده وترحيله.`);
+        toast.warning(`تم إنشاء ${openingStockRequests} طلب رصيد افتتاحي، ويظهر في المخزون بعد اعتماده وترحيله.`);
       }
     } catch (err: any) {
-      alert(`خطأ: ${err?.message || err}`);
+      toast.error(`خطأ: ${err?.message || err}`);
     } finally {
       setIsSaving(false);
     }
@@ -917,7 +921,7 @@ export const ProductsView: React.FC = () => {
         loadStats();
         loadLookups();
       } catch (err: any) {
-        alert(`تعذر الحذف: ${err?.message || err}`);
+        toast.error(`تعذر الحذف: ${err?.message || err}`);
       }
     }
   };
@@ -929,7 +933,7 @@ export const ProductsView: React.FC = () => {
       loadStats();
       loadLookups();
     } catch (err: any) {
-      alert(`تعذر نسخ الصنف: ${err?.message || err}`);
+      toast.error(`تعذر نسخ الصنف: ${err?.message || err}`);
     }
   };
 
@@ -939,7 +943,7 @@ export const ProductsView: React.FC = () => {
       loadProducts();
       loadStats();
     } catch (err: any) {
-      alert(`تعذر تغيير حالة الصنف: ${err?.message || err}`);
+      toast.error(`تعذر تغيير حالة الصنف: ${err?.message || err}`);
     }
   };
 
@@ -964,7 +968,7 @@ export const ProductsView: React.FC = () => {
       loadProducts();
       loadStats();
     } catch (err: any) {
-      alert(`تعذر ${label} الأصناف المحددة: ${err?.message || err}`);
+      toast.error(`تعذر ${label} الأصناف المحددة: ${err?.message || err}`);
       loadProducts();
       loadStats();
     }
@@ -983,7 +987,7 @@ export const ProductsView: React.FC = () => {
     if (!stockProduct) return;
     const rows = stockRows.filter((r) => r.addBoxes > 0);
     if (rows.length === 0) {
-      alert('أدخل كمية أكبر من صفر في أحد المخازن.');
+      toast.warning('أدخل كمية أكبر من صفر في أحد المخازن.');
       return;
     }
     setStockSaving(true);
@@ -1105,7 +1109,7 @@ export const ProductsView: React.FC = () => {
         rows,
       });
     } catch (err: any) {
-      alert(`تعذر التصدير: ${err?.message || err}`);
+      toast.error(`تعذر التصدير: ${err?.message || err}`);
     }
   };
 
@@ -1316,78 +1320,67 @@ export const ProductsView: React.FC = () => {
   ]), [tracksInventory, canAdjustInventory, canManagePricing]);
 
   return (
-    <div className="erp-page" dir="rtl">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900">
-            إدارة {productsLabel} المتكاملة
-            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
-          </h2>
-          <p className="text-xs text-slate-500">الأنواع والماركات والمقاسات والعدد والكمية والمترات والتسعير والمخزون والصور والمتغيرات</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {canImportProducts && <button onClick={() => setIsImportOpen(true)} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
-            <Upload className="w-4 h-4" />
-            <span>استيراد جدول بيانات</span>
-          </button>}
-          {canExportProducts && <button onClick={handleExport} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
-            <Download className="w-4 h-4" />
-            <span>تصدير جدول بيانات</span>
-          </button>}
-          {canCreateProduct && <CentralLimitGuard metric="maxProducts"><button onClick={handleOpenAddModal} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm">
-            <Plus className="w-4 h-4" />
-            <span>إضافة {productSingularLabel} جديد</span>
-          </button></CentralLimitGuard>}
-        </div>
+    <div className="erp-page">
+      <PageHeader
+        title={`إدارة ${productsLabel} المتكاملة`}
+        description={`الأنواع والماركات والمقاسات والعدد والكمية والمترات والتسعير والمخزون والصور والمتغيرات · ${businessProfileLabel}`}
+        icon={<Package className="h-5 w-5" />}
+        actions={
+          <>
+            {canImportProducts && <Button variant="secondary" size="sm" leadingIcon={<Upload className="h-4 w-4" />} onClick={() => setIsImportOpen(true)}>استيراد جدول بيانات</Button>}
+            {canExportProducts && <Button variant="secondary" size="sm" leadingIcon={<Download className="h-4 w-4" />} onClick={handleExport}>تصدير جدول بيانات</Button>}
+            {canCreateProduct && <CentralLimitGuard metric="maxProducts"><Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAddModal}>إضافة {productSingularLabel} جديد</Button></CentralLimitGuard>}
+          </>
+        }
+      />
+
+      <div className="erp-stat-grid">
+        <ErpStatCard label="إجمالي الأصناف" value={String(stats?.totalProducts ?? totalItems)} hint={`نشط: ${stats?.activeProducts ?? 0} | موقوف: ${stats?.inactiveProducts ?? 0}`} icon={<Package className="h-4 w-4" />} />
+        <ErpStatCard label="إجمالي الكميات" value={String(stats?.totalStockM2 ?? 0)} icon={<Boxes className="h-4 w-4" />} />
+        {canViewCosts && <ErpStatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="h-4 w-4" />} />}
+        <ErpStatCard label="أصناف قاربت على النفاذ" value={String(stats?.lowStock ?? 0)} icon={<AlertTriangle className="h-4 w-4" />} tone="warning" />
+        <ErpStatCard label="أصناف نافدة" value={String(stats?.outOfStock ?? 0)} icon={<XCircle className="h-4 w-4" />} tone="danger" />
+        <ErpStatCard label="الأنواع / الماركات" value={`${categories.length} / ${brands.length}`} hint={`${attributes.length} خصائص`} icon={<Layers className="h-4 w-4" />} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="إجمالي الأصناف" value={String(stats?.totalProducts ?? totalItems)} hint={`نشط: ${stats?.activeProducts ?? 0} | موقوف: ${stats?.inactiveProducts ?? 0}`} icon={<Package className="w-5 h-5 text-sky-600" />} tone="bg-sky-50" />
-        <StatCard label="إجمالي الكميات" value={String(stats?.totalStockM2 ?? 0)} icon={<Boxes className="w-5 h-5 text-emerald-600" />} tone="bg-emerald-50" />
-        {canViewCosts && <StatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="w-5 h-5 text-indigo-600" />} tone="bg-indigo-50" />}
-        <StatCard label="أصناف قاربت على النفاذ" value={String(stats?.lowStock ?? 0)} icon={<AlertTriangle className="w-5 h-5 text-amber-600" />} tone="bg-amber-50" />
-        <StatCard label="أصناف نافدة" value={String(stats?.outOfStock ?? 0)} icon={<XCircle className="w-5 h-5 text-rose-600" />} tone="bg-rose-50" />
-        <StatCard label="الأنواع / الماركات" value={`${categories.length} / ${brands.length}`} hint={`${attributes.length} خصائص`} icon={<Layers className="w-5 h-5 text-violet-600" />} tone="bg-violet-50" />
-      </div>
-
-      <FilterToolbar ariaLabel="بحث وتصفية الأصناف" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <FilterToolbar ariaLabel="بحث وتصفية الأصناف" className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[240px] relative">
-            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--cerami-muted)]" />
             <input
               type="text"
               aria-label="بحث الأصناف"
               placeholder="بحث بالاسم، الباركود، الكود، المقاس، النوع، الماركة..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-4 pr-9 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="ui-input w-full ps-9 pe-3 text-xs font-medium"
             />
           </div>
-          <button onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} aria-controls="product-advanced-filters" className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${showFilters ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+          <button onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} aria-controls="product-advanced-filters" className={`erp-btn erp-btn--sm ${showFilters ? 'erp-btn--primary' : ''}`}>
             <Filter className="w-4 h-4" /> فلاتر متقدمة
           </button>
-        <div className="flex items-center overflow-hidden rounded-xl border border-slate-200">
-            <button onClick={() => setViewMode('table')} className={`px-2.5 py-2 ${viewMode === 'table' ? 'bg-sky-600 text-white' : 'bg-white text-slate-500'}`} title="عرض جدول"><List className="w-4 h-4" /></button>
-            <button onClick={() => setViewMode('cards')} className={`px-2.5 py-2 ${viewMode === 'cards' ? 'bg-sky-600 text-white' : 'bg-white text-slate-500'}`} title="عرض بطاقات"><LayoutGrid className="w-4 h-4" /></button>
+        <div className="flex items-center overflow-hidden rounded-[var(--ui-radius-sm)] border border-[var(--win-border)]">
+            <button onClick={() => setViewMode('table')} className={`px-2.5 py-2 ${viewMode === 'table' ? 'bg-[var(--win-accent)] text-[var(--win-accent-text,#fff)]' : 'text-[var(--cerami-muted)]'}`} title="عرض جدول"><List className="w-4 h-4" /></button>
+            <button onClick={() => setViewMode('cards')} className={`px-2.5 py-2 ${viewMode === 'cards' ? 'bg-[var(--win-accent)] text-[var(--win-accent-text,#fff)]' : 'text-[var(--cerami-muted)]'}`} title="عرض بطاقات"><LayoutGrid className="w-4 h-4" /></button>
           </div>
-          <button onClick={() => { loadProducts(); loadStats(); loadLookups(); }} className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={() => { loadProducts(); loadStats(); loadLookups(); }} className="erp-btn erp-btn--secondary erp-btn--icon erp-btn--sm" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
         </div>
 
         {showFilters && (
           <div id="product-advanced-filters" className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             <FormField label="نوع المنتج" visuallyHidden>
-            <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSearchParams(e.target.value ? { category: e.target.value } : {}, { replace: true }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSearchParams(e.target.value ? { category: e.target.value } : {}, { replace: true }); }} className="ui-input w-full text-xs font-bold">
               <option value="">جميع الأنواع</option>
               {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
             </select>
             </FormField>
             <FormField label="الماركة" visuallyHidden>
-            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="ui-input w-full text-xs font-bold">
               <option value="">جميع الماركات</option>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </select>
             </FormField>
-            {businessConfig.businessType === 'ceramics' && (<FormField label="الفرز" visuallyHidden><select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            {businessConfig.businessType === 'ceramics' && (<FormField label="الفرز" visuallyHidden><select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="ui-input w-full text-xs font-bold">
               <option value="">جميع الفرزات</option>
               {gradeOptions.filter((option) => option.isActive).map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
             </select></FormField>)}
@@ -1397,7 +1390,7 @@ export const ProductsView: React.FC = () => {
                   <select value={selectedCustomField === field.id ? selectedCustomFieldValue : ''} onChange={(event) => {
                     setSelectedCustomField(field.id);
                     setSelectedCustomFieldValue(event.target.value);
-                  }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">
+                  }} className="ui-input w-full text-xs font-bold">
                     <option value="">كل القيم — {field.name}</option>
                     {field.dataType === 'BOOLEAN'
                       ? <><option value="true">نعم</option><option value="false">لا</option></>
@@ -1407,7 +1400,7 @@ export const ProductsView: React.FC = () => {
                   <input value={selectedCustomField === field.id ? selectedCustomFieldValue : ''} onChange={(event) => {
                     setSelectedCustomField(field.id);
                     setSelectedCustomFieldValue(event.target.value);
-                  }} placeholder={`تصفية حسب ${field.name}`} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700" />
+                  }} placeholder={`تصفية حسب ${field.name}`} className="ui-input w-full text-xs font-bold" />
                 )}
               </FormField>
             ))}
@@ -1424,7 +1417,7 @@ export const ProductsView: React.FC = () => {
                         setSelectedAttribute(attribute.id);
                         setSelectedAttributeValue(event.target.value);
                       }}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                      className="ui-input w-full text-xs font-bold"
                     >
                       <option value="">كل القيم — {attribute.name}</option>
                       {attribute.dataType === 'BOOLEAN'
@@ -1441,13 +1434,13 @@ export const ProductsView: React.FC = () => {
                         setSelectedAttributeValue(event.target.value);
                       }}
                       placeholder={`تصفية حسب ${attribute.name}`}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                      className="ui-input w-full text-xs font-bold"
                     />
                   )}
                 </FormField>
               ))}
             <FormField label="حالة المخزون" visuallyHidden>
-            <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="ui-input w-full text-xs font-bold">
               <option value="all">حالة المخزون: الكل</option>
               <option value="in">متوفر</option>
               <option value="low">قارب على النفاذ</option>
@@ -1455,7 +1448,7 @@ export const ProductsView: React.FC = () => {
             </select>
             </FormField>
             <FormField label="ترتيب الأصناف" visuallyHidden>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="ui-input w-full text-xs font-bold">
               <option value="name">ترتيب: الاسم</option>
               <option value="newest">الأحدث إضافة</option>
               <option value="price_asc">السعر: الأقل</option>
@@ -1465,36 +1458,36 @@ export const ProductsView: React.FC = () => {
             </select>
             </FormField>
             <FormField label="حالة الصنف" visuallyHidden>
-            <select aria-label="حالة الصنف" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <select aria-label="حالة الصنف" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="ui-input text-xs font-bold">
               <option value="active">الأصناف النشطة</option>
               <option value="inactive">الأصناف غير النشطة</option>
               <option value="all">كل الأصناف</option>
             </select>
             </FormField>
-            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setSelectedCustomField(''); setSelectedCustomFieldValue(''); setSelectedAttribute(''); setSelectedAttributeValue(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
+            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setSelectedCustomField(''); setSelectedCustomFieldValue(''); setSelectedAttribute(''); setSelectedAttributeValue(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="erp-btn erp-btn--secondary erp-btn--sm">مسح عوامل التصفية</button>
           </div>
         )}
       </FilterToolbar>
 
       {selectedProductIds.length > 0 && (canExportProducts || canDeleteProduct) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <div className="text-xs font-bold text-sky-900">تم تحديد {selectedProductIds.length} صنف من الصفحة الحالية</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--ui-radius-md)] border border-[var(--win-accent-border)] bg-[var(--win-accent-soft)] px-4 py-3">
+          <div className="text-xs font-bold text-[var(--win-accent-soft-text)]">تم تحديد {selectedProductIds.length} صنف من الصفحة الحالية</div>
           <div className="flex items-center gap-2">
-            {canExportProducts && <button onClick={handleExport} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">تصدير المحدد</button>}
-            {canDeleteProduct && <button onClick={() => handleBulkStatus(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">تفعيل المحدد</button>}
-            {canDeleteProduct && <button onClick={() => handleBulkStatus(false)} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700">إيقاف المحدد</button>}
-            <button onClick={() => setSelectedProductIds([])} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">مسح التحديد</button>
+            {canExportProducts && <button onClick={handleExport} className="erp-btn erp-btn--secondary erp-btn--sm">تصدير المحدد</button>}
+            {canDeleteProduct && <button onClick={() => handleBulkStatus(true)} className="erp-btn erp-btn--success erp-btn--sm">تفعيل المحدد</button>}
+            {canDeleteProduct && <button onClick={() => handleBulkStatus(false)} className="erp-btn erp-btn--secondary erp-btn--sm">إيقاف المحدد</button>}
+            <button onClick={() => setSelectedProductIds([])} className="erp-btn erp-btn--secondary erp-btn--sm">مسح التحديد</button>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div>
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-slate-500"><Loader2 className="h-8 w-8 animate-spin text-sky-500" /><span className="text-sm">جاري تحميل دليل الأصناف...</span></div>
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-[var(--cerami-muted)]"><Loader2 className="h-8 w-8 animate-spin text-[var(--cerami-primary-readable)]" /><span className="text-sm">جاري تحميل دليل الأصناف...</span></div>
         ) : loadError ? (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><AlertTriangle className="h-8 w-8 text-amber-500" /><p className="text-sm font-bold text-slate-700">تعذر تحميل البيانات</p><p className="text-xs text-slate-500">{loadError}</p><button onClick={loadProducts} className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700">إعادة المحاولة</button></div>
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><AlertTriangle className="h-8 w-8 text-[var(--win-warning)]" /><p className="text-sm font-bold text-[var(--win-text)]">تعذر تحميل البيانات</p><p className="text-xs text-[var(--cerami-muted)]">{loadError}</p><button onClick={loadProducts} className="erp-btn erp-btn--primary erp-btn--sm">إعادة المحاولة</button></div>
         ) : products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><Package className="h-9 w-9 text-slate-300" /><p className="text-sm font-bold text-slate-700">لا توجد أصناف مطابقة</p><p className="text-xs text-slate-500">جرّب تعديل البحث أو أضف صنفًا جديدًا إلى الدليل.</p></div>
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><Package className="h-9 w-9 text-[var(--cerami-muted)] opacity-40" /><p className="text-sm font-bold text-[var(--win-text)]">لا توجد أصناف مطابقة</p><p className="text-xs text-[var(--cerami-muted)]">جرّب تعديل البحث أو أضف صنفًا جديدًا إلى الدليل.</p></div>
         ) : viewMode === 'table' ? (
           <ProductsTable
             products={products}
@@ -1631,102 +1624,88 @@ export const ProductsView: React.FC = () => {
       />
 
       {/* STOCK MODAL */}
-      {stockProduct && canAdjustInventory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><PackagePlus className="w-5 h-5" /></div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">إضافة كمية للمخزون</h3>
-                  <p className="text-[11px] text-slate-500">{stockProduct.name}{stockProduct.productType === 'GENERAL' ? ` • الوحدة: ${getProductUnitLabel(stockProduct)}` : ` • ${stockProduct.metersPerBox} م²/كرتونة`}</p>
+      <Modal
+        open={stockProduct !== null && canAdjustInventory}
+        onClose={() => setStockProduct(null)}
+        title="إضافة كمية للمخزون"
+        description={stockProduct ? `${stockProduct.name}${stockProduct.productType === 'GENERAL' ? ` • الوحدة: ${getProductUnitLabel(stockProduct)}` : ` • ${stockProduct.metersPerBox} م²/كرتونة`}` : undefined}
+        icon={<PackagePlus className="h-5 w-5" />}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setStockProduct(null)}>إلغاء</Button>
+            <Button variant="success" onClick={handleSaveStock} loading={stockSaving} leadingIcon={<PackagePlus className="h-4 w-4" />}>
+              إضافة للمخزون
+            </Button>
+          </>
+        }
+      >
+        {stockProduct && (
+          <div className="space-y-4 text-xs">
+            <div className="space-y-2">
+              {stockRows.map((row, index) => (
+                <div key={row.warehouseId} className="grid grid-cols-1 sm:grid-cols-3 items-end gap-2 rounded-[var(--ui-radius-sm)] border border-[var(--win-border)] bg-[var(--cerami-surface-muted)] p-3">
+                  <Field label="المخزن"><div className="px-3 py-2 font-bold">{row.warehouseName}</div></Field>
+                  <div className="rounded-[var(--ui-radius-sm)] border border-[var(--win-success-border)] bg-[var(--win-success-soft)] px-3 py-2">
+                    <div className="text-[10px] font-bold text-[var(--win-success-text)]">الرصيد الحالي</div>
+                    <div className="font-black text-[var(--win-success-text)]">{stockProduct.productType === 'GENERAL' ? `${round(row.currentM2, 3)} ${getProductUnitLabel(stockProduct)}` : CeramicMath.formatM2(row.currentM2)}</div>
+                  </div>
+                  <Field label={stockProduct.productType === 'GENERAL' ? `الكمية المضافة (${getProductUnitLabel(stockProduct)})` : 'عدد الكراتين المضافة'}>
+                    <input type="number" min="0" step="0.01" value={row.addBoxes || ''} onChange={(e) => { const value = Number.parseFloat(e.target.value) || 0; setStockRows((prev) => prev.map((r, i) => i === index ? { ...r, addBoxes: value } : r)); }} className="ui-input w-full font-bold" placeholder="0" />
+                  </Field>
                 </div>
-              </div>
-              <button onClick={() => setStockProduct(null)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+              ))}
             </div>
-            <div className="space-y-4 p-6 text-xs">
-              <div className="space-y-2">
-                {stockRows.map((row, index) => (
-                  <div key={row.warehouseId} className="grid grid-cols-1 sm:grid-cols-3 items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                    <Field label="المخزن"><div className="px-3 py-2 font-bold text-slate-700">{row.warehouseName}</div></Field>
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                      <div className="text-[10px] font-bold text-emerald-700">الرصيد الحالي</div>
-                      <div className="font-black text-emerald-700">{stockProduct.productType === 'GENERAL' ? `${round(row.currentM2, 3)} ${getProductUnitLabel(stockProduct)}` : CeramicMath.formatM2(row.currentM2)}</div>
-                    </div>
-                    <Field label={stockProduct.productType === 'GENERAL' ? `الكمية المضافة (${getProductUnitLabel(stockProduct)})` : 'عدد الكراتين المضافة'}>
-                      <input type="number" min="0" step="0.01" value={row.addBoxes || ''} onChange={(e) => { const value = Number.parseFloat(e.target.value) || 0; setStockRows((prev) => prev.map((r, i) => i === index ? { ...r, addBoxes: value } : r)); }} className="w-full px-3 py-2 bg-white rounded-xl border border-emerald-300 font-bold" placeholder="0" />
-                    </Field>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label={stockProduct.productType === 'GENERAL' ? `القيمة المضافة (${getProductUnitLabel(stockProduct)})` : 'القيمة المضافة (م²)'}>
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-black text-emerald-700">
-                    {round(stockRows.reduce((s, r) => s + r.addBoxes, 0) * (stockProduct.productType === 'GENERAL' ? 1 : (stockProduct.metersPerBox || 0)), 3)} {getProductUnitLabel(stockProduct)}
-                  </div>
-                </Field>
-                <Field label="سبب الإضافة / ملاحظة">
-                  <input value={stockReason} onChange={(e) => setStockReason(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                </Field>
-              </div>
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-                <button type="button" onClick={() => setStockProduct(null)} className="rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700 hover:bg-slate-200">إلغاء</button>
-                <button type="button" onClick={handleSaveStock} disabled={stockSaving} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 font-black text-white hover:bg-emerald-700 disabled:opacity-60">
-                  {stockSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackagePlus className="w-4 h-4" />}
-                  إضافة للمخزون
-                </button>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label={stockProduct.productType === 'GENERAL' ? `القيمة المضافة (${getProductUnitLabel(stockProduct)})` : 'القيمة المضافة (م²)'}>
+                <div className="rounded-[var(--ui-radius-sm)] border border-[var(--win-success-border)] bg-[var(--win-success-soft)] px-3 py-2 font-black text-[var(--win-success-text)]">
+                  {round(stockRows.reduce((sum, r) => sum + r.addBoxes, 0) * (stockProduct.productType === 'GENERAL' ? 1 : (stockProduct.metersPerBox || 0)), 3)} {getProductUnitLabel(stockProduct)}
+                </div>
+              </Field>
+              <Field label="سبب الإضافة / ملاحظة">
+                <input value={stockReason} onChange={(e) => setStockReason(e.target.value)} className="ui-input w-full font-bold" />
+              </Field>
             </div>
           </div>
-        </div>
-      )}
-
+        )}
+      </Modal>
       {/* IMPORT MODAL */}
-      {isImportOpen && canImportProducts && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><FileSpreadsheet className="w-5 h-5" /></div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">استيراد الأصناف من جدول بيانات</h3>
-                  <p className="text-[11px] text-slate-500">ارفع ملف جدول بيانات (.xlsx) لإضافة الأصناف دفعة واحدة</p>
-                </div>
+      <Modal
+        open={isImportOpen && canImportProducts}
+        onClose={() => { setIsImportOpen(false); setImportResult(null); }}
+        title="استيراد الأصناف من جدول بيانات"
+        description="ارفع ملف جدول بيانات (.xlsx) لإضافة الأصناف دفعة واحدة"
+        icon={<FileSpreadsheet className="h-5 w-5" />}
+        size="lg"
+        footer={<Button variant="secondary" onClick={() => { setIsImportOpen(false); setImportResult(null); }}>إغلاق</Button>}
+      >
+        <div className="space-y-4 text-xs">
+          <button type="button" onClick={downloadImportTemplate} className="erp-btn erp-btn--secondary w-full justify-between">
+            <span className="flex items-center gap-2"><Download className="h-4 w-4 text-[var(--cerami-primary-readable)]" /> تحميل قالب جدول بيانات جاهز</span>
+            <span className="text-[10px] text-[var(--cerami-muted)]">xlsx</span>
+          </button>
+          <button type="button" onClick={() => importInputRef.current?.click()} className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--ui-radius-lg)] border-2 border-dashed border-[var(--win-accent-border)] bg-[var(--win-accent-soft)] px-4 py-10 text-center hover:border-[var(--win-accent)]">
+            {isImporting ? <Loader2 className="h-8 w-8 animate-spin text-[var(--cerami-primary-readable)]" /> : <Upload className="h-8 w-8 text-[var(--cerami-primary-readable)]" />}
+            <span className="text-sm font-bold">{isImporting ? 'جارٍ استيراد الأصناف...' : 'اضغط لاختيار ملف جدول بيانات'}</span>
+            <span className="text-[10px] text-[var(--cerami-muted)]">يتم إنشاء الأنواع والماركات غير الموجودة تلقائيًا</span>
+          </button>
+          <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImportFile(file); e.target.value = ''; }} />
+          {importResult && (
+            <div className={`rounded-[var(--ui-radius-sm)] border p-3 ${importResult.errors.length > 0 ? 'border-[var(--win-warning-border)] bg-[var(--win-warning-soft)]' : 'border-[var(--win-success-border)] bg-[var(--win-success-soft)]'}`}>
+              <div className="flex items-center gap-2 font-black">
+                <CheckCircle className="h-4 w-4 text-[var(--cerami-success)]" />
+                تم إنشاء {importResult.created} صنفًا
               </div>
-              <button onClick={() => { setIsImportOpen(false); setImportResult(null); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-4 p-6 text-xs">
-              <button onClick={downloadImportTemplate} className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-slate-700 hover:bg-slate-100">
-                <span className="flex items-center gap-2"><Download className="w-4 h-4 text-sky-600" /> تحميل قالب جدول بيانات جاهز</span>
-                <span className="text-[10px] text-slate-400">xlsx</span>
-              </button>
-              <button type="button" onClick={() => importInputRef.current?.click()} className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/50 px-4 py-10 text-center hover:border-sky-500">
-                {isImporting ? <Loader2 className="w-8 h-8 animate-spin text-sky-600" /> : <Upload className="w-8 h-8 text-sky-500" />}
-                <span className="text-sm font-bold text-slate-700">{isImporting ? 'جارٍ استيراد الأصناف...' : 'اضغط لاختيار ملف جدول بيانات'}</span>
-                <span className="text-[10px] text-slate-500">يتم إنشاء الأنواع والماركات غير الموجودة تلقائيًا</span>
-              </button>
-              <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImportFile(file); e.target.value = ''; }} />
-              {importResult && (
-                <div className={`rounded-xl border p-3 ${importResult.errors.length > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
-                  <div className="flex items-center gap-2 font-black">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
-                    تم إنشاء {importResult.created} صنفًا
-                  </div>
-                  {importResult.errors.length > 0 && (
-                    <ul className="mt-2 list-disc space-y-1 pr-5 text-[10px] text-amber-700">
-                      {importResult.errors.slice(0, 8).map((err, i) => <li key={i}>{err}</li>)}
-                      {importResult.errors.length > 8 && <li>... و{importResult.errors.length - 8} أخطاء أخرى</li>}
-                    </ul>
-                  )}
-                </div>
+              {importResult.errors.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pe-5 text-[10px] text-[var(--cerami-warning)]">
+                  {importResult.errors.slice(0, 8).map((err, i) => <li key={i}>{err}</li>)}
+                  {importResult.errors.length > 8 && <li>... و{importResult.errors.length - 8} أخطاء أخرى</li>}
+                </ul>
               )}
-              <div className="flex justify-end">
-                <button onClick={() => { setIsImportOpen(false); setImportResult(null); }} className="rounded-xl bg-slate-100 px-5 py-2 font-bold text-slate-700 hover:bg-slate-200">إغلاق</button>
-              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

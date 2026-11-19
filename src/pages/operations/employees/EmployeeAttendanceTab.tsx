@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import { countAttendanceByStatus } from './helpers';
 import type { AttendanceRecord, Employee } from '../../../types/hr/employeesPage';
@@ -57,88 +58,77 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
       {/* Attendance Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
-                <th className="p-4">العامل ومقر العمل</th>
-                <th className="p-4">المسمى الوظيفي</th>
-                <th className="p-4 text-center">حالة الحضور</th>
-                <th className="p-4">ملاحظات اليوم</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 text-sm">
-              {employees.map(emp => {
-                const record = attendance.find(a => a.date === attendanceDate && a.employeeId === emp.id);
-                const status = record?.status;
-
-                return (
-                  <tr key={emp.id} className="hover:bg-slate-100 transition">
-                    <td className="p-4 font-bold text-slate-900">
-                      {emp.name}
-                      <span className="text-[10px] text-slate-500 font-medium block">{emp.location}</span>
-                    </td>
-                    <td className="p-4 text-slate-500 text-xs font-semibold">{emp.role}</td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => onUpdateAttendance(emp.id, 'PRESENT')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${status === 'PRESENT'
- ? 'bg-emerald-600 border-emerald-500 text-white'
- : 'bg-slate-50 hover:bg-slate-50 text-slate-500'
- }`}
-                        >
-                          حاضر
-                        </button>
-                        <button
-                          onClick={() => onUpdateAttendance(emp.id, 'LATE')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${status === 'LATE'
- ? 'bg-amber-600 border-amber-500 text-white'
- : 'bg-slate-50 hover:bg-slate-50 text-slate-500'
- }`}
-                        >
-                          متأخر
-                        </button>
-                        <button
-                          onClick={() => onUpdateAttendance(emp.id, 'ABSENT')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${status === 'ABSENT'
- ? 'bg-rose-600 border-rose-500 text-white'
- : 'bg-slate-50 hover:bg-slate-50 text-slate-500'
- }`}
-                        >
-                          غائب
-                        </button>
-                        <button
-                          onClick={() => onUpdateAttendance(emp.id, 'LEAVE')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${status === 'LEAVE'
- ? 'bg-sky-600 border-sky-500 text-white'
- : 'bg-slate-50 hover:bg-slate-50 text-slate-500'
- }`}
-                        >
-                          إجازة
-                        </button>
-                      </div>
-                    </td>
-                    <td className="p-4 text-xs text-slate-500">
-                      <input
-                        type="text"
-                        placeholder="أضف ملاحظة (مثال: تأخير إذن، عذر طبي)..."
-                        value={record?.notes || ''}
-                        onChange={(e) => onAttendanceNotesChange(emp.id, status, e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-300 text-xs"
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-              {employees.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-slate-500 font-bold">
-                    لا يوجد موظفون متاحون للتسجيل.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="حضور الموظفين"
+            rows={employees}
+            rowKey={(emp: any) => String(emp.id)}
+            tableClassName="border-collapse text-sm"
+            rowClassName={() => 'transition hover:bg-slate-100'}
+            columns={[
+              {
+                key: 'emp', header: 'العامل ومقر العمل',
+                render: (emp: any) => (
+                  <span className="block font-bold text-slate-900">
+                    {emp.name}
+                    <span className="block text-[10px] font-medium text-slate-500">{emp.location}</span>
+                  </span>
+                ),
+              },
+              { key: 'role', header: 'المسمى الوظيفي', render: (emp: any) => <span className="text-xs font-semibold text-slate-500">{emp.role}</span> },
+              {
+                key: 'status', header: 'حالة الحضور', align: 'center',
+                render: (emp: any) => {
+                  const record = attendance.find(a => a.date === attendanceDate && a.employeeId === emp.id);
+                  const status = record?.status;
+                  return (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => onUpdateAttendance(emp.id, 'PRESENT')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${status === 'PRESENT' ? 'border-emerald-500 bg-emerald-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        حاضر
+                      </button>
+                      <button
+                        onClick={() => onUpdateAttendance(emp.id, 'LATE')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${status === 'LATE' ? 'border-amber-500 bg-amber-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        متأخر
+                      </button>
+                      <button
+                        onClick={() => onUpdateAttendance(emp.id, 'ABSENT')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${status === 'ABSENT' ? 'border-rose-500 bg-rose-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        غائب
+                      </button>
+                      <button
+                        onClick={() => onUpdateAttendance(emp.id, 'LEAVE')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${status === 'LEAVE' ? 'border-sky-500 bg-sky-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        إجازة
+                      </button>
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'notes', header: 'ملاحظات اليوم',
+                render: (emp: any) => {
+                  const record = attendance.find(a => a.date === attendanceDate && a.employeeId === emp.id);
+                  const status = record?.status;
+                  return (
+                    <input
+                      type="text"
+                      placeholder="أضف ملاحظة (مثال: تأخير إذن، عذر طبي)..."
+                      value={record?.notes || ''}
+                      onChange={(e) => onAttendanceNotesChange(emp.id, status, e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-slate-300 focus:outline-none"
+                    />
+                  );
+                },
+              },
+            ]}
+            emptyTitle="لا يوجد موظفون متاحون للتسجيل."
+          />
         </div>
       </div>
     </div>

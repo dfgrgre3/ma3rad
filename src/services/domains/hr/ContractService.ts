@@ -9,6 +9,7 @@ import { LeaveService } from './LeaveService';
 import { localDateString } from '../../../utils/shared/date';
 import { unscaleMoneyRow } from '../../../utils/money';
 const CONTRACT_MONEY_FIELDS = ['salary'] as const;
+const SETTLEMENT_MONEY_FIELDS = ['base_salary', 'earned_wages', 'leave_payout', 'total_amount'] as const;
 
 import type { User } from '../../../types/auth/identity';
 import type {
@@ -431,7 +432,7 @@ export class ContractService {
            id, employee_id, branch_id, contract_number, contract_type, start_date, end_date,
            job_title, salary, salary_components_json, currency, status, renewal_notice_days,
            renewed_from_id, notes, created_by, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?)`,
         [
           renewalId, existing.employeeId, employee.branchId, contractNumber, existing.contractType,
           startDate, input.endDate, existing.jobTitle, input.salary ?? existing.salary,
@@ -631,7 +632,7 @@ export class ContractService {
        WHERE ${conditions.join(' AND ')}
        ORDER BY s.termination_date DESC, s.created_at DESC`,
       params
-    );
+    ).map((row) => unscaleMoneyRow(row, SETTLEMENT_MONEY_FIELDS));
   }
 
   public getEmployeeLifecycleHistory(employeeId: string): EmployeeLifecycleHistory {

@@ -359,7 +359,7 @@ export const AppConfigurationPage: React.FC = () => {
   }, [pageCatalog, pageSearch]);
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6" dir="rtl" data-config-ignore>
+    <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6" data-config-ignore>
       <div className="w-full space-y-4">
         <header className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

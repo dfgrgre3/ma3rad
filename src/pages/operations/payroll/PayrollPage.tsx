@@ -9,6 +9,8 @@ import { PayrollTransactionModal } from './PayrollTransactionModal';
 import { PayrollPayoutModal } from './PayrollPayoutModal';
 import { PayrollTaxRulesModal } from './PayrollTaxRulesModal';
 
+import { DataTable } from '../../../components/ui/DataTable';
+import { useToast } from '../../../components/ui/Toast';
 const PAYMENT_METHOD_LABELS: Record<PayrollPaymentMethod, string> = {
   CASH: 'نقدي',
   BANK_TRANSFER: 'تحويل بنكي',
@@ -29,6 +31,7 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
 const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 
 export const PayrollPage: React.FC = () => {
+  const toast = useToast();
   const actor = AuthService.getCurrentUser();
   const canViewPayroll = PermissionService.canAny(actor, ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
   const canManagePayroll = PermissionService.canAny(actor, ['employees.payroll.manage', 'employees.manage']);
@@ -86,7 +89,7 @@ export const PayrollPage: React.FC = () => {
     e.preventDefault();
     if (!target) return;
     const amount = Number(form.amount);
-    if (!(amount > 0)) { alert('أدخل مبلغاً صحيحاً.'); return; }
+    if (!(amount > 0)) { toast.warning('أدخل مبلغاً صحيحاً.'); return; }
     setSaving(true);
     try {
       EmployeeService.addTransaction({
@@ -99,14 +102,14 @@ export const PayrollPage: React.FC = () => {
       });
       setTarget(null);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر تسجيل الحركة.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر تسجيل الحركة.'); }
     finally { setSaving(false); }
   };
 
   const removeTx = (tx: PayrollTransaction) => {
     if (!confirm('حذف حركة الرواتب هذه؟')) return;
     try { EmployeeService.deleteTransaction(tx.id); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر حذف الحركة.'); }
+    catch (err: any) { toast.error(err?.message || 'تعذر حذف الحركة.'); }
   };
 
   const calculateRun = () => {
@@ -204,7 +207,7 @@ export const PayrollPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center"><Wallet className="w-5 h-5 text-sky-600" /></div>
         <div>
@@ -279,40 +282,52 @@ export const PayrollPage: React.FC = () => {
                     )))}
                   </div>
                 )}
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1100px] text-right text-xs">
-                    <thead className="border-b border-slate-200 bg-white">
-                      <tr>{['الموظف', 'الأساسي', 'الإضافي', 'مكافأة وعمولة', 'غياب / إجازة', 'تأخير', 'سلف وخصومات', 'ضريبة', 'الصافي', 'الصرف', 'القسيمة / التحذيرات'].map((heading) => <th key={heading} className="px-3 py-3 font-bold text-slate-500">{heading}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {run.items.map((item) => (
-                        <tr key={item.id} className="align-top hover:bg-slate-50/70">
-                          <td className="px-3 py-3 font-bold">{item.employeeName}<div className="mt-1 text-[10px] font-normal text-slate-400">{item.expectedWorkdays} يوم عمل مستحق</div></td>
-                          <td className="px-3 py-3 font-mono">{fmt(item.baseAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{fmt(item.overtimeAmount)}<div className="mt-1 text-[10px] text-slate-400">{item.overtimeMinutes} دقيقة</div></td>
-                          <td className="px-3 py-3 font-mono">{fmt(item.bonusAmount + item.commissionAmount)}</td>
-                          <td className="px-3 py-3">{item.absentDays} / {item.unpaidLeaveDays} يوم<div className="mt-1 font-mono">{fmt(item.attendanceDeductionAmount)}</div></td>
-                          <td className="px-3 py-3">{item.lateMinutes} دقيقة</td>
-                          <td className="px-3 py-3 font-mono">{fmt(item.advanceAmount + item.manualDeductionAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{fmt(item.taxAmount)}</td>
-                          <td className={`px-3 py-3 font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{fmt(item.netAmount)}</td>
-                          <td className="px-3 py-3">
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod}</span>
-                            {item.payoutStatus === 'PAID' && <div className="mt-1 text-[10px] font-bold text-emerald-700">مصروف</div>}
-                            {item.paymentReference && <div className="mt-1 max-w-[130px] truncate font-mono text-[10px] text-slate-400" title={item.paymentReference}>{item.paymentReference}</div>}
-                          </td>
-                          <td className="px-3 py-3">
-                            <button onClick={() => printPayslip(item)} className="mb-1 flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 font-bold text-slate-600">
-                              <Printer className="h-3 w-3" /> قسيمة
-                            </button>
-                            {item.warnings.map((warning) => <div key={warning} className="max-w-[220px] text-[10px] text-amber-700">{warning}</div>)}
-                          </td>
-                        </tr>
-                      ))}
-                      {!run.items.length && <tr><td colSpan={11} className="py-10 text-center text-slate-400">لا يوجد موظفون مستحقون في هذه الفترة.</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                                    ariaLabel="بنود مسير الرواتب"
+                                    rows={run.items}
+                                    rowKey={(item) => item.id}
+                                    minWidth={1100}
+                                    dense
+                                    columns={[
+                                      {
+                                        key: 'employee', header: 'الموظف',
+                                        render: (item) => (
+                                          <span className="font-bold align-top">{item.employeeName}<div className="mt-1 text-[10px] font-normal text-slate-400">{item.expectedWorkdays} يوم عمل مستحق</div></span>
+                                        ),
+                                      },
+                                      { key: 'base', header: 'الأساسي', render: (item) => <span className="font-mono">{fmt(item.baseAmount)}</span> },
+                                      { key: 'overtime', header: 'الإضافي', render: (item) => <span className="font-mono">{fmt(item.overtimeAmount)}<div className="mt-1 text-[10px] text-slate-400">{item.overtimeMinutes} دقيقة</div></span> },
+                                      { key: 'bonus', header: 'مكافأة وعمولة', render: (item) => <span className="font-mono">{fmt(item.bonusAmount + item.commissionAmount)}</span> },
+                                      { key: 'absence', header: 'غياب / إجازة', render: (item) => <span>{item.absentDays} / {item.unpaidLeaveDays} يوم<div className="mt-1 font-mono">{fmt(item.attendanceDeductionAmount)}</div></span> },
+                                      { key: 'late', header: 'تأخير', render: (item) => <span>{item.lateMinutes} دقيقة</span> },
+                                      { key: 'deductions', header: 'سلف وخصومات', render: (item) => <span className="font-mono">{fmt(item.advanceAmount + item.manualDeductionAmount)}</span> },
+                                      { key: 'tax', header: 'ضريبة', render: (item) => <span className="font-mono">{fmt(item.taxAmount)}</span> },
+                                      { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{fmt(item.netAmount)}</span> },
+                                      {
+                                        key: 'payout', header: 'الصرف',
+                                        render: (item) => (
+                                          <span>
+                                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod}</span>
+                                            {item.payoutStatus === 'PAID' && <div className="mt-1 text-[10px] font-bold text-emerald-700">مصروف</div>}
+                                            {item.paymentReference && <div className="mt-1 max-w-[130px] truncate font-mono text-[10px] text-slate-400" title={item.paymentReference}>{item.paymentReference}</div>}
+                                          </span>
+                                        ),
+                                      },
+                                      {
+                                        key: 'payslip', header: 'القسيمة / التحذيرات',
+                                        render: (item) => (
+                                          <span>
+                                            <button onClick={() => printPayslip(item)} className="mb-1 flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 font-bold text-slate-600">
+                                              <Printer className="h-3 w-3" /> قسيمة
+                                            </button>
+                                            {item.warnings.map((warning) => <div key={warning} className="max-w-[220px] text-[10px] text-amber-700">{warning}</div>)}
+                                          </span>
+                                        ),
+                                      },
+                                    ]}
+                                    emptyTitle="لا يوجد موظفون مستحقون في هذه الفترة."
+                                  />
+
               </> : <div className="flex flex-col items-center gap-3 p-10 text-center text-sm text-slate-500">
                 <span>لم يتم احتساب رواتب هذه الفترة بعد.</span>
                 {canManagePayroll && <button onClick={calculateRun} disabled={saving} className="rounded-lg bg-sky-600 px-4 py-2 font-bold text-white disabled:opacity-50"><Calculator className="ml-1 inline h-4 w-4" /> احتساب المسودة</button>}
@@ -341,26 +356,22 @@ export const PayrollPage: React.FC = () => {
                 <h3 className="text-sm font-black flex items-center gap-2"><Banknote className="w-4 h-4 text-slate-400" /> آخر حركات الرواتب</h3>
                 <span className="text-[10px] text-slate-400">{transactions.length} حركة</span>
               </div>
-              <div className="max-h-[420px] overflow-auto">
-                <table className="w-full text-sm text-right">
-                  <thead className="bg-white border-b border-slate-200 sticky top-0">
-                    <tr>{['الموظف', 'النوع', 'المبلغ', 'التاريخ', 'ملاحظات', ''].map((h) => <th key={h} className="px-4 py-2.5 text-xs font-bold text-slate-500">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-2.5 font-bold text-slate-700">{tx.employeeName || tx.employeeId}</td>
-                        <td className="px-4 py-2.5"><span className={`text-[10px] px-2 py-1 rounded border font-bold ${TX_COLORS[tx.type]}`}>{TX_LABELS[tx.type]}</span></td>
-                        <td className="px-4 py-2.5 font-mono font-bold text-slate-800">{fmt(Number(tx.amount))}</td>
-                        <td className="px-4 py-2.5 text-slate-500 font-mono">{tx.date}</td>
-                        <td className="px-4 py-2.5 text-slate-400 text-xs max-w-[240px] truncate">{tx.notes || '—'}</td>
-                        <td className="px-4 py-2.5">{canManagePayroll && <button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
-                      </tr>
-                    ))}
-                    {transactions.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-slate-400">لا توجد حركات رواتب مسجلة</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                                ariaLabel="آخر حركات الرواتب"
+                                rows={transactions}
+                                rowKey={(tx) => tx.id}
+                                dense
+                                columns={[
+                                  { key: 'employee', header: 'الموظف', render: (tx) => <span className="font-bold text-slate-700">{tx.employeeName || tx.employeeId}</span> },
+                                  { key: 'type', header: 'النوع', render: (tx) => <span className={`text-[10px] px-2 py-1 rounded border font-bold ${TX_COLORS[tx.type]}`}>{TX_LABELS[tx.type]}</span> },
+                                  { key: 'amount', header: 'المبلغ', render: (tx) => <span className="font-mono font-bold text-slate-800">{fmt(Number(tx.amount))}</span> },
+                                  { key: 'date', header: 'التاريخ', render: (tx) => <span className="text-slate-500 font-mono">{tx.date}</span> },
+                                  { key: 'notes', header: 'ملاحظات', render: (tx) => <span className="text-slate-400 text-xs max-w-[240px] truncate block">{tx.notes || '—'}</span> },
+                                  { key: 'actions', header: '', render: (tx) => canManagePayroll ? <button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button> : null },
+                                ]}
+                                emptyTitle="لا توجد حركات رواتب مسجلة"
+                              />
+
             </div>
           </>
         )}

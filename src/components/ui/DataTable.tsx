@@ -29,6 +29,11 @@ export interface DataTableProps<T> {
   tableClassName?: string;
   minWidth?: number;
   rowClassName?: (row: T) => string;
+  onRowClick?: (row: T) => void;
+  /** Renders an expandable detail row under rows matching this predicate. */
+  isRowExpanded?: (row: T) => boolean;
+  renderExpandedRow?: (row: T) => React.ReactNode;
+  expandedRowClassName?: string;
   /** Optional server/client pagination footer. */
   page?: number;
   pageCount?: number;
@@ -37,6 +42,8 @@ export interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   stickyHeader?: boolean;
   dense?: boolean;
+  /** Optional table footer content (e.g. totals row). */
+  footer?: React.ReactNode;
 }
 
 const ALIGN_CLASS = {
@@ -65,6 +72,10 @@ export function DataTable<T>({
   tableClassName = '',
   minWidth,
   rowClassName,
+  onRowClick,
+  isRowExpanded,
+  renderExpandedRow,
+  expandedRowClassName = '',
   page,
   pageCount,
   total,
@@ -72,6 +83,7 @@ export function DataTable<T>({
   onPageChange,
   stickyHeader = false,
   dense = false,
+  footer,
 }: DataTableProps<T>) {
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={onRetry} />;
@@ -104,19 +116,33 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={rowKey(row)} className={rowClassName?.(row)}>
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.hideBelow ? HIDE_BELOW_CLASS[column.hideBelow] : ''} ${column.className ?? ''}`}
+            {rows.map((row, index) => {
+              const subRow = isRowExpanded?.(row) && renderExpandedRow ? renderExpandedRow(row) : null;
+              return (
+                <React.Fragment key={rowKey(row)}>
+                  <tr
+                    className={`${rowClassName?.(row) ?? ''} ${onRowClick ? 'cursor-pointer' : ''}`}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
                   >
-                    {column.render(row, index)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={`${ALIGN_CLASS[column.align ?? 'start']} ${column.hideBelow ? HIDE_BELOW_CLASS[column.hideBelow] : ''} ${column.className ?? ''}`}
+                      >
+                        {column.render(row, index)}
+                      </td>
+                    ))}
+                  </tr>
+                  {subRow != null && (
+                    <tr className={expandedRowClassName}>
+                      <td colSpan={columns.length}>{subRow}</td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
+          {footer != null && <tfoot>{footer}</tfoot>}
         </table>
       </div>
       {showPagination && (

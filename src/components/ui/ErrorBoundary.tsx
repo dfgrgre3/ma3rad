@@ -48,7 +48,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     const errorMessage = this.state.error.message || 'لم يتم توفير تفاصيل الخطأ.';
 
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-slate-100 px-6 text-center select-none" dir="rtl">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-slate-100 px-6 text-center select-none">
         <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-rose-200 bg-rose-50 shadow-[0_12px_30px_rgba(244,63,94,0.12)]">
           <AlertOctagon className="h-10 w-10 text-rose-500" />
         </div>

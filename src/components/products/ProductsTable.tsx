@@ -206,7 +206,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       render: (product) => {
         const stock = stockOf(product);
         return (
-          <span className={`inline-block rounded-lg px-2 py-1 text-[11px] font-black ${stockTone(product)}`}>
+          <span className={`erp-badge ${stockTone(product)}`}>
             {product.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(product)}` : (
               <>
                 {CeramicMath.formatM2(stock.m2)}

@@ -7,7 +7,9 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { TYPE_CONFIG } from './crmActivityConfig';
 import { CrmActivityModal } from './CrmActivityModal';
 
+import { useToast } from '../../../components/ui/Toast';
 export const CrmActivitiesPage: React.FC = () => {
+  const toast = useToast();
   const service = new CrmService();
   const user = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(user, 'ui.crm.activities.create');
@@ -42,7 +44,7 @@ export const CrmActivitiesPage: React.FC = () => {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.leadId) { alert('يرجى اختيار العميل المحتمل.'); return; }
+    if (!form.leadId) { toast.warning('يرجى اختيار العميل المحتمل.'); return; }
     setSaving(true);
     try {
       service.createActivity({
@@ -56,18 +58,18 @@ export const CrmActivitiesPage: React.FC = () => {
       setForm({ leadId: '', activityType: 'CALL', subject: '', scheduledAt: '', body: '' });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إضافة النشاط.');
+      toast.error(err?.message || 'تعذر إضافة النشاط.');
     } finally {
       setSaving(false);
     }
   };
 
   const markDone = (id: string) => {
-    try { service.completeActivity(id); load(); } catch (err: any) { alert(err?.message); }
+    try { service.completeActivity(id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center">

@@ -67,7 +67,7 @@ export const BarcodesPrintPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header (Hidden when printing) */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
         <div className="flex items-center gap-3">

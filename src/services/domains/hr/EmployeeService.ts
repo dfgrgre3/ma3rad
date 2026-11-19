@@ -1448,7 +1448,7 @@ export class EmployeeService {
               ), e.base_salary / 100.0) AS baseSalary,
               e.salary_type AS salaryType,
               e.joined_date AS joinedDate, e.terminated_at AS terminatedAt,
-              ec.salary AS contractSalary, ec.start_date AS contractStartDate, ec.end_date AS contractEndDate,
+              ec.salary / 100.0 AS contractSalary, ec.start_date AS contractStartDate, ec.end_date AS contractEndDate,
               ec.salary_components_json AS salaryComponentsJson,
               CASE WHEN EXISTS (
                 SELECT 1 FROM employee_contracts hx
@@ -1719,7 +1719,7 @@ export class EmployeeService {
               ), e.base_salary / 100.0) AS baseSalary,
               e.joined_date AS joinedDate,
               e.terminated_at AS terminatedAt,
-              c.salary AS contractSalary, c.start_date AS contractStartDate, c.end_date AS contractEndDate,
+              c.salary / 100.0 AS contractSalary, c.start_date AS contractStartDate, c.end_date AS contractEndDate,
               c.salary_components_json AS salaryComponentsJson,
               CASE WHEN EXISTS (
                 SELECT 1 FROM employee_contracts hx
@@ -2535,7 +2535,7 @@ export class EmployeeService {
             WHEN e.reference_type = 'PAYROLL_REVERSAL' THEN reversed_tx.employee_id
             ELSE NULL
           END AS employee_id,
-          l.credit - l.debit AS balance
+          (l.credit - l.debit) / 100.0 AS balance
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1
         JOIN chart_of_accounts a ON a.id = l.account_id AND a.code = '2104'

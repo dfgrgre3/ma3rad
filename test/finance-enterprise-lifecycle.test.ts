@@ -107,7 +107,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
     for (const partyType of ['CUSTOMER', 'SUPPLIER'] as const) {
       const accountCode = partyType === 'CUSTOMER' ? '1103' : '2101';
       const rawBalance = Number(queryOne<{ balance: number }>(`
-        SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+        SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0) AS balance
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
@@ -270,12 +270,12 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   assert.equal(closedFy?.status, 'CLOSED', 'Fiscal year must be CLOSED');
   assert.equal(closedFy?.closingEntryId, closingEntryId);
   const closingTotals = queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [closingEntryId]
   );
   assert.equal(closingTotals?.debit, closingTotals?.credit, 'Annual closing journal entry must balance');
   const retainedEarningsLine = queryOne<{ debit: number; credit: number }>(`
-    SELECT l.debit, l.credit FROM journal_entry_lines l
+    SELECT l.debit / 100.0 AS debit, l.credit / 100.0 AS credit FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ? AND a.code = '3101'
   `, [closingEntryId]);
@@ -324,7 +324,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   for (const period of financeService.getFiscalPeriods(lossYearId)) financeService.closePeriod(period.id);
   const lossClosingEntryId = financeService.closeFiscalYear(lossYearId, '3101');
   const retainedLossLine = queryOne<{ debit: number; credit: number }>(`
-    SELECT l.debit, l.credit FROM journal_entry_lines l
+    SELECT l.debit / 100.0 AS debit, l.credit / 100.0 AS credit FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ? AND a.code = '3101'
   `, [lossClosingEntryId]);
@@ -404,7 +404,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   const chqId = `chq_test_${Date.now()}`;
   db.run(`
     INSERT INTO cheques (id, cheque_number, type, party_type, party_name, bank_name, amount, due_date, status, created_by)
-    VALUES (?, 'CHQ-9901', 'RECEIVED', 'CUSTOMER', 'شركة الأهرام للتطوير', 'CIB', 75000, '2026-03-15', 'PENDING', ?)
+    VALUES (?, 'CHQ-9901', 'RECEIVED', 'CUSTOMER', 'شركة الأهرام للتطوير', 'CIB', 7500000, '2026-03-15', 'PENDING', ?)
   `, [chqId, adminId]);
 
   // Transition: PENDING -> DEPOSITED
@@ -420,7 +420,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   assert.ok(chq?.clearingEntryId, 'Must link clearance journal entry');
 
   const clearJvLines = db.query<any>(`
-    SELECT a.code, l.debit, l.credit
+    SELECT a.code, l.debit / 100.0 AS debit, l.credit / 100.0 AS credit
     FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ?
@@ -434,7 +434,7 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
     bounceFee: 100,
     date: '2026-03-16',
   });
-  chq = queryOne<any>(`SELECT status, bounce_reason AS bounceReason, bounce_fee AS bounceFee, bounce_entry_id AS bounceEntryId FROM cheques WHERE id = ?`, [chqId]);
+  chq = queryOne<any>(`SELECT status, bounce_reason AS bounceReason, bounce_fee / 100.0 AS bounceFee, bounce_entry_id AS bounceEntryId FROM cheques WHERE id = ?`, [chqId]);
   assert.equal(chq?.status, 'BOUNCED');
   assert.equal(chq?.bounceFee, 100);
   assert.ok(chq?.bounceEntryId, 'Must link bounce journal entry');
@@ -503,12 +503,12 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   });
   assert.ok(settleId, 'Settlement record must be saved');
 
-  const settleRecord = queryOne<any>(`SELECT net_amount AS netAmount, journal_entry_id AS journalEntryId FROM payment_gateway_settlements WHERE id = ?`, [settleId]);
+  const settleRecord = queryOne<any>(`SELECT net_amount / 100.0 AS netAmount, journal_entry_id AS journalEntryId FROM payment_gateway_settlements WHERE id = ?`, [settleId]);
   assert.equal(settleRecord?.netAmount, 9799, 'Net deposited amount must be 10,000 - 201 = 9,799');
   assert.ok(settleRecord?.journalEntryId, 'Must create balanced ledger entry');
 
   const settleJvLines = db.query<any>(`
-    SELECT a.code, l.debit, l.credit
+    SELECT a.code, l.debit / 100.0 AS debit, l.credit / 100.0 AS credit
     FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ?
@@ -525,12 +525,12 @@ test('removes only unchanged, unused example records', async () => {
   assert.ok(cleanup, 'Sample cleanup migration must exist');
 
   db.run(`INSERT INTO bank_accounts
-    (id, account_name, bank_name, account_number, iban, swift_code, gl_account_id, current_balance, is_active)
+    (id, account_name, bank_name, account_number, iban, swift_code, gl_account_id, current_balance, is_active, branch_id)
     VALUES ('bank_default', 'البنك الأهلي المصري - الحساب الرئيسي', 'البنك الأهلي المصري',
-      '10002938481', 'EG12000200010002938481001', 'NBEGEGCX', 'acc_1102', 0, 1)`);
+      '10002938481', 'EG12000200010002938481001', 'NBEGEGCX', 'acc_1102', 0, 1, 'br_main')`);
   db.run(`INSERT INTO bank_accounts
-    (id, account_name, bank_name, account_number, gl_account_id, current_balance, is_active)
-    VALUES ('bank_for_sample_settlement', 'حساب مستخدم', 'بنك مصر', 'USER-001', 'acc_1102', 0, 1)`);
+    (id, account_name, bank_name, account_number, gl_account_id, current_balance, is_active, branch_id)
+    VALUES ('bank_for_sample_settlement', 'حساب مستخدم', 'بنك مصر', 'USER-001', 'acc_1102', 0, 1, 'br_main')`);
   db.run(`INSERT INTO payment_gateways
     (id, name, provider_code, gl_account_id, commission_rate, fixed_fee, settlement_period_days, is_active)
     VALUES
@@ -669,7 +669,7 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   assert.ok(depreciation && depreciation.amount > 0);
   assert.equal(depreciation?.status, 'POSTED');
   const depreciationBalance = queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [depreciation?.journalEntryId]
   );
   assert.equal(depreciationBalance?.debit, depreciationBalance?.credit);
@@ -700,7 +700,7 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   service.approveFixedAssetDepreciationRequest(unitsRequest);
   AuthService.setCurrentUser(adminUser);
   assert.equal(queryOne<{ accumulatedDepreciation: number }>(
-    'SELECT accumulated_depreciation AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [unitsAsset.id]
+    'SELECT accumulated_depreciation / 100.0 AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [unitsAsset.id]
   )?.accumulatedDepreciation, 100);
 
   service.recordFixedAssetMaintenance({
@@ -712,7 +712,7 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   );
   assert.ok(operationalMaintenance?.journalEntryId);
   const operationalLines = db.query<{ accountCode: string; debit: number; credit: number }>(
-    `SELECT a.code AS accountCode, l.debit, l.credit FROM journal_entry_lines l
+    `SELECT a.code AS accountCode, l.debit / 100.0 AS debit, l.credit / 100.0 AS credit FROM journal_entry_lines l
      JOIN chart_of_accounts a ON a.id = l.account_id WHERE l.entry_id = ?`,
     [operationalMaintenance?.journalEntryId]
   );
@@ -729,13 +729,13 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   );
   assert.ok(capitalized?.journalEntryId);
   const capitalizedBalance = queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [capitalized?.journalEntryId]
   );
   assert.equal(capitalizedBalance?.debit, 100);
   assert.equal(capitalizedBalance?.credit, 100);
   assert.equal(queryOne<{ purchaseCost: number }>(
-    'SELECT purchase_cost AS purchaseCost FROM fixed_assets WHERE id = ?', [asset.id]
+    'SELECT purchase_cost / 100.0 AS purchaseCost FROM fixed_assets WHERE id = ?', [asset.id]
   )?.purchaseCost, 1300);
 
   const postingPeriod = queryOne<{ id: string; status: string }>(
@@ -795,10 +795,10 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   const registerId = 'cr_fixed_asset_settlement';
   db.run(
     'INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, ?, 0, 1, ?)',
-    [registerId, 'خزينة تسوية الأصول', 100, branchId]
+    [registerId, 'خزينة تسوية الأصول', 10000, branchId]
   );
   const cashBeforeDisposal = queryOne<{ currentBalance: number }>(
-    'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
+    'SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
   )?.currentBalance || 0;
   assert.ok(service.getFixedAssetSettlementSources(asset.id).some((source) => source.id === registerId));
   const disposal = service.disposeFixedAsset({
@@ -806,18 +806,18 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
     settlementType: 'CASH_REGISTER', settlementId: registerId,
   });
   assert.equal(disposal.bookValue, 1300 - Number(queryOne<{ accumulatedDepreciation: number }>(
-    'SELECT accumulated_depreciation AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [asset.id]
+    'SELECT accumulated_depreciation / 100.0 AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [asset.id]
   )?.accumulatedDepreciation));
   assert.equal(disposal.gainLoss, Math.round((900 - disposal.bookValue) * 100) / 100);
   assert.equal(queryOne<{ currentBalance: number }>(
-    'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
+    'SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
   )?.currentBalance, cashBeforeDisposal + 875);
   assert.throws(() => service.disposeFixedAsset({
     assetId: asset.id, date: today, reason: 'تكرار', proceeds: 1,
     settlementType: 'CASH_REGISTER', settlementId: registerId,
   }), /مستبعد بالفعل/);
   const disposalBalance = queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [disposal.journalEntryId]
   );
   assert.equal(disposalBalance?.debit, disposalBalance?.credit);
@@ -849,7 +849,7 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
   db.run(
     `INSERT INTO bank_accounts (id, account_name, bank_name, account_number, currency, opening_balance,
        current_balance, gl_account_id, branch_id, is_active)
-     VALUES (?, ?, ?, ?, 'EGP', 50, 50, ?, ?, 1)`,
+     VALUES (?, ?, ?, ?, 'EGP', 5000, 5000, ?, ?, 1)`,
     [bankId, 'بنك تسوية الأصول', 'بنك اختبار', 'FA-SETTLEMENT-01', bankGlAccount.id, branchId]
   );
   service.saveFixedAsset({
@@ -863,13 +863,13 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
     settlementType: 'BANK_ACCOUNT', settlementId: bankId,
   });
   assert.equal(queryOne<{ currentBalance: number }>(
-    'SELECT current_balance AS currentBalance FROM bank_accounts WHERE id = ?', [bankId]
+    'SELECT current_balance / 100.0 AS currentBalance FROM bank_accounts WHERE id = ?', [bankId]
   )?.currentBalance, 85);
   assert.equal(queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [bankDisposal.journalEntryId]
   )?.debit, queryOne<{ debit: number; credit: number }>(
-    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    'SELECT SUM(debit) / 100.0 AS debit, SUM(credit) / 100.0 AS credit FROM journal_entry_lines WHERE entry_id = ?',
     [bankDisposal.journalEntryId]
   )?.credit);
   const timeline = service.getFixedAssetTimeline(asset.id);

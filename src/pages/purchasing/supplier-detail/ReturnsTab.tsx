@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
@@ -26,35 +27,22 @@ export const ReturnsTab: React.FC<ReturnsTabProps> = ({ returns }) => {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs text-right min-w-[700px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr>
-              <th className="p-3">رقم المرتجع</th>
-              <th className="p-3">التاريخ</th>
-              <th className="p-3">قيمة المرتجع</th>
-              <th className="p-3">سبب الإرجاع</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {returns.map((ret) => (
-              <tr key={ret.id} className="hover:bg-slate-50">
-                <td className="p-3 font-mono font-bold text-slate-900">{ret.return_number}</td>
-                <td className="p-3 text-slate-600">{ret.date}</td>
-                <td className="p-3 font-black text-rose-700">
-                  {CeramicMath.formatCurrency(ret.total_amount)}
-                </td>
-                <td className="p-3 text-slate-700">{ret.reason || '—'}</td>
-              </tr>
-            ))}
-            {returns.length === 0 && (
-              <tr>
-                <td colSpan={4} className="p-10 text-center text-slate-400">
-                  لا توجد مرتجعات شراء مسجلة لهذا المورد.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="مرتجعات شراء المورد"
+          rows={returns}
+          rowKey={(ret: any) => String(ret.id)}
+          minWidth={700}
+          dense
+          tableClassName="text-xs"
+          rowClassName={() => 'transition hover:bg-slate-50'}
+          columns={[
+            { key: 'num', header: 'رقم المرتجع', render: (ret: any) => <span className="font-mono font-bold text-slate-900">{ret.return_number}</span> },
+            { key: 'date', header: 'التاريخ', render: (ret: any) => <span className="text-slate-600">{ret.date}</span> },
+            { key: 'amount', header: 'قيمة المرتجع', render: (ret: any) => <span className="font-black text-rose-700">{CeramicMath.formatCurrency(ret.total_amount)}</span> },
+            { key: 'reason', header: 'سبب الإرجاع', render: (ret: any) => <span className="text-slate-700">{ret.reason || '—'}</span> },
+          ]}
+          emptyTitle="لا توجد مرتجعات شراء مسجلة لهذا المورد."
+        />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   CheckCircle2, ClipboardCheck, FileBadge, MessageSquareText, Plus, RefreshCw,
   ShieldCheck, Trash2, UserMinus, XCircle,
@@ -10,7 +11,15 @@ import {
 import { EmployeeService, Employee } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; icon?: React.ReactNode; tone?: string }> = ({ label, value, hint, icon, tone }: any) => (
+  <UiStatCard label={label} value={value} hint={hint} icon={icon} tone={statTone(tone || '')} />
+);
 type Tab = 'requests' | 'followup';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -63,15 +72,6 @@ const categoryLabel: Record<string, string> = {
   ADMINISTRATIVE: 'إدارية',
 };
 
-const StatCard: React.FC<{ label: string; value: string; icon: React.ReactNode; tone: string }> = ({ label, value, icon, tone }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-bold text-slate-500">{label}</span>
-      <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${tone}`}>{icon}</span>
-    </div>
-    <div className="mt-2 text-xl font-black tabular-nums">{value}</div>
-  </div>
-);
 
 export const EmployeeClearancePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('requests');
@@ -244,7 +244,7 @@ export const EmployeeClearancePage: React.FC = () => {
   }, [selected]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200 bg-teal-50">
           <ShieldCheck className="h-5 w-5 text-teal-600" />
@@ -297,51 +297,53 @@ export const EmployeeClearancePage: React.FC = () => {
                 <h2 className="text-sm font-black">الطلبات ({clearances.length})</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-right text-xs">
-                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2 font-bold">رقم الطلب</th>
-                      <th className="px-3 py-2 font-bold">الموظف</th>
-                      <th className="px-3 py-2 font-bold">تاريخ الإنهاء</th>
-                      <th className="px-3 py-2 font-bold">الأصول</th>
-                      <th className="px-3 py-2 font-bold">المالية</th>
-                      <th className="px-3 py-2 font-bold">الحالة</th>
-                      <th className="px-3 py-2 font-bold">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {clearances.map((clearance) => (
-                      <tr key={clearance.id} className={`hover:bg-slate-50/70 ${selectedId === clearance.id ? 'bg-teal-50/40' : ''}`}>
-                        <td className="px-3 py-3 font-mono text-[10px]">{clearance.clearanceNumber}</td>
-                        <td className="px-3 py-3">
-                          <div className="font-bold">{clearance.employeeName}</div>
-                          <div className="text-[10px] text-slate-500">{clearance.departmentName} • {clearance.branchName}</div>
-                        </td>
-                        <td className="px-3 py-3 tabular-nums">{clearance.terminationDate}</td>
-                        <td className="px-3 py-3 text-[10px]">{assetStatusLabel[clearance.assetClearanceStatus] || clearance.assetClearanceStatus}</td>
-                        <td className="px-3 py-3 text-[10px]">{financialStatusLabel[clearance.financialClearanceStatus] || clearance.financialClearanceStatus}</td>
-                        <td className="px-3 py-3">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(clearance.status)}`}>{statusLabel[clearance.status]}</span>
-                          {clearance.clearanceCertificateIssued && <div className="mt-1 text-[10px] font-bold text-emerald-600">شهادة صادرة</div>}
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            <button onClick={() => openFollowup(clearance)} className="rounded border border-teal-200 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-50">متابعة</button>
-                            {clearance.status === 'CLEARED' && !clearance.clearanceCertificateIssued && (
-                              <button onClick={() => { setSelectedId(clearance.id); run(() => EmployeeClearanceService.issueClearanceCertificate(clearance.id), 'تم إصدار الشهادة.'); }} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">شهادة</button>
-                            )}
-                            {clearance.status !== 'CLEARED' && clearance.status !== 'CANCELLED' && (
-                              <button onClick={() => { if (window.confirm('إلغاء الطلب؟')) run(() => EmployeeClearanceService.cancelClearance(clearance.id), 'تم إلغاء الطلب.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="إلغاء"><Trash2 className="h-3 w-3" /></button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {!clearances.length && (
-                      <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد طلبات إخلاء طرف بهذه الحالة.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="طلبات إخلاء الطرف"
+                  rows={clearances}
+                  rowKey={(clearance: any) => String(clearance.id)}
+                  dense
+                  tableClassName="text-xs"
+                  rowClassName={(clearance: any) => `hover:bg-slate-50/70 ${selectedId === clearance.id ? 'bg-teal-50/40' : ''}`}
+                  columns={[
+                    { key: 'num', header: 'رقم الطلب', render: (clearance: any) => <span className="font-mono text-[10px]">{clearance.clearanceNumber}</span> },
+                    {
+                      key: 'emp', header: 'الموظف',
+                      render: (clearance: any) => (
+                        <span className="block">
+                          <span className="block font-bold">{clearance.employeeName}</span>
+                          <span className="block text-[10px] text-slate-500">{clearance.departmentName} • {clearance.branchName}</span>
+                        </span>
+                      ),
+                    },
+                    { key: 'term', header: 'تاريخ الإنهاء', render: (clearance: any) => <span className="tabular-nums">{clearance.terminationDate}</span> },
+                    { key: 'assets', header: 'الأصول', render: (clearance: any) => <span className="text-[10px]">{assetStatusLabel[clearance.assetClearanceStatus] || clearance.assetClearanceStatus}</span> },
+                    { key: 'fin', header: 'المالية', render: (clearance: any) => <span className="text-[10px]">{financialStatusLabel[clearance.financialClearanceStatus] || clearance.financialClearanceStatus}</span> },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (clearance: any) => (
+                        <span className="block">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(clearance.status)}`}>{statusLabel[clearance.status as keyof typeof statusLabel]}</span>
+                          {clearance.clearanceCertificateIssued && <span className="mt-1 block text-[10px] font-bold text-emerald-600">شهادة صادرة</span>}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'actions', header: 'إجراءات',
+                      render: (clearance: any) => (
+                        <span className="flex flex-wrap gap-1">
+                          <button onClick={() => openFollowup(clearance)} className="rounded border border-teal-200 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-50">متابعة</button>
+                          {clearance.status === 'CLEARED' && !clearance.clearanceCertificateIssued && (
+                            <button onClick={() => { setSelectedId(clearance.id); run(() => EmployeeClearanceService.issueClearanceCertificate(clearance.id), 'تم إصدار الشهادة.'); }} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">شهادة</button>
+                          )}
+                          {clearance.status !== 'CLEARED' && clearance.status !== 'CANCELLED' && (
+                            <button onClick={() => { if (window.confirm('إلغاء الطلب؟')) run(() => EmployeeClearanceService.cancelClearance(clearance.id), 'تم إلغاء الطلب.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="إلغاء"><Trash2 className="h-3 w-3" /></button>
+                          )}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  emptyTitle="لا توجد طلبات إخلاء طرف بهذه الحالة."
+                />
               </div>
             </div>
 

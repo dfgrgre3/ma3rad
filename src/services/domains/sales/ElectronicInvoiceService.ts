@@ -47,11 +47,19 @@ export interface EtaInvoiceDocumentBuilder {
 
 /** ETA v1 API transport. Signing and legal-document mapping are deliberately injected separately. */
 export class EtaElectronicInvoiceProvider implements ElectronicInvoiceProvider {
+  private readonly config: { baseUrl: string; clientId: string; clientSecret: string; taxpayerId: string };
+  private readonly signDocument: (document: unknown) => Promise<unknown>;
+  private readonly fetcher: typeof fetch;
+
   constructor(
-    private readonly config: { baseUrl: string; clientId: string; clientSecret: string; taxpayerId: string },
-    private readonly signDocument: (document: unknown) => Promise<unknown>,
-    private readonly fetcher: typeof fetch = fetch,
-  ) {}
+    config: { baseUrl: string; clientId: string; clientSecret: string; taxpayerId: string },
+    signDocument: (document: unknown) => Promise<unknown>,
+    fetcher: typeof fetch = fetch,
+  ) {
+    this.config = config;
+    this.signDocument = signDocument;
+    this.fetcher = fetcher;
+  }
 
   private async token(): Promise<string> {
     const form = new URLSearchParams({ grant_type: 'client_credentials' });
@@ -133,10 +141,16 @@ export class ElectronicInvoiceService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
 
+  private readonly providerFactory?: () => ElectronicInvoiceProvider;
+  private readonly documentBuilder?: EtaInvoiceDocumentBuilder;
+
   constructor(
-    private readonly providerFactory?: () => ElectronicInvoiceProvider,
-    private readonly documentBuilder?: EtaInvoiceDocumentBuilder,
-  ) {}
+    providerFactory?: () => ElectronicInvoiceProvider,
+    documentBuilder?: EtaInvoiceDocumentBuilder,
+  ) {
+    this.providerFactory = providerFactory;
+    this.documentBuilder = documentBuilder;
+  }
 
   private scope(user: User) {
     return {

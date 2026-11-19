@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertCircle, ArrowDownRight, ArrowUpRight, Check, CheckCircle2, Clock,
   Download, FileText, Printer, RefreshCw, Search, SlidersHorizontal, X
@@ -270,7 +271,7 @@ export const SupplierStatementPage: React.FC = () => {
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -449,49 +450,39 @@ export const SupplierStatementPage: React.FC = () => {
               <span className="text-xs font-bold text-slate-500">{transactions.length} حركة</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] border-collapse text-right text-xs">
-                <thead className="bg-white text-slate-600">
-                  <tr className="border-b border-slate-200">
-                    <th scope="col" className="px-4 py-3 font-bold">التاريخ</th>
-                    <th scope="col" className="px-4 py-3 font-bold">رقم المستند</th>
-                    <th scope="col" className="px-4 py-3 font-bold">البيان</th>
-                    <th scope="col" className="px-4 py-3 text-left font-bold text-sky-800">دائن — فاتورة</th>
-                    <th scope="col" className="px-4 py-3 text-left font-bold text-emerald-800">مدين — سداد / تسوية</th>
-                    <th scope="col" className="px-4 py-3 text-left font-bold text-slate-900">الرصيد</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr className="bg-slate-50 font-bold text-slate-700">
-                    <td className="px-4 py-3">{dateFrom || '—'}</td>
-                    <td className="px-4 py-3 font-mono">—</td>
-                    <td className="px-4 py-3">الرصيد الافتتاحي للفترة</td>
-                    <td className="px-4 py-3 text-left">—</td>
-                    <td className="px-4 py-3 text-left">—</td>
-                    <td className="px-4 py-3 text-left font-mono tabular-nums">{fmt(statementData.openingBalance)}</td>
-                  </tr>
-                  {transactions.map((transaction: any, index: number) => (
-                    <tr key={`${transaction.id}-${index}`} className="transition-colors hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{transaction.date}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono font-bold text-slate-800">{transaction.docNumber || '—'}</td>
-                      <td className="min-w-[260px] px-4 py-3 text-slate-700">{transaction.description}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-left font-mono font-bold tabular-nums text-sky-800">
-                        {Number(transaction.credit) > 0 ? fmt(transaction.credit) : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-left font-mono font-bold tabular-nums text-emerald-800">
-                        {Number(transaction.debit) > 0 ? fmt(transaction.debit) : '—'}
-                      </td>
-                      <td className="whitespace-nowrap bg-slate-50/60 px-4 py-3 text-left font-mono font-black tabular-nums text-slate-900">{fmt(transaction.balanceAfter)}</td>
-                    </tr>
-                  ))}
-                  {transactions.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-12 text-center">
-                        <CheckCircle2 className="mx-auto h-6 w-6 text-slate-300" />
-                        <p className="mt-2 text-sm font-bold text-slate-600">لا توجد حركات في هذه الفترة</p>
-                        <p className="mt-1 text-xs text-slate-500">الرصيد الختامي يساوي الرصيد الافتتاحي.</p>
-                      </td>
-                    </tr>
-                  )}
+              <DataTable
+                ariaLabel="كشف حساب المورد التفصيلي"
+                rows={[
+                  { __opening: true, date: dateFrom || '—', docNumber: '—', description: 'الرصيد الافتتاحي للفترة', credit: null, debit: null, balanceAfter: statementData.openingBalance },
+                  ...transactions.map((transaction: any, index: number) => ({ ...transaction, __i: index })),
+                ]}
+                rowKey={(tx: any) => tx.__opening ? '__opening' : `${tx.id}-${tx.__i}`}
+                minWidth={820}
+                dense
+                tableClassName="border-collapse text-xs"
+                rowClassName={(tx: any) => `${tx.__opening ? 'bg-slate-50 font-bold text-slate-700' : 'transition-colors hover:bg-slate-50'} ${tx.balanceAfter != null && !tx.__opening ? 'bg-slate-50/60' : ''}`}
+                columns={[
+                  { key: 'date', header: 'التاريخ', render: (tx: any) => <span className={`whitespace-nowrap text-slate-600 ${tx.__opening ? '' : 'font-mono'}`}>{tx.date}</span> },
+                  { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-800">{tx.docNumber || '—'}</span> },
+                  { key: 'desc', header: 'البيان', render: (tx: any) => <span className={`min-w-[260px] text-slate-700 ${tx.__opening ? '' : ''}`}>{tx.description}</span> },
+                  {
+                    key: 'credit', header: 'دائن — فاتورة', align: 'end', headerClassName: 'font-bold text-sky-800',
+                    render: (tx: any) => tx.__opening ? <span className="text-left">—</span> : (
+                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-sky-800">{Number(tx.credit) > 0 ? fmt(tx.credit) : '—'}</span>
+                    ),
+                  },
+                  {
+                    key: 'debit', header: 'مدين — سداد / تسوية', align: 'end', headerClassName: 'font-bold text-emerald-800',
+                    render: (tx: any) => tx.__opening ? <span className="text-left">—</span> : (
+                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-emerald-800">{Number(tx.debit) > 0 ? fmt(tx.debit) : '—'}</span>
+                    ),
+                  },
+                  {
+                    key: 'balance', header: 'الرصيد', align: 'end',
+                    render: (tx: any) => <span className="whitespace-nowrap font-mono font-black tabular-nums text-slate-900">{fmt(tx.balanceAfter)}</span>,
+                  },
+                ]}
+                footer={(
                   <tr className="border-t border-slate-300 bg-slate-100 font-black text-slate-900">
                     <td className="px-4 py-3">{dateTo || '—'}</td>
                     <td className="px-4 py-3 font-mono">—</td>
@@ -500,8 +491,10 @@ export const SupplierStatementPage: React.FC = () => {
                     <td className="px-4 py-3 text-left font-mono tabular-nums text-emerald-800">{fmt(periodCredits)}</td>
                     <td className="px-4 py-3 text-left font-mono tabular-nums">{fmt(statementData.closingBalance)}</td>
                   </tr>
-                </tbody>
-              </table>
+                )}
+                emptyTitle="لا توجد حركات في هذه الفترة"
+                emptyDescription="الرصيد الختامي يساوي الرصيد الافتتاحي."
+              />
             </div>
           </section>
         )}

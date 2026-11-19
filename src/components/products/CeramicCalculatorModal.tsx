@@ -147,7 +147,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-scaleIn" dir="rtl">
+      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-scaleIn">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">

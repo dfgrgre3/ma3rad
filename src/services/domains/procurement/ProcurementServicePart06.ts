@@ -33,7 +33,10 @@ private claimJoins(): string {
   private buildClaimsQuery(actor: ReturnType<typeof AuthService.requireAuth>, search: string, status: string, supplierId: string): { sql: string; params: any[] } {
     const scope = this.claimScope(actor);
     let sql = `
-      SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
+      SELECT c.*,
+        c.claimed_amount / 100.0 AS claimed_amount,
+        c.agreed_amount / 100.0 AS agreed_amount,
+        s.name AS supplierName, u.full_name AS createdByName,
         pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
       FROM supplier_claims c
       JOIN suppliers s ON s.id = c.supplier_id
@@ -77,7 +80,10 @@ public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaim
     const scope = this.claimScope(actor);
     return {
       rowSql: `
-      SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
+      SELECT c.*,
+        c.claimed_amount / 100.0 AS claimed_amount,
+        c.agreed_amount / 100.0 AS agreed_amount,
+        s.name AS supplierName, u.full_name AS createdByName,
         COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id) AS branchId,
         pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
       FROM supplier_claims c
@@ -87,7 +93,7 @@ public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaim
       WHERE c.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
     `,
       rowParams: [id, ...scope.branch.params, ...scope.company.params],
-      itemsSql: `SELECT * FROM supplier_claim_items WHERE claim_id = ?`,
+      itemsSql: `SELECT *, unit_cost / 100.0 AS unit_cost, total_amount / 100.0 AS total_amount FROM supplier_claim_items WHERE claim_id = ?`,
       itemsParams: [id],
     };
   }

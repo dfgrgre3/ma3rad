@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../ui/DataTable';
 import { AlertCircle, CheckCircle2, ClipboardCheck, Loader2, RefreshCw, Scale } from 'lucide-react';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
@@ -123,55 +124,56 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 text-right">بند المصالحة</th>
-                    <th className="px-4 py-3 text-left">الأستاذ العام</th>
-                    <th className="px-4 py-3 text-left">المصدر التشغيلي</th>
-                    <th className="px-4 py-3 text-left">الفرق</th>
-                    <th className="px-4 py-3 text-right">الحالة / سبب الفرق</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {checks.map((check) => {
-                    const reasonInputId = `reconcile-reason-${check.key}`;
-                    return (
-                      <tr key={check.key}>
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-800">{check.label}</p>
-                          <p className="mt-1 text-xs text-slate-500">{check.detail}</p>
-                        </td>
-                        <td className="px-4 py-3 text-left font-mono">{fmt(check.ledger)} ج.م</td>
-                        <td className="px-4 py-3 text-left font-mono">{fmt(check.source)} ج.م</td>
-                        <td className={`px-4 py-3 text-left font-mono ${check.status === 'MATCH' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {fmt(check.difference)} ج.م
-                        </td>
-                        <td className="px-4 py-3">
-                          {check.status === 'MATCH' ? (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">متطابق</span>
-                          ) : canClose ? (
-                            <div className="block min-w-64">
-                              <label htmlFor={reasonInputId} className="sr-only">سبب الفرق في {check.label}</label>
-                              <textarea
-                                id={reasonInputId}
-                                value={reasons[check.key] || ''}
-                                onChange={(event) => setReasons((current) => ({ ...current, [check.key]: event.target.value }))}
-                                rows={2}
-                                maxLength={1000}
-                                placeholder="سجل سبب الفرق أو الإجراء المتخذ"
-                                className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:border-teal-500 focus:outline-none"
-                              />
-                            </div>
-                          ) : (
-                            <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">فرق</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="بنود المصالحة المالية"
+                rows={checks}
+                rowKey={(check) => check.key}
+                minWidth={850}
+                tableClassName="text-sm"
+                columns={[
+                  {
+                    key: 'item', header: 'بند المصالحة',
+                    render: (check) => (
+                      <span>
+                        <span className="block font-bold text-slate-800">{check.label}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{check.detail}</span>
+                      </span>
+                    ),
+                  },
+                  { key: 'ledger', header: 'الأستاذ العام', align: 'end' as const, render: (check) => <span className="font-mono">{fmt(check.ledger)} ج.م</span> },
+                  { key: 'source', header: 'المصدر التشغيلي', align: 'end' as const, render: (check) => <span className="font-mono">{fmt(check.source)} ج.م</span> },
+                  {
+                    key: 'diff', header: 'الفرق', align: 'end' as const,
+                    render: (check) => <span className={`font-mono ${check.status === 'MATCH' ? 'text-emerald-700' : 'text-rose-700'}`}>{fmt(check.difference)} ج.م</span>,
+                  },
+                  {
+                    key: 'status', header: 'الحالة / سبب الفرق',
+                    render: (check) => {
+                      const reasonInputId = `reconcile-reason-${check.key}`;
+                      if (check.status === 'MATCH') {
+                        return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">متطابق</span>;
+                      }
+                      if (canClose) {
+                        return (
+                          <div className="block min-w-64">
+                            <label htmlFor={reasonInputId} className="sr-only">سبب الفرق في {check.label}</label>
+                            <textarea
+                              id={reasonInputId}
+                              value={reasons[check.key] || ''}
+                              onChange={(event) => setReasons((current) => ({ ...current, [check.key]: event.target.value }))}
+                              rows={2}
+                              maxLength={1000}
+                              placeholder="سجل سبب الفرق أو الإجراء المتخذ"
+                              className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:border-teal-500 focus:outline-none"
+                            />
+                          </div>
+                        );
+                      }
+                      return <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">فرق</span>;
+                    },
+                  },
+                ]}
+              />
             </div>
           </div>
 

@@ -89,7 +89,7 @@ export const FinanceOverviewPage: React.FC = () => {
   ];
 
   return (
-    <div className="erp-page" dir="rtl">
+    <div className="erp-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-slate-900">المؤشرات المالية</h1>

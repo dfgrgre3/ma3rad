@@ -99,7 +99,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (!open) return null;
 
   return createPortal(
-    <div className="erp-modal-layer" dir="rtl">
+    <div className="erp-modal-layer">
       <div
         className="erp-modal-backdrop"
         aria-hidden="true"

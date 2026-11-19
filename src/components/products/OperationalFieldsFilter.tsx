@@ -11,7 +11,7 @@ export const OperationalFieldsFilter: React.FC<{
   const filterable = fields.filter((field) => field.isFilterable);
   if (!filterable.length) return null;
   return (
-    <div className="flex flex-wrap gap-2" dir="rtl">
+    <div className="flex flex-wrap gap-2">
       {filterable.map((field) => (
         <label key={field.id} className="min-w-36 text-[10px] font-bold text-slate-500">
           <span className="mb-1 block">{field.name}</span>

@@ -198,7 +198,7 @@ export const FixedAssetWorkflows: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-2 backdrop-blur-sm sm:p-5" dir="rtl" role="dialog" aria-modal="true" aria-label="عمليات الأصول الثابتة">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-2 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-label="عمليات الأصول الثابتة">
       <section className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[var(--cerami-surface)]">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-6">
           <div><h2 className="font-black">عمليات الأصول الثابتة</h2><p className="mt-1 text-xs text-slate-500">سجلات محفوظة ومؤرخة — دون تعديل كميات المخزون</p></div>

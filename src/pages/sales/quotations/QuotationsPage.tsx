@@ -28,6 +28,7 @@ import { OperationalFieldService, type OperationalFieldDefinition } from '../../
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
 
+import { useToast } from '../../../components/ui/Toast';
 const PAGE_SIZE = 12;
 
 const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
@@ -40,6 +41,7 @@ const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> =
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
 export const QuotationsPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new QuotationService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
   const productService = useMemo(() => new ProductService(), []);
@@ -150,7 +152,7 @@ export const QuotationsPage: React.FC = () => {
       setForm({ ...emptyForm(), warehouseId: service.getDefaultWarehouseId() || whs[0]?.id || '' });
       setOperationalFieldValues({});
       setFormOpen(true);
-    } catch (e: any) { alert(e?.message || 'تعذر تحميل البيانات.'); }
+    } catch (e: any) { toast.error(e?.message || 'تعذر تحميل البيانات.'); }
   };
 
   const openEdit = (quotation: Quotation) => {
@@ -185,7 +187,7 @@ export const QuotationsPage: React.FC = () => {
         })),
       });
       setFormOpen(true);
-    } catch (e: any) { alert(e?.message || 'تعذر تحميل عرض السعر.'); }
+    } catch (e: any) { toast.error(e?.message || 'تعذر تحميل عرض السعر.'); }
   };
 
   const setLine = (idx: number, patch: Partial<Line>) =>
@@ -228,8 +230,8 @@ export const QuotationsPage: React.FC = () => {
     e.preventDefault();
     const items = form.lines.filter((l) => l.productId && l.quantity > 0);
     const serviceItems = form.serviceLines.filter((line) => line.description.trim() && line.quantity > 0);
-    if (!form.customerId) return alert('اختر العميل.');
-    if (items.length === 0 && serviceItems.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
+    if (!form.customerId) return toast.warning('اختر العميل.');
+    if (items.length === 0 && serviceItems.length === 0) return toast.warning('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
     try {
       fieldService.validateRecordValues(
@@ -271,7 +273,7 @@ export const QuotationsPage: React.FC = () => {
       setFormOpen(false);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حفظ عرض السعر.');
+      toast.error(err?.message || 'تعذر حفظ عرض السعر.');
     } finally {
       setSaving(false);
     }
@@ -299,9 +301,9 @@ export const QuotationsPage: React.FC = () => {
       });
       setConvertTarget(null);
       load();
-      alert(`تم تحويل عرض السعر إلى الفاتورة ${invoice.invoiceNumber} بنجاح.`);
+      toast.success(`تم تحويل عرض السعر إلى الفاتورة ${invoice.invoiceNumber} بنجاح.`);
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحويل عرض السعر.');
+      toast.error(err?.message || 'تعذر تحويل عرض السعر.');
     } finally {
       setSaving(false);
     }
@@ -310,23 +312,23 @@ export const QuotationsPage: React.FC = () => {
   const cancelQuotation = (quotation: Quotation) => {
     if (!window.confirm(`إلغاء عرض السعر ${quotation.quotationNumber}؟`)) return;
     try { service.setStatus(quotation.id, 'CANCELLED'); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const reopenQuotation = (quotation: Quotation) => {
     try { service.setStatus(quotation.id, 'PENDING'); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const deleteQuotation = (quotation: Quotation) => {
     if (!window.confirm(`حذف عرض السعر ${quotation.quotationNumber} نهائياً؟`)) return;
     try { service.deleteQuotation(quotation.id); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const duplicate = (quotation: Quotation) => {
     try { service.duplicateQuotation(quotation.id); load(); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const shareOnWhatsApp = (quotation: Quotation) => {
@@ -353,7 +355,7 @@ export const QuotationsPage: React.FC = () => {
       setFollowUpTarget(null);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حفظ المتابعة.');
+      toast.error(err?.message || 'تعذر حفظ المتابعة.');
     } finally {
       setSaving(false);
     }
@@ -364,7 +366,7 @@ export const QuotationsPage: React.FC = () => {
       service.recordContact(quotation.id, `تم التواصل مع العميل بتاريخ ${localDateString()}`);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تسجيل التواصل.');
+      toast.error(err?.message || 'تعذر تسجيل التواصل.');
     }
   };
 
@@ -387,9 +389,9 @@ export const QuotationsPage: React.FC = () => {
       setOrderTarget(null);
       setDetail(null);
       load();
-      alert(`تم إنشاء الطلب ${order.orderNumber} بنجاح.`);
+      toast.success(`تم إنشاء الطلب ${order.orderNumber} بنجاح.`);
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحويل عرض السعر إلى طلب.');
+      toast.error(err?.message || 'تعذر تحويل عرض السعر إلى طلب.');
     } finally {
       setSaving(false);
     }
@@ -436,7 +438,7 @@ export const QuotationsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><FileText className="w-5 h-5 text-amber-600" /></div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowUpLeft, Loader2 } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
@@ -128,35 +129,29 @@ export const DrilldownModal: React.FC<DrilldownModalProps> = ({
             </div>
           ) : (
             <div className="max-h-[60vh] overflow-auto rounded-[2px] border border-[#d9d9d9] dark:border-[#4a4a4a]">
-              <table className="w-full min-w-[680px] border-collapse text-right text-[11px]">
-                <thead className="sticky top-0 z-10 bg-[#fafafa] dark:bg-[#323232]">
-                  <tr>
-                    {result.columns.map((column) => (
-                      <th key={column.key} scope="col" className="whitespace-nowrap border-b border-[#d9d9d9] px-3 py-2.5 font-bold text-[#4d4d4d] dark:border-[#4a4a4a] dark:text-[#c8c8c8]">
-                        {column.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.rows.map((row, index) => (
-                    <tr key={index} className="border-b border-[#f0f0f0] last:border-0 hover:bg-[#f8fbfe] dark:border-[#3d3d3d] dark:hover:bg-[#30363b]">
-                      {result.columns.map((column) => (
-                        <td
-                          key={column.key}
-                          className={`whitespace-nowrap px-3 py-2 ${
-                            column.type === 'money' || column.type === 'number' || column.type === 'percent'
-                              ? 'tabular-nums text-[#1b1b1b] dark:text-[#f0f0f0]'
-                              : 'text-[#4d4d4d] dark:text-[#c8c8c8]'
-                          }`}
-                        >
-                          {formatCell(row[column.key] ?? null, column.type)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="تفاصيل المؤشر"
+                rows={result.rows.map((row: any, index: number) => ({ ...row, __index: index }))}
+                rowKey={(row: any) => String(row.__index)}
+                minWidth={680}
+                dense
+                stickyHeader
+                tableClassName="border-collapse text-right text-[11px]"
+                columns={result.columns.map((column: any) => ({
+                  key: column.key,
+                  header: <span className="font-bold text-[#4d4d4d] dark:text-[#c8c8c8]">{column.label}</span>,
+                  headerClassName: 'whitespace-nowrap border-b border-[#d9d9d9] dark:border-[#4a4a4a]',
+                  render: (row: any) => (
+                    <span className={`whitespace-nowrap px-3 py-2 ${
+                      column.type === 'money' || column.type === 'number' || column.type === 'percent'
+                        ? 'tabular-nums text-[#1b1b1b] dark:text-[#f0f0f0]'
+                        : 'text-[#4d4d4d] dark:text-[#c8c8c8]'
+                    }`}>
+                      {formatCell(row[column.key] ?? null, column.type)}
+                    </span>
+                  ),
+                }))}
+              />
             </div>
           )}
         </div>

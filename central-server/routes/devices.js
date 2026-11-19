@@ -6,6 +6,7 @@ const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { recordAuditEvent } = require('../lib/audit');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
+const { runCloneDetection } = require('../lib/cloneDetection');
 
 const router = express.Router();
 
@@ -214,102 +215,26 @@ router.post(
   requirePlatformPermission(['platform.devices.view', 'platform.devices.update']),
   async (req, res, next) => {
     try {
-      const db = getDb();
-      // Cross-tenant clone detection cannot be scoped to a subset of tenants;
-      // scoped staff are denied rather than shown other tenants' devices.
       const scoped = await getScopedTenantIds(req);
       if (Array.isArray(scoped)) {
         return res.status(403).json({ error: 'Clone detection requires full tenant scope' });
       }
-      const alerts = [];
-      const flaggedDevices = [];
-      const flaggedLicenses = [];
 
-      const duplicateHwids = await db.all(`
-        SELECT hardware_id, COUNT(DISTINCT tenant_id) as tenant_count
-        FROM platform_devices
-        WHERE status IN ('ACTIVE', 'SUSPENDED')
-        GROUP BY hardware_id
-        HAVING tenant_count > 1
-      `);
-
-      for (const row of duplicateHwids) {
-        const hwid = row.hardware_id;
-        const devices = await db.all(
-          `SELECT * FROM platform_devices WHERE hardware_id = ? AND status IN ('ACTIVE', 'SUSPENDED')`,
-          [hwid]
-        );
-        for (const device of devices) {
-          await db.run(
-            `UPDATE platform_devices SET clone_suspected = 1, updated_at = ? WHERE id = ?`,
-            [nowIso(), device.id]
-          );
-          flaggedDevices.push(device);
-          alerts.push(`اشتباه استنساخ: بصمة العتاد ${hwid} مستخدمة على عدة عملاء`);
-        }
-      }
-
-      const overLimitLicenses = await db.all(`
-        SELECT l.id, l.device_limit, COUNT(d.id) as active_device_count
-        FROM platform_licenses l
-        LEFT JOIN platform_devices d ON d.license_id = l.id AND d.status = 'ACTIVE'
-        WHERE l.status = 'ACTIVE'
-        GROUP BY l.id
-        HAVING active_device_count > l.device_limit
-      `);
-
-      for (const row of overLimitLicenses) {
-        const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.id]);
-        if (license) {
-          flaggedLicenses.push(license);
-          alerts.push(`تجاوز عدد الأجهزة: الترخيص  مفعل على ${row.active_device_count} أجهزة والحد المسموح ${license.device_limit}`);
-        }
-      }
-
-      const rapidTransfers = await db.all(`
-        SELECT license_id, COUNT(*) as transfer_count
-        FROM platform_license_activations
-        WHERE action = 'TRANSFER' AND created_at > date('now', '-30 day')
-        GROUP BY license_id
-        HAVING transfer_count > 3
-      `);
-
-      for (const row of rapidTransfers) {
-        const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.license_id]);
-        if (license) {
-          alerts.push(`نقل سريع للترخيص:  نُقل ${row.transfer_count} مرة خلال 30 يوماً`);
-        }
-      }
-
-      const multiHwidLicenses = await db.all(`
-        SELECT l.id, l.device_limit, COUNT(DISTINCT d.hardware_id) as distinct_hwids
-        FROM platform_licenses l
-        JOIN platform_devices d ON d.license_id = l.id AND d.status = 'ACTIVE'
-        WHERE l.status = 'ACTIVE'
-        GROUP BY l.id
-        HAVING distinct_hwids > 1 AND l.device_limit = 1
-      `);
-
-      for (const row of multiHwidLicenses) {
-        const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [row.id]);
-        if (license) {
-          flaggedLicenses.push(license);
-          alerts.push(`ترخيص فردي على أجهزة متعددة:  مفعل على ${row.distinct_hwids} بصمات عتاد مختلفة`);
-        }
-      }
-
-      await recordAuditEvent({
+      const result = await runCloneDetection({
         actorId: req.platformUser?.id,
         actorName: req.platformUser?.full_name,
-        action: 'CLONE_DETECTION_RUN',
-        resourceType: 'platform_devices',
-        resourceId: null,
-        afterData: { flaggedDevices: flaggedDevices.length, flaggedLicenses: flaggedLicenses.length, alerts: alerts.length },
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      res.json({ devices: flaggedDevices, licenses: flaggedLicenses, alerts });
+      res.json({
+        devices: result.devices,
+        licenses: result.licenses,
+        alerts: result.alerts,
+        duplicateHwids: result.duplicateHwids,
+        overLimitLicenses: result.overLimitLicenses,
+        suspiciousTransfers: result.suspiciousTransfers,
+      });
     } catch (err) {
       next(err);
     }

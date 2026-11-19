@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { CalendarDays, Download, Loader2, Pencil, Plus, Search, Tag, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import { CashierService } from '../../../services/domains/finance/CashierService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -78,7 +79,7 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center"><TrendingDown className="w-5 h-5 text-rose-600" /></div>
@@ -112,26 +113,36 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
         {error && <div role="alert" className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-rose-500" /></div> : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 border-b border-slate-200"><tr>{['الفئة', 'التاريخ', 'طريقة الدفع', 'المستفيد', 'الوصف والبيان', 'المبلغ', 'إجراءات'].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-bold text-slate-500">{heading}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((expense) => (
-                  <tr key={expense.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-600"><Tag className="w-3 h-3" />{expense.category}</span></td>
-                    <td className="px-4 py-3 text-slate-500">{expense.date}</td>
-                    <td className="px-4 py-3 text-slate-700 font-semibold"><span className="inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5" />{PAYMENT_LABELS[expense.paymentType] || expense.paymentType}</span></td>
-                    <td className="px-4 py-3 text-slate-500">{expense.recipient || '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 max-w-[260px] truncate">{expense.description}</td>
-                    <td className="px-4 py-3 text-rose-600 font-black">{fmt(Number(expense.amount))}</td>
-                    <td className="px-4 py-3">
-                      {canEdit && <button aria-label={`تعديل مصروف ${expense.description}`} onClick={() => setEditor({ initial: expense })} className="p-2 rounded-lg text-sky-600 hover:bg-sky-50"><Pencil className="w-4 h-4" /></button>}
-                      {canDelete && <button aria-label={`حذف مصروف ${expense.description}`} onClick={() => removeExpense(expense)} className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button>}
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && <tr><td colSpan={7} className="py-16 text-center text-slate-400">لا توجد مصروفات مطابقة للفلاتر</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="المصروفات"
+              rows={filtered}
+              rowKey={(expense: any) => String(expense.id)}
+              tableClassName="text-sm"
+              columns={[
+                {
+                  key: 'category', header: 'الفئة',
+                  render: (expense: any) => <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"><Tag className="h-3 w-3" />{expense.category}</span>,
+                },
+                { key: 'date', header: 'التاريخ', render: (expense: any) => <span className="text-slate-500">{expense.date}</span> },
+                {
+                  key: 'method', header: 'طريقة الدفع',
+                  render: (expense: any) => <span className="inline-flex items-center gap-1 font-semibold text-slate-700"><Wallet className="h-3.5 w-3.5" />{PAYMENT_LABELS[expense.paymentType] || expense.paymentType}</span>,
+                },
+                { key: 'recipient', header: 'المستفيد', render: (expense: any) => <span className="text-slate-500">{expense.recipient || '—'}</span> },
+                { key: 'desc', header: 'الوصف والبيان', render: (expense: any) => <span className="block max-w-[260px] truncate text-slate-500">{expense.description}</span> },
+                { key: 'amount', header: 'المبلغ', render: (expense: any) => <span className="font-black text-rose-600">{fmt(Number(expense.amount))}</span> },
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (expense: any) => (
+                    <span>
+                      {canEdit && <button aria-label={`تعديل مصروف ${expense.description}`} onClick={() => setEditor({ initial: expense })} className="rounded-lg p-2 text-sky-600 hover:bg-sky-50"><Pencil className="h-4 w-4" /></button>}
+                      {canDelete && <button aria-label={`حذف مصروف ${expense.description}`} onClick={() => removeExpense(expense)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>}
+                    </span>
+                  ),
+                },
+              ]}
+              emptyTitle="لا توجد مصروفات مطابقة للفلاتر"
+            />
           </div>
         )}
       </main>

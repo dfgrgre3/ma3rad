@@ -143,7 +143,6 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ onOpenQuickCommand }) => {
             id={`win-topnav-panel-${openGroup.id}`}
             role="menu"
             aria-label={openGroup.label}
-            dir="rtl"
             className="win-nav-panel"
             style={{ top: anchor.top, right: anchor.right, width: anchor.width, maxHeight: anchor.maxHeight }}
           >

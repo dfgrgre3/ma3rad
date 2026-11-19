@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { Product } from '../../../types';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 
+import { useToast } from '../../../components/ui/Toast';
+import { DataTable } from '../../../components/ui/DataTable';
 const STATUS_LABELS: Record<PurchaseRequestStatus, { label: string; color: string }> = {
   PENDING: { label: 'بانتظار الاعتماد', color: 'bg-slate-100 text-slate-600 border-slate-200' },
   APPROVED: { label: 'تمت الموافقة', color: 'bg-sky-50 text-sky-600 border-sky-200' },
@@ -34,6 +36,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 type Line = { productId: string; quantityM2: number; estimatedUnitCost: number; notes: string };
 
 export const PurchaseRequestsPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new PurchaseRequestService(), []);
   const procurementService = new ProcurementService();
   const navigate = useNavigate();
@@ -96,7 +99,7 @@ export const PurchaseRequestsPage: React.FC = () => {
     try {
       setItems(await service.getItemsAsync(r.id));
     } catch (e: any) {
-      alert(e?.message);
+      toast.warning(e?.message);
     } finally {
       setItemsLoading(false);
     }
@@ -114,7 +117,7 @@ export const PurchaseRequestsPage: React.FC = () => {
         setLines([{ productId: '', quantityM2: 0, estimatedUnitCost: 0, notes: '' }]);
         setModalOpen(true);
       } catch (e: any) {
-        alert(e?.message);
+        toast.warning(e?.message);
       }
     })();
   };
@@ -125,7 +128,7 @@ export const PurchaseRequestsPage: React.FC = () => {
       setSuggestions(list);
       setSuggestionsModal(true);
     } catch (e: any) {
-      alert(e?.message);
+      toast.warning(e?.message);
     }
   };
 
@@ -148,7 +151,7 @@ export const PurchaseRequestsPage: React.FC = () => {
       setSuggestionsModal(false);
       setModalOpen(true);
     } catch (e: any) {
-      alert(e?.message);
+      toast.warning(e?.message);
     }
   };
 
@@ -165,7 +168,7 @@ export const PurchaseRequestsPage: React.FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = lines.filter((l) => l.productId && l.quantityM2 > 0);
-    if (payload.length === 0) return alert('أضف صنفاً واحداً على الأقل.');
+    if (payload.length === 0) return toast.warning('أضف صنفاً واحداً على الأقل.');
     setSaving(true);
     try {
       service.createRequest({
@@ -178,7 +181,7 @@ export const PurchaseRequestsPage: React.FC = () => {
       setModalOpen(false);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تقديم الطلب.');
+      toast.error(err?.message || 'تعذر تقديم الطلب.');
     } finally {
       setSaving(false);
     }
@@ -202,12 +205,12 @@ export const PurchaseRequestsPage: React.FC = () => {
       service.decide(r.id, status);
       load();
     } catch (e: any) {
-      alert(e?.message);
+      toast.warning(e?.message);
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -270,149 +273,113 @@ export const PurchaseRequestsPage: React.FC = () => {
           <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-orange-500" /></div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  {['كود الطلب', 'تاريخ الطلب', 'مقدم الطلب', 'المخزن', 'الأصناف', 'القيمة التقديرية', 'مستوى الاعتماد', 'الأولوية', 'الحالة', 'الخيارات'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {requests.map((req) => {
-                  const st = STATUS_LABELS[req.status] || { label: req.status, color: 'bg-slate-50' };
-                  const pr = PRIORITY_LABELS[req.priority] || { label: req.priority, color: 'text-slate-500' };
-                  const isLevel2 = (req.estimatedTotal || 0) >= 25000;
-
-                  return (
-                    <React.Fragment key={req.id}>
-                      <tr className="hover:bg-slate-50/70 transition">
-                        <td className="px-4 py-3 font-mono text-orange-600 font-bold">{req.requestNumber}</td>
-                        <td className="px-4 py-3 text-slate-500">{req.date}</td>
-                        <td className="px-4 py-3 text-slate-900 font-medium">{req.requesterName || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600">{req.warehouseName || '—'}</td>
-                        <td className="px-4 py-3 text-slate-700 font-bold">{req.itemsCount || 0} أصناف</td>
-                        <td className="px-4 py-3 font-mono font-bold text-slate-800">{fmt(Number(req.estimatedTotal || 0))}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${
-                            isLevel2
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-slate-50 text-slate-700 border-slate-200'
-                          }`}>
-                            {isLevel2 ? 'مستوى 2 (إدارة مالية)' : 'مستوى 1 (مباشر)'}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-3 font-bold ${pr.color}`}>{pr.label}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => openDetails(req)}
-                              className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-bold"
-                            >
-                              <FileText className="w-3.5 h-3.5" /> البنود
-                            </button>
-
-                            {req.status === 'PENDING' && (canApprove || canReject || canCancelRequest) && (
-                              <div className="flex gap-1">
-                                {canApprove && <button
-                                  onClick={() => decide(req, 'APPROVED')}
-                                  className="p-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100"
-                                  title="اعتماد الطلب"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                </button>}
-                                {canReject && <button
-                                  onClick={() => decide(req, 'REJECTED')}
-                                  className="p-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
-                                  title="رفض"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                </button>}
-                                {canCancelRequest && <button
-                                  onClick={() => decide(req, 'CANCELLED')}
-                                  className="p-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
-                                  title="إلغاء الطلب"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>}
-                              </div>
-                            )}
-
-                            {req.status === 'APPROVED' && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => navigate('/purchases/quotations')}
-                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-[10px] font-bold hover:bg-orange-100"
-                                  title="طرح عروض أسعار"
-                                >
-                                  <FileSpreadsheet className="w-3 h-3" /> RFQ
-                                </button>
-                                {canApprove && (
-                                  <button
-                                    onClick={() => decide(req, 'ORDERED')}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100"
-                                    title="أمر شراء مباشر"
-                                  >
-                                    <Truck className="w-3 h-3" /> أمر شراء
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {expanded === req.id && (
-                        <tr className="bg-slate-50/80">
-                          <td colSpan={10} className="px-6 py-4">
-                            {itemsLoading ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                            ) : (
-                              <table className="w-full text-right text-[11px] bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                <thead className="bg-slate-100 text-slate-500 font-bold">
-                                  <tr>
-                                    <th className="px-3 py-2">الصنف والكود</th>
-                                    <th className="px-3 py-2">الكمية بوحدة الصنف</th>
-                                    <th className="px-3 py-2">التكلفة التقديرية</th>
-                                    <th className="px-3 py-2">الإجمالي التقديري</th>
-                                    <th className="px-3 py-2">ملاحظات البند</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {items.map((it: any) => (
-                                    <tr key={it.id}>
-                                      <td className="px-3 py-2 font-bold">{it.productName} <span className="text-slate-400 font-normal">({it.sku || '—'})</span></td>
-                                      <td className="px-3 py-2 font-mono font-bold">{formatProductQuantity(it.quantityM2, it)}</td>
-                                      <td className="px-3 py-2 font-mono">{fmt(Number(it.estimatedUnitCost || 0))}</td>
-                                      <td className="px-3 py-2 font-bold text-orange-600">{fmt(Number(it.quantityM2 || 0) * Number(it.estimatedUnitCost || 0))}</td>
-                                      <td className="px-3 py-2 text-slate-500">{it.notes || '—'}</td>
-                                    </tr>
-                                  ))}
-                                  {items.length === 0 && (
-                                    <tr><td colSpan={5} className="py-4 text-center text-slate-400">لا توجد بنود</td></tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            )}
-                            {req.notes && <div className="mt-2 text-[11px] text-slate-600 font-medium">ملاحظات الطلب: {req.notes}</div>}
-                            {req.decidedByName && (
-                              <div className="mt-1 text-[11px] text-slate-500">
-                                تم الاعتماد بواسطة: <strong>{req.decidedByName}</strong> في {req.decidedAt ? new Date(req.decidedAt).toLocaleString('ar-EG') : ''}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-                {requests.length === 0 && (
-                  <tr><td colSpan={10} className="py-16 text-center text-slate-400">لا توجد طلبات شراء مسجلة</td></tr>
-                )}
-              </tbody>
-            </table>
+            <>
+                        <DataTable
+                          ariaLabel="طلبات الشراء"
+                          rows={requests}
+                          rowKey={(req) => req.id}
+                          minWidth={900}
+                          columns={[
+                            { key: 'code', header: 'كود الطلب', render: (req) => <span className="font-mono text-orange-600 font-bold">{req.requestNumber}</span> },
+                            { key: 'date', header: 'تاريخ الطلب', render: (req) => <span className="text-slate-500">{req.date}</span> },
+                            { key: 'requester', header: 'مقدم الطلب', render: (req) => <span className="text-slate-900 font-medium">{req.requesterName || '—'}</span> },
+                            { key: 'warehouse', header: 'المخزن', render: (req) => <span className="text-slate-600">{req.warehouseName || '—'}</span> },
+                            { key: 'items', header: 'الأصناف', render: (req) => <span className="text-slate-700 font-bold">{req.itemsCount || 0} أصناف</span> },
+                            { key: 'total', header: 'القيمة التقديرية', render: (req) => <span className="font-mono font-bold text-slate-800">{fmt(Number(req.estimatedTotal || 0))}</span> },
+                            {
+                              key: 'level', header: 'مستوى الاعتماد',
+                              render: (req) => {
+                                const isLevel2 = (req.estimatedTotal || 0) >= 25000;
+                                return (
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${isLevel2 ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                                    {isLevel2 ? 'مستوى 2 (إدارة مالية)' : 'مستوى 1 (مباشر)'}
+                                  </span>
+                                );
+                              },
+                            },
+                            {
+                              key: 'priority', header: 'الأولوية',
+                              render: (req) => {
+                                const pr = PRIORITY_LABELS[req.priority] || { label: req.priority, color: 'text-slate-500' };
+                                return <span className={`font-bold ${pr.color}`}>{pr.label}</span>;
+                              },
+                            },
+                            {
+                              key: 'status', header: 'الحالة',
+                              render: (req) => {
+                                const st = STATUS_LABELS[req.status] || { label: req.status, color: 'bg-slate-50' };
+                                return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span>;
+                              },
+                            },
+                            {
+                              key: 'actions', header: 'الخيارات',
+                              render: (req) => {
+                                const st = STATUS_LABELS[req.status] || { label: req.status, color: 'bg-slate-50' };
+                                void st;
+                                return (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button onClick={() => openDetails(req)} className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-bold">
+                                      <FileText className="w-3.5 h-3.5" /> البنود
+                                    </button>
+                                    {req.status === 'PENDING' && (canApprove || canReject || canCancelRequest) && (
+                                      <div className="flex gap-1">
+                                        {canApprove && <button onClick={() => decide(req, 'APPROVED')} className="p-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100" title="اعتماد الطلب"><CheckCircle2 className="w-3.5 h-3.5" /></button>}
+                                        {canReject && <button onClick={() => decide(req, 'REJECTED')} className="p-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100" title="رفض"><XCircle className="w-3.5 h-3.5" /></button>}
+                                        {canCancelRequest && <button onClick={() => decide(req, 'CANCELLED')} className="p-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200" title="إلغاء الطلب"><X className="w-3.5 h-3.5" /></button>}
+                                      </div>
+                                    )}
+                                    {req.status === 'APPROVED' && (
+                                      <div className="flex gap-1">
+                                        <button onClick={() => navigate('/purchases/quotations')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-[10px] font-bold hover:bg-orange-100" title="طرح عروض أسعار">
+                                          <FileSpreadsheet className="w-3 h-3" /> RFQ
+                                        </button>
+                                        {canApprove && (
+                                          <button onClick={() => decide(req, 'ORDERED')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100" title="أمر شراء مباشر">
+                                            <Truck className="w-3 h-3" /> أمر شراء
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              },
+                            },
+                          ]}
+                          emptyTitle="لا توجد طلبات شراء مسجلة"
+                        />
+                        {expanded && (() => {
+                          const req = requests.find((r) => r.id === expanded);
+                          if (!req) return null;
+                          return (
+                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4">
+                              {itemsLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                              ) : (
+                                <DataTable
+                                  ariaLabel="بنود طلب الشراء"
+                                  rows={items}
+                                  rowKey={(it: any) => it.id}
+                                  dense
+                                  columns={[
+                                    { key: 'product', header: 'الصنف والكود', render: (it: any) => <span className="font-bold">{it.productName} <span className="text-slate-400 font-normal">({it.sku || '—'})</span></span> },
+                                    { key: 'qty', header: 'الكمية بوحدة الصنف', render: (it: any) => <span className="font-mono font-bold">{formatProductQuantity(it.quantityM2, it)}</span> },
+                                    { key: 'cost', header: 'التكلفة التقديرية', render: (it: any) => <span className="font-mono">{fmt(Number(it.estimatedUnitCost || 0))}</span> },
+                                    { key: 'total', header: 'الإجمالي التقديري', render: (it: any) => <span className="font-bold text-orange-600">{fmt(Number(it.quantityM2 || 0) * Number(it.estimatedUnitCost || 0))}</span> },
+                                    { key: 'notes', header: 'ملاحظات البند', render: (it: any) => <span className="text-slate-500">{it.notes || '—'}</span> },
+                                  ]}
+                                  emptyTitle="لا توجد بنود"
+                                />
+                              )}
+                              {req.notes && <div className="mt-2 text-[11px] text-slate-600 font-medium">ملاحظات الطلب: {req.notes}</div>}
+                              {req.decidedByName && (
+                                <div className="mt-1 text-[11px] text-slate-500">
+                                  تم الاعتماد بواسطة: <strong>{req.decidedByName}</strong> في {req.decidedAt ? new Date(req.decidedAt).toLocaleString('ar-EG') : ''}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </>
           </div>
         )}
       </div>
@@ -436,38 +403,29 @@ export const PurchaseRequestsPage: React.FC = () => {
             </p>
 
             <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-2.5">الصنف</th>
-                    <th className="p-2.5">الرصيد الحالي</th>
-                    <th className="p-2.5">حد الأمان الأدنى</th>
-                    <th className="p-2.5 text-orange-600 font-black">الكمية المقترحة</th>
-                    <th className="p-2.5">التكلفة التقديرية</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {suggestions.map((s) => (
-                    <tr key={s.productId} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-bold text-slate-900">
-                        {s.productName}
-                        <small className="block text-slate-400 font-normal">{s.sku} · {s.brandName || ''}</small>
-                      </td>
-                      <td className="p-2.5 font-mono text-rose-600 font-bold">{s.currentStock} {s.unit}</td>
-                      <td className="p-2.5 font-mono text-slate-500">{s.minStockLevel} {s.unit}</td>
-                      <td className="p-2.5 font-mono text-orange-600 font-black">{s.suggestedQuantity} {s.unit}</td>
-                      <td className="p-2.5 font-mono font-bold text-slate-800">{fmt(s.estimatedCost)}</td>
-                    </tr>
-                  ))}
-                  {!suggestions.length && (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400">
-                        جميع الأصناف في المخازن تفوق حد الأمان ولا يوجد عجز حالياً
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+                              ariaLabel="اقتراحات الشراء"
+                              rows={suggestions}
+                              rowKey={(sg) => sg.productId}
+                              dense
+                              columns={[
+                                {
+                                  key: 'product', header: 'الصنف',
+                                  render: (sg) => (
+                                    <span className="font-bold text-slate-900">
+                                      {sg.productName}
+                                      <small className="block text-slate-400 font-normal">{sg.sku} · {sg.brandName || ''}</small>
+                                    </span>
+                                  ),
+                                },
+                                { key: 'stock', header: 'الرصيد الحالي', render: (sg) => <span className="font-mono text-rose-600 font-bold">{sg.currentStock} {sg.unit}</span> },
+                                { key: 'min', header: 'حد الأمان الأدنى', render: (sg) => <span className="font-mono text-slate-500">{sg.minStockLevel} {sg.unit}</span> },
+                                { key: 'suggested', header: 'الكمية المقترحة', className: 'text-orange-600 font-black', render: (sg) => <span className="font-mono text-orange-600 font-black">{sg.suggestedQuantity} {sg.unit}</span> },
+                                { key: 'cost', header: 'التكلفة التقديرية', render: (sg) => <span className="font-mono font-bold text-slate-800">{fmt(sg.estimatedCost)}</span> },
+                              ]}
+                              emptyTitle="جميع الأصناف في المخازن تفوق حد الأمان ولا يوجد عجز حالياً"
+                            />
+
             </div>
 
             {suggestions.length > 0 && (
@@ -537,62 +495,66 @@ export const PurchaseRequestsPage: React.FC = () => {
 
               {/* Items Table */}
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-right text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500 font-bold">
-                    <tr>
-                      <th className="px-3 py-2">الصنف</th>
-                      <th className="px-3 py-2 w-24">الكمية / الوحدة</th>
-                      <th className="px-3 py-2 w-28">تكلفة الوحدة</th>
-                      <th className="px-3 py-2">الإجمالي</th>
-                      <th className="px-3 py-2 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {lines.map((l, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2">
-                          <ProductPicker
-                            value={l.productId}
-                            selectedLabel={products.find((product) => product.id === l.productId)?.name}
-                            ariaLabel={`استعراض أصناف طلب الشراء للسطر ${idx + 1}`}
-                            onChange={(productId) => pickProduct(idx, productId)}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={l.quantityM2 || ''}
-                            onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })}
-                            placeholder={products.find((product) => product.id === l.productId) ? getProductUnitLabel(products.find((product) => product.id === l.productId)!) : 'الوحدة'}
-                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={l.estimatedUnitCost || ''}
-                            onChange={(e) => setLine(idx, { estimatedUnitCost: Number(e.target.value) || 0 })}
-                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center"
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantityM2 * l.estimatedUnitCost)}</td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev))}
-                            className="p-1 text-slate-400 hover:text-rose-600"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                                  ariaLabel="أصناف طلب الشراء"
+                                  rows={lines.map((l, i) => ({ ...l, _i: i }))}
+                                  rowKey={(l) => String(l._i)}
+                                  dense
+                                  columns={[
+                                    {
+                                      key: 'product', header: 'الصنف',
+                                      render: (l) => (
+                                        <ProductPicker
+                                          value={l.productId}
+                                          selectedLabel={products.find((product) => product.id === l.productId)?.name}
+                                          ariaLabel={`استعراض أصناف طلب الشراء للسطر ${l._i + 1}`}
+                                          onChange={(productId) => pickProduct(l._i, productId)}
+                                        />
+                                      ),
+                                    },
+                                    {
+                                      key: 'qty', header: 'الكمية / الوحدة',
+                                      render: (l) => (
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step="0.01"
+                                          value={l.quantityM2 || ''}
+                                          onChange={(e) => setLine(l._i, { quantityM2: Number(e.target.value) || 0 })}
+                                          placeholder={products.find((product) => product.id === l.productId) ? getProductUnitLabel(products.find((product) => product.id === l.productId)!) : 'الوحدة'}
+                                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center"
+                                        />
+                                      ),
+                                    },
+                                    {
+                                      key: 'cost', header: 'تكلفة الوحدة',
+                                      render: (l) => (
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step="0.01"
+                                          value={l.estimatedUnitCost || ''}
+                                          onChange={(e) => setLine(l._i, { estimatedUnitCost: Number(e.target.value) || 0 })}
+                                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center"
+                                        />
+                                      ),
+                                    },
+                                    { key: 'total', header: 'الإجمالي', render: (l) => <span className="font-bold text-slate-700">{fmt(l.quantityM2 * l.estimatedUnitCost)}</span> },
+                                    {
+                                      key: 'actions', header: '',
+                                      render: (l) => (
+                                        <button
+                                          type="button"
+                                          onClick={() => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== l._i) : prev))}
+                                          className="p-1 text-slate-400 hover:text-rose-600"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      ),
+                                    },
+                                  ]}
+                                />
+
                 <div className="p-2 border-t border-slate-100">
                   <button
                     type="button"

@@ -169,7 +169,9 @@ test('apartment designs persist under a project and link to project quotations',
     id: saved.id, projectId: project.id, name: 'الشقة ١ - تعديل جديد',
     areaM2: 22, totalAmount: 6100, rooms, costLines,
   });
-  assert.equal(estimates.getByProject(project.id)[0].quotationId, null);
+  // Versions keep quotation links as history instead of clearing them on edit.
+  assert.equal(estimates.getByProject(project.id)[0].quotationId, quotation.id);
+  assert.equal(estimates.getQuotationLinks(saved.id, project.id)[0]?.quotationId, quotation.id);
 });
 
 test('project branch scope prevents cross-branch reads and writes', async () => {
@@ -195,7 +197,11 @@ test('project branch scope prevents cross-branch reads and writes', async () => 
     name: 'Restricted apartment design',
     areaM2: 10,
     totalAmount: 1000,
-    rooms: [],
+    rooms: [{
+      id: 'room-beta', name: 'غرفة', length: 4, width: 3, height: 3,
+      doorCount: 0, doorWidth: 0, doorHeight: 0,
+      windowCount: 0, windowWidth: 0, windowHeight: 0,
+    }],
     costLines: [],
   });
   access.setCurrentBranchId('br_main', admin);

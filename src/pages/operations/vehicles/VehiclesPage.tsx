@@ -9,6 +9,7 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
+import { useToast } from '../../../components/ui/Toast';
 const STATUS_LABEL: Record<Vehicle['status'], string> = {
   AVAILABLE: 'متاحة', ON_DELIVERY: 'في رحلة', MAINTENANCE: 'صيانة', OUT_OF_SERVICE: 'خارج الخدمة',
 };
@@ -20,6 +21,7 @@ const STATUS_STYLE: Record<Vehicle['status'], string> = {
 };
 
 export const VehiclesPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new OperationsService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const currentUser = AuthService.getCurrentUser();
@@ -77,16 +79,16 @@ export const VehiclesPage: React.FC = () => {
       setModalOpen(false);
       setForm({ plateNumber: '', make: '', model: '', year: '', capacityKg: '', assignedDriverId: '', licenseExpiresAt: '', insuranceExpiresAt: '' });
       load(search);
-    } catch (err: any) { alert(err?.message || 'تعذر إضافة المركبة.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر إضافة المركبة.'); }
     finally { setSaving(false); }
   };
 
   const changeStatus = (v: Vehicle, status: Vehicle['status']) => {
-    try { service.updateVehicleStatus(v.id, status); load(search); } catch (e: any) { alert(e?.message); }
+    try { service.updateVehicleStatus(v.id, status); load(search); } catch (e: any) { toast.warning(e?.message); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center"><Truck className="w-5 h-5 text-teal-600" /></div>

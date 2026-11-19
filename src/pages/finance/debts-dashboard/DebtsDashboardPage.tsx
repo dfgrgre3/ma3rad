@@ -27,6 +27,7 @@ import { exportToExcel, exportToPdf } from "../../../utils/export/export";
 import { v4 as uuidv4 } from "uuid";
 import { BranchAccessService } from "../../../services/domains/auth/BranchAccessService";
 
+import { useToast } from '../../../components/ui/Toast';
 const TYPE_LABELS: Record<DebtRow["type"], { label: string; color: string }> = {
   CUSTOMER_RECEIVABLE: {
     label: "ذمم مدينة (لنا)",
@@ -49,6 +50,7 @@ type PromiseRow = {
 };
 
 export const DebtsDashboardPage: React.FC = () => {
+  const toast = useToast();
   const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const navigate = useNavigate();
@@ -276,7 +278,7 @@ export const DebtsDashboardPage: React.FC = () => {
         notes: "",
       });
     } catch (error: any) {
-      alert(error?.message || "تعذر تسجيل وعد السداد.");
+      toast.error(error?.message || "تعذر تسجيل وعد السداد.");
     }
   };
 
@@ -383,7 +385,7 @@ export const DebtsDashboardPage: React.FC = () => {
       setExpandedCustomer(null);
       load();
     } catch (error: any) {
-      alert(error?.message || "تعذر عكس السند.");
+      toast.error(error?.message || "تعذر عكس السند.");
     }
   };
 
@@ -504,11 +506,11 @@ export const DebtsDashboardPage: React.FC = () => {
     const value = invoiceOptions.length
       ? allocations.reduce((sum, a) => sum + a.amount, 0)
       : Number(amount);
-    if (!(value > 0)) return alert("أدخل مبلغاً صحيحاً.");
+    if (!(value > 0)) return toast.warning("أدخل مبلغاً صحيحاً.");
     if (value > target.amount + 0.009)
-      return alert("المبلغ أكبر من إجمالي المستحق.");
+      return toast.warning("المبلغ أكبر من إجمالي المستحق.");
     if (invoiceOptions.length && allocations.length === 0)
-      return alert("وزّع الدفعة على فاتورة واحدة على الأقل.");
+      return toast.warning("وزّع الدفعة على فاتورة واحدة على الأقل.");
     if (
       allocations.some(
         (a) =>
@@ -518,7 +520,7 @@ export const DebtsDashboardPage: React.FC = () => {
             0.009,
       )
     )
-      return alert("أحد المبالغ أكبر من المتبقي في الفاتورة.");
+      return toast.warning("أحد المبالغ أكبر من المتبقي في الفاتورة.");
     setSaving(true);
     try {
       const registers = new CashierService().getAllRegisters();
@@ -562,7 +564,7 @@ export const DebtsDashboardPage: React.FC = () => {
       setTarget(null);
       load();
     } catch (err: any) {
-      alert(err?.message || "تعذر تسجيل الدفعة.");
+      toast.error(err?.message || "تعذر تسجيل الدفعة.");
     } finally {
       setSaving(false);
     }
@@ -573,7 +575,6 @@ export const DebtsDashboardPage: React.FC = () => {
   return (
     <div
       className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden"
-      dir="rtl"
     >
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex items-center gap-3">

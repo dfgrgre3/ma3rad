@@ -7,6 +7,7 @@ import { ProductService } from '../../../services/domains/products/ProductServic
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import type { Product, Supplier } from '../../../types';
+import { DataTable } from '../../../components/ui/DataTable';
 import { useToast } from '../../../components/ui/Toast';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
@@ -148,7 +149,7 @@ export const PurchaseOrdersPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center">
@@ -188,64 +189,65 @@ export const PurchaseOrdersPage: React.FC = () => {
           <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-orange-500" /></div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
-                <tr>{['رقم الأمر', 'التاريخ', 'المورد', 'المخزن', 'التوريد المتوقع', 'الأصناف', 'الإجمالي', 'الحالة', 'إجراءات'].map((h) => <th key={h} className="px-4 py-3 font-bold">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((row) => (
-                  <React.Fragment key={row.id}>
-                    <tr className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-mono font-bold text-orange-600">{row.orderNumber}</td>
-                      <td className="px-4 py-3 text-slate-500">{row.date}</td>
-                      <td className="px-4 py-3 font-semibold">{row.supplierName || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{row.warehouseName || '—'}</td>
-                      <td className="px-4 py-3 text-slate-500">{row.expectedDate || '—'}</td>
-                      <td className="px-4 py-3">{row.itemsCount || 0}</td>
-                      <td className="px-4 py-3 font-mono font-bold">{fmt(row.totalAmount)}</td>
-                      <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${STATUS[row.status].color}`}>{STATUS[row.status].label}</span></td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1">
-                          <button onClick={() => openDetails(row)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600" title="تفاصيل"><Eye className="w-3.5 h-3.5" /></button>
-                          {canUpdate && row.status === 'DRAFT' && <button onClick={() => changeStatus(row, 'SENT')} className="p-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-600" title="إرسال للمورد"><Send className="w-3.5 h-3.5" /></button>}
-                          {canUpdate && row.status === 'SENT' && <button onClick={() => changeStatus(row, 'CONFIRMED')} className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600" title="تأكيد"><CheckCircle2 className="w-3.5 h-3.5" /></button>}
-                          {canCreate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => receive(row)} className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600" title="استلام وترحيل فاتورة"><Truck className="w-3.5 h-3.5" /></button>}
-                          {canUpdate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => { if (confirm('إلغاء أمر الشراء؟')) changeStatus(row, 'CANCELLED'); }} className="p-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600" title="إلغاء"><Ban className="w-3.5 h-3.5" /></button>}
-                        </div>
-                      </td>
-                    </tr>
-                    {expanded === row.id && details && (
-                      <tr className="bg-slate-50/80">
-                        <td colSpan={9} className="px-6 py-3">
-                          <table className="w-full text-right text-[11px] bg-white border border-slate-200 rounded-lg overflow-hidden">
-                            <thead className="bg-slate-100 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية بوحدة الصنف</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">المستلم</th><th className="px-3 py-2">تكلفة الوحدة</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {details.items.map((item: any) => (
-                                <tr key={item.id}>
-                                  <td className="px-3 py-2 font-semibold">{item.productName}</td>
-                                  <td className="px-3 py-2 font-mono">{formatProductQuantity(item.quantityM2, item)}</td>
-                                  <td className="px-3 py-2 font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</td>
-                                  <td className="px-3 py-2 font-mono">{formatProductQuantity(item.receivedM2, item)}</td>
-                                  <td className="px-3 py-2 font-mono">{fmt(item.unitCost)}</td>
-                                  <td className="px-3 py-2 font-mono font-bold">{fmt(item.totalCost)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {details.notes && <div className="mt-2 text-[11px] text-slate-500">ملاحظات: {details.notes}</div>}
-                          <OperationalFieldsSummary fields={fields} values={valuesByOrder[row.id] || {}} />
-                          <OperationalFieldsRecordEditor recordLabel={row.orderNumber} fields={fields} initialValues={valuesByOrder[row.id] || {}} canEdit={canUpdate} onSave={(next) => {
-                            fieldService.setRecordValues('purchase_orders', row.id, next, 'update');
-                            setValuesByOrder((previous) => ({ ...previous, [row.id]: next }));
-                          }} />
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-                {rows.length === 0 && <tr><td colSpan={9} className="py-16 text-center text-slate-400">لا توجد أوامر شراء</td></tr>}
-              </tbody>
-            </table>
+            <>
+                        <DataTable
+                          ariaLabel="أوامر الشراء"
+                          rows={rows}
+                          rowKey={(row) => row.id}
+                          columns={[
+                            { key: 'num', header: 'رقم الأمر', render: (row) => <span className="font-mono font-bold text-orange-600">{row.orderNumber}</span> },
+                            { key: 'date', header: 'التاريخ', render: (row) => <span className="text-slate-500">{row.date}</span> },
+                            { key: 'supplier', header: 'المورد', render: (row) => <span className="font-semibold">{row.supplierName || '—'}</span> },
+                            { key: 'warehouse', header: 'المخزن', render: (row) => <span className="text-slate-600">{row.warehouseName || '—'}</span> },
+                            { key: 'expected', header: 'التوريد المتوقع', render: (row) => <span className="text-slate-500">{row.expectedDate || '—'}</span> },
+                            { key: 'items', header: 'الأصناف', render: (row) => row.itemsCount || 0 },
+                            { key: 'total', header: 'الإجمالي', render: (row) => <span className="font-mono font-bold">{fmt(row.totalAmount)}</span> },
+                            { key: 'status', header: 'الحالة', render: (row) => <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${STATUS[row.status].color}`}>{STATUS[row.status].label}</span> },
+                            {
+                              key: 'actions', header: 'إجراءات',
+                              render: (row) => (
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <button onClick={() => openDetails(row)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600" title="تفاصيل"><Eye className="w-3.5 h-3.5" /></button>
+                                  {canUpdate && row.status === 'DRAFT' && <button onClick={() => changeStatus(row, 'SENT')} className="p-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-600" title="إرسال للمورد"><Send className="w-3.5 h-3.5" /></button>}
+                                  {canUpdate && row.status === 'SENT' && <button onClick={() => changeStatus(row, 'CONFIRMED')} className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600" title="تأكيد"><CheckCircle2 className="w-3.5 h-3.5" /></button>}
+                                  {canCreate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => receive(row)} className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600" title="استلام وترحيل فاتورة"><Truck className="w-3.5 h-3.5" /></button>}
+                                  {canUpdate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => { if (confirm('إلغاء أمر الشراء؟')) changeStatus(row, 'CANCELLED'); }} className="p-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600" title="إلغاء"><Ban className="w-3.5 h-3.5" /></button>}
+                                </div>
+                              ),
+                            },
+                          ]}
+                          emptyTitle="لا توجد أوامر شراء"
+                        />
+                        {expanded && details && (() => {
+                          const row = rows.find((r) => r.id === expanded);
+                          if (!row) return null;
+                          return (
+                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                              <DataTable
+                                ariaLabel="بنود أمر الشراء"
+                                rows={details.items}
+                                rowKey={(item: any) => item.id}
+                                dense
+                                columns={[
+                                  { key: 'product', header: 'الصنف', render: (item: any) => <span className="font-semibold">{item.productName}</span> },
+                                  { key: 'qty', header: 'الكمية بوحدة الصنف', render: (item: any) => <span className="font-mono">{formatProductQuantity(item.quantityM2, item)}</span> },
+                                  { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</span> },
+                                  { key: 'received', header: 'المستلم', render: (item: any) => <span className="font-mono">{formatProductQuantity(item.receivedM2, item)}</span> },
+                                  { key: 'cost', header: 'تكلفة الوحدة', render: (item: any) => <span className="font-mono">{fmt(item.unitCost)}</span> },
+                                  { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-mono font-bold">{fmt(item.totalCost)}</span> },
+                                ]}
+                              />
+                              {details.notes && <div className="mt-2 text-[11px] text-slate-500">ملاحظات: {details.notes}</div>}
+                              <OperationalFieldsSummary fields={fields} values={valuesByOrder[row.id] || {}} />
+                              <OperationalFieldsRecordEditor recordLabel={row.orderNumber} fields={fields} initialValues={valuesByOrder[row.id] || {}} canEdit={canUpdate} onSave={(next) => {
+                                fieldService.setRecordValues('purchase_orders', row.id, next, 'update');
+                                setValuesByOrder((previous) => ({ ...previous, [row.id]: next }));
+                              }} />
+                            </div>
+                          );
+                        })()}
+                      </>
+
           </div>
         )}
       </div>
@@ -280,28 +282,31 @@ export const PurchaseOrdersPage: React.FC = () => {
               </div>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-right text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية / الوحدة</th><th className="px-3 py-2 w-28">تكلفة الوحدة</th><th className="px-3 py-2 w-24">الكراتين</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {lines.map((line, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2">
-                          <ProductPicker
-                            value={line.productId}
-                            selectedLabel={products.find((product) => product.id === line.productId)?.name}
-                            ariaLabel={`استعراض أصناف أمر الشراء للسطر ${idx + 1}`}
-                            onChange={(productId) => pickProduct(idx, productId)}
-                          />
-                        </td>
-                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} placeholder={products.find((product) => product.id === line.productId) ? getProductUnitLabel(products.find((product) => product.id === line.productId)!) : 'الوحدة'} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.unitCost || ''} onChange={(e) => setLine(idx, { unitCost: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" disabled={products.find((product) => product.id === line.productId)?.productType === 'GENERAL'} value={line.boxesCount || ''} onChange={(e) => setLine(idx, { boxesCount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono disabled:bg-slate-100" /></td>
-                        <td className="px-3 py-2 font-bold">{fmt((Number(line.quantityM2) || 0) * (Number(line.unitCost) || 0))}</td>
-                        <td className="px-3 py-2"><button type="button" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                                  ariaLabel="أصناف أمر الشراء"
+                                  rows={lines.map((line, i) => ({ ...line, _i: i }))}
+                                  rowKey={(line) => String(line._i)}
+                                  dense
+                                  columns={[
+                                    {
+                                      key: 'product', header: 'الصنف',
+                                      render: (line) => (
+                                        <ProductPicker
+                                          value={line.productId}
+                                          selectedLabel={products.find((product) => product.id === line.productId)?.name}
+                                          ariaLabel={`استعراض أصناف أمر الشراء للسطر ${line._i + 1}`}
+                                          onChange={(productId) => pickProduct(line._i, productId)}
+                                        />
+                                      ),
+                                    },
+                                    { key: 'qty', header: 'الكمية / الوحدة', render: (line) => <input type="number" min={0} step="0.01" value={line.quantityM2 || ''} onChange={(e) => setLine(line._i, { quantityM2: Number(e.target.value) || 0 })} placeholder={products.find((product) => product.id === line.productId) ? getProductUnitLabel(products.find((product) => product.id === line.productId)!) : 'الوحدة'} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                                    { key: 'cost', header: 'تكلفة الوحدة', render: (line) => <input type="number" min={0} step="0.01" value={line.unitCost || ''} onChange={(e) => setLine(line._i, { unitCost: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                                    { key: 'boxes', header: 'الكراتين', render: (line) => <input type="number" min={0} step="0.01" disabled={products.find((product) => product.id === line.productId)?.productType === 'GENERAL'} value={line.boxesCount || ''} onChange={(e) => setLine(line._i, { boxesCount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono disabled:bg-slate-100" /> },
+                                    { key: 'total', header: 'الإجمالي', render: (line) => <span className="font-bold">{fmt((Number(line.quantityM2) || 0) * (Number(line.unitCost) || 0))}</span> },
+                                    { key: 'actions', header: '', render: (line) => <button type="button" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== line._i) : prev)} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button> },
+                                  ]}
+                                />
+
                 <div className="p-2 border-t border-slate-100">
                   <button type="button" onClick={() => setLines((prev) => [...prev, { productId: '', quantityM2: 0, unitCost: 0, boxesCount: 0 }])} className="text-[11px] font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة صنف</button>
                 </div>

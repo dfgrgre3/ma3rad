@@ -12,6 +12,7 @@ import { OperationalFieldsFilter, matchesOperationalFieldFilters, type Operation
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
+import { useToast } from '../../../components/ui/Toast';
 const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
   PLANNED:   { label: 'قيد التخطيط', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
   ACTIVE:    { label: 'جاري التنفيذ', color: 'text-sky-700',    bg: 'bg-sky-50 border-sky-200' },
@@ -23,6 +24,7 @@ const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
 export const ProjectsPage: React.FC = () => {
+  const toast = useToast();
   const service = new ProjectService();
   const fieldService = new OperationalFieldService();
   const navigate = useNavigate();
@@ -97,14 +99,14 @@ export const ProjectsPage: React.FC = () => {
       setForm({ name: '', customerId: '', projectType: 'BUILDING', contractorName: '', engineerName: '', city: '', startDate: '', expectedEndDate: '', contractValue: '', notes: '' });
       navigate(`/projects/${project.id}`);
     } catch (err: any) {
-      alert(err?.message || 'تعذر إنشاء المشروع.');
+      toast.error(err?.message || 'تعذر إنشاء المشروع.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Boxes className="w-5 h-5 text-violet-600" />

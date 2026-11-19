@@ -45,7 +45,6 @@ import type {
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { useToast } from '../../components/ui/Toast';
 import {
   EmptyState,
   StatusBadge,
@@ -54,6 +53,8 @@ import {
   Toggle,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
+import { DataTable } from '../../components/ui/DataTable';
 type TabKey = 'accounts' | 'sessions' | 'invites' | 'logins' | 'security';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
@@ -649,94 +650,79 @@ export const PlatformStaffPage: React.FC = () => {
                 description="أضف موظفي الدعم أو الفوترة أو العمليات، أو عدّل البحث الحالي."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-right text-xs">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">الموظف</th>
-                      <th className="px-4 py-3">الدور</th>
-                      <th className="px-4 py-3">MFA</th>
-                      <th className="px-4 py-3">نطاق البيانات</th>
-                      <th className="px-4 py-3">الحالة</th>
-                      <th className="px-4 py-3">آخر دخول</th>
-                      <th className="px-4 py-3 text-center">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {staffList.map((staff) => {
-                      const isMfaMissing = mfaMissingIds.has(staff.id);
-                      const isSuperAdmin = staff.role === 'SUPER_ADMIN';
-                      return (
-                        <tr key={staff.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="font-bold text-slate-100">{staff.fullName}</div>
-                            <div className="text-[10px] font-mono text-slate-500">{staff.email}</div>
-                            {staff.phone && <div className="text-[10px] text-slate-500" dir="ltr">{staff.phone}</div>}
-                          </td>
-                          <td className="px-4 py-3">{getRoleBadge(staff.role)}</td>
-                          <td className="px-4 py-3">
-                            {isMfaMissing ? (
-                              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-400"><ShieldOff className="h-3 w-3" /> غير مفعّلة</span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-400"><ShieldCheck className="h-3 w-3" /> مفعّلة</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-[10.5px] font-bold ${staff.dataScope === 'LIMITED' ? 'text-amber-400' : 'text-slate-400'}`}>
-                              {staff.dataScope === 'LIMITED' ? 'عملاء محددون' : 'كل العملاء'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`font-bold inline-flex items-center gap-1 ${staff.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {staff.isActive ? <><CheckCircle2 className="h-3 w-3" /> نشط{staff.mustChangePassword ? ' · رهن التفعيل' : ''}</> : <><XCircle className="h-3 w-3" /> موقوف</>}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-400">{staff.lastLoginAt ? formatDateTime(staff.lastLoginAt) : 'لم يسجل دخول بعد'}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {canUpdate && (
-                                <button onClick={() => openEdit(staff)} className="text-sky-400 hover:text-sky-300 p-1" title="تعديل البيانات">
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
-                                <button onClick={() => { setResetTarget(staff); setResetPassword(''); setResetConfirm(''); }} className="text-violet-400 hover:text-violet-300 p-1" title="إعادة تعيين كلمة المرور">
-                                  <KeyRound className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
-                                <button onClick={() => handleForcePasswordChange(staff)} className={`p-1 ${staff.mustChangePassword ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-300'}`} title={staff.mustChangePassword ? 'إلغاء فرض تغيير كلمة المرور' : 'فرض تغيير كلمة المرور'}>
-                                  <Lock className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {canManagePermissions && !isSuperAdmin && (
-                                <>
-                                  <button onClick={() => { setTransferFrom(staff); setTransferToId(''); setTransferNote(''); }} className="text-teal-400 hover:text-teal-300 p-1" title="نقل الصلاحيات إلى موظف آخر">
-                                    <ArrowLeftRight className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button onClick={() => openScopeEditor(staff)} className="text-orange-400 hover:text-orange-300 p-1" title="نطاق البيانات (العملاء المرئيون)">
-                                    <Shield className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
-                              {!isSuperAdmin && canDeactivate && (
-                                <button onClick={() => handleToggleActive(staff)} className={`p-1 ${staff.isActive ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}`} title={staff.isActive ? 'تجميد الحساب + إنهاء جلساته' : 'تفعيل الحساب'}>
-                                  {staff.isActive ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
-                                </button>
-                              )}
-                              {!isSuperAdmin && canDelete && (
-                                <button onClick={() => handleDelete(staff)} className="text-rose-400 hover:text-rose-300 p-1" title="حذف منطقي (يبقى سجل التدقيق)">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                              ariaLabel="طاقم المنصة"
+                              rows={staffList}
+                              rowKey={(staff) => staff.id}
+                              minWidth={980}
+                              columns={[
+                                {
+                                  key: 'staff', header: 'الموظف',
+                                  render: (staff) => (
+                                    <div>
+                                      <div className="font-bold text-slate-100">{staff.fullName}</div>
+                                      <div className="text-[10px] font-mono text-slate-500">{staff.email}</div>
+                                      {staff.phone && <div className="text-[10px] text-slate-500" dir="ltr">{staff.phone}</div>}
+                                    </div>
+                                  ),
+                                },
+                                { key: 'role', header: 'الدور', render: (staff) => getRoleBadge(staff.role) },
+                                {
+                                  key: 'mfa', header: 'MFA',
+                                  render: (staff) => mfaMissingIds.has(staff.id) ? (
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-400"><ShieldOff className="h-3 w-3" /> غير مفعّلة</span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-400"><ShieldCheck className="h-3 w-3" /> مفعّلة</span>
+                                  ),
+                                },
+                                {
+                                  key: 'scope', header: 'نطاق البيانات',
+                                  render: (staff) => <span className={`text-[10.5px] font-bold ${staff.dataScope === 'LIMITED' ? 'text-amber-400' : 'text-slate-400'}`}>{staff.dataScope === 'LIMITED' ? 'عملاء محددون' : 'كل العملاء'}</span>,
+                                },
+                                {
+                                  key: 'status', header: 'الحالة',
+                                  render: (staff) => (
+                                    <span className={`font-bold inline-flex items-center gap-1 ${staff.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      {staff.isActive ? <><CheckCircle2 className="h-3 w-3" /> نشط{staff.mustChangePassword ? ' · رهن التفعيل' : ''}</> : <><XCircle className="h-3 w-3" /> موقوف</>}
+                                    </span>
+                                  ),
+                                },
+                                { key: 'last', header: 'آخر دخول', render: (staff) => <span className="text-slate-400">{staff.lastLoginAt ? formatDateTime(staff.lastLoginAt) : 'لم يسجل دخول بعد'}</span> },
+                                {
+                                  key: 'actions', header: 'إجراءات', align: 'center',
+                                  render: (staff) => {
+                                    const isSuperAdmin = staff.role === 'SUPER_ADMIN';
+                                    return (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        {canUpdate && (
+                                          <button onClick={() => openEdit(staff)} className="text-sky-400 hover:text-sky-300 p-1" title="تعديل البيانات"><Edit2 className="h-3.5 w-3.5" /></button>
+                                        )}
+                                        {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
+                                          <button onClick={() => { setResetTarget(staff); setResetPassword(''); setResetConfirm(''); }} className="text-violet-400 hover:text-violet-300 p-1" title="إعادة تعيين كلمة المرور"><KeyRound className="h-3.5 w-3.5" /></button>
+                                        )}
+                                        {canResetPassword && (!isSuperAdmin || currentUser?.role === 'SUPER_ADMIN') && (
+                                          <button onClick={() => handleForcePasswordChange(staff)} className={`p-1 ${staff.mustChangePassword ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-300'}`} title={staff.mustChangePassword ? 'إلغاء فرض تغيير كلمة المرور' : 'فرض تغيير كلمة المرور'}><Lock className="h-3.5 w-3.5" /></button>
+                                        )}
+                                        {canManagePermissions && !isSuperAdmin && (
+                                          <>
+                                            <button onClick={() => { setTransferFrom(staff); setTransferToId(''); setTransferNote(''); }} className="text-teal-400 hover:text-teal-300 p-1" title="نقل الصلاحيات إلى موظف آخر"><ArrowLeftRight className="h-3.5 w-3.5" /></button>
+                                            <button onClick={() => openScopeEditor(staff)} className="text-orange-400 hover:text-orange-300 p-1" title="نطاق البيانات (العملاء المرئيون)"><Shield className="h-3.5 w-3.5" /></button>
+                                          </>
+                                        )}
+                                        {!isSuperAdmin && canDeactivate && (
+                                          <button onClick={() => handleToggleActive(staff)} className={`p-1 ${staff.isActive ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}`} title={staff.isActive ? 'تجميد الحساب + إنهاء جلساته' : 'تفعيل الحساب'}>
+                                            {staff.isActive ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                                          </button>
+                                        )}
+                                        {!isSuperAdmin && canDelete && (
+                                          <button onClick={() => handleDelete(staff)} className="text-rose-400 hover:text-rose-300 p-1" title="حذف منطقي (يبقى سجل التدقيق)"><Trash2 className="h-3.5 w-3.5" /></button>
+                                        )}
+                                      </div>
+                                    );
+                                  },
+                                },
+                              ]}
+                            />
             )}
           </div>
         </>
@@ -773,32 +759,35 @@ export const PlatformStaffPage: React.FC = () => {
             {sessions.length === 0 ? (
               <EmptyState icon={<MonitorSmartphone className="h-6 w-6 text-slate-500" />} title="لا توجد جلسات مسجلة" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-right text-xs">
-                  <thead className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                    <tr><th className="px-4 py-2">الموظف</th><th className="px-4 py-2">الجهاز</th><th className="px-4 py-2">عنوان IP</th><th className="px-4 py-2">موثوقة</th><th className="px-4 py-2">بدأت</th><th className="px-4 py-2">آخر نشاط</th><th className="px-4 py-2"></th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {sessions.map((session) => (
-                      <tr key={session.id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-2.5"><div className="font-bold text-slate-200">{session.staffName}</div><div className="text-[9.5px] text-slate-500">{session.staffRole}</div></td>
-                        <td className="px-4 py-2.5 text-slate-300">{session.deviceName || 'غير معروف'}{session.isCurrent ? <span className="mr-1 text-[9px] font-black text-sky-400">(الحالية)</span> : ''}</td>
-                        <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-400" dir="ltr">{session.ipAddress || '—'}</td>
-                        <td className="px-4 py-2.5">{session.isTrustedDevice ? <span className="text-emerald-400 font-bold">نعم</span> : <span className="text-slate-500">لا</span>}</td>
-                        <td className="px-4 py-2.5 text-slate-400">{formatDateTime(session.createdAt)}</td>
-                        <td className="px-4 py-2.5 text-slate-400">{formatDateTime(session.lastActivityAt)}</td>
-                        <td className="px-4 py-2.5">
-                          {!session.isCurrent && canRevokeSessions && (
-                            <button onClick={() => handleRevokeSession(session)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">
-                              إنهاء الجلسة
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                              ariaLabel="الجلسات النشطة"
+                              rows={sessions}
+                              rowKey={(session) => session.id}
+                              minWidth={900}
+                              dense
+                              columns={[
+                                {
+                                  key: 'staff', header: 'الموظف',
+                                  render: (session) => (
+                                    <div><div className="font-bold text-slate-200">{session.staffName}</div><div className="text-[9.5px] text-slate-500">{session.staffRole}</div></div>
+                                  ),
+                                },
+                                {
+                                  key: 'device', header: 'الجهاز',
+                                  render: (session) => <span className="text-slate-300">{session.deviceName || 'غير معروف'}{session.isCurrent ? <span className="mr-1 text-[9px] font-black text-sky-400">(الحالية)</span> : ''}</span>,
+                                },
+                                { key: 'ip', header: 'عنوان IP', render: (session) => <span className="font-mono text-[10.5px] text-slate-400" dir="ltr">{session.ipAddress || '—'}</span> },
+                                { key: 'trusted', header: 'موثوقة', render: (session) => session.isTrustedDevice ? <span className="text-emerald-400 font-bold">نعم</span> : <span className="text-slate-500">لا</span> },
+                                { key: 'started', header: 'بدأت', render: (session) => <span className="text-slate-400">{formatDateTime(session.createdAt)}</span> },
+                                { key: 'activity', header: 'آخر نشاط', render: (session) => <span className="text-slate-400">{formatDateTime(session.lastActivityAt)}</span> },
+                                {
+                                  key: 'actions', header: '',
+                                  render: (session) => !session.isCurrent && canRevokeSessions ? (
+                                    <button onClick={() => handleRevokeSession(session)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">إنهاء الجلسة</button>
+                                  ) : null,
+                                },
+                              ]}
+                            />
             )}
           </div>
 
@@ -807,31 +796,25 @@ export const PlatformStaffPage: React.FC = () => {
             {devices.length === 0 ? (
               <EmptyState icon={<MonitorSmartphone className="h-6 w-6 text-slate-500" />} title="لا توجد أجهزة موثوقة بعد" description="كل موظف يمكنه توثيق جهازه الحالي لحماية الجلسات المميزة." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-right text-xs">
-                  <thead className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                    <tr><th className="px-4 py-2">الموظف</th><th className="px-4 py-2">الجهاز</th><th className="px-4 py-2">البصمة</th><th className="px-4 py-2">آخر ظهور</th><th className="px-4 py-2"></th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {devices.map((device) => (
-                      <tr key={device.id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-2.5 font-bold text-slate-200">{device.staffName || device.staffId}</td>
-                        <td className="px-4 py-2.5 text-slate-300">{device.deviceName || 'جهاز'}</td>
-                        <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-500" dir="ltr">{device.fingerprint.slice(0, 18)}…</td>
-                        <td className="px-4 py-2.5 text-slate-400">{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : '—'}</td>
-                        <td className="px-4 py-2.5">
-                          {!device.revokedAt && canUpdate && (
-                            <button onClick={() => handleRevokeTrustedDevice(device)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">
-                              إلغاء التوثيق
-                            </button>
-                          )}
-                          {device.revokedAt && <span className="text-[10px] text-slate-600">ملغى</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                              ariaLabel="الأجهزة الموثوقة"
+                              rows={devices}
+                              rowKey={(device) => device.id}
+                              minWidth={760}
+                              dense
+                              columns={[
+                                { key: 'staff', header: 'الموظف', render: (device) => <span className="font-bold text-slate-200">{device.staffName || device.staffId}</span> },
+                                { key: 'device', header: 'الجهاز', render: (device) => <span className="text-slate-300">{device.deviceName || 'جهاز'}</span> },
+                                { key: 'fp', header: 'البصمة', render: (device) => <span className="font-mono text-[10.5px] text-slate-500" dir="ltr">{device.fingerprint.slice(0, 18)}…</span> },
+                                { key: 'seen', header: 'آخر ظهور', render: (device) => <span className="text-slate-400">{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : '—'}</span> },
+                                {
+                                  key: 'actions', header: '',
+                                  render: (device) => device.revokedAt ? <span className="text-[10px] text-slate-600">ملغى</span> : (!device.revokedAt && canUpdate ? (
+                                    <button onClick={() => handleRevokeTrustedDevice(device)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">إلغاء التوثيق</button>
+                                  ) : null),
+                                },
+                              ]}
+                            />
             )}
           </div>
         </>
@@ -886,33 +869,31 @@ export const PlatformStaffPage: React.FC = () => {
             {invites.length === 0 ? (
               <EmptyState icon={<MailCheck className="h-6 w-6 text-slate-500" />} title="لا توجد دعوات" description="أنشئ دعوة لموظف جديد — سيُنشئ هو كلمة مروره عبر الرابط المحدود المدة." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-right text-xs">
-                  <thead className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                    <tr><th className="px-4 py-2">الموظف</th><th className="px-4 py-2">الدور</th><th className="px-4 py-2">الحالة</th><th className="px-4 py-2">تنتهي في</th><th className="px-4 py-2">أنشأها</th><th className="px-4 py-2"></th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {invites.map((invite) => (
-                      <tr key={invite.id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-2.5"><div className="font-bold text-slate-200">{invite.fullName}</div><div className="text-[10px] text-slate-500" dir="ltr">{invite.email}</div></td>
-                        <td className="px-4 py-2.5">{getRoleBadge(invite.role)}</td>
-                        <td className="px-4 py-2.5">
-                          <StatusBadge value={invite.status} label={invite.status === 'PENDING' ? 'معلقة' : invite.status === 'ACCEPTED' ? 'مقبولة' : invite.status === 'REVOKED' ? 'ملغية' : 'منتهية'} />
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-400">{formatDateTime(invite.expiresAt)}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{invite.invitedByName || '—'}</td>
-                        <td className="px-4 py-2.5">
-                          {invite.status === 'PENDING' && canUpdate && (
-                            <button onClick={() => handleRevokeInvite(invite)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">
-                              إلغاء الدعوة
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                              ariaLabel="دعوات الموظفين"
+                              rows={invites}
+                              rowKey={(invite) => invite.id}
+                              minWidth={850}
+                              dense
+                              columns={[
+                                {
+                                  key: 'staff', header: 'الموظف',
+                                  render: (invite) => (
+                                    <div><div className="font-bold text-slate-200">{invite.fullName}</div><div className="text-[10px] text-slate-500" dir="ltr">{invite.email}</div></div>
+                                  ),
+                                },
+                                { key: 'role', header: 'الدور', render: (invite) => getRoleBadge(invite.role) },
+                                { key: 'status', header: 'الحالة', render: (invite) => <StatusBadge value={invite.status} label={invite.status === 'PENDING' ? 'معلقة' : invite.status === 'ACCEPTED' ? 'مقبولة' : invite.status === 'REVOKED' ? 'ملغية' : 'منتهية'} /> },
+                                { key: 'expires', header: 'تنتهي في', render: (invite) => <span className="text-slate-400">{formatDateTime(invite.expiresAt)}</span> },
+                                { key: 'by', header: 'أنشأها', render: (invite) => <span className="text-slate-500">{invite.invitedByName || '—'}</span> },
+                                {
+                                  key: 'actions', header: '',
+                                  render: (invite) => invite.status === 'PENDING' && canUpdate ? (
+                                    <button onClick={() => handleRevokeInvite(invite)} className="text-rose-400 hover:text-rose-300 text-[10.5px] font-bold">إلغاء الدعوة</button>
+                                  ) : null,
+                                },
+                              ]}
+                            />
             )}
           </div>
         </>
@@ -934,25 +915,19 @@ export const PlatformStaffPage: React.FC = () => {
             {logins.length === 0 ? (
               <EmptyState icon={<ShieldCheck className="h-6 w-6 text-slate-500" />} title="لا توجد محاولات مسجلة" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-right text-xs">
-                  <thead className="text-[10.5px] text-slate-500 border-b border-slate-800">
-                    <tr><th className="px-4 py-2">التوقيت</th><th className="px-4 py-2">البريد</th><th className="px-4 py-2">النتيجة</th><th className="px-4 py-2">السبب</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {logins.map((login) => (
-                      <tr key={login.id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-2.5 text-slate-400">{formatDateTime(login.attemptedAt)}</td>
-                        <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-300" dir="ltr">{login.email}</td>
-                        <td className="px-4 py-2.5">
-                          <StatusBadge value={login.status} label={login.status === 'SUCCESS' ? 'نجاح' : login.status === 'FAILED' ? 'فاشلة' : 'محظورة'} />
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-500">{login.failureReason || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                              ariaLabel="محاولات تسجيل الدخول"
+                              rows={logins}
+                              rowKey={(login) => login.id}
+                              minWidth={760}
+                              dense
+                              columns={[
+                                { key: 'time', header: 'التوقيت', render: (login) => <span className="text-slate-400">{formatDateTime(login.attemptedAt)}</span> },
+                                { key: 'email', header: 'البريد', render: (login) => <span className="font-mono text-[10.5px] text-slate-300" dir="ltr">{login.email}</span> },
+                                { key: 'result', header: 'النتيجة', render: (login) => <StatusBadge value={login.status} label={login.status === 'SUCCESS' ? 'نجاح' : login.status === 'FAILED' ? 'فاشلة' : 'محظورة'} /> },
+                                { key: 'reason', header: 'السبب', render: (login) => <span className="text-slate-500">{login.failureReason || '—'}</span> },
+                              ]}
+                            />
             )}
           </div>
         </>

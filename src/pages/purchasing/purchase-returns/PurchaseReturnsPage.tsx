@@ -13,6 +13,7 @@ import { PrintService } from '../../../services/shared/PrintService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
+import { DataTable } from '../../../components/ui/DataTable';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -221,7 +222,7 @@ export const PurchaseReturnsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center">
@@ -293,54 +294,48 @@ export const PurchaseReturnsPage: React.FC = () => {
         ) : (
           <>
             <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto shadow-sm">
-              <table className="w-full text-right text-xs min-w-[920px]">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                  <tr>
-                    <th className="px-4 py-3">رقم المرتجع</th>
-                    <th className="px-4 py-3">فاتورة الشراء</th>
-                    <th className="px-4 py-3">المورد</th>
-                    <th className="px-4 py-3">المخزن</th>
-                    <th className="px-4 py-3">التاريخ</th>
-                    <th className="px-4 py-3">الأصناف</th>
-                    <th className="px-4 py-3">القيمة</th>
-                    <th className="px-4 py-3">نقدي / حساب المورد</th>
-                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
-                    <th className="px-4 py-3 text-left">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pageItems.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-mono font-bold text-rose-600">{row.returnNumber}</td>
-                      <td className="px-4 py-3 font-mono text-slate-700">{row.originalInvoiceNumber}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{row.supplierName || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{row.warehouseName || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600"><span className="inline-flex items-center gap-1"><Calendar className="w-3 h-3" />{row.date || '—'}</span></td>
-                      <td className="px-4 py-3 font-mono">{row.itemsCount || 0}</td>
-                      <td className="px-4 py-3 font-black text-rose-600">{fmt(row.totalAmount)}</td>
-                      <td className="px-4 py-3 text-[10px] text-slate-500">
-                        <div className="flex items-center gap-1">
-                          {row.refundMethod === 'CASH' ? <Banknote className="w-3.5 h-3.5 text-amber-600" /> : <Wallet className="w-3.5 h-3.5 text-sky-600" />}
-                          <span className="font-bold text-slate-700">{REFUND_LABEL[row.refundMethod] || '—'}</span>
-                        </div>
-                        <div className="mt-0.5">نقدي: {fmt(row.refundedAmount)} • حساب: {fmt(row.remainingToBalance)}</div>
-                      </td>
-                      {operationalFields.map((field) => <td key={field.id} className="px-4 py-3 text-slate-600">{valuesByReturn[row.id]?.[field.name] || '—'}</td>)}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Btn onClick={() => setDetail(service.getReturnById(row.id) as ReturnDetail)} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
-                          <Btn onClick={() => printService.printPurchaseReturn(service.getReturnById(row.id))} tone="slate"><Printer className="w-3.5 h-3.5" /></Btn>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && (
-                    <tr><td colSpan={9 + operationalFields.length} className="py-16 text-center text-slate-400">
-                      <PackageX className="w-8 h-8 mx-auto mb-2 text-slate-300" /> لا توجد مرتجعات شراء مسجلة
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+                            ariaLabel="مرتجعات الشراء"
+                            rows={pageItems}
+                            rowKey={(row) => row.id}
+                            minWidth={920}
+                            columns={[
+                              { key: 'num', header: 'رقم المرتجع', render: (row) => <span className="font-mono font-bold text-rose-600">{row.returnNumber}</span> },
+                              { key: 'invoice', header: 'فاتورة الشراء', render: (row) => <span className="font-mono text-slate-700">{row.originalInvoiceNumber}</span> },
+                              { key: 'supplier', header: 'المورد', render: (row) => <span className="font-bold text-slate-800">{row.supplierName || '—'}</span> },
+                              { key: 'warehouse', header: 'المخزن', render: (row) => <span className="text-slate-600">{row.warehouseName || '—'}</span> },
+                              { key: 'date', header: 'التاريخ', render: (row) => <span className="inline-flex items-center gap-1 text-slate-600"><Calendar className="w-3 h-3" />{row.date || '—'}</span> },
+                              { key: 'items', header: 'الأصناف', render: (row) => <span className="font-mono">{row.itemsCount || 0}</span> },
+                              { key: 'total', header: 'القيمة', render: (row) => <span className="font-black text-rose-600">{fmt(row.totalAmount)}</span> },
+                              {
+                                key: 'refund', header: 'نقدي / حساب المورد',
+                                render: (row) => (
+                                  <div className="text-[10px] text-slate-500">
+                                    <div className="flex items-center gap-1">
+                                      {row.refundMethod === 'CASH' ? <Banknote className="w-3.5 h-3.5 text-amber-600" /> : <Wallet className="w-3.5 h-3.5 text-sky-600" />}
+                                      <span className="font-bold text-slate-700">{REFUND_LABEL[row.refundMethod] || '—'}</span>
+                                    </div>
+                                    <div className="mt-0.5">نقدي: {fmt(row.refundedAmount)} • حساب: {fmt(row.remainingToBalance)}</div>
+                                  </div>
+                                ),
+                              },
+                              ...operationalFields.map((field) => ({
+                                key: `op-${field.id}`, header: field.name,
+                                render: (row: PurchaseReturnRow) => <span className="text-slate-600">{valuesByReturn[row.id]?.[field.name] || '—'}</span>,
+                              })),
+                              {
+                                key: 'actions', header: 'إجراءات', align: 'end',
+                                render: (row) => (
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <Btn onClick={() => setDetail(service.getReturnById(row.id) as ReturnDetail)} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
+                                    <Btn onClick={() => printService.printPurchaseReturn(service.getReturnById(row.id))} tone="slate"><Printer className="w-3.5 h-3.5" /></Btn>
+                                  </div>
+                                ),
+                              },
+                            ]}
+                            emptyTitle="لا توجد مرتجعات شراء مسجلة"
+                          />
+
             </div>
 
             {rows.length > PAGE_SIZE && (
@@ -378,34 +373,27 @@ export const PurchaseReturnsPage: React.FC = () => {
 
             {lines.length > 0 && (
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-right text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500 font-bold">
-                    <tr>
-                      <th className="px-3 py-2">الصنف</th>
-                      <th className="px-3 py-2">المشترى</th>
-                      <th className="px-3 py-2">مُرجع سابقاً</th>
-                      <th className="px-3 py-2">القابل للإرجاع</th>
-                      <th className="px-3 py-2">سعر التكلفة</th>
-                      <th className="px-3 py-2 w-28">كمية الإرجاع</th>
-                      <th className="px-3 py-2">الإجمالي</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {lines.map((l, idx) => (
-                      <tr key={l.productId}>
-                        <td className="px-3 py-2 font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.grade}</div></td>
-                        <td className="px-3 py-2 font-mono">{formatProductQuantity(l.purchasedM2, l)}</td>
-                        <td className="px-3 py-2 font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</td>
-                        <td className="px-3 py-2 font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</td>
-                        <td className="px-3 py-2 font-mono">{fmt(l.unitCost)}</td>
-                        <td className="px-3 py-2">
-                          <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
-                        </td>
-                        <td className="px-3 py-2 font-bold text-rose-600">{fmt(l.quantityM2 * l.unitCost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                                ariaLabel="أصناف مرتجع الشراء"
+                                rows={lines.map((l, i) => ({ ...l, _i: i }))}
+                                rowKey={(l) => l.productId}
+                                dense
+                                columns={[
+                                  { key: 'product', header: 'الصنف', render: (l) => <span className="font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.grade}</div></span> },
+                                  { key: 'purchased', header: 'المشترى', render: (l) => <span className="font-mono">{formatProductQuantity(l.purchasedM2, l)}</span> },
+                                  { key: 'returned', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</span> },
+                                  { key: 'available', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</span> },
+                                  { key: 'cost', header: 'سعر التكلفة', render: (l) => <span className="font-mono">{fmt(l.unitCost)}</span> },
+                                  {
+                                    key: 'qty', header: 'كمية الإرجاع',
+                                    render: (l) => (
+                                      <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(l._i, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
+                                    ),
+                                  },
+                                  { key: 'total', header: 'الإجمالي', render: (l) => <span className="font-bold text-rose-600">{fmt(l.quantityM2 * l.unitCost)}</span> },
+                                ]}
+                              />
+
               </div>
             )}
 
@@ -475,22 +463,23 @@ export const PurchaseReturnsPage: React.FC = () => {
             load();
           }} />
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[560px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الفرز</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">سعر التكلفة</th><th className="px-3 py-2">قيمة الارتجاع</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {(detail.items || []).map((i: any) => (
-                  <tr key={i.id}>
-                    <td className="px-3 py-2 font-bold text-slate-800">{i.productName}</td>
-                    <td className="px-3 py-2">{i.grade}</td>
-                    <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
-                    <td className="px-3 py-2 font-mono">{i.boxesCount}</td>
-                    <td className="px-3 py-2 font-mono">{fmt(i.unitCost)}</td>
-                    <td className="px-3 py-2 font-bold">{fmt(i.totalRefund)}</td>
-                  </tr>
-                ))}
-                {(detail.items || []).length === 0 && <tr><td colSpan={6} className="py-6 text-center text-slate-400">لا توجد بنود</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+                          ariaLabel="أصناف مرتجع الشراء"
+                          rows={detail.items || []}
+                          rowKey={(i: any) => i.id}
+                          minWidth={560}
+                          dense
+                          columns={[
+                            { key: 'product', header: 'الصنف', render: (i: any) => <span className="font-bold text-slate-800">{i.productName}</span> },
+                            { key: 'grade', header: 'الفرز', render: (i: any) => i.grade },
+                            { key: 'qty', header: 'الكمية', render: (i: any) => <span className="font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</span> },
+                            { key: 'boxes', header: 'الكراتين', render: (i: any) => <span className="font-mono">{i.boxesCount}</span> },
+                            { key: 'cost', header: 'سعر التكلفة', render: (i: any) => <span className="font-mono">{fmt(i.unitCost)}</span> },
+                            { key: 'total', header: 'قيمة الارتجاع', render: (i: any) => <span className="font-bold">{fmt(i.totalRefund)}</span> },
+                          ]}
+                          emptyTitle="لا توجد بنود"
+                        />
+
           </div>
           <div className="flex justify-end pt-3 border-t border-slate-100">
             <button onClick={() => printService.printPurchaseReturn(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>

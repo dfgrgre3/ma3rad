@@ -14,7 +14,9 @@ import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice'
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformPoliciesPage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<'TERMS' | 'PRIVACY' | 'RETENTION'>('TERMS');
   const canManagePolicies = canPlatform('policies');
 
@@ -66,7 +68,7 @@ export const PlatformPoliciesPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!canManagePolicies) {
-      alert('لا تملك صلاحية تعديل سياسات المنصة.');
+      toast.warning('لا تملك صلاحية تعديل سياسات المنصة.');
       return;
     }
     setSaving(true);
@@ -80,11 +82,11 @@ export const PlatformPoliciesPage: React.FC = () => {
       setRetention(saved.retention);
       setLastSaved(saved.updatedAt);
       setError(null);
-      alert('تم حفظ السياسات وفترات الاحتفاظ في قاعدة البيانات.');
+      toast.success('تم حفظ السياسات وفترات الاحتفاظ في قاعدة البيانات.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'تعذر حفظ السياسات.';
       setError(message);
-      alert(message);
+      toast.warning(message);
     } finally {
       setSaving(false);
     }

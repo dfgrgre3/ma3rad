@@ -4,6 +4,7 @@ import { PricingService, Promotion } from '../../../services/domains/sales/Prici
 import { localDateString } from '../../../utils/shared/date';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
+import { useToast } from '../../../components/ui/Toast';
 const TYPE_LABELS: Record<Promotion['promotionType'], string> = {
   PERCENTAGE: 'نسبة خصم %',
   FIXED_AMOUNT: 'خصم مبلغ ثابت',
@@ -21,6 +22,7 @@ const APPLIES_LABELS: Record<Promotion['appliesTo'], string> = {
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const PromotionsPage: React.FC = () => {
+  const toast = useToast();
   const service = new PricingService();
   const canManage = usePermission()('promotions.manage');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -78,7 +80,7 @@ export const PromotionsPage: React.FC = () => {
       setForm({ name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '', bundlePrice: '', buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL', targetIds: '', couponCode: '', startsAt: today, endsAt: today, usageLimit: '', notes: '' });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إنشاء العرض.');
+      toast.error(err?.message || 'تعذر إنشاء العرض.');
     } finally {
       setSaving(false);
     }
@@ -86,13 +88,13 @@ export const PromotionsPage: React.FC = () => {
 
   const toggle = (p: Promotion) => {
     if (!canManage) return;
-    try { service.togglePromotion(p.id, !p.isActive); load(); } catch (e: any) { alert(e?.message); }
+    try { service.togglePromotion(p.id, !p.isActive); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const remove = (p: Promotion) => {
     if (!canManage) return;
     if (!confirm(`حذف العرض "${p.name}"؟`)) return;
-    try { service.deletePromotion(p.id); load(); } catch (e: any) { alert(e?.message); }
+    try { service.deletePromotion(p.id); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const describe = (p: Promotion) => {
@@ -106,7 +108,7 @@ export const PromotionsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">

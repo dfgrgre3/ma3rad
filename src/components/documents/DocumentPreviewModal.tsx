@@ -44,7 +44,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
-      dir="rtl"
     >
       <button
         type="button"

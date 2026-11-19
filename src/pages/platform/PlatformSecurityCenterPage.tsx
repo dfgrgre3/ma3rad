@@ -51,9 +51,12 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
+import { DataTable } from '../../components/ui/DataTable';
 type SecurityTab = 'OVERVIEW' | 'SESSIONS' | 'LOGINS' | 'KEYS' | 'INCIDENTS';
 
 export const PlatformSecurityCenterPage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<SecurityTab>('OVERVIEW');
   const [data, setData] = useState<PlatformCentralSecurityOverview | null>(null);
   const [apiKeys, setApiKeys] = useState<PlatformApiKey[]>([]);
@@ -143,7 +146,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       platformAdminService.revokeStaffSession(sessionId);
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إنهاء الجلسة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إنهاء الجلسة.');
     }
   };
 
@@ -154,7 +157,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       platformAdminService.revokeAllOtherStaffSessions();
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت العملية.');
+      toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
@@ -165,7 +168,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       await platformAdminService.rotatePlatformSigningKey(keyAlias);
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تدوير المفتاح.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تدوير المفتاح.');
     }
   };
 
@@ -176,7 +179,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       platformAdminService.revokeApiKey(id);
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إلغاء المفتاح.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إلغاء المفتاح.');
     }
   };
 
@@ -188,19 +191,19 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       setNewKeyResult(res);
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تدوير مفتاح الـ API.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تدوير مفتاح الـ API.');
     }
   };
 
   // Create API Key
   const handleCreateApiKey = () => {
     if (!apiKeyForm.name.trim()) {
-      alert('اسم المفتاح مطلوب.');
+      toast.warning('اسم المفتاح مطلوب.');
       return;
     }
     const tenantTarget = apiKeyForm.tenantId || (tenants[0]?.id ?? '');
     if (!tenantTarget) {
-      alert('يجب اختيار العميل أو توفير عميل مسجل أولاً.');
+      toast.warning('يجب اختيار العميل أو توفير عميل مسجل أولاً.');
       return;
     }
     try {
@@ -220,14 +223,14 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       });
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل إنشاء مفتاح الـ API.');
+      toast.error(err instanceof Error ? err.message : 'فشل إنشاء مفتاح الـ API.');
     }
   };
 
   // Create Incident
   const handleCreateIncident = () => {
     if (!incidentForm.title.trim()) {
-      alert('عنوان الحادث مطلوب.');
+      toast.warning('عنوان الحادث مطلوب.');
       return;
     }
     try {
@@ -242,7 +245,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       });
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل تسجيل الحادث.');
+      toast.error(err instanceof Error ? err.message : 'فشل تسجيل الحادث.');
     }
   };
 
@@ -258,7 +261,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       platformAdminService.respondToSecurityIncident(id, action, resolve);
       loadSecurity();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت الاستجابة.');
+      toast.error(err instanceof Error ? err.message : 'فشلت الاستجابة.');
     }
   };
 
@@ -429,38 +432,19 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-slate-800 text-[11px] text-slate-400">
-                  <th className="px-3 py-2 font-semibold">الحساب</th>
-                  <th className="px-3 py-2 font-semibold">المصدر</th>
-                  <th className="px-3 py-2 font-semibold">الحالة</th>
-                  <th className="px-3 py-2 font-semibold">الاعتماد</th>
-                  <th className="px-3 py-2 font-semibold">ملاحظات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ownerAccounts.map((account) => (
-                  <tr key={`${account.source}:${account.id}`} className="border-b border-slate-800/60">
-                    <td className="px-3 py-2 font-semibold text-slate-200" dir="ltr">{account.label}</td>
-                    <td className="px-3 py-2 text-slate-400">
-                      {account.source === 'platform_staff' ? 'موظفو المنصة' : 'مستخدمو ERP'}
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge value={account.isActive ? 'success' : 'neutral'} label={account.isActive ? 'مفعّل' : 'غير مفعّل'} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge value={account.approved ? 'success' : 'danger'} label={account.approved ? 'معتمد' : 'غير معتمد'} />
-                    </td>
-                    <td className="px-3 py-2 text-[11px] text-amber-300">
-                      {account.concerns.length > 0 ? account.concerns.join(' • ') : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="حسابات مالك المنصة"
+                      rows={ownerAccounts}
+                      rowKey={(account) => `${account.source}:${account.id}`}
+                      columns={[
+                        { key: 'account', header: 'الحساب', render: (account) => <span className="font-semibold text-slate-200" dir="ltr">{account.label}</span> },
+                        { key: 'source', header: 'المصدر', render: (account) => <span className="text-slate-400">{account.source === 'platform_staff' ? 'موظفو المنصة' : 'مستخدمو ERP'}</span> },
+                        { key: 'status', header: 'الحالة', render: (account) => <StatusBadge value={account.isActive ? 'success' : 'neutral'} label={account.isActive ? 'مفعّل' : 'غير مفعّل'} /> },
+                        { key: 'approval', header: 'الاعتماد', render: (account) => <StatusBadge value={account.approved ? 'success' : 'danger'} label={account.approved ? 'معتمد' : 'غير معتمد'} /> },
+                        { key: 'notes', header: 'ملاحظات', render: (account) => <span className="text-[11px] text-amber-300">{account.concerns.length > 0 ? account.concerns.join(' • ') : '—'}</span> },
+                      ]}
+                    />
+
         </section>
       )}
 
@@ -566,7 +550,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                       platformAdminService.setStaffMfaEnforcement(data.twoFactorEnforcement.enabled ? 'optional' : 'required');
                       loadSecurity();
                     } catch (err) {
-                      alert(err instanceof Error ? err.message : 'تعذر تغيير السياسة.');
+                      toast.error(err instanceof Error ? err.message : 'تعذر تغيير السياسة.');
                     }
                   }}
                   className="w-full rounded-lg border border-slate-700 px-3 py-1.5 text-[10.5px] font-bold text-sky-300 transition hover:border-sky-600 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
@@ -683,76 +667,64 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             </Button>
           </header>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-right">
-              <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">الموظف والدور</th>
-                  <th className="px-4 py-3">الجهاز والمتصفح</th>
-                  <th className="px-4 py-3">عنوان IP</th>
-                  <th className="px-4 py-3">موثوقية الجهاز</th>
-                  <th className="px-4 py-3">آخر نشاط</th>
-                  <th className="px-4 py-3 text-center">الإجراء</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {data.sessions.map((sess) => (
-                  <tr key={sess.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 text-xs">
-                      <p className="font-bold text-slate-100 flex items-center gap-1.5">
-                        {sess.staffName}
-                        {sess.isCurrent && (
-                          <span className="rounded bg-emerald-500/20 text-emerald-300 text-[9px] px-1.5 py-0.5 font-bold">
-                            جلستك الحالية
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-[10.5px] text-slate-400">{sess.staffRole}</p>
-                    </td>
+          <DataTable
+                        ariaLabel="الجلسات المركزية والأجهزة الموثوقة"
+                        rows={data.sessions}
+                        rowKey={(sess) => sess.id}
+                        minWidth={800}
+                        columns={[
+                          {
+                            key: 'staff', header: 'الموظف والدور',
+                            render: (sess) => (
+                              <div className="text-xs">
+                                <p className="font-bold text-slate-100 flex items-center gap-1.5">
+                                  {sess.staffName}
+                                  {sess.isCurrent && (
+                                    <span className="rounded bg-emerald-500/20 text-emerald-300 text-[9px] px-1.5 py-0.5 font-bold">
+                                      جلستك الحالية
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[10.5px] text-slate-400">{sess.staffRole}</p>
+                              </div>
+                            ),
+                          },
+                          {
+                            key: 'device', header: 'الجهاز والمتصفح',
+                            render: (sess) => (
+                              <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                                <Laptop className="h-3.5 w-3.5 text-slate-400" />
+                                {sess.deviceName || 'غير محدد'}
+                              </span>
+                            ),
+                          },
+                          { key: 'ip', header: 'عنوان IP', render: (sess) => <span className="text-xs font-mono text-slate-300">{sess.ipAddress || '—'}</span> },
+                          {
+                            key: 'trusted', header: 'موثوقية الجهاز',
+                            render: (sess) => sess.isTrustedDevice ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-xs"><CheckCircle2 className="h-3 w-3" /> موثوق</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-amber-400 font-bold text-xs"><AlertTriangle className="h-3 w-3" /> غير مصادق</span>
+                            ),
+                          },
+                          { key: 'activity', header: 'آخر نشاط', render: (sess) => <span className="text-xs text-slate-400">{formatDateTime(sess.lastActivityAt)}</span> },
+                          {
+                            key: 'action', header: 'الإجراء', align: 'center',
+                            render: (sess) => !sess.isCurrent ? (
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={() => handleRevokeSession(sess.id)}
+                                disabled={!canManageSecurity}
+                                leadingIcon={<LogOut className="h-3 w-3" />}
+                              >
+                                إنهاء الجلسة
+                              </Button>
+                            ) : null,
+                          },
+                        ]}
+                      />
 
-                    <td className="px-4 py-3 text-xs text-slate-300">
-                      <span className="flex items-center gap-1.5">
-                        <Laptop className="h-3.5 w-3.5 text-slate-400" />
-                        {sess.deviceName || 'غير محدد'}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3 text-xs font-mono text-slate-300">{sess.ipAddress || '—'}</td>
-
-                    <td className="px-4 py-3 text-xs">
-                      {sess.isTrustedDevice ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
-                          <CheckCircle2 className="h-3 w-3" /> موثوق
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-amber-400 font-bold">
-                          <AlertTriangle className="h-3 w-3" /> غير مصادق
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3 text-xs text-slate-400">
-                      {formatDateTime(sess.lastActivityAt)}
-                    </td>
-
-                    <td className="px-4 py-3 text-center">
-                      {!sess.isCurrent && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleRevokeSession(sess.id)}
-                          disabled={!canManageSecurity}
-                          leadingIcon={<LogOut className="h-3 w-3" />}
-                        >
-                          إنهاء الجلسة
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </section>
       )}
 
@@ -785,59 +757,45 @@ export const PlatformSecurityCenterPage: React.FC = () => {
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-right">
-                <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">البريد الإلكتروني</th>
-                    <th className="px-4 py-3">عنوان IP</th>
-                    <th className="px-4 py-3">حالة المحاولة</th>
-                    <th className="px-4 py-3">السبب / الملاحظات</th>
-                    <th className="px-4 py-3">التوقيت</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80">
-                  {filteredLogins.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-xs text-slate-500">
-                        لا توجد سجلات دخول تطابق البحث.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredLogins.map((login) => (
-                      <tr key={login.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3 text-xs font-bold text-slate-100">{login.email}</td>
-                        <td className="px-4 py-3 text-xs font-mono text-slate-300">{login.ipAddress || '—'}</td>
-                        <td className="px-4 py-3 text-xs">
-                          <span
-                            className={`inline-flex items-center gap-1 font-bold ${
-                              login.status === 'SUCCESS'
-                                ? 'text-emerald-400'
-                                : login.status === 'BLOCKED'
-                                ? 'text-rose-500'
-                                : 'text-amber-400'
-                            }`}
-                          >
-                            {login.status === 'SUCCESS' ? (
-                              <CheckCircle2 className="h-3 w-3" />
-                            ) : (
-                              <XCircle className="h-3 w-3" />
-                            )}
-                            {login.status === 'SUCCESS'
-                              ? 'ناجح'
-                              : login.status === 'BLOCKED'
-                              ? 'محظور IP'
-                              : 'فشل كلمة المرور'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-400">{login.failureReason || '—'}</td>
-                        <td className="px-4 py-3 text-xs text-slate-400">{formatDateTime(login.attemptedAt)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                            ariaLabel="سجل محاولات الدخول"
+                            rows={filteredLogins}
+                            rowKey={(login) => login.id}
+                            minWidth={800}
+                            emptyTitle="لا توجد سجلات دخول تطابق البحث."
+                            columns={[
+                              { key: 'email', header: 'البريد الإلكتروني', render: (login) => <span className="text-xs font-bold text-slate-100">{login.email}</span> },
+                              { key: 'ip', header: 'عنوان IP', render: (login) => <span className="text-xs font-mono text-slate-300">{login.ipAddress || '—'}</span> },
+                              {
+                                key: 'status', header: 'حالة المحاولة',
+                                render: (login) => (
+                                  <span
+                                    className={`inline-flex items-center gap-1 font-bold text-xs ${
+                                      login.status === 'SUCCESS'
+                                        ? 'text-emerald-400'
+                                        : login.status === 'BLOCKED'
+                                        ? 'text-rose-500'
+                                        : 'text-amber-400'
+                                    }`}
+                                  >
+                                    {login.status === 'SUCCESS' ? (
+                                      <CheckCircle2 className="h-3 w-3" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3" />
+                                    )}
+                                    {login.status === 'SUCCESS'
+                                      ? 'ناجح'
+                                      : login.status === 'BLOCKED'
+                                      ? 'محظور IP'
+                                      : 'فشل كلمة المرور'}
+                                  </span>
+                                ),
+                              },
+                              { key: 'reason', header: 'السبب / الملاحظات', render: (login) => <span className="text-xs text-slate-400">{login.failureReason || '—'}</span> },
+                              { key: 'time', header: 'التوقيت', render: (login) => <span className="text-xs text-slate-400">{formatDateTime(login.attemptedAt)}</span> },
+                            ]}
+                          />
+
           </div>
         </section>
       )}
@@ -926,70 +884,45 @@ export const PlatformSecurityCenterPage: React.FC = () => {
             {apiKeys.length === 0 ? (
               <p className="text-xs text-slate-500 py-4 text-center">لا توجد مفاتيح API مسجلة حالياً.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="border-b border-slate-800 text-[11px] text-slate-400">
-                    <tr>
-                      <th className="py-2 px-3">اسم المفتاح</th>
-                      <th className="py-2 px-3">البادئة</th>
-                      <th className="py-2 px-3">الصلاحيات</th>
-                      <th className="py-2 px-3">الحالة</th>
-                      <th className="py-2 px-3">تاريخ الانتهاء</th>
-                      <th className="py-2 px-3">آخر استخدام</th>
-                      <th className="py-2 px-3 text-center">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {apiKeys.map((key) => (
-                      <tr key={key.id}>
-                        <td className="py-2.5 px-3 font-bold text-slate-200">{key.name}</td>
-                        <td className="py-2.5 px-3 font-mono text-slate-400">{key.keyPrefix}...</td>
-                        <td className="py-2.5 px-3 text-slate-400">
-                          {key.scopes.join(', ') || 'الكل'}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={`font-bold ${
-                              key.isActive ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {key.isActive ? 'نشط' : 'ملغي'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-400">
-                          {key.expiresAt ? formatDateTime(key.expiresAt) : 'دائم'}
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-400">
-                          {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : 'لم يستخدم'}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {key.isActive && (
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                disabled={!canManageSecurity}
-                                onClick={() => handleRotateApiKey(key.id)}
-                                className="text-sky-400 hover:underline text-xs flex items-center gap-1"
-                                title="تدوير المفتاح"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                                تدوير
-                              </button>
-                              <span className="text-slate-600">|</span>
-                              <button
-                                disabled={!canManageSecurity}
-                                onClick={() => handleRevokeApiKey(key.id)}
-                                className="text-rose-400 hover:underline text-xs"
-                              >
-                                إلغاء
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                              ariaLabel="مفاتيح API"
+                              rows={apiKeys}
+                              rowKey={(key) => key.id}
+                              dense
+                              columns={[
+                                { key: 'name', header: 'اسم المفتاح', render: (key) => <span className="font-bold text-slate-200">{key.name}</span> },
+                                { key: 'prefix', header: 'البادئة', render: (key) => <span className="font-mono text-slate-400">{key.keyPrefix}...</span> },
+                                { key: 'scopes', header: 'الصلاحيات', render: (key) => <span className="text-slate-400">{key.scopes.join(', ') || 'الكل'}</span> },
+                                { key: 'status', header: 'الحالة', render: (key) => <span className={`font-bold ${key.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>{key.isActive ? 'نشط' : 'ملغي'}</span> },
+                                { key: 'expires', header: 'تاريخ الانتهاء', render: (key) => <span className="text-slate-400">{key.expiresAt ? formatDateTime(key.expiresAt) : 'دائم'}</span> },
+                                { key: 'lastUsed', header: 'آخر استخدام', render: (key) => <span className="text-slate-400">{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : 'لم يستخدم'}</span> },
+                                {
+                                  key: 'actions', header: 'إجراءات', align: 'center',
+                                  render: (key) => key.isActive ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                      <button
+                                        disabled={!canManageSecurity}
+                                        onClick={() => handleRotateApiKey(key.id)}
+                                        className="text-sky-400 hover:underline text-xs flex items-center gap-1"
+                                        title="تدوير المفتاح"
+                                      >
+                                        <RotateCcw className="h-3 w-3" />
+                                        تدوير
+                                      </button>
+                                      <span className="text-slate-600">|</span>
+                                      <button
+                                        disabled={!canManageSecurity}
+                                        onClick={() => handleRevokeApiKey(key.id)}
+                                        className="text-rose-400 hover:underline text-xs"
+                                      >
+                                        إلغاء
+                                      </button>
+                                    </div>
+                                  ) : null,
+                                },
+                              ]}
+                            />
+
             )}
           </section>
         </div>
@@ -1020,83 +953,75 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                 description="لم يتم رصد أي اختراقات أو حوادث أمنية على المنصة."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-right">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">عنوان الحادث</th>
-                      <th className="px-4 py-3">مستوى الخطورة</th>
-                      <th className="px-4 py-3">الحالة</th>
-                      <th className="px-4 py-3">إجراء الاحتواء المتخذ</th>
-                      <th className="px-4 py-3">التوقيت</th>
-                      <th className="px-4 py-3 text-center">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {data.incidents.map((inc) => (
-                      <tr key={inc.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3 text-xs">
-                          <p className="font-bold text-slate-100">{inc.title}</p>
-                          {inc.details && <p className="text-[11px] text-slate-400 mt-0.5">{inc.details}</p>}
-                        </td>
+              <DataTable
+                              ariaLabel="سجل الحوادث الأمنية"
+                              rows={data.incidents}
+                              rowKey={(inc) => inc.id}
+                              minWidth={800}
+                              columns={[
+                                {
+                                  key: 'incident', header: 'عنوان الحادث',
+                                  render: (inc) => (
+                                    <div className="text-xs">
+                                      <p className="font-bold text-slate-100">{inc.title}</p>
+                                      {inc.details && <p className="text-[11px] text-slate-400 mt-0.5">{inc.details}</p>}
+                                    </div>
+                                  ),
+                                },
+                                {
+                                  key: 'severity', header: 'مستوى الخطورة',
+                                  render: (inc) => (
+                                    <span
+                                      className={`rounded px-2 py-0.5 text-[10px] font-black ${
+                                        inc.severity === 'CRITICAL'
+                                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                          : inc.severity === 'HIGH'
+                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          : 'bg-slate-800 text-slate-300'
+                                      }`}
+                                    >
+                                      {inc.severity}
+                                    </span>
+                                  ),
+                                },
+                                {
+                                  key: 'status', header: 'الحالة',
+                                  render: (inc) => (
+                                    <span
+                                      className={`font-bold text-xs ${
+                                        inc.status === 'RESOLVED'
+                                          ? 'text-emerald-400'
+                                          : inc.status === 'CONTAINED'
+                                          ? 'text-sky-400'
+                                          : 'text-rose-400'
+                                      }`}
+                                    >
+                                      {inc.status === 'RESOLVED'
+                                        ? 'تم الحل'
+                                        : inc.status === 'CONTAINED'
+                                        ? 'قيد الاحتواء'
+                                        : 'مفتوح'}
+                                    </span>
+                                  ),
+                                },
+                                { key: 'action', header: 'إجراء الاحتواء المتخذ', render: (inc) => <span className="text-xs text-slate-300">{inc.containmentAction || 'بانتظار إجراء'}</span> },
+                                { key: 'time', header: 'التوقيت', render: (inc) => <span className="text-xs text-slate-400">{formatDateTime(inc.createdAt)}</span> },
+                                {
+                                  key: 'actions', header: 'إجراءات', align: 'center',
+                                  render: (inc) => inc.status !== 'RESOLVED' ? (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={!canManageSecurity}
+                                      onClick={() => handleRespondIncident(inc.id, true)}
+                                    >
+                                      إغلاق كـ محلول
+                                    </Button>
+                                  ) : null,
+                                },
+                              ]}
+                            />
 
-                        <td className="px-4 py-3 text-xs">
-                          <span
-                            className={`rounded px-2 py-0.5 text-[10px] font-black ${
-                              inc.severity === 'CRITICAL'
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                : inc.severity === 'HIGH'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
-                          >
-                            {inc.severity}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3 text-xs">
-                          <span
-                            className={`font-bold ${
-                              inc.status === 'RESOLVED'
-                                ? 'text-emerald-400'
-                                : inc.status === 'CONTAINED'
-                                ? 'text-sky-400'
-                                : 'text-rose-400'
-                            }`}
-                          >
-                            {inc.status === 'RESOLVED'
-                              ? 'تم الحل'
-                              : inc.status === 'CONTAINED'
-                              ? 'قيد الاحتواء'
-                              : 'مفتوح'}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3 text-xs text-slate-300">
-                          {inc.containmentAction || 'بانتظار إجراء'}
-                        </td>
-
-                        <td className="px-4 py-3 text-xs text-slate-400">
-                          {formatDateTime(inc.createdAt)}
-                        </td>
-
-                        <td className="px-4 py-3 text-center">
-                          {inc.status !== 'RESOLVED' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={!canManageSecurity}
-                        onClick={() => handleRespondIncident(inc.id, true)}
-                            >
-                              إغلاق كـ محلول
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             )}
           </div>
         </div>
@@ -1285,7 +1210,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
                   variant="secondary"
                   onClick={() => {
                     navigator.clipboard.writeText(newKeyResult.plainTextKey);
-                    alert('تم نسخ المفتاح إلى الحافظة بنجاح.');
+                    toast.success('تم نسخ المفتاح إلى الحافظة بنجاح.');
                   }}
                   leadingIcon={<Copy className="h-4 w-4" />}
                 >

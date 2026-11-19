@@ -25,9 +25,9 @@ import type { PlatformSettingsMap } from '../../services/domains/platform/platfo
 import type { User } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import { Field, inputClass, formatDateTime } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 interface PlatformSettingsPageProps {
   currentUser: User;
 }

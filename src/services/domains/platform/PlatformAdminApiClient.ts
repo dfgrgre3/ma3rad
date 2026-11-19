@@ -1253,8 +1253,22 @@ export class PlatformAdminApiClient {
   }
 
   /** Cross-tenant clone detection; requires full tenant scope server-side. */
-  async detectCloneDevices(): Promise<{ devices: PlatformDevice[]; licenses: PlatformLicense[]; alerts: string[] }> {
-    const envelope = await this.requestEnvelope<{ devices: any[]; licenses: any[]; alerts: string[] }>({ path: '/api/v1/admin/devices/detect-clones',
+  async detectCloneDevices(): Promise<{
+    devices: PlatformDevice[];
+    licenses: PlatformLicense[];
+    alerts: string[];
+    duplicateHwids: Array<{ hardwareId: string; tenants: string[]; tenantCount: number }>;
+    overLimitLicenses: Array<{ licenseId: string; licenseKey: string; tenantId: string; deviceCount: number; deviceLimit: number }>;
+    suspiciousTransfers: Array<{ licenseId: string; licenseKey: string; tenantId: string; transferCount: number }>;
+  }> {
+    const envelope = await this.requestEnvelope<{
+      devices: any[];
+      licenses: any[];
+      alerts: string[];
+      duplicateHwids?: any[];
+      overLimitLicenses?: any[];
+      suspiciousTransfers?: any[];
+    }>({ path: '/api/v1/admin/devices/detect-clones',
       method: 'POST' });
     if (envelope.success === false) {
       throw new CentralApiError({ status: 0, envelope });
@@ -1264,6 +1278,24 @@ export class PlatformAdminApiClient {
       devices: (Array.isArray(data.devices) ? data.devices : []).map(mapCentralDevice),
       licenses: (Array.isArray(data.licenses) ? data.licenses : []).map(mapCentralLicense),
       alerts: Array.isArray(data.alerts) ? data.alerts.map(String) : [],
+      duplicateHwids: (Array.isArray(data.duplicateHwids) ? data.duplicateHwids : []).map((row: any) => ({
+        hardwareId: String(row.hardwareId ?? row.hardware_id ?? ''),
+        tenants: Array.isArray(row.tenants) ? row.tenants.map(String) : [],
+        tenantCount: Number(row.tenantCount ?? row.tenant_count ?? 0) || 0,
+      })),
+      overLimitLicenses: (Array.isArray(data.overLimitLicenses) ? data.overLimitLicenses : []).map((row: any) => ({
+        licenseId: String(row.licenseId ?? row.license_id ?? ''),
+        licenseKey: String(row.licenseKey ?? row.license_key ?? ''),
+        tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+        deviceCount: Number(row.deviceCount ?? row.device_count ?? row.active_device_count ?? 0) || 0,
+        deviceLimit: Number(row.deviceLimit ?? row.device_limit ?? 0) || 0,
+      })),
+      suspiciousTransfers: (Array.isArray(data.suspiciousTransfers) ? data.suspiciousTransfers : []).map((row: any) => ({
+        licenseId: String(row.licenseId ?? row.license_id ?? ''),
+        licenseKey: String(row.licenseKey ?? row.license_key ?? ''),
+        tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+        transferCount: Number(row.transferCount ?? row.transfer_count ?? 0) || 0,
+      })),
     };
   }
 

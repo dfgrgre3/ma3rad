@@ -106,27 +106,27 @@ test('dashboard sales and gross profit reconcile invoice returns and same-period
     (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,
      cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
     VALUES (?, ?, ?, 'Dashboard return test', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2',
-      4, 1.44, 80, 100, 90, 0, 0, 1)`,
+      4, 1.44, 8000, 10000, 9000, 0, 0, 1)`,
     [`${id}_product`, `${id}_product`, `${id}_product`]);
 
   db.run(`INSERT INTO sales_invoices
     (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
      paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
+    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 20000, 0, 0, 20000, 0, 20000, 'CREDIT', 'UNPAID', 'COMPLETED', 8000, 12000, 'usr_admin')`,
     [`${id}_current`, `${id}_current`, today, customerId]);
   db.run(`INSERT INTO sales_returns
     (id,return_number,original_invoice_id,original_invoice_number,customer_id,warehouse_id,date,total_amount,
      refunded_amount,remaining_to_balance,reason,created_by)
-    VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 100, 0, 100, 'test', 'usr_admin')`,
+    VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 10000, 0, 10000, 'test', 'usr_admin')`,
     [`${id}_return`, `${id}_return`, `${id}_current`, `${id}_current`, customerId, today]);
   db.run(`INSERT INTO sales_return_items
     (id,return_id,product_id,product_name,grade,quantity_m2,boxes_count,unit_price,unit_cost,total_refund)
-    VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 100, 80, 100)`,
+    VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 10000, 8000, 10000)`,
     [`${id}_item`, `${id}_return`, `${id}_product`]);
   db.run(`INSERT INTO sales_invoices
     (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
      paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 100, 0, 0, 100, 0, 100, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 60, 'usr_admin')`,
+    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 10000, 0, 0, 10000, 0, 10000, 'CREDIT', 'UNPAID', 'COMPLETED', 4000, 6000, 'usr_admin')`,
     [`${id}_previous`, `${id}_previous`, previousMonthDate, customerId]);
   const after = new AccountingService().getDashboardMetrics();
 
@@ -163,26 +163,26 @@ test('dashboard trend and monthly comparison batch invoice and return totals cor
       (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,
        cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
       VALUES (?, ?, ?, 'Dashboard summary batch test', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2',
-        4, 1.44, 80, 100, 90, 0, 0, 1)`,
+        4, 1.44, 8000, 10000, 9000, 0, 0, 1)`,
       [`${id}_product`, `${id}_product`, `${id}_product`]);
     db.run(`INSERT INTO sales_invoices
       (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
        paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
+      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 20000, 0, 0, 20000, 0, 20000, 'CREDIT', 'UNPAID', 'COMPLETED', 8000, 12000, 'usr_admin')`,
       [`${id}_current`, `${id}_current`, today, customerId]);
     db.run(`INSERT INTO sales_returns
       (id,return_number,original_invoice_id,original_invoice_number,customer_id,warehouse_id,date,total_amount,
        refunded_amount,remaining_to_balance,reason,created_by)
-      VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 100, 0, 100, 'test', 'usr_admin')`,
+      VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 10000, 0, 10000, 'test', 'usr_admin')`,
       [`${id}_return`, `${id}_return`, `${id}_current`, `${id}_current`, customerId, today]);
     db.run(`INSERT INTO sales_return_items
       (id,return_id,product_id,product_name,grade,quantity_m2,boxes_count,unit_price,unit_cost,total_refund)
-      VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 100, 80, 100)`,
+      VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 10000, 8000, 10000)`,
       [`${id}_item`, `${id}_return`, `${id}_product`]);
     db.run(`INSERT INTO sales_invoices
       (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
        paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 90, 0, 0, 90, 0, 90, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 50, 'usr_admin')`,
+      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 9000, 0, 0, 9000, 0, 9000, 'CREDIT', 'UNPAID', 'COMPLETED', 4000, 5000, 'usr_admin')`,
       [`${id}_previous`, `${id}_previous`, previousMonthDate, customerId]);
 
     const trendAfter = accounting.getSalesTrendLast7Days();
@@ -301,7 +301,7 @@ test('scheduled shift closure records the expected till balance for the next ope
     const opened = service.openShift('cr_main', 'usr_admin', 125);
     shiftId = opened.id;
     manager.run(
-      'UPDATE cash_shifts SET total_sales_cash = 40, total_expenses = 15 WHERE id = ?',
+      'UPDATE cash_shifts SET total_sales_cash = 4000, total_expenses = 1500 WHERE id = ?',
       [opened.id]
     );
 
@@ -574,7 +574,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
        wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
     [pid, 'SKU-ST1', 'BAR-ST1', 'بلاط اختبار', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60',
-     'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 10]
+     'M2', 'M2', 4, 1.44, 10000, 30000, 25000, 0, 10]
   );
   db.run(
     `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
@@ -597,7 +597,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   );
   db.run(
     `INSERT INTO price_list_items (id, price_list_id, product_id, price_m2, price_box, min_quantity_m2)
-     VALUES ('pli_stmt', 'pl_stmt', ?, 280, 403.2, 0)`,
+     VALUES ('pli_stmt', 'pl_stmt', ?, 28000, 40320, 0)`,
     [pid]
   );
   const listed = pricing.getEffectivePrice(pid, customer.id, 10);
@@ -621,12 +621,12 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   assert.equal(sale.totalAmount, 2600);
 
   const statements = new FinancialStatementsService();
-  const aging = statements.getCustomerAging();
+  const aging = await statements.getCustomerAging();
   const row = aging.rows.find((r) => r.id === customer.id);
   assert.ok(row, 'customer should appear in AR aging');
   assert.equal(row!.total, 2600);
 
-  const sheet = statements.getBalanceSheet();
+  const sheet = await statements.getBalanceSheet();
   const receivables = sheet.assets.find((l) => l.label.includes('العملاء'));
   assert.ok((receivables?.amount || 0) >= 2600, 'receivables should include the open invoice');
   assert.ok(sheet.totals.assets > 0, 'assets should be positive');
@@ -649,7 +649,7 @@ test('financial statements use posted ledger balances as of the requested date',
 
   db.run('BEGIN TRANSACTION');
   try {
-    const before = statements.getBalanceSheet(asOfBefore);
+    const before = await statements.getBalanceSheet(asOfBefore);
     postLedgerEntry(db, {
       date: postingDate,
       description: 'Financial statement as-of test',
@@ -662,8 +662,8 @@ test('financial statements use posted ledger balances as of the requested date',
         { accountCode: '4101', debit: 0, credit: 321.45 },
       ],
     });
-    const after = statements.getBalanceSheet(postingDate);
-    const flow = statements.getCashFlow(postingDate, postingDate);
+    const after = await statements.getBalanceSheet(postingDate);
+    const flow = await statements.getCashFlow(postingDate, postingDate);
 
     assert.equal(after.assets[0].amount, before.assets[0].amount + 321.45);
     assert.equal(flow.totals.inflows, 321.45);
@@ -728,7 +728,7 @@ test('commissions and stock reservations lifecycle', async () => {
     'SELECT current_balance AS balance FROM cash_registers WHERE id = ?',
     [commissionRegister.id]
   )[0].balance;
-  assert.equal(Number(commissionRegister.balance) - Number(balanceAfterPayment), commission!.commissionAmount);
+  assert.equal(Number(commissionRegister.balance) - Number(balanceAfterPayment), commission!.commissionAmount * 100);
   assert.throws(() => commissions.setStatus(commission!.id, 'PAID'), /مدفوعة بالفعل/);
   assert.equal(
     q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [commissionRegister.id])[0].balance,
@@ -766,7 +766,7 @@ test('commissions and stock reservations lifecycle', async () => {
     [second.id]
   )[0];
   assert.equal(Number(consumedMovement.quantity), -5, 'reservation consumption must be an outbound movement');
-  assert.equal(Number(consumedMovement.totalCost), 500);
+  assert.equal(Number(consumedMovement.totalCost), 50000);
   const consumptionLedger = q(
     `SELECT coa.code AS code, jel.debit AS debit, jel.credit AS credit
      FROM journal_entries je
@@ -775,8 +775,8 @@ test('commissions and stock reservations lifecycle', async () => {
      WHERE je.reference_type = 'RESERVATION_CONSUMPTION' AND je.reference_id = ?`,
     [consumedMovement.id]
   );
-  assert.equal(consumptionLedger.find((line: any) => line.code === '5101')?.debit, 500);
-  assert.equal(consumptionLedger.find((line: any) => line.code === '1104')?.credit, 500);
+  assert.equal(consumptionLedger.find((line: any) => line.code === '5101')?.debit, 50000);
+  assert.equal(consumptionLedger.find((line: any) => line.code === '1104')?.credit, 50000);
 
   const overdue = reservations.createReservation({
     productId: 'prod_stmt_1', warehouseId: 'wh_main', quantityM2: 3,
@@ -801,7 +801,7 @@ test('approved credit-limit request updates the customer automatically', async (
   });
   service.decide(request.id, true, '?????? ??????');
   const updated = q(`SELECT credit_limit AS creditLimit FROM customers WHERE id = ?`, [customer.id])[0];
-  assert.equal(updated.creditLimit, 5000);
+  assert.equal(updated.creditLimit, 500000);
   const decisions = q(`SELECT status FROM approval_requests WHERE id = ?`, [request.id]);
   assert.equal(decisions[0].status, 'APPROVED');
 });
@@ -837,7 +837,7 @@ test('supplier lifecycle supports edit, archive, reactivation, payments and stat
   const registerBefore = q('SELECT current_balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].currentBalance;
   const payment = service.recordPayment(supplier.id, 30, 'CASH', undefined, 'دفعة اختبار');
   const registerAfter = q('SELECT current_balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].currentBalance;
-  assert.equal(registerAfter, registerBefore - 30);
+  assert.equal(registerAfter, registerBefore - 3000);
   assert.equal(q(
     `SELECT id FROM audit_logs WHERE record_id = ? AND action = 'سداد دفعة لمورد' AND module = 'SUPPLIERS'`,
     [payment.id]
@@ -863,7 +863,7 @@ test("daily operations expose today's sales, purchases, expenses and debts", asy
 
   db.run(
     `INSERT INTO expenses (id, category, amount, register_id, payment_type, date, description, performed_by)
-     VALUES ('exp_daily_test', '??????', 125, ?, 'CASH', ?, '????? ?????? ??????', 'usr_admin')`,
+     VALUES ('exp_daily_test', '??????', 12500, ?, 'CASH', ?, '????? ?????? ??????', 'usr_admin')`,
     [register.id, today]
   );
 
@@ -964,7 +964,7 @@ test('payroll run snapshots period attendance, contract pay and policy deduction
          (id, employee_id, branch_id, contract_number, contract_type, start_date, job_title,
           salary, status, created_by)
        VALUES (?, ?, ?, ?, 'PERMANENT', ?, ?, ?, 'ACTIVE', ?)`,
-      ['contract_payroll_run_test', employee.id, employee.branchId, 'CTR_PAYROLL_RUN_TEST', '2020-06-15', employee.role, 3000, 'usr_admin']
+      ['contract_payroll_run_test', employee.id, employee.branchId, 'CTR_PAYROLL_RUN_TEST', '2020-06-15', employee.role, 300000, 'usr_admin']
     );
     manager.run(
       `INSERT INTO attendance
@@ -988,7 +988,7 @@ test('payroll run snapshots period attendance, contract pay and policy deduction
     manager.run(
       `INSERT INTO commissions
          (id, employee_id, branch_id, source_type, period_month, commission_amount, status, created_by)
-       VALUES (?, ?, ?, 'MANUAL', ?, 250, 'PENDING', ?)`,
+       VALUES (?, ?, ?, 'MANUAL', ?, 25000, 'PENDING', ?)`,
       ['commission_payroll_run_test', employee.id, employee.branchId, '2020-06', 'usr_admin']
     );
     new CommissionService().setStatus('commission_payroll_run_test', 'APPROVED');
@@ -1213,7 +1213,7 @@ test('fixed asset acquisition uses the approved clearing liability by default', 
   )[0];
   assert.ok(entry);
   const lines = q(
-    `SELECT a.code,l.debit,l.credit FROM journal_entry_lines l
+    `SELECT a.code,l.debit/100.0 AS debit,l.credit/100.0 AS credit FROM journal_entry_lines l
      JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=?`,
     [entry.id]
   );

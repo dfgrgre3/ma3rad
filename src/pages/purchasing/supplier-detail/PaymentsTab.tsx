@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { DollarSign } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { SupplierPaymentRow } from '../../../types/purchasing/supplierDetailPage';
@@ -29,47 +30,27 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ payments, canPay, onOp
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs text-right min-w-[700px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr>
-              <th className="p-3">رقم السند</th>
-              <th className="p-3">التاريخ</th>
-              <th className="p-3">المبلغ المسدد</th>
-              <th className="p-3">طريقة الدفع</th>
-              <th className="p-3">الخزينة / المصدر</th>
-              <th className="p-3">البيان / ملاحظات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {payments.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="p-3 font-mono font-bold text-slate-900">{p.receipt_number}</td>
-                <td className="p-3 text-slate-600">{p.date}</td>
-                <td className="p-3 font-black text-emerald-700 text-sm">
-                  {CeramicMath.formatCurrency(p.amount)}
-                </td>
-                <td className="p-3 font-bold text-slate-800">
-                  {p.payment_type === 'CASH'
-                    ? 'نقدي'
-                    : p.payment_type === 'BANK'
-                    ? 'تحويل بنكي'
-                    : p.payment_type === 'CHEQUE'
-                    ? 'شيك'
-                    : p.payment_type}
-                </td>
-                <td className="p-3 font-mono text-slate-500">{p.register_id || 'cr_main'}</td>
-                <td className="p-3 text-slate-600">{p.notes || '—'}</td>
-              </tr>
-            ))}
-            {payments.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-10 text-center text-slate-400">
-                  لا توجد سندات صرف مسجلة لهذا المورد.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="سندات صرف المورد"
+          rows={payments}
+          rowKey={(p: any) => String(p.id)}
+          minWidth={700}
+          dense
+          tableClassName="text-xs"
+          rowClassName={() => 'transition hover:bg-slate-50'}
+          columns={[
+            { key: 'num', header: 'رقم السند', render: (p: any) => <span className="font-mono font-bold text-slate-900">{p.receipt_number}</span> },
+            { key: 'date', header: 'التاريخ', render: (p: any) => <span className="text-slate-600">{p.date}</span> },
+            { key: 'amount', header: 'المبلغ المسدد', render: (p: any) => <span className="text-sm font-black text-emerald-700">{CeramicMath.formatCurrency(p.amount)}</span> },
+            {
+              key: 'method', header: 'طريقة الدفع',
+              render: (p: any) => <span className="font-bold text-slate-800">{p.payment_type === 'CASH' ? 'نقدي' : p.payment_type === 'BANK' ? 'تحويل بنكي' : p.payment_type === 'CHEQUE' ? 'شيك' : p.payment_type}</span>,
+            },
+            { key: 'src', header: 'الخزينة / المصدر', render: (p: any) => <span className="font-mono text-slate-500">{p.register_id || 'cr_main'}</span> },
+            { key: 'notes', header: 'البيان / ملاحظات', render: (p: any) => <span className="text-slate-600">{p.notes || '—'}</span> },
+          ]}
+          emptyTitle="لا توجد سندات صرف مسجلة لهذا المورد."
+        />
       </div>
     </div>
   );

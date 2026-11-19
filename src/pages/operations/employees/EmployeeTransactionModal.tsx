@@ -22,7 +22,7 @@ export const EmployeeTransactionModal: React.FC<EmployeeTransactionModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 bg-white backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <h2 className="text-sm font-black text-slate-900">
             تسجيل حركة حساب مالي للعامل:{' '}

@@ -10,6 +10,7 @@ import { LoyaltyService } from '../src/services/domains/sales/LoyaltyService.ts'
 import { PricingService, type PromotionCartItem } from '../src/services/domains/sales/PricingService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { calculatePosTotals } from '../src/hooks/pages/sales/pos/usePosTotals.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 
 test('promotions created in pricing evaluate to the same discounts POS applies', async () => {
@@ -102,19 +103,23 @@ test('POS totals match persisted invoice for stacked discounts, tax, and shippin
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = db.query<{ id: string }>(`SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id])[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   const customer = new CustomerService().createCustomer({
     name: 'POS totals parity customer', phone: '01088776655', customerType: 'RETAIL', creditLimit: 0,
   });
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
     VALUES ('prod_pos_totals_parity','SKU-PTP','BAR-PTP','POS totals parity','cat_floor','br_cleo','GRADE_1','1x1',
-    'M2','M2',1,1,40,100,90,0,0,1)`);
+    'M2','M2',1,1,4000,10000,9000,0,0,1)`);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
     VALUES ('stk_pos_totals_parity','wh_main','prod_pos_totals_parity',10,0)`);
   const today = localDateString();
-  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,starts_at,ends_at,is_active,usage_count,created_by)
-    VALUES ('promo_pos_totals_parity','PTP','POS totals parity','FIXED_AMOUNT',10,?,?,1,0,'usr_admin')`, [today, today]);
+  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,min_order_amount,applies_to,starts_at,ends_at,is_active,usage_count,created_by)
+    VALUES ('promo_pos_totals_parity','PTP','POS totals parity','FIXED_AMOUNT',1000,0,'ALL',?,?,1,0,'usr_admin')`, [today, today]);
   const loyalty = new LoyaltyService();
   loyalty.initializeCustomerLoyalty(customer.id);
   loyalty.earnPoints({ customerId: customer.id, points: 5, referenceType: 'TEST_SEED', referenceId: 'pos-totals-parity' });
@@ -131,7 +136,7 @@ test('POS totals match persisted invoice for stacked discounts, tax, and shippin
     customerId: customer.id, warehouseId: 'wh_main',
     items: [{ productId: 'prod_pos_totals_parity', soldBy: 'M2', quantityM2: 2, boxesCount: 0,
       piecesCount: 0, unitPrice: 100, discountAmount: 10 }],
-    discountAmount: 35, taxAmount: posTotals.taxAmount, shippingCost: 7,
+    discountAmount: 35, taxPercentage: 10, shippingCost: 7,
     paidAmount: posTotals.totalAmount, paymentType: 'CASH',
     promotionUsage: { promotionId: 'promo_pos_totals_parity', discountAmount: 10 },
     loyaltyRedemption: { points: 5, discountAmount: 5 },
@@ -303,14 +308,18 @@ test('sale creation validates numeric inputs and matches promotion and loyalty d
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = db.query<{ id: string }>(`SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id])[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   const customer = new CustomerService().createCustomer({
     name: 'Sale integrity customer', phone: '01099887766', customerType: 'RETAIL', creditLimit: 0,
   });
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
     pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
     VALUES ('prod_integrity_sale','SKU-IS','BAR-IS','Integrity sale product','cat_floor','br_cleo','GRADE_1','60x60',
-    'M2','M2',4,1.44,40,100,90,0,0,1)`);
+    'M2','M2',4,1.44,4000,10000,9000,0,0,1)`);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
     VALUES ('stk_integrity_sale','wh_main','prod_integrity_sale',20,0)`);
   const sales = new SalesService();
@@ -324,15 +333,16 @@ test('sale creation validates numeric inputs and matches promotion and loyalty d
   assert.throws(() => sales.createSale({ ...baseDto, shippingCost: Number.POSITIVE_INFINITY }), /تكلفة الشحن غير صحيح/);
   assert.throws(() => sales.createSale({ ...baseDto, payments: [{ method: 'CASH', amount: -1 }] }), /مبلغ إحدى وسائل الدفع غير صحيح/);
   assert.throws(() => sales.createSale({ ...baseDto, items: [{ ...baseDto.items[0], discountAmount: 201 }] }), /خصم الصنف/);
+  // Promotion eligibility is validated before loyalty, so this assertion omits
+  // promotionUsage to reach the insufficient-points check.
   assert.throws(() => sales.createSale({
     ...baseDto, discountAmount: 35,
-    promotionUsage: { promotionId: 'missing-promo', discountAmount: 10 },
     loyaltyRedemption: { points: 5, discountAmount: 5 },
   }), /رصيد نقاط الولاء غير كافٍ/);
 
   const today = new Date().toISOString().slice(0, 10);
-  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,starts_at,ends_at,is_active,usage_limit,usage_count,created_by)
-    VALUES ('promo_integrity_sale','IS','Integrity sale promo','FIXED_AMOUNT',10,?,?,1,5,0,'usr_admin')`, [today, today]);
+  db.run(`INSERT INTO promotions (id,code,name,promotion_type,discount_amount,min_order_amount,applies_to,starts_at,ends_at,is_active,usage_limit,usage_count,created_by)
+    VALUES ('promo_integrity_sale','IS','Integrity sale promo','FIXED_AMOUNT',1000,0,'ALL',?,?,1,5,0,'usr_admin')`, [today, today]);
   const loyalty = new LoyaltyService();
   loyalty.initializeCustomerLoyalty(customer.id);
   loyalty.earnPoints({ customerId: customer.id, points: 20, referenceType: 'TEST_SEED', referenceId: 'integrity-seed' });
@@ -340,18 +350,18 @@ test('sale creation validates numeric inputs and matches promotion and loyalty d
   const invoice = sales.createSale({
     ...baseDto,
     discountAmount: 35,
-    taxAmount: 15,
+    taxPercentage: 10,
     loyaltyRedemption: { points: 5, discountAmount: 5 },
     promotionUsage: { promotionId: 'promo_integrity_sale', couponCode: 'IS', discountAmount: 10 },
   });
   assert.equal(invoice.discountAmount, 35);
   assert.equal(invoice.totalCost, 80);
   assert.equal(invoice.grossProfit, 75);
-  const stockCost = Number(db.query<any>(`SELECT total_cost AS totalCost FROM inventory_transactions WHERE reference_id=? AND type='SALE'`, [invoice.id])[0].totalCost);
-  const cogs = Number(db.query<any>(`SELECT jel.debit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
+  const stockCost = Number(db.query<any>(`SELECT total_cost / 100.0 AS totalCost FROM inventory_transactions WHERE reference_id=? AND type='SALE'`, [invoice.id])[0].totalCost);
+  const cogs = Number(db.query<any>(`SELECT jel.debit / 100.0 AS debit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
     JOIN chart_of_accounts coa ON coa.id=jel.account_id
     WHERE je.reference_type='SALES_INVOICE' AND je.reference_id=? AND coa.code='5101'`, [invoice.id])[0].debit);
-  const revenue = Number(db.query<any>(`SELECT jel.credit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
+  const revenue = Number(db.query<any>(`SELECT jel.credit / 100.0 AS credit FROM journal_entry_lines jel JOIN journal_entries je ON je.id=jel.entry_id
     JOIN chart_of_accounts coa ON coa.id=jel.account_id
     WHERE je.reference_type='SALES_INVOICE' AND je.reference_id=? AND coa.code='4101'`, [invoice.id])[0].credit);
   assert.equal(stockCost, invoice.totalCost);

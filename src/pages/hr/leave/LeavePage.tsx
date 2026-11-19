@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { CalendarDays, Check, Loader2, Plus, RefreshCw, X } from 'lucide-react';
 import { LeaveService } from '../../../services/domains/hr/LeaveService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
@@ -278,7 +279,7 @@ export const LeavePage: React.FC = () => {
   }, {});
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
@@ -336,34 +337,33 @@ export const LeavePage: React.FC = () => {
           />
         </div>
         {Object.keys(entriesByDate).length ? (
-          <div className="max-h-72 overflow-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
-                <tr><th className="p-2">التاريخ</th><th className="p-2">الموظفون</th></tr>
-              </thead>
-              <tbody>
-                {Object.entries(entriesByDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, entries]) => (
-                  <tr key={date} className="border-t border-slate-100 align-top">
-                    <td className="whitespace-nowrap p-2 font-medium">{date}</td>
-                    <td className="p-2">
-                      <div className="flex flex-wrap gap-1">
-                        {entries.map((entry) => (
-                          <span key={`${entry.employeeId}-${entry.status}`} className={`rounded-full px-2 py-1 text-xs ${
-                            entry.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700'
-                              : entry.status === 'ABSENT' ? 'bg-rose-50 text-rose-700'
-                                : 'bg-amber-50 text-amber-700'
-                          }`}>
-                            {entry.employeeName} · {entry.leaveType ? typeLabels[entry.leaveType] : 'غياب'}
-                            {' · '}{entry.status === 'APPROVED' ? 'في إجازة' : entry.status === 'ABSENT' ? 'غائب' : 'طلب معلق'}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                        ariaLabel="إجازات الشهر"
+                        rows={Object.entries(entriesByDate).sort(([a], [b]) => a.localeCompare(b))}
+                        rowKey={(entry) => entry[0]}
+                        dense
+                        columns={[
+                          { key: 'date', header: 'التاريخ', render: (entry) => <span className="whitespace-nowrap font-medium">{entry[0]}</span> },
+                          {
+                            key: 'employees', header: 'الموظفون',
+                            render: (entry) => (
+                              <div className="flex flex-wrap gap-1">
+                                {entry[1].map((e) => (
+                                  <span key={`${e.employeeId}-${e.status}`} className={`rounded-full px-2 py-1 text-xs ${
+                                    e.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700'
+                                      : e.status === 'ABSENT' ? 'bg-rose-50 text-rose-700'
+                                        : 'bg-amber-50 text-amber-700'
+                                  }`}>
+                                    {e.employeeName} · {e.leaveType ? typeLabels[e.leaveType] : 'غياب'}
+                                    {' · '}{e.status === 'APPROVED' ? 'في إجازة' : e.status === 'ABSENT' ? 'غائب' : 'طلب معلق'}
+                                  </span>
+                                ))}
+                              </div>
+                            ),
+                          },
+                        ]}
+                      />
+
         ) : <p className="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">لا توجد إجازات أو طلبات معلقة في هذا الشهر.</p>}
       </section>
 
@@ -579,21 +579,20 @@ export const LeavePage: React.FC = () => {
                 حفظ حركة الرصيد
               </button>
               {balanceForm.employeeId && (
-                <div className="overflow-auto">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-50 text-slate-500"><tr>
-                      <th className="p-2">التاريخ</th><th className="p-2">الحركة</th><th className="p-2">الأيام</th><th className="p-2">السبب</th><th className="p-2">بواسطة</th>
-                    </tr></thead>
-                    <tbody>{balanceTransactions.map((transaction) => (
-                      <tr key={transaction.id} className="border-t border-slate-100">
-                        <td className="p-2">{transaction.effectiveDate}</td>
-                        <td className="p-2">{transaction.transactionType === 'CARRYOVER' ? 'ترحيل' : transaction.transactionType === 'ALLOCATION' ? 'استحقاق' : 'تسوية'}</td>
-                        <td className={`p-2 ${transaction.daysDelta < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{transaction.daysDelta > 0 ? '+' : ''}{transaction.daysDelta}</td>
-                        <td className="p-2">{transaction.reason}</td><td className="p-2">{transaction.createdByName}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
+                <DataTable
+                                    ariaLabel="حركات رصيد الإجازات"
+                                    rows={balanceTransactions}
+                                    rowKey={(transaction) => transaction.id}
+                                    dense
+                                    columns={[
+                                      { key: 'date', header: 'التاريخ', render: (transaction) => transaction.effectiveDate },
+                                      { key: 'type', header: 'الحركة', render: (transaction) => transaction.transactionType === 'CARRYOVER' ? 'ترحيل' : transaction.transactionType === 'ALLOCATION' ? 'استحقاق' : 'تسوية' },
+                                      { key: 'days', header: 'الأيام', render: (transaction) => <span className={transaction.daysDelta < 0 ? 'text-rose-700' : 'text-emerald-700'}>{transaction.daysDelta > 0 ? '+' : ''}{transaction.daysDelta}</span> },
+                                      { key: 'reason', header: 'السبب', render: (transaction) => transaction.reason },
+                                      { key: 'by', header: 'بواسطة', render: (transaction) => transaction.createdByName },
+                                    ]}
+                                  />
+
               )}
         </section>
       )}
@@ -617,58 +616,43 @@ export const LeavePage: React.FC = () => {
         </section>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-right text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500">
-            <tr>
-              <th className="p-3">الموظف</th>
-              <th className="p-3">النوع</th>
-              <th className="p-3">الفترة</th>
-              <th className="p-3">الأيام</th>
-              <th className="p-3">الحالة</th>
-              <th className="p-3">الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-500">جارٍ التحميل…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-500">لا توجد طلبات إجازة.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="p-3 font-medium text-slate-700">{row.employeeName}</td>
-                <td className="p-3">{typeLabels[row.leaveType]}</td>
-                <td className="p-3 text-slate-600">{row.startDate} → {row.endDate}</td>
-                <td className="p-3">{row.days}</td>
-                <td className="p-3">
-                  <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.status]}`}>
-                    {statusLabels[row.status]}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="flex gap-1">
-                    {canApprove && row.status === 'PENDING' && (
-                      <>
-                        <button className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد" onClick={() => decide(row, 'APPROVED')}>
-                          <Check className="h-4 w-4" />
-                        </button>
-                        <button className="rounded bg-rose-50 p-1 text-rose-700" title="رفض" onClick={() => decide(row, 'REJECTED')}>
-                          <X className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                    {(row.status === 'PENDING' || row.status === 'APPROVED') && (canApprove || canRequest) && (
-                      <button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" onClick={() => cancel(row)}>
-                        إلغاء
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+                ariaLabel="طلبات الإجازات"
+                rows={rows}
+                rowKey={(row) => row.id}
+                loading={loading}
+                emptyTitle="لا توجد طلبات إجازة."
+                columns={[
+                  { key: 'employee', header: 'الموظف', render: (row) => <span className="font-medium text-slate-700">{row.employeeName}</span> },
+                  { key: 'type', header: 'النوع', render: (row) => typeLabels[row.leaveType] },
+                  { key: 'period', header: 'الفترة', render: (row) => <span className="text-slate-600">{row.startDate} → {row.endDate}</span> },
+                  { key: 'days', header: 'الأيام', render: (row) => row.days },
+                  { key: 'status', header: 'الحالة', render: (row) => <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.status]}`}>{statusLabels[row.status]}</span> },
+                  {
+                    key: 'action', header: 'الإجراء',
+                    render: (row) => (
+                      <div className="flex gap-1">
+                        {canApprove && row.status === 'PENDING' && (
+                          <>
+                            <button className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد" onClick={() => decide(row, 'APPROVED')}>
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button className="rounded bg-rose-50 p-1 text-rose-700" title="رفض" onClick={() => decide(row, 'REJECTED')}>
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                        {(row.status === 'PENDING' || row.status === 'APPROVED') && (canApprove || canRequest) && (
+                          <button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" onClick={() => cancel(row)}>
+                            إلغاء
+                          </button>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+
     </div>
   );
 };

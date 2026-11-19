@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock3, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { ContractService } from '../../../services/domains/hr/ContractService';
@@ -228,7 +229,7 @@ export const EmployeeContractsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
@@ -413,80 +414,72 @@ export const EmployeeContractsPage: React.FC = () => {
       )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-right text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500">
-            <tr>
-              <th className="p-3">الموظف</th>
-              <th className="p-3">رقم العقد</th>
-              <th className="p-3">النوع</th>
-              <th className="p-3">الفترة</th>
-              <th className="p-3">الراتب</th>
-              <th className="p-3">الحالة</th>
-              <th className="p-3">الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="p-8 text-center text-slate-500">جارٍ التحميل…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="p-8 text-center text-slate-500">لا توجد عقود مسجلة.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="p-3 font-medium text-slate-700">{row.employeeName}</td>
-                <td className="p-3 font-mono text-xs text-slate-600">{row.contractNumber}</td>
-                <td className="p-3">{typeLabels[row.contractType]}</td>
-                <td className="p-3 text-slate-600">{row.startDate} → {row.endDate || 'مفتوح'}</td>
-                <td className="p-3">{money(row.salary, row.currency)}</td>
-                <td className="p-3">
-                  <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.effectiveStatus || row.status]}`}>
-                    {statusLabels[row.effectiveStatus || row.status]}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="flex flex-wrap gap-1">
-                    {row.status === 'DRAFT' && (
-                      <>
-                        {canApprove && !row.approvedAt && (
-                          <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => approve(row)}>
-                            اعتماد
-                          </button>
-                        )}
-                        {canManage && row.approvedAt && (
-                          <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => activate(row)}>
-                            تفعيل
-                          </button>
-                        )}
-                        {canManage && (
-                          <button className="rounded bg-rose-50 p-1 text-rose-700" title="حذف المسودة" onClick={() => remove(row)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </>
-                    )}
-                    {canManage && row.status === 'ACTIVE' && (
-                      <button className="rounded bg-sky-50 px-2 py-1 text-xs text-sky-700" onClick={() => renew(row)}>
-                        تجديد
-                      </button>
-                    )}
-                    {canTerminate && row.status === 'ACTIVE' && ['ACTIVE', 'EXPIRING'].includes(row.effectiveStatus || '') && (
-                      <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => terminate(row)}>
-                        <XCircle className="h-3.5 w-3.5" /> إنهاء
-                      </button>
-                    )}
-                    {can('hr.contracts.view') && (
-                      <button
-                        className="flex items-center gap-1 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600"
-                        onClick={() => showHistory(row)}
-                      >
-                        <Clock3 className="h-3.5 w-3.5" /> السجل
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="عقود الموظفين"
+          rows={rows}
+          rowKey={(row) => row.id}
+          loading={loading}
+          emptyTitle="لا توجد عقود مسجلة."
+          columns={[
+            { key: 'employee', header: 'الموظف', render: (row) => <span className="font-medium text-slate-700">{row.employeeName}</span> },
+            { key: 'number', header: 'رقم العقد', render: (row) => <span className="font-mono text-xs text-slate-600">{row.contractNumber}</span> },
+            { key: 'type', header: 'النوع', render: (row) => typeLabels[row.contractType] },
+            { key: 'period', header: 'الفترة', render: (row) => <span className="text-slate-600">{row.startDate} → {row.endDate || 'مفتوح'}</span> },
+            { key: 'salary', header: 'الراتب', render: (row) => money(row.salary, row.currency) },
+            {
+              key: 'status', header: 'الحالة',
+              render: (row) => (
+                <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.effectiveStatus || row.status]}`}>
+                  {statusLabels[row.effectiveStatus || row.status]}
+                </span>
+              ),
+            },
+            {
+              key: 'action', header: 'الإجراء',
+              render: (row) => (
+                <div className="flex flex-wrap gap-1">
+                  {row.status === 'DRAFT' && (
+                    <>
+                      {canApprove && !row.approvedAt && (
+                        <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => approve(row)}>
+                          اعتماد
+                        </button>
+                      )}
+                      {canManage && row.approvedAt && (
+                        <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => activate(row)}>
+                          تفعيل
+                        </button>
+                      )}
+                      {canManage && (
+                        <button className="rounded bg-rose-50 p-1 text-rose-700" title="حذف المسودة" onClick={() => remove(row)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {canManage && row.status === 'ACTIVE' && (
+                    <button className="rounded bg-sky-50 px-2 py-1 text-xs text-sky-700" onClick={() => renew(row)}>
+                      تجديد
+                    </button>
+                  )}
+                  {canTerminate && row.status === 'ACTIVE' && ['ACTIVE', 'EXPIRING'].includes(row.effectiveStatus || '') && (
+                    <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => terminate(row)}>
+                      <XCircle className="h-3.5 w-3.5" /> إنهاء
+                    </button>
+                  )}
+                  {can('hr.contracts.view') && (
+                    <button
+                      className="flex items-center gap-1 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                      onClick={() => showHistory(row)}
+                    >
+                      <Clock3 className="h-3.5 w-3.5" /> السجل
+                    </button>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {settlements.length > 0 && (
@@ -496,34 +489,27 @@ export const EmployeeContractsPage: React.FC = () => {
             <p className="text-xs text-amber-800">تشمل الأجور المكتسبة حتى تاريخ الخدمة ورصيد الإجازة السنوية غير المستخدم.</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500">
-                <tr>
-                  <th className="p-3">الموظف</th><th className="p-3">العقد</th><th className="p-3">تاريخ الخدمة</th>
-                  <th className="p-3">الأجور</th><th className="p-3">رصيد الإجازة</th><th className="p-3">مقابل الإجازة</th><th className="p-3">الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {settlements.map((settlement) => (
-                  <tr key={settlement.id} className="border-t border-slate-100">
-                    <td className="p-3">{settlement.employeeName}</td>
-                    <td className="p-3 font-mono text-xs">{settlement.contractNumber}</td>
-                    <td className="p-3">{settlement.terminationDate}</td>
-                    <td className="p-3">{money(settlement.earnedWages, 'EGP')}</td>
-                    <td className="p-3">{settlement.unusedAnnualLeaveDays}</td>
-                    <td className="p-3">{money(settlement.leavePayout, 'EGP')}</td>
-                    <td className="p-3 font-bold">{money(settlement.totalAmount, 'EGP')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="التسويات النهائية"
+              rows={settlements}
+              rowKey={(settlement) => settlement.id}
+              columns={[
+                { key: 'employee', header: 'الموظف', render: (settlement) => settlement.employeeName },
+                { key: 'contract', header: 'العقد', render: (settlement) => <span className="font-mono text-xs">{settlement.contractNumber}</span> },
+                { key: 'date', header: 'تاريخ الخدمة', render: (settlement) => settlement.terminationDate },
+                { key: 'wages', header: 'الأجور', render: (settlement) => money(settlement.earnedWages, 'EGP') },
+                { key: 'leave', header: 'رصيد الإجازة', render: (settlement) => settlement.unusedAnnualLeaveDays },
+                { key: 'leavePay', header: 'مقابل الإجازة', render: (settlement) => money(settlement.leavePayout, 'EGP') },
+                { key: 'total', header: 'الإجمالي', render: (settlement) => <span className="font-bold">{money(settlement.totalAmount, 'EGP')}</span> },
+              ]}
+            />
           </div>
         </section>
       )}
 
       {lifecycleHistory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation">
-          <section className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl" dir="rtl" role="dialog" aria-modal="true">
+          <section className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl" role="dialog" aria-modal="true">
             <header className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white p-4">
               <div>
                 <h2 className="font-bold text-slate-800">السجل الوظيفي: {historyEmployeeName}</h2>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   UserRound, Wallet, CheckSquare, CalendarDays, ShieldAlert, GraduationCap,
   Star, Gift, Inbox, Send, ChevronRight, Printer, X,
@@ -120,7 +121,7 @@ export const HrSelfServicePage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center">
           <UserRound className="w-5 h-5 text-sky-600" />
@@ -441,29 +442,37 @@ export const HrSelfServicePage: React.FC = () => {
                 <div><span className="font-bold text-slate-700">تاريخ الطباعة:</span> {new Date().toLocaleDateString('ar-EG')}</div>
               </div>
 
-              <table className="w-full text-right text-sm mb-6">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 text-slate-500 font-bold">البند</th>
-                    <th className="px-3 py-2 text-slate-500 font-bold text-left">المبلغ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr><td className="px-3 py-2">الراتب الأساسي</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.baseAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">العمل الإضافي</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.overtimeAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">المكافآت</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.bonusAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">العمولات المعتمدة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.commissionAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">البدلات الشهرية</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.allowanceAmount)}</td></tr>
-                  <tr><td className="px-3 py-2 bg-emerald-50"><span className="font-bold">الإجمالي الاستحقاقات</span></td><td className="px-3 py-2 font-mono font-bold text-emerald-700 text-left">{money(payslipDetail.grossAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">خصم الحضور والإجازة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.attendanceDeductionAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">الخصومات المعتمدة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.manualDeductionAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">السلف</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.advanceAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">أقساط القروض</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.loanDeductionAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">الضريبة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.taxAmount)}</td></tr>
-                  <tr><td className="px-3 py-2">تأمينات اجتماعية (موظف)</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.socialInsuranceEmployeeShare)}</td></tr>
-                  <tr className="bg-rose-25"><td className="px-3 py-2 font-bold">صافي الراتب المستحق</td><td className="px-3 py-2 font-mono font-bold text-rose-700 text-left">{money(payslipDetail.netAmount)}</td></tr>
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="تفاصيل قسيمة الراتب"
+                rows={[
+                  { label: 'الراتب الأساسي', amount: payslipDetail.baseAmount },
+                  { label: 'العمل الإضافي', amount: payslipDetail.overtimeAmount },
+                  { label: 'المكافآت', amount: payslipDetail.bonusAmount },
+                  { label: 'العمولات المعتمدة', amount: payslipDetail.commissionAmount },
+                  { label: 'البدلات الشهرية', amount: payslipDetail.allowanceAmount },
+                  { label: 'الإجمالي الاستحقاقات', amount: payslipDetail.grossAmount, total: true },
+                  { label: 'خصم الحضور والإجازة', amount: payslipDetail.attendanceDeductionAmount },
+                  { label: 'الخصومات المعتمدة', amount: payslipDetail.manualDeductionAmount },
+                  { label: 'السلف', amount: payslipDetail.advanceAmount },
+                  { label: 'أقساط القروض', amount: payslipDetail.loanDeductionAmount },
+                  { label: 'الضريبة', amount: payslipDetail.taxAmount },
+                  { label: 'تأمينات اجتماعية (موظف)', amount: payslipDetail.socialInsuranceEmployeeShare },
+                  { label: 'صافي الراتب المستحق', amount: payslipDetail.netAmount, net: true },
+                ]}
+                rowKey={(r: any) => r.label}
+                tableClassName="mb-6 text-sm"
+                columns={[
+                  {
+                    key: 'label', header: 'البند',
+                    render: (r: any) => <span className={`px-3 py-2 ${r.total ? 'font-bold' : ''} ${r.net ? 'font-bold' : ''}`}>{r.label}</span>,
+                  },
+                  {
+                    key: 'amount', header: 'المبلغ', align: 'end',
+                    render: (r: any) => <span className={`px-3 py-2 font-mono ${r.total ? 'font-bold text-emerald-700' : ''} ${r.net ? 'font-bold text-rose-700' : ''}`}>{money(r.amount)}</span>,
+                  },
+                ]}
+                rowClassName={(r: any) => `${r.total ? 'bg-emerald-50' : ''} ${r.net ? 'bg-rose-25' : ''}`}
+              />
 
               {payslipDetail.warnings && payslipDetail.warnings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">

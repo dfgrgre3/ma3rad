@@ -196,7 +196,7 @@ export const SettingsHubPage: React.FC = () => {
   };
 
   return (
-    <div className="erp-page" dir="rtl">
+    <div className="erp-page">
       <PageHeader
         icon={<SettingsIcon className="h-5 w-5" />}
         title="مركز إعدادات النظام"

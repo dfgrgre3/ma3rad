@@ -20,8 +20,8 @@ public getBankAccounts(): BankAccount[] {
       iban: r.iban,
       swiftCode: r.swiftCode,
       currency: r.currency || 'EGP',
-      openingBalance: Number(r.openingBalance || 0),
-      currentBalance: Number(r.currentBalance || 0),
+      openingBalance: Number(r.openingBalance || 0) / 100,
+      currentBalance: Number(r.currentBalance || 0) / 100,
       glAccountId: r.glAccountId,
       glAccountCode: r.glAccountCode,
       glAccountName: r.glAccountName,
@@ -33,7 +33,8 @@ public getBankAccounts(): BankAccount[] {
   }
 
 public saveBankAccount(input: Partial<BankAccount> & { accountName: string; bankName: string; accountNumber: string; glAccountId: string }): string {
-    this.requireManage();
+    const actor = this.requireManage();
+    const branchId = input.branchId || this.branchAccess.getCurrentBranchId(actor);
     if (!input.accountName?.trim()) throw new Error('اسم الحساب البنكي مطلوب.');
     if (!input.bankName?.trim()) throw new Error('اسم البنك مطلوب.');
     if (!input.accountNumber?.trim()) throw new Error('رقم الحساب مطلوب.');
@@ -50,7 +51,7 @@ public saveBankAccount(input: Partial<BankAccount> & { accountName: string; bank
       `, [
         input.accountName.trim(), input.bankName.trim(), input.accountNumber.trim(),
         input.iban?.trim() || null, input.swiftCode?.trim() || null, input.currency || 'EGP',
-        input.glAccountId, input.branchId || null, input.isActive ? 1 : 0, input.id,
+        input.glAccountId, branchId, input.isActive ? 1 : 0, input.id,
       ]);
       return input.id;
     } else {
@@ -61,7 +62,7 @@ public saveBankAccount(input: Partial<BankAccount> & { accountName: string; bank
       `, [
         id, input.accountName.trim(), input.bankName.trim(), input.accountNumber.trim(),
         input.iban?.trim() || null, input.swiftCode?.trim() || null, input.currency || 'EGP',
-        round2(input.openingBalance || 0), round2(input.openingBalance || 0), input.glAccountId, input.branchId || null, 1,
+        round2(input.openingBalance || 0), round2(input.openingBalance || 0), input.glAccountId, branchId, 1,
       ]);
       return id;
     }

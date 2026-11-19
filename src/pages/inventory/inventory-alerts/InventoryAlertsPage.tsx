@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { AlertTriangle, Bell, Search, Download, RefreshCw, CircleDollarSign, Package } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -148,7 +149,7 @@ export const InventoryAlertsPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-rose-600" /></div>
@@ -229,38 +230,25 @@ export const InventoryAlertsPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">المخزن</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">الصنف</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">SKU</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase text-center">المتاح (م²)</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase text-center">المحجوز (م²)</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase text-center">السعر التكلفي</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase text-center">القيمة (م²)</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAlerts.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50 transition group">
-                    <td className="px-4 py-3 text-xs font-medium text-slate-900">{a.warehouseName || '—'}</td>
-                    <td className="px-4 py-3 text-xs font-semibold text-slate-900">{a.productName || '—'}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500 font-mono">{a.sku || '—'}</td>
-                    <td className="px-4 py-3 text-xs text-center font-mono text-slate-900">{a.availableM2.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-xs text-center font-mono text-slate-500">{a.reservedM2.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-xs text-center font-mono text-slate-600">{Number(a.costPrice || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-xs text-center font-mono text-violet-600 font-bold">{Number(a.availableM2 * (a.costPrice || 0)).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-xs">
-                      <span className={`px-2 py-0.5 rounded-full font-bold border ${a.severityColor}`}>
-                        {a.severityLabel}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="تنبيهات المخزون"
+              rows={filteredAlerts}
+              rowKey={(a: any) => String(a.id)}
+              tableClassName="border-collapse text-xs"
+              columns={[
+                { key: 'wh', header: 'المخزن', render: (a: any) => <span className="text-xs font-medium text-slate-900">{a.warehouseName || '—'}</span> },
+                { key: 'product', header: 'الصنف', render: (a: any) => <span className="text-xs font-semibold text-slate-900">{a.productName || '—'}</span> },
+                { key: 'sku', header: 'SKU', render: (a: any) => <span className="font-mono text-xs text-slate-500">{a.sku || '—'}</span> },
+                { key: 'avail', header: 'المتاح (م²)', align: 'center', render: (a: any) => <span className="font-mono text-xs text-slate-900">{a.availableM2.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> },
+                { key: 'reserved', header: 'المحجوز (م²)', align: 'center', render: (a: any) => <span className="font-mono text-xs text-slate-500">{a.reservedM2.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> },
+                { key: 'cost', header: 'السعر التكلفي', align: 'center', render: (a: any) => <span className="font-mono text-xs text-slate-600">{Number(a.costPrice || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> },
+                { key: 'value', header: 'القيمة (م²)', align: 'center', render: (a: any) => <span className="font-mono text-xs font-bold text-violet-600">{Number(a.availableM2 * (a.costPrice || 0)).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (a: any) => <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${a.severityColor}`}>{a.severityLabel}</span>,
+                },
+              ]}
+            />
             <div className="mt-3 flex justify-end">
               <span className="text-xs text-slate-500">{filteredAlerts.length} صنف من أصل {alerts.length}</span>
             </div>

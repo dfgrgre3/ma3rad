@@ -8,6 +8,7 @@ import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
+import { DataTable } from '../../../components/ui/DataTable';
 import { localDateString } from '../../../utils/shared/date';
 import { csvCell } from '../../../utils/export/csv';
 import {
@@ -530,7 +531,7 @@ export const PartnersPage: React.FC = () => {
   };
 
   return (
-    <div className="erp-page" dir="rtl">
+    <div className="erp-page">
       <style>{`
         @media print {
           body * { visibility: hidden !important; }
@@ -648,54 +649,33 @@ export const PartnersPage: React.FC = () => {
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1320px] text-right text-xs">
-                  <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
-                    <tr>
-                      {['الشريك', 'الملكية', 'الأرباح %', 'رأس المال', 'المسدد', 'المتبقي', 'المساهمات', 'المسحوبات', 'القروض', 'مسحوبات شخصية', 'الأرباح المستحقة', 'المصروفة', 'التسويات', 'صافي الرصيد', 'الحالة'].map((heading) => (
-                        <th key={heading} className="px-3 py-3 font-bold">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {partners.length === 0 ? (
-                      <tr><td colSpan={15} className="py-12 text-center text-slate-500">لا توجد بيانات شركاء.</td></tr>
-                    ) : partners.map((partner) => (
-                      <tr key={partner.id} className="cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50" onClick={() => selectPartner(partner.id)}>
-                        <td className="px-3 py-3 font-bold">{partner.name}</td>
-                        <td className="px-3 py-3">{formatNumber.format(partner.ownershipPercent)}%</td>
-                        <td className="px-3 py-3">{formatNumber.format(partner.profitSharePercent)}%</td>
-                        <td className="px-3 py-3">{formatMoney(partner.capitalAmount)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.capitalPaid)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.remainingCapital)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.capitalContributions)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.withdrawals)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.loansReceived - partner.loansRepaid)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.personalDrawings)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.profitsDue)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.profitsDistributed)}</td>
-                        <td className="px-3 py-3">{formatMoney(partner.adjustments)}</td>
-                        <td className={`px-3 py-3 font-extrabold ${partner.netBalance < 0 ? 'text-rose-600' : ''}`}>{formatMoney(partner.netBalance)}</td>
-                        <td className="px-3 py-3">{partner.isActive ? 'نشط' : 'غير نشط'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50 font-extrabold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                    <tr>
-                      <td className="px-3 py-3">الإجمالي</td>
-                      <td className="px-3 py-3">{formatNumber.format(activeOwnership)}%</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalCapitalAgreed)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalContributions)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalWithdrawals)}</td>
-                      <td className="px-3 py-3">{formatMoney(outstandingLoans)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalDrawings)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalProfitsDue)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalProfitsDistributed)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalAdjustments)}</td>
-                      <td className="px-3 py-3">{formatMoney(overview.totalNetBalance)}</td>
-                      <td className="px-3 py-3">—</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                <DataTable
+                                ariaLabel="الشركاء"
+                                rows={[...partners, { __total: true } as any]}
+                                rowKey={(partner: any) => partner.__total ? '__total__' : partner.id}
+                                rowClassName={(partner: any) => partner.__total ? 'font-extrabold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-800' : 'cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50'}
+                                minWidth={1320}
+                                dense
+                                columns={[
+                                  { key: 'name', header: 'الشريك', render: (partner: any) => partner.__total ? 'الإجمالي' : <button type="button" onClick={() => selectPartner(partner.id)} className="font-bold text-start">{partner.name}</button> },
+                                  { key: 'ownership', header: 'الملكية', render: (partner: any) => partner.__total ? `${formatNumber.format(activeOwnership)}%` : `${formatNumber.format(partner.ownershipPercent)}%` },
+                                  { key: 'profit', header: 'الأرباح %', render: (partner: any) => partner.__total ? '—' : `${formatNumber.format(partner.profitSharePercent)}%` },
+                                  { key: 'capital', header: 'رأس المال', render: (partner: any) => partner.__total ? formatMoney(overview.totalCapitalAgreed) : formatMoney(partner.capitalAmount) },
+                                  { key: 'paid', header: 'المسدد', render: (partner: any) => partner.__total ? '—' : formatMoney(partner.capitalPaid) },
+                                  { key: 'remaining', header: 'المتبقي', render: (partner: any) => partner.__total ? '—' : formatMoney(partner.remainingCapital) },
+                                  { key: 'contrib', header: 'المساهمات', render: (partner: any) => partner.__total ? formatMoney(overview.totalContributions) : formatMoney(partner.capitalContributions) },
+                                  { key: 'withdrawals', header: 'المسحوبات', render: (partner: any) => partner.__total ? formatMoney(overview.totalWithdrawals) : formatMoney(partner.withdrawals) },
+                                  { key: 'loans', header: 'القروض', render: (partner: any) => partner.__total ? formatMoney(outstandingLoans) : formatMoney(partner.loansReceived - partner.loansRepaid) },
+                                  { key: 'drawings', header: 'مسحوبات شخصية', render: (partner: any) => partner.__total ? formatMoney(overview.totalDrawings) : formatMoney(partner.personalDrawings) },
+                                  { key: 'due', header: 'الأرباح المستحقة', render: (partner: any) => partner.__total ? formatMoney(overview.totalProfitsDue) : formatMoney(partner.profitsDue) },
+                                  { key: 'distributed', header: 'المصروفة', render: (partner: any) => partner.__total ? formatMoney(overview.totalProfitsDistributed) : formatMoney(partner.profitsDistributed) },
+                                  { key: 'adjust', header: 'التسويات', render: (partner: any) => partner.__total ? formatMoney(overview.totalAdjustments) : formatMoney(partner.adjustments) },
+                                  { key: 'net', header: 'صافي الرصيد', render: (partner: any) => partner.__total ? formatMoney(overview.totalNetBalance) : <span className={partner.netBalance < 0 ? 'font-extrabold text-rose-600' : 'font-extrabold'}>{formatMoney(partner.netBalance)}</span> },
+                                  { key: 'status', header: 'الحالة', render: (partner: any) => partner.__total ? '—' : (partner.isActive ? 'نشط' : 'غير نشط') },
+                                ]}
+                                emptyTitle="لا توجد بيانات شركاء."
+                              />
+
               </div>
             </section>
           )}
@@ -708,28 +688,29 @@ export const PartnersPage: React.FC = () => {
                   <span className="text-xs text-slate-500">{formatNumber.format(distributionHistory.length)} دفعة</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-right text-xs">
-                    <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
-                      <tr>{['رقم الدفعة', 'التاريخ', 'عدد الشركاء', 'إجمالي الموزع', 'التفاصيل'].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {distributionHistory.length === 0 ? (
-                        <tr><td colSpan={5} className="py-12 text-center text-slate-500">لم يتم توزيع أرباح بعد.</td></tr>
-                      ) : distributionHistory.map((batch) => (
-                        <tr key={batch.batchId} className="text-slate-700 dark:text-slate-300">
-                          <td className="px-3 py-3 font-mono">{batch.batchId}</td>
-                          <td className="px-3 py-3">{formatDate(batch.transactionDate)}</td>
-                          <td className="px-3 py-3">{formatNumber.format(batch.partnersCount)}</td>
-                          <td className="px-3 py-3 font-extrabold">{formatMoney(batch.totalAmount)}</td>
-                          <td className="px-3 py-3">
-                            <button type="button" onClick={() => toggleBatch(batch.batchId)} className="rounded-lg border border-slate-200 px-2 py-1 font-bold text-sky-700 dark:border-slate-700 dark:text-sky-300">
-                              {openBatchId === batch.batchId ? 'إخفاء' : 'عرض الحصص'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable
+                                      ariaLabel="سجل توزيعات الأرباح"
+                                      rows={distributionHistory}
+                                      rowKey={(batch) => batch.batchId}
+                                      minWidth={640}
+                                      dense
+                                      columns={[
+                                        { key: 'batch', header: 'رقم الدفعة', render: (batch) => <span className="font-mono">{batch.batchId}</span> },
+                                        { key: 'date', header: 'التاريخ', render: (batch) => formatDate(batch.transactionDate) },
+                                        { key: 'partners', header: 'عدد الشركاء', render: (batch) => formatNumber.format(batch.partnersCount) },
+                                        { key: 'total', header: 'إجمالي الموزع', render: (batch) => <span className="font-extrabold">{formatMoney(batch.totalAmount)}</span> },
+                                        {
+                                          key: 'details', header: 'التفاصيل',
+                                          render: (batch) => (
+                                            <button type="button" onClick={() => toggleBatch(batch.batchId)} className="rounded-lg border border-slate-200 px-2 py-1 font-bold text-sky-700 dark:border-slate-700 dark:text-sky-300">
+                                              {openBatchId === batch.batchId ? 'إخفاء' : 'عرض الحصص'}
+                                            </button>
+                                          ),
+                                        },
+                                      ]}
+                                      emptyTitle="لم يتم توزيع أرباح بعد."
+                                    />
+
                 </div>
               </div>
               {openBatchId && (
@@ -807,23 +788,22 @@ export const PartnersPage: React.FC = () => {
                       <p className="px-4 py-3 text-xs text-slate-500">لا توجد تغييرات موثقة بعد.</p>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[700px] text-right text-xs">
-                          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
-                            <tr>{['التاريخ', 'النوع', 'من', 'إلى', 'السبب', 'سجله'].map((heading) => <th key={heading} className="px-3 py-2">{heading}</th>)}</tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {capitalHistory.map((entry) => (
-                              <tr key={entry.id}>
-                                <td className="px-3 py-2">{formatDate(entry.effectiveDate)}</td>
-                                <td className="px-3 py-2">{entry.type === 'OWNERSHIP' ? 'ملكية' : entry.type === 'PROFIT_SHARE' ? 'توزيع أرباح' : 'رأس المال'}</td>
-                                <td className="px-3 py-2">{entry.type === 'CAPITAL' ? formatMoney(entry.oldValue) : `${formatNumber.format(entry.oldValue)}%`}</td>
-                                <td className="px-3 py-2">{entry.type === 'CAPITAL' ? formatMoney(entry.newValue) : `${formatNumber.format(entry.newValue)}%`}</td>
-                                <td className="px-3 py-2">{entry.reason}</td>
-                                <td className="px-3 py-2">{entry.createdByName}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <DataTable
+                                                  ariaLabel="تاريخ رأس المال"
+                                                  rows={capitalHistory}
+                                                  rowKey={(entry) => entry.id}
+                                                  minWidth={700}
+                                                  dense
+                                                  columns={[
+                                                    { key: 'date', header: 'التاريخ', render: (entry) => formatDate(entry.effectiveDate) },
+                                                    { key: 'type', header: 'النوع', render: (entry) => entry.type === 'OWNERSHIP' ? 'ملكية' : entry.type === 'PROFIT_SHARE' ? 'توزيع أرباح' : 'رأس المال' },
+                                                    { key: 'from', header: 'من', render: (entry) => entry.type === 'CAPITAL' ? formatMoney(entry.oldValue) : `${formatNumber.format(entry.oldValue)}%` },
+                                                    { key: 'to', header: 'إلى', render: (entry) => entry.type === 'CAPITAL' ? formatMoney(entry.newValue) : `${formatNumber.format(entry.newValue)}%` },
+                                                    { key: 'reason', header: 'السبب', render: (entry) => entry.reason },
+                                                    { key: 'by', header: 'سجله', render: (entry) => entry.createdByName },
+                                                  ]}
+                                                />
+
                       </div>
                     )}
                   </section>
@@ -866,72 +846,86 @@ export const PartnersPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[1060px] text-right text-xs">
-                        <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
-                          <tr>
-                            {['التاريخ', 'البيان', 'نوع العملية', 'الفرع', 'طريقة الدفع', 'مدين', 'دائن', 'الرصيد', 'رقم القيد', 'سجلها', 'إجراء'].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {statement && statement.openingBalance !== 0 && (
-                            <tr className="bg-slate-50/70 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300">
-                              <td className="px-3 py-3">{statement.from ? formatDate(statement.from) : '—'}</td>
-                              <td className="px-3 py-3 font-bold" colSpan={6}>رصيد افتتاحي</td>
-                              <td className="px-3 py-3 font-extrabold">{formatMoney(statement.openingBalance)}</td>
-                              <td className="px-3 py-3" colSpan={3}>—</td>
-                            </tr>
-                          )}
-                          {!statement?.transactions.length ? (
-                            <tr><td colSpan={11} className="py-12 text-center text-slate-500">لا توجد حركات مطابقة للفلاتر الحالية.</td></tr>
-                          ) : statement.transactions.map((transaction) => {
-                            const canReverseRow = canReverse
-                              && transaction.transactionType !== 'REVERSAL'
-                              && !transaction.reversalOfId
-                              && !transaction.isReversed;
-                            return (
-                              <tr key={transaction.id} className={`text-slate-700 dark:text-slate-300 ${transaction.transactionType === 'REVERSAL' ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''}`}>
-                                <td className="whitespace-nowrap px-3 py-3">{formatDate(transaction.transactionDate)}</td>
-                                <td className="max-w-56 px-3 py-3">
-                                  {transaction.description}
-                                  {transaction.referenceNumber && <span className="mt-0.5 block font-mono text-[10px] text-slate-400">مرجع: {transaction.referenceNumber}</span>}
-                                  {transaction.attachments.map((attachment, index) => (
-                                    <a key={`${transaction.id}-${index}`} href={attachment.dataUrl} target="_blank" rel="noreferrer"
-                                      className="mt-1 block text-[10px] font-bold text-sky-700 hover:underline dark:text-sky-300">
-                                      إثبات: {attachment.name}
-                                    </a>
-                                  ))}
-                                  {transaction.isReversed && <span className="mt-0.5 block text-[10px] font-bold text-amber-600">تم عكسها لاحقًا</span>}
-                                </td>
-                                <td className="px-3 py-3">
-                                  {TRANSACTION_LABELS[transaction.transactionType]}
-                                  {transaction.reversalOfType && <span className="mt-0.5 block text-[10px] text-slate-400">لـ: {TRANSACTION_LABELS[transaction.reversalOfType]}</span>}
-                                </td>
-                                <td className="px-3 py-3">{transaction.branchName}</td>
-                                <td className="px-3 py-3">{paymentTypeLabel(transaction.paymentType)}{transaction.registerName ? ` · ${transaction.registerName}` : transaction.bankAccountName ? ` · ${transaction.bankAccountName}` : ''}</td>
-                                <td className="px-3 py-3">{transaction.balanceEffect < 0 ? formatMoney(Math.abs(transaction.balanceEffect)) : '—'}</td>
-                                <td className="px-3 py-3">{transaction.balanceEffect > 0 ? formatMoney(transaction.balanceEffect) : '—'}</td>
-                                <td className={`px-3 py-3 font-extrabold ${transaction.runningBalance < 0 ? 'text-rose-600' : ''}`}>{formatMoney(transaction.runningBalance)}</td>
-                                <td className="whitespace-nowrap px-3 py-3 font-mono">{transaction.journalEntryNumber}</td>
-                                <td className="px-3 py-3">{transaction.createdByName}</td>
-                                <td className="px-3 py-3 partner-print-hidden">
-                                  {canReverseRow ? (
-                                    <button type="button" onClick={() => openReversal(transaction)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-[11px] font-bold text-rose-600 dark:border-rose-900 dark:text-rose-300">
-                                      <RotateCcw className="h-3 w-3" /> عكس
-                                    </button>
-                                  ) : '—'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="bg-slate-50 font-extrabold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                          <tr>
-                            <td className="px-3 py-3" colSpan={7}>الرصيد الختامي للفترة</td>
-                            <td className="px-3 py-3">{formatMoney(statement?.closingBalance || 0)}</td>
-                            <td className="px-3 py-3" colSpan={3}>—</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                      <DataTable
+                                              ariaLabel="كشف حساب الشريك"
+                                              rows={[
+                                                ...(statement && statement.openingBalance !== 0 ? [{ __kind: 'opening', __id: 'opening' } as any] : []),
+                                                ...(statement?.transactions || []).map((t: any) => ({ ...t, __kind: 'txn' })),
+                                                ...(statement ? [{ __kind: 'closing', __id: 'closing' } as any] : []),
+                                              ]}
+                                              rowKey={(row: any) => row.__kind === 'opening' ? 'opening' : row.__kind === 'closing' ? 'closing' : row.id}
+                                              rowClassName={(row: any) => row.__kind === 'opening' ? 'bg-slate-50/70 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300' : row.__kind === 'closing' ? 'font-extrabold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-800' : `text-slate-700 dark:text-slate-300 ${row.transactionType === 'REVERSAL' ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''}`}
+                                              minWidth={1060}
+                                              dense
+                                              columns={[
+                                                {
+                                                  key: 'date', header: 'التاريخ',
+                                                  render: (row: any) => row.__kind === 'opening' ? (statement?.from ? formatDate(statement.from) : '—')
+                                                    : row.__kind === 'closing' ? ''
+                                                    : <span className="whitespace-nowrap">{formatDate(row.transactionDate)}</span>,
+                                                },
+                                                {
+                                                  key: 'desc', header: 'البيان',
+                                                  render: (row: any) => {
+                                                    if (row.__kind === 'opening') return <span className="font-bold col-span-6 inline-block">رصيد افتتاحي</span>;
+                                                    if (row.__kind === 'closing') return <span className="font-bold">الرصيد الختامي للفترة</span>;
+                                                    return (
+                                                      <span className="block max-w-56">
+                                                        {row.description}
+                                                        {row.referenceNumber && <span className="mt-0.5 block font-mono text-[10px] text-slate-400">مرجع: {row.referenceNumber}</span>}
+                                                        {row.attachments.map((attachment: any, index: number) => (
+                                                          <a key={`${row.id}-${index}`} href={attachment.dataUrl} target="_blank" rel="noreferrer"
+                                                            className="mt-1 block text-[10px] font-bold text-sky-700 hover:underline dark:text-sky-300">
+                                                            إثبات: {attachment.name}
+                                                          </a>
+                                                        ))}
+                                                        {row.isReversed && <span className="mt-0.5 block text-[10px] font-bold text-amber-600">تم عكسها لاحقًا</span>}
+                                                      </span>
+                                                    );
+                                                  },
+                                                },
+                                                {
+                                                  key: 'type', header: 'نوع العملية',
+                                                  render: (row: any) => row.__kind !== 'txn' ? '—' : (
+                                                    <span>
+                                                      {TRANSACTION_LABELS[row.transactionType as PartnerTransactionType]}
+                                                      {row.reversalOfType && <span className="mt-0.5 block text-[10px] text-slate-400">لـ: {TRANSACTION_LABELS[row.reversalOfType as PartnerTransactionType]}</span>}
+                                                    </span>
+                                                  ),
+                                                },
+                                                { key: 'branch', header: 'الفرع', render: (row: any) => row.__kind === 'txn' ? row.branchName : '—' },
+                                                { key: 'payment', header: 'طريقة الدفع', render: (row: any) => row.__kind === 'txn' ? `${paymentTypeLabel(row.paymentType)}${row.registerName ? ` · ${row.registerName}` : row.bankAccountName ? ` · ${row.bankAccountName}` : ''}` : '—' },
+                                                { key: 'debit', header: 'مدين', render: (row: any) => row.__kind === 'txn' && row.balanceEffect < 0 ? formatMoney(Math.abs(row.balanceEffect)) : '—' },
+                                                { key: 'credit', header: 'دائن', render: (row: any) => row.__kind === 'txn' && row.balanceEffect > 0 ? formatMoney(row.balanceEffect) : '—' },
+                                                {
+                                                  key: 'balance', header: 'الرصيد',
+                                                  render: (row: any) => {
+                                                    if (row.__kind === 'opening') return <span className="font-extrabold">{formatMoney(statement?.openingBalance || 0)}</span>;
+                                                    if (row.__kind === 'closing') return <span className="font-extrabold">{formatMoney(statement?.closingBalance || 0)}</span>;
+                                                    return <span className={`font-extrabold ${row.runningBalance < 0 ? 'text-rose-600' : ''}`}>{formatMoney(row.runningBalance)}</span>;
+                                                  },
+                                                },
+                                                { key: 'journal', header: 'رقم القيد', render: (row: any) => row.__kind === 'txn' ? <span className="whitespace-nowrap font-mono">{row.journalEntryNumber}</span> : '—' },
+                                                { key: 'by', header: 'سجلها', render: (row: any) => row.__kind === 'txn' ? row.createdByName : '—' },
+                                                {
+                                                  key: 'action', header: 'إجراء',
+                                                  render: (row: any) => {
+                                                    if (row.__kind !== 'txn') return '—';
+                                                    const canReverseRow = canReverse
+                                                      && row.transactionType !== 'REVERSAL'
+                                                      && !row.reversalOfId
+                                                      && !row.isReversed;
+                                                    return canReverseRow ? (
+                                                      <button type="button" onClick={() => openReversal(row)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-[11px] font-bold text-rose-600 dark:border-rose-900 dark:text-rose-300 partner-print-hidden">
+                                                        <RotateCcw className="h-3 w-3" /> عكس
+                                                      </button>
+                                                    ) : '—';
+                                                  },
+                                                },
+                                              ]}
+                                              emptyTitle="لا توجد حركات مطابقة للفلاتر الحالية."
+                                            />
+
                     </div>
                   </section>
                 </section>

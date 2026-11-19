@@ -49,7 +49,6 @@ export function UpdateNotification() {
         type="button"
         onClick={() => setCollapsed(false)}
         className="fixed bottom-4 right-4 z-[110] rounded-full bg-sky-700 px-4 py-2 text-sm font-bold text-white shadow-xl"
-        dir="rtl"
       >
         تحديث {update.status === 'downloaded' ? 'جاهز' : 'جارٍ التحميل'} · v{update.version}
       </button>
@@ -63,7 +62,6 @@ export function UpdateNotification() {
       <section
         role={update.mandatory ? 'alert' : 'status'}
         aria-live={update.mandatory ? 'assertive' : 'polite'}
-        dir="rtl"
         className="w-[min(92vw,420px)] overflow-hidden rounded-2xl border border-sky-200 bg-white text-slate-900 shadow-2xl dark:border-sky-800 dark:bg-slate-900 dark:text-white"
       >
         <div className="flex items-start justify-between gap-3 bg-sky-700 px-4 py-3 text-white">

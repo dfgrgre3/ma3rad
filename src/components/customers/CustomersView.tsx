@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../ui/DataTable';
 import { Link } from 'react-router-dom';
 import { 
   Users, Plus, Search, DollarSign, FileText, 
@@ -8,6 +9,12 @@ import { CustomerService } from '../../services/domains/customers/CustomerServic
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { Customer } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
+import { PageHeader } from '../ui/PageHeader';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { FilterToolbar } from '../ui/FilterToolbar';
+import { Modal } from '../ui/Modal';
+import { useToast } from '../ui/Toast';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { usePermission } from '../../hooks/domains/auth/usePermission';
@@ -19,9 +26,9 @@ import { OperationalFieldsFilter, matchesOperationalFieldFilters, type Operation
 import { FinanceEnterpriseService } from '../../services/domains/finance/FinanceEnterpriseService';
 import type { BankAccount } from '../../types/finance';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs border-slate-200">
-    <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
-    <div className="flex items-center gap-2"><select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 "><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:opacity-40 ">السابق</button><span className="min-w-[70px] text-center font-bold">{page} / {totalPages}</span><button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:opacity-40 ">التالي</button></div>
+  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--win-border)] px-4 py-3 text-xs">
+    <span className="text-[var(--cerami-muted)]">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
+    <div className="flex items-center gap-2"><select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="ui-input px-2 py-1 text-xs"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="erp-btn erp-btn--secondary erp-btn--sm">السابق</button><span className="min-w-[70px] text-center font-bold">{page} / {totalPages}</span><button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="erp-btn erp-btn--secondary erp-btn--sm">التالي</button></div>
   </div>
 );
 
@@ -81,6 +88,7 @@ export const CustomersView: React.FC = () => {
   const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const financeEnterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const toast = useToast();
 
   useEffect(() => {
     try { setBankAccounts(financeEnterpriseService.getBankAccounts().filter((account) => account.isActive)); }
@@ -108,7 +116,7 @@ export const CustomersView: React.FC = () => {
   const handleDeleteCustomer = (customer: any) => {
     if (!window.confirm(`حذف العميل "${customer.name}"؟`)) return;
     try { customerService.deleteCustomer(customer.id); loadCustomers(); }
-    catch (e: any) { alert(e?.message || 'تعذر حذف العميل.'); }
+    catch (e: any) { toast.error('تعذر حذف العميل', e?.message); }
   };
   const handleToggleCustomerStatus = (customer: Customer) => {
     const isActivating = customer.isActive === 0;
@@ -118,7 +126,7 @@ export const CustomersView: React.FC = () => {
       setSelectedCustomer(updatedCustomer);
       loadCustomers();
     } catch (error: any) {
-      alert(error?.message || 'تعذر تحديث حالة العميل.');
+      toast.error('تعذر تحديث حالة العميل', error?.message);
     }
   };
 
@@ -159,7 +167,7 @@ export const CustomersView: React.FC = () => {
       setOperationalFieldValues({});
       loadCustomers();
     } catch (err: any) {
-      alert(`خطأ: ${err.message || err}`);
+      toast.error('تعذر حفظ البيانات', err?.message || String(err));
     }
   };
 
@@ -188,53 +196,48 @@ export const CustomersView: React.FC = () => {
         setSelectedCustomer(null);
         setStatement(null);
       }
-      alert('تم تسجيل سند القبض وتحصيل الدفعة بنجاح.');
+      toast.success('تم تسجيل سند القبض', 'تم تحصيل الدفعة بنجاح.');
     } catch (err: any) {
-      alert(`خطأ: ${err.message || err}`);
+      toast.error('تعذر تسجيل الدفعة', err?.message || String(err));
     }
   };
 
   return (
-    <div className="erp-page" dir="rtl">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900">
-            إدارة {customersLabel}
-            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
-          </h2>
-          <p className="text-xs text-slate-500">متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية</p>
-        </div>
+    <div className="erp-page">
+      <PageHeader
+        title={`إدارة ${customersLabel}`}
+        description={`متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية · ${businessProfileLabel}`}
+        icon={<Users className="h-5 w-5" />}
+        actions={
+          <ConfiguredActionButton
+            actionId="customers.create"
+            fallbackLabel={`إضافة ${customerSingularLabel} جديد`}
+            icon={<Plus className="h-4 w-4" />}
+            className="erp-btn erp-btn--primary"
+            onClick={() => {
+              setFormData({
+                name: '',
+                phone: '',
+                phone2: '',
+                nationalId: '',
+                address: '',
+                city: 'القاهرة',
+                customerType: 'RETAIL',
+                creditLimit: 50000,
+                paymentTermsDays: 0,
+                initialBalance: 0,
+                notes: ''
+              });
+              setOperationalFieldValues({});
+              setIsAddModalOpen(true);
+            }}
+          />
+        }
+      />
 
-        <ConfiguredActionButton
-          actionId="customers.create"
-          fallbackLabel={`إضافة ${customerSingularLabel} جديد`}
-          icon={<Plus className="w-4 h-4" />}
-          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
-          onClick={() => {
-            setFormData({
-              name: '',
-              phone: '',
-              phone2: '',
-              nationalId: '',
-              address: '',
-              city: 'القاهرة',
-              customerType: 'RETAIL',
-              creditLimit: 50000,
-              paymentTermsDays: 0,
-              initialBalance: 0,
-              notes: ''
-            });
-            setOperationalFieldValues({});
-            setIsAddModalOpen(true);
-          }}
-        />
-      </div>
-
-      {/* Search */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+      <FilterToolbar ariaLabel="بحث العملاء" className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--cerami-muted)]" />
           <label htmlFor="customer-search" className="sr-only">بحث بالاسم، رقم الهاتف، أو كود العميل</label>
           <input
             id="customer-search"
@@ -242,135 +245,135 @@ export const CustomersView: React.FC = () => {
             placeholder="بحث بالاسم، رقم الهاتف، أو كود العميل..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-9 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none"
+            className="ui-input w-full pe-9"
           />
         </div>
-      </div>
-      <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
+        <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
+      </FilterToolbar>
 
-      {/* Customers List & Statement Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Customer List */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5">كود العميل</th>
-                  <th className="p-3.5">الاسم والبيانات</th>
-                  <th className="p-3.5">الهاتف</th>
-                  <th className="p-3.5">النوع</th>
-                  <th className="p-3.5">الحالة</th>
-                  {canViewPurchases && <th className="p-3.5">إجمالي المشتريات</th>}
-                  {canViewDebts && <th className="p-3.5">الرصيد المستحق</th>}
-                  {canViewStatement && <th className="p-3.5 text-center">كشف الحساب</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 ">
-                {customers.filter((customer) => matchesOperationalFieldFilters(customer.id, customerFieldValuesById, fieldFilters)).map((c) => {
-                  const hasDebt = canViewDebts && c.currentBalance > 0;
-                  const isSelected = selectedCustomer?.id === c.id;
-
-                  return (
-                    <tr
-                      key={c.id}
-                      className={`hover:bg-slate-100 transition ${canViewStatement ? 'cursor-pointer' : ''} ${
- isSelected ? 'bg-sky-50/60 ' : ''
- }`}
-                      onClick={canViewStatement ? () => handleOpenStatement(c) : undefined}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 ui-table-scroll">
+          <DataTable
+            ariaLabel="العملاء"
+            rows={customers.filter((customer) => matchesOperationalFieldFilters(customer.id, customerFieldValuesById, fieldFilters))}
+            rowKey={(c: any) => String(c.id)}
+            onRowClick={canViewStatement ? (c: any) => handleOpenStatement(c) : undefined}
+            rowClassName={(c: any) => {
+              const isSelected = selectedCustomer?.id === c.id;
+              return `${isSelected ? 'bg-[var(--win-accent-soft)]' : ''}`;
+            }}
+            columns={[
+              { key: 'code', header: 'كود العميل', render: (c: any) => <span className="font-mono font-bold text-[var(--cerami-muted)]">{c.code}</span> },
+              {
+                key: 'name', header: 'الاسم والبيانات',
+                render: (c: any) => (
+                  <span>
+                    <Link
+                      to={`/customers/${encodeURIComponent(c.id)}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="font-bold hover:text-[var(--cerami-primary-readable)] hover:underline"
+                      aria-label={`فتح ملف العميل ${c.name}`}
                     >
-                      <td className="p-3.5 font-mono font-bold text-slate-500">{c.code}</td>
-                      <td className="p-3.5 font-bold text-slate-900">
-                        <Link
-                          to={`/customers/${encodeURIComponent(c.id)}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="hover:text-sky-700 hover:underline"
-                          aria-label={`فتح ملف العميل ${c.name}`}
-                        >
-                          {c.name}
-                        </Link>
-                        {c.address && <div className="text-[10px] text-slate-500 font-normal">{c.address}</div>}
-                        {Object.entries(customerFieldValues[c.id] || {}).map(([label, value]) => (
-                          <div key={label} className="text-[10px] font-normal text-teal-700">{label}: {value}</div>
-                        ))}
-                      </td>
-                      <td className="p-3.5 font-mono text-slate-600 ">{c.phone}</td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
-                          {c.customerType === 'CONTRACTOR' ? 'مقاول / مهندس' : 'قطاعي / أفراد'}
-                        </span>
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.isActive === 0 ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>
-                          {c.isActive === 0 ? 'موقوف' : 'نشط'}
-                        </span>
-                      </td>
-                      {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
-                        {CeramicMath.formatCurrency(c.totalPurchases)}
-                      </td>}
-                      {canViewDebts && <td className="p-3.5">
-                        <span className={`font-black text-sm ${hasDebt ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {CeramicMath.formatCurrency(c.currentBalance)}
-                        </span>
-                      </td>}
-                      {canViewStatement && <td className="p-3.5 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenStatement(c);
-                          }}
-                          className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 hover:bg-sky-600 hover:text-slate-900 transition"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      </td>}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      {c.name}
+                    </Link>
+                    {c.address && <span className="block text-[10px] text-[var(--cerami-muted)] font-normal">{c.address}</span>}
+                    {Object.entries(customerFieldValues[c.id] || {}).map(([label, value]) => (
+                      <span key={label} className="block text-[10px] font-normal text-[var(--cerami-text-secondary)]">{label}: {value}</span>
+                    ))}
+                  </span>
+                ),
+              },
+              { key: 'phone', header: 'الهاتف', render: (c: any) => <span className="font-mono">{c.phone}</span> },
+              {
+                key: 'type', header: 'النوع',
+                render: (c: any) => (
+                  <span className="erp-badge">
+                    {c.customerType === 'CONTRACTOR' ? 'مقاول / مهندس' : 'قطاعي / أفراد'}
+                  </span>
+                ),
+              },
+              {
+                key: 'status', header: 'الحالة',
+                render: (c: any) => (
+                  <span className={`erp-badge ${c.isActive === 0 ? '' : 'erp-badge--success'}`}>
+                    {c.isActive === 0 ? 'موقوف' : 'نشط'}
+                  </span>
+                ),
+              },
+              ...(canViewPurchases ? [{
+                key: 'purchases', header: 'إجمالي المشتريات',
+                render: (c: any) => <span className="font-bold">{CeramicMath.formatCurrency(c.totalPurchases)}</span>,
+              }] : []),
+              ...(canViewDebts ? [{
+                key: 'balance', header: 'الرصيد المستحق',
+                render: (c: any) => {
+                  const hasDebt = c.currentBalance > 0;
+                  return <span className={`font-black text-sm ${hasDebt ? 'text-[var(--cerami-warning)]' : 'text-[var(--cerami-success)]'}`}>{CeramicMath.formatCurrency(c.currentBalance)}</span>;
+                },
+              }] : []),
+              ...(canViewStatement ? [{
+                key: 'statement', header: 'كشف الحساب', align: 'center' as const,
+                render: (c: any) => (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    iconOnly
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenStatement(c);
+                    }}
+                    aria-label="فتح كشف الحساب"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                ),
+              }] : []),
+            ]}
+          />
           {totalItems > 0 && <CustomerPagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
         </div>
 
-        {/* Customer Statement & Action Panel */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        <Card className="flex flex-col justify-between">
           {selectedCustomer && statement ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--win-border)] pb-3">
                 <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">{selectedCustomer.name}</h3>
-                  <p className="text-[11px] text-slate-500 font-mono">{selectedCustomer.phone}</p>
+                  <h3 className="font-extrabold text-sm">{selectedCustomer.name}</h3>
+                  <p className="text-[11px] font-mono text-[var(--cerami-muted)]">{selectedCustomer.phone}</p>
                 </div>
-                {canCollect && <button
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  <span>سند قبض / تحصيل</span>
-                </button>}
-                {canUpdate && selectedCustomer && <button
-                  onClick={() => handleToggleCustomerStatus(selectedCustomer)}
-                  className={`px-3 py-1.5 font-bold rounded-xl text-xs border ${selectedCustomer.isActive === 0 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'}`}
-                >
-                  {selectedCustomer.isActive === 0 ? 'تفعيل العميل' : 'إيقاف العميل'}
-                </button>}
-                {canDelete && selectedCustomer && (
-                  <button
-                    onClick={() => handleDeleteCustomer(selectedCustomer)}
-                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-rose-200"
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {canCollect && <Button
+                    variant="success"
+                    size="sm"
+                    leadingIcon={<DollarSign className="h-4 w-4" />}
+                    onClick={() => setIsPaymentModalOpen(true)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                    <span>حذف</span>
-                  </button>
-                )}
+                    سند قبض / تحصيل
+                  </Button>}
+                  {canUpdate && selectedCustomer && <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleToggleCustomerStatus(selectedCustomer)}
+                  >
+                    {selectedCustomer.isActive === 0 ? 'تفعيل العميل' : 'إيقاف العميل'}
+                  </Button>}
+                  {canDelete && selectedCustomer && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      leadingIcon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => handleDeleteCustomer(selectedCustomer)}
+                    >
+                      حذف
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {/* Statement Summary Card */}
-              <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 text-xs">
+              <div className="rounded-[var(--ui-radius-sm)] bg-[var(--cerami-surface-muted)] p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">الرصيد الحالي المستحق:</span>
-                  <span className="font-black text-amber-600 text-sm">
+                  <span className="text-[var(--cerami-muted)]">الرصيد الحالي المستحق:</span>
+                  <span className="font-black text-sm text-[var(--cerami-warning)]">
                     {CeramicMath.formatCurrency(selectedCustomer.currentBalance)}
                   </span>
                 </div>
@@ -382,29 +385,28 @@ export const CustomersView: React.FC = () => {
                   readOnly
                 />
                 <div className="flex justify-between">
-                  <span className="text-slate-500">الحد الائتماني المسموح:</span>
+                  <span className="text-[var(--cerami-muted)]">الحد الائتماني المسموح:</span>
                   <span className="font-bold">{CeramicMath.formatCurrency(selectedCustomer.creditLimit)}</span>
                 </div>
               </div>
 
-              {/* Transactions Timeline */}
               <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-500">سجل حركات كشف الحساب:</div>
-                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                <div className="text-xs font-bold text-[var(--cerami-muted)]">سجل حركات كشف الحساب:</div>
+                <div className="max-h-80 overflow-y-auto space-y-2 pe-1">
                   {statement.transactions.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-500">لا توجد حركات مسجلة</div>
+                    <div className="text-center py-6 text-xs text-[var(--cerami-muted)]">لا توجد حركات مسجلة</div>
                   ) : (
                     statement.transactions.map((tx: any) => (
-                      <div key={tx.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-100 text-[11px] space-y-1">
+                      <div key={tx.id} className="p-2.5 rounded-[var(--ui-radius-sm)] border border-[var(--win-border)] bg-[var(--cerami-surface-muted)] text-[11px] space-y-1">
                         <div className="flex justify-between font-bold">
                           <span>{tx.description}</span>
-                          <span className="font-mono text-slate-500">{tx.date}</span>
+                          <span className="font-mono text-[var(--cerami-muted)]">{tx.date}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
-                          <span className={tx.debit > 0 ? 'text-red-500 font-bold' : 'text-emerald-500 font-bold'}>
+                          <span className={tx.debit > 0 ? 'text-[var(--cerami-danger)] font-bold' : 'text-[var(--cerami-success)] font-bold'}>
                             {tx.debit > 0 ? `+${CeramicMath.formatCurrency(tx.debit)} (مدين)` : `-${CeramicMath.formatCurrency(tx.credit)} (سداد)`}
                           </span>
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] text-[var(--cerami-muted)]">
                             الرصيد بعدها: {CeramicMath.formatCurrency(tx.balanceAfter)}
                           </span>
                         </div>
@@ -415,201 +417,175 @@ export const CustomersView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-12">
-              <Users className="w-12 h-12 mb-2 opacity-30" />
+            <div className="h-full flex flex-col items-center justify-center text-center text-[var(--cerami-muted)] py-12">
+              <Users className="h-12 w-12 mb-2 opacity-30" />
               <p className="text-xs font-bold">اختر عميلاً لعرض كشف حسابه</p>
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
-      {/* Add Customer Modal */}
-      {isAddModalOpen && canCreate && (
-        <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">إضافة {customerSingularLabel} جديد</h3>
+      <Modal
+        open={isAddModalOpen && canCreate}
+        onClose={() => setIsAddModalOpen(false)}
+        title={`إضافة ${customerSingularLabel} جديد`}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>إلغاء</Button>
+            <Button variant="primary" type="submit" form="customer-form">حفظ العميل</Button>
+          </>
+        }
+      >
+        <form id="customer-form" onSubmit={handleSaveCustomer} className="space-y-3 text-xs">
+          <div>
+            <label htmlFor="customer-name" className="font-bold block mb-1">اسم {customerSingularLabel} *</label>
+            <input
+              id="customer-name"
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="ui-input w-full font-bold"
+            />
+          </div>
 
-            <form onSubmit={handleSaveCustomer} className="space-y-3 text-xs">
-              <div>
-                <label htmlFor="customer-name" className="font-bold text-slate-700 block mb-1">اسم {customerSingularLabel} *</label>
-                <input
-                  id="customer-name"
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="customer-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
-                  <input
-                    id="customer-phone"
-                    type="tel"
-                    required
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="customer-type" className="font-bold text-slate-700 block mb-1">نوع العميل</label>
-                  <select
-                    id="customer-type"
-                    value={formData.customerType}
-                    onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                  >
-                    <option value="RETAIL">أفراد / قطاعي</option>
-                    <option value="CONTRACTOR">مقاول / مهندس ديكور</option>
-                    <option value="WHOLESALE">تاجر جملة</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="customer-credit-limit" className="font-bold text-slate-700 block mb-1">الحد الائتماني (ج.م)</label>
-                  <input
-                    id="customer-credit-limit"
-                    type="number"
-                    value={formData.creditLimit}
-                    onChange={(e) => setFormData({ ...formData, creditLimit: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="customer-payment-terms" className="font-bold text-slate-700 block mb-1">أجل السداد (أيام)</label>
-                  <input id="customer-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number.parseInt(e.target.value, 10) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                </div>
-                <div>
-                  <label htmlFor="customer-initial-balance" className="font-bold text-slate-700 block mb-1">رصيد افتتاحي (إن وجد)</label>
-                  <input
-                    id="customer-initial-balance"
-                    type="number"
-                    value={formData.initialBalance}
-                    onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="customer-address" className="font-bold text-slate-700 block mb-1">العنوان</label>
-                <input
-                  id="customer-address"
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
-                />
-              </div>
-              <OperationalFieldsForm
-                fields={operationalFields}
-                values={operationalFieldValues}
-                onChange={setOperationalFieldValues}
-                title="بيانات إضافية"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="customer-phone" className="font-bold block mb-1">رقم الهاتف *</label>
+              <input
+                id="customer-phone"
+                type="tel"
+                required
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="ui-input w-full font-mono font-bold"
               />
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-lg shadow-sky-600/30"
-                >
-                  حفظ العميل
-                </button>
-              </div>
-            </form>
+            </div>
+            <div>
+              <label htmlFor="customer-type" className="font-bold block mb-1">نوع العميل</label>
+              <select
+                id="customer-type"
+                value={formData.customerType}
+                onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
+                className="ui-input w-full font-bold"
+              >
+                <option value="RETAIL">أفراد / قطاعي</option>
+                <option value="CONTRACTOR">مقاول / مهندس ديكور</option>
+                <option value="WHOLESALE">تاجر جملة</option>
+              </select>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Record Payment Modal */}
-      {isPaymentModalOpen && selectedCustomer && canCollect && (
-        <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">سند قبض / تحصيل دفعة</h3>
-            <p className="text-xs text-slate-500">
-              العميل: <strong className="text-slate-800">{selectedCustomer.name}</strong>
-            </p>
-
-            <form onSubmit={handleRecordPayment} className="space-y-3 text-xs">
-              <div>
-                <label htmlFor="customer-payment-amount" className="font-bold text-slate-700 block mb-1">المبلغ المحصل (ج.م) *</label>
-                <input
-                  id="customer-payment-amount"
-                  type="number"
-                  required
-                  value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm text-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="customer-payment-type" className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
-                <select
-                  id="customer-payment-type"
-                  value={paymentData.paymentType}
-                  onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                >
-                  <option value="CASH">نقدي كاش (الخزينة)</option>
-                  <option value="CARD">بطاقة بنكية / فيزا</option>
-                  <option value="BANK_TRANSFER">تحويل بنكي / محفظة</option>
-                </select>
-              </div>
-
-              {paymentData.paymentType === 'BANK_TRANSFER' && (
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">الحساب البنكي المستلم *</label>
-                  <select required value={paymentData.bankAccountId} onChange={(e) => setPaymentData({ ...paymentData, bankAccountId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                    <option value="">اختر الحساب البنكي</option>
-                    {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
-                  </select>
-                  {bankAccounts.length === 0 && <p className="mt-1 text-rose-600">لا توجد حسابات بنكية متاحة بصلاحياتك.</p>}
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="customer-payment-notes" className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
-                <input
-                  id="customer-payment-notes"
-                  type="text"
-                  value={paymentData.notes}
-                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
-                <button
-                  type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30"
-                >
-                  اعتماد السند
-                </button>
-              </div>
-            </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="customer-credit-limit" className="font-bold block mb-1">الحد الائتماني (ج.م)</label>
+              <input
+                id="customer-credit-limit"
+                type="number"
+                value={formData.creditLimit}
+                onChange={(e) => setFormData({ ...formData, creditLimit: Number.parseFloat(e.target.value) || 0 })}
+                className="ui-input w-full font-bold"
+              />
+            </div>
+            <div>
+              <label htmlFor="customer-payment-terms" className="font-bold block mb-1">أجل السداد (أيام)</label>
+              <input id="customer-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number.parseInt(e.target.value, 10) || 0 })} className="ui-input w-full font-bold" />
+            </div>
+            <div>
+              <label htmlFor="customer-initial-balance" className="font-bold block mb-1">رصيد افتتاحي (إن وجد)</label>
+              <input
+                id="customer-initial-balance"
+                type="number"
+                value={formData.initialBalance}
+                onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
+                className="ui-input w-full font-bold"
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label htmlFor="customer-address" className="font-bold block mb-1">العنوان</label>
+            <input
+              id="customer-address"
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="ui-input w-full"
+            />
+          </div>
+          <OperationalFieldsForm
+            fields={operationalFields}
+            values={operationalFieldValues}
+            onChange={setOperationalFieldValues}
+            title="بيانات إضافية"
+          />
+        </form>
+      </Modal>
+
+      <Modal
+        open={isPaymentModalOpen && selectedCustomer !== null && canCollect}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="سند قبض / تحصيل دفعة"
+        description={selectedCustomer ? `العميل: ${selectedCustomer.name}` : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>إلغاء</Button>
+            <Button variant="primary" type="submit" form="payment-form">اعتماد السند</Button>
+          </>
+        }
+      >
+        <form id="payment-form" onSubmit={handleRecordPayment} className="space-y-3 text-xs">
+          <div>
+            <label htmlFor="customer-payment-amount" className="font-bold block mb-1">المبلغ المحصل (ج.م) *</label>
+            <input
+              id="customer-payment-amount"
+              type="number"
+              required
+              value={paymentData.amount}
+              onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
+              className="ui-input w-full font-black text-sm text-[var(--cerami-success)]"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="customer-payment-type" className="font-bold block mb-1">طريقة السداد</label>
+            <select
+              id="customer-payment-type"
+              value={paymentData.paymentType}
+              onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value })}
+              className="ui-input w-full font-bold"
+            >
+              <option value="CASH">نقدي كاش (الخزينة)</option>
+              <option value="CARD">بطاقة بنكية / فيزا</option>
+              <option value="BANK_TRANSFER">تحويل بنكي / محفظة</option>
+            </select>
+          </div>
+
+          {paymentData.paymentType === 'BANK_TRANSFER' && (
+            <div>
+              <label htmlFor="customer-payment-bank" className="font-bold block mb-1">الحساب البنكي المستلم *</label>
+              <select id="customer-payment-bank" required value={paymentData.bankAccountId} onChange={(e) => setPaymentData({ ...paymentData, bankAccountId: e.target.value })} className="ui-input w-full font-bold">
+                <option value="">اختر الحساب البنكي</option>
+                {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
+              </select>
+              {bankAccounts.length === 0 && <p className="mt-1 text-[var(--cerami-danger)]">لا توجد حسابات بنكية متاحة بصلاحياتك.</p>}
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="customer-payment-notes" className="font-bold block mb-1">البيان / الملاحظات</label>
+            <input
+              id="customer-payment-notes"
+              type="text"
+              value={paymentData.notes}
+              onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+              className="ui-input w-full"
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

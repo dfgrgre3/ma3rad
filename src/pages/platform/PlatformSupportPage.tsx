@@ -43,6 +43,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 interface CentralTicketRow {
   id: string;
   tenantId: string;
@@ -103,6 +104,7 @@ function mapCentralMessage(row: any) {
 }
 
 export const PlatformSupportPage: React.FC = () => {
+  const toast = useToast();
   const canManageSupport = canPlatform('support', 'platform.support.update');
   const centralActive = getCentralDataSourceState().active;
   const [tickets, setTickets] = useState<PlatformSupportTicket[]>([]);
@@ -248,7 +250,7 @@ export const PlatformSupportPage: React.FC = () => {
 
   // Handle send message
   const handleSendMessage = () => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId || !messageBody.trim()) return;
     setSendingMessage(true);
     if (centralActive) {
@@ -263,7 +265,7 @@ export const PlatformSupportPage: React.FC = () => {
           loadTicketDetails(selectedTicketId);
           loadTickets();
         })
-        .catch((err) => alert(err instanceof Error ? err.message : 'فشل إرسال الرسالة.'))
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'فشل إرسال الرسالة.'))
         .finally(() => setSendingMessage(false));
       return;
     }
@@ -284,7 +286,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل إرسال الرسالة.');
+      toast.error(err instanceof Error ? err.message : 'فشل إرسال الرسالة.');
     } finally {
       setSendingMessage(false);
     }
@@ -297,7 +299,7 @@ export const PlatformSupportPage: React.FC = () => {
     if (centralActive) {
       centralPlatformClient.updateSupportTicket(selectedTicketId, { status: newStatus })
         .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
-        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.'));
       return;
     }
     try {
@@ -305,7 +307,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تغيير حالة التذكرة.');
     }
   };
 
@@ -316,7 +318,7 @@ export const PlatformSupportPage: React.FC = () => {
     if (centralActive) {
       centralPlatformClient.updateSupportTicket(selectedTicketId, { priority: mapPriorityToCentral(priority) })
         .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
-        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.'));
       return;
     }
     try {
@@ -324,7 +326,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تغيير أولوية التذكرة.');
     }
   };
 
@@ -335,7 +337,7 @@ export const PlatformSupportPage: React.FC = () => {
     if (centralActive) {
       centralPlatformClient.updateSupportTicket(selectedTicketId, { assigneeName: assignee || null })
         .then(() => { loadTicketDetails(selectedTicketId); loadTickets(); })
-        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.'));
       return;
     }
     try {
@@ -343,17 +345,17 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إسناد التذكرة.');
     }
   };
 
   // Remote Access Toggle / Approve
   const centralOnlyLocal = (feature: string) => {
-    alert(`${feature} غير متاح في الوضع المركزي بعد — متاح على المصدر المحلي فقط.`);
+    toast.warning(`${feature} غير متاح في الوضع المركزي بعد — متاح على المصدر المحلي فقط.`);
   };
 
   const handleToggleRemoteRequest = async (requested: boolean) => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       if (centralActive) {
@@ -364,12 +366,12 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر طلب الوصول عن بُعد للتذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر طلب الوصول عن بُعد للتذكرة.');
     }
   };
 
   const handleApproveRemoteAccess = async (approved: boolean) => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       if (centralActive) {
@@ -380,13 +382,13 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر الموافقة على الوصول عن بُعد.');
+      toast.error(err instanceof Error ? err.message : 'تعذر الموافقة على الوصول عن بُعد.');
     }
   };
 
   // Start Remote Session
   const handleStartRemoteSession = async () => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
     try {
       if (centralActive) {
@@ -402,13 +404,13 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر بدء جلسة الوصول عن بُعد.');
+      toast.error(err instanceof Error ? err.message : 'تعذر بدء جلسة الوصول عن بُعد.');
     }
   };
 
   // End Remote Session
   const handleEndRemoteSession = async (sessionId: string) => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     const summary = prompt('أدخل ملخص إنهاء جلسة الوصول عن بُعد:');
     try {
       if (centralActive) {
@@ -418,15 +420,15 @@ export const PlatformSupportPage: React.FC = () => {
       }
       if (selectedTicketId) loadTicketDetails(selectedTicketId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إنهاء جلسة الوصول.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إنهاء جلسة الوصول.');
     }
   };
 
   // Create Ticket
   const handleCreateTicket = () => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!newTenantId || !newSubject.trim()) {
-      alert('يرجى اختيار العميل وكتابة عنوان التذكرة.');
+      toast.warning('يرجى اختيار العميل وكتابة عنوان التذكرة.');
       return;
     }
     if (centralActive) {
@@ -445,7 +447,7 @@ export const PlatformSupportPage: React.FC = () => {
           loadTickets();
           setSelectedTicketId(created?.id ?? created?.data?.id ?? null);
         })
-        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.'));
       return;
     }
     try {
@@ -462,13 +464,13 @@ export const PlatformSupportPage: React.FC = () => {
       loadTickets();
       setSelectedTicketId(created.id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إنشاء التذكرة.');
     }
   };
 
   // Rate Ticket
   const handleRateTicket = () => {
-    if (!canManageSupport) { alert('لا تملك صلاحية إدارة الدعم'); return; }
+    if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (centralActive) { centralOnlyLocal('تقييم التذاكر'); return; }
     if (!selectedTicketId) return;
     try {
@@ -477,7 +479,7 @@ export const PlatformSupportPage: React.FC = () => {
       loadTicketDetails(selectedTicketId);
       loadTickets();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تقييم التذكرة.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تقييم التذكرة.');
     }
   };
 

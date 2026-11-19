@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { X, ExternalLink, ArrowLeft, Building2, KeyRound, CalendarClock, Wallet, CreditCard, AlertTriangle, CheckCircle2, XCircle, Clock, User, Mail, Phone, MapPin, Package, GitBranch, Cpu, Server, DollarSign, TrendingUp, BarChart2, LineChart, PieChart, Activity, Shield, Eye, Edit, Download, MoreVertical, Users, RotateCcw, ScrollText, Tag, Percent, Calculator, Wifi } from 'lucide-react';
 import type { PlatformTenant, PlatformLicense, PlatformSubscription, PlatformInvoice, PlatformPayment, PlatformDevice } from '../../../services/domains/platform/platformTypes';
 import { formatMoney, formatNumber, formatDate, formatDateTime, StatusBadge } from './PlatformUI';
@@ -178,26 +179,18 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <div>
           <h4 className="mb-2 text-sm font-bold text-slate-700">بنود الفاتورة</h4>
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead>
-                <tr className="text-[10.5px] text-slate-500">
-                  <th className="px-4 py-2 font-semibold">الوصف</th>
-                  <th className="px-4 py-2 font-semibold">الكمية</th>
-                  <th className="px-4 py-2 font-semibold">سعر الوحدة</th>
-                  <th className="px-4 py-2 font-semibold">الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.items.map((item, i) => (
-                  <tr key={i} className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-[12px] font-semibold text-slate-700">{item.description}</td>
-                    <td className="px-4 py-2 text-[11px] text-slate-500">{formatNumber(item.quantity)}</td>
-                    <td className="px-4 py-2 text-[11px] text-slate-500">{formatMoney(item.unitPrice)}</td>
-                    <td className="px-4 py-2 text-[11px] font-bold text-slate-700">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+            ariaLabel="أصناف الفاتورة"
+            rows={invoice.items.map((item: any, i: number) => ({ ...item, __i: i }))}
+            rowKey={(item: any) => String(item.__i)}
+            dense
+            columns={[
+              { key: 'desc', header: 'الوصف', render: (item: any) => <span className="text-[12px] font-semibold text-slate-700">{item.description}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="text-[11px] text-slate-500">{formatNumber(item.quantity)}</span> },
+              { key: 'price', header: 'سعر الوحدة', render: (item: any) => <span className="text-[11px] text-slate-500">{formatMoney(item.unitPrice)}</span> },
+              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="text-[11px] font-bold text-slate-700">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</span> },
+            ]}
+          />
           </div>
         </div>
       )}

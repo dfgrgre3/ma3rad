@@ -117,23 +117,23 @@ test('accounting cycle: party sub-ledger statement and dated reconciliation', as
     ],
   });
   manager.run(`INSERT OR REPLACE INTO customers (id, code, name, phone, current_balance, total_purchases)
-    VALUES (?, 'CUST-ACCT-CYCLE', 'Test accounting customer', '01000000000', 130, 0)`, [customerId]);
+    VALUES (?, 'CUST-ACCT-CYCLE', 'Test accounting customer', '01000000000', 13000, 0)`, [customerId]);
   manager.run(`INSERT OR REPLACE INTO finance_subledger_party_baselines
-    (company_id, party_type, party_id, balance, captured_at) VALUES (?, 'CUSTOMER', ?, 100, ?)`,
+    (company_id, party_type, party_id, balance, captured_at) VALUES (?, 'CUSTOMER', ?, 10000, ?)`,
     [companyId, customerId, new Date().toISOString()]);
   manager.run(`INSERT OR REPLACE INTO finance_subledger_events
     (id, journal_entry_id, company_id, party_type, party_id, account_code, amount, effective_date, reference_type, reference_id)
-    VALUES ('sble_test_open', ?, ?, 'CUSTOMER', ?, '1103', 50, ?, 'SALES_INVOICE', 'inv_test_open')`,
+    VALUES ('sble_test_open', ?, ?, 'CUSTOMER', ?, '1103', 5000, ?, 'SALES_INVOICE', 'inv_test_open')`,
     [openEntryId, companyId, customerId, today]);
   manager.run(`INSERT OR REPLACE INTO finance_subledger_events
     (id, journal_entry_id, company_id, party_type, party_id, account_code, amount, effective_date, reference_type, reference_id)
-    VALUES ('sble_test_collect', ?, ?, 'CUSTOMER', ?, '1103', -20, ?, 'CUSTOMER_PAYMENT', 'pay_test_collect')`,
+    VALUES ('sble_test_collect', ?, ?, 'CUSTOMER', ?, '1103', -2000, ?, 'CUSTOMER_PAYMENT', 'pay_test_collect')`,
     [collectEntryId, companyId, customerId, today]);
 
-  const options = statements.getSubledgerParties('CUSTOMER');
+  const options = await statements.getSubledgerParties('CUSTOMER');
   assert.ok(options.some((option) => option.id === customerId), 'party is exposed in the sub-ledger selector');
 
-  const statement = statements.getPartyStatement('CUSTOMER', customerId, today, today);
+  const statement = await statements.getPartyStatement('CUSTOMER', customerId, today, today);
   assert.equal(statement.opening, 100);
   assert.equal(statement.closing, 130);
   assert.equal(statement.lines.length, 2);
@@ -141,8 +141,8 @@ test('accounting cycle: party sub-ledger statement and dated reconciliation', as
   assert.equal(statement.lines[1].credit, 20);
   assert.equal(statement.masterStatus, 'MATCH', 'as-of-today statement reconciles to the customer master balance');
 
-  manager.run('UPDATE customers SET current_balance = 131 WHERE id = ?', [customerId]);
-  assert.equal(statements.getPartyStatement('CUSTOMER', customerId, today, today).masterStatus, 'DIFFERENCE');
+  manager.run('UPDATE customers SET current_balance = 13100 WHERE id = ?', [customerId]);
+  assert.equal((await statements.getPartyStatement('CUSTOMER', customerId, today, today)).masterStatus, 'DIFFERENCE');
   manager.run('DELETE FROM customers WHERE id = ?', [customerId]);
   manager.run('DELETE FROM finance_subledger_events WHERE id IN (?, ?)', ['sble_test_open', 'sble_test_collect']);
   manager.run('DELETE FROM finance_subledger_party_baselines WHERE company_id = ? AND party_id = ?', [companyId, customerId]);

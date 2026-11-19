@@ -9,7 +9,26 @@ import { useNavigate } from 'react-router-dom';
 import { OperationsService, Delivery } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+function StatCard({ label, value, sub, icon: Icon, color, bg }: {
+  label: string; value: string; sub?: string;
+  icon: React.ElementType; color: string; bg: string;
+}) {
+  return (
+    <UiStatCard
+      label={label}
+      value={value}
+      hint={sub}
+      icon={Icon ? <Icon className="h-5 w-5" /> : undefined}
+      tone={statTone(color || bg || '')}
+    />
+  );
+}
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 
@@ -71,24 +90,6 @@ function buildFleetStats(service: OperationsService): FleetStats {
     recentDeliveries: deliveries.slice(0, 8),
     driverStats: Object.values(driverMap).sort((a, b) => b.trips - a.trips).slice(0, 5),
   };
-}
-
-function StatCard({ label, value, sub, icon: Icon, color, bg }: {
-  label: string; value: string; sub?: string;
-  icon: React.ElementType; color: string; bg: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${bg}`}>
-        <Icon className={`w-6 h-6 ${color}`} />
-      </div>
-      <div>
-        <p className="text-xs text-slate-500 font-medium">{label}</p>
-        <p className="text-2xl font-black text-slate-900 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
 }
 
 function RecentDeliveries({ deliveries }: { deliveries: Delivery[] }) {
@@ -203,7 +204,7 @@ export const FleetDashboardPage: React.FC = () => {
   }, [refreshToken, canView, load]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">

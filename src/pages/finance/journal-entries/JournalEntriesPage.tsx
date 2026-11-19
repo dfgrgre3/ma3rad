@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../../services/domains/finance/FinanceExtrasService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 
+import { useToast } from '../../../components/ui/Toast';
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 type DraftLine = { accountId: string; debit: string; credit: string; description: string };
 const emptyLine = (): DraftLine => ({ accountId: '', debit: '', credit: '', description: '' });
 
 export const JournalEntriesPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new FinanceExtrasService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.journal.approve');
   const [tab, setTab] = useState<'entries' | 'trial'>('entries');
@@ -67,7 +70,7 @@ export const JournalEntriesPage: React.FC = () => {
       setForm({ date: localDateString(), description: '' });
       setDraft([emptyLine(), emptyLine()]);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر حفظ القيد.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر حفظ القيد.'); }
     finally { setSaving(false); }
   };
 
@@ -80,11 +83,11 @@ export const JournalEntriesPage: React.FC = () => {
     try {
       service.reverseJournalEntry(entry.id, { reason });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر عكس القيد.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر عكس القيد.'); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
@@ -137,19 +140,20 @@ export const JournalEntriesPage: React.FC = () => {
                 </button>
                 {expanded === entry.id && (
                   <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-                    <table className="w-full text-xs text-right">
-                      <thead><tr className="text-slate-400">{['الحساب', 'البيان', 'مدين', 'دائن'].map((h) => <th key={h} className="py-1.5 font-bold">{h}</th>)}</tr></thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(lines[entry.id] || []).map((line) => (
-                          <tr key={line.id}>
-                            <td className="py-1.5 font-bold text-slate-700">{line.accountCode} — {line.accountName}</td>
-                            <td className="py-1.5 text-slate-500">{line.description || '—'}</td>
-                            <td className="py-1.5 font-mono text-emerald-700">{Number(line.debit) ? fmt(Number(line.debit)) : '—'}</td>
-                            <td className="py-1.5 font-mono text-rose-700">{Number(line.credit) ? fmt(Number(line.credit)) : '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      ariaLabel="سطور القيد"
+                      rows={lines[entry.id] || []}
+                      rowKey={(line) => line.id}
+                      dense
+                      tableClassName="text-xs"
+                      columns={[
+                        { key: 'account', header: 'الحساب', render: (line) => <span className="font-bold text-slate-700">{line.accountCode} — {line.accountName}</span> },
+                        { key: 'desc', header: 'البيان', render: (line) => <span className="text-slate-500">{line.description || '—'}</span> },
+                        { key: 'debit', header: 'مدين', render: (line) => <span className="font-mono text-emerald-700">{Number(line.debit) ? fmt(Number(line.debit)) : '—'}</span> },
+                        { key: 'credit', header: 'دائن', render: (line) => <span className="font-mono text-rose-700">{Number(line.credit) ? fmt(Number(line.credit)) : '—'}</span> },
+                      ]}
+                      emptyTitle="لا توجد سطور"
+                    />
                   </div>
                 )}
               </div>
@@ -158,34 +162,28 @@ export const JournalEntriesPage: React.FC = () => {
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>{['الكود', 'الحساب', 'النوع', 'إجمالي المدين', 'إجمالي الدائن', 'الرصيد'].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {trial.map((row) => (
-                  <tr key={row.code} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-2.5 font-mono text-slate-600">{row.code}</td>
-                    <td className="px-4 py-2.5 font-bold text-slate-800">{row.name}</td>
-                    <td className="px-4 py-2.5 text-slate-500 text-xs">{row.type}</td>
-                    <td className="px-4 py-2.5 font-mono text-emerald-700">{fmt(Number(row.debit))}</td>
-                    <td className="px-4 py-2.5 font-mono text-rose-700">{fmt(Number(row.credit))}</td>
-                    <td className="px-4 py-2.5 font-mono font-black text-slate-900">{fmt(Number(row.debit) - Number(row.credit))}</td>
-                  </tr>
-                ))}
-                {trial.length === 0 && <tr><td colSpan={6} className="py-16 text-center text-slate-400">لا توجد حركات مسجلة بعد</td></tr>}
-              </tbody>
-              {trial.length > 0 && (
-                <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-black">
-                  <tr>
-                    <td colSpan={3} className="px-4 py-3 text-xs text-slate-600">الإجمالي</td>
-                    <td className="px-4 py-3 font-mono text-emerald-700">{fmt(trial.reduce((s, r) => s + Number(r.debit), 0))}</td>
-                    <td className="px-4 py-3 font-mono text-rose-700">{fmt(trial.reduce((s, r) => s + Number(r.credit), 0))}</td>
-                    <td className="px-4 py-3 font-mono">{fmt(trial.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0))}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+            <DataTable
+              ariaLabel="ميزان المراجعة"
+              rows={trial}
+              rowKey={(row) => row.code}
+              emptyTitle="لا توجد حركات مسجلة بعد"
+              columns={[
+                { key: 'code', header: 'الكود', render: (row) => <span className="font-mono text-slate-600">{row.code}</span> },
+                { key: 'name', header: 'الحساب', render: (row) => <span className="font-bold text-slate-800">{row.name}</span> },
+                { key: 'type', header: 'النوع', render: (row) => <span className="text-slate-500 text-xs">{row.type}</span> },
+                { key: 'debit', header: 'إجمالي المدين', render: (row) => <span className="font-mono text-emerald-700">{fmt(Number(row.debit))}</span> },
+                { key: 'credit', header: 'إجمالي الدائن', render: (row) => <span className="font-mono text-rose-700">{fmt(Number(row.credit))}</span> },
+                { key: 'balance', header: 'الرصيد', render: (row) => <span className="font-mono font-black text-slate-900">{fmt(Number(row.debit) - Number(row.credit))}</span> },
+              ]}
+            />
+            {trial.length > 0 && (
+              <div className="flex items-center gap-4 border-t-2 border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black">
+                <span className="text-slate-600">الإجمالي</span>
+                <span className="font-mono text-emerald-700">{fmt(trial.reduce((sum, r) => sum + Number(r.debit), 0))}</span>
+                <span className="font-mono text-rose-700">{fmt(trial.reduce((sum, r) => sum + Number(r.credit), 0))}</span>
+                <span className="font-mono">{fmt(trial.reduce((sum, r) => sum + Number(r.debit) - Number(r.credit), 0))}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -204,27 +202,33 @@ export const JournalEntriesPage: React.FC = () => {
               </div>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-xs text-right">
-                  <thead className="bg-slate-50"><tr>{['الحساب', 'مدين', 'دائن', 'بيان السطر', ''].map((h) => <th key={h} className="px-2 py-2 font-bold text-slate-500">{h}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {draft.map((line, idx) => (
-                      <tr key={idx}>
-                        <td className="p-1.5">
-                          <select required value={line.accountId} onChange={(e) => setDraft(draft.map((l, i) => i === idx ? { ...l, accountId: e.target.value } : l))} className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                <DataTable
+                    ariaLabel="سطور القيد الجديد"
+                    rows={draft.map((line, idx) => ({ ...line, __idx: idx }))}
+                    rowKey={(line) => String(line.__idx)}
+                    dense
+                    tableClassName="text-xs"
+                    columns={[
+                      {
+                        key: 'account', header: 'الحساب',
+                        render: (line) => (
+                          <select required value={line.accountId} onChange={(e) => setDraft(draft.map((l, i) => i === line.__idx ? { ...l, accountId: e.target.value } : l))} className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
                             <option value="">— اختر الحساب —</option>
                             {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                           </select>
-                        </td>
-                        <td className="p-1.5"><input type="number" min={0} step="0.01" value={line.debit} onChange={(e) => setDraft(draft.map((l, i) => i === idx ? { ...l, debit: e.target.value, credit: '' } : l))} className="w-28 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200 font-mono" /></td>
-                        <td className="p-1.5"><input type="number" min={0} step="0.01" value={line.credit} onChange={(e) => setDraft(draft.map((l, i) => i === idx ? { ...l, credit: e.target.value, debit: '' } : l))} className="w-28 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200 font-mono" /></td>
-                        <td className="p-1.5"><input value={line.description} onChange={(e) => setDraft(draft.map((l, i) => i === idx ? { ...l, description: e.target.value } : l))} className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200" /></td>
-                        <td className="p-1.5">
-                          <button type="button" disabled={draft.length <= 2} onClick={() => setDraft(draft.filter((_, i) => i !== idx))} className="p-1 rounded text-rose-500 hover:bg-rose-50 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5" /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        ),
+                      },
+                      { key: 'debit', header: 'مدين', render: (line) => <input type="number" min={0} step="0.01" value={line.debit} onChange={(e) => setDraft(draft.map((l, i) => i === line.__idx ? { ...l, debit: e.target.value, credit: '' } : l))} className="w-28 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200 font-mono" /> },
+                      { key: 'credit', header: 'دائن', render: (line) => <input type="number" min={0} step="0.01" value={line.credit} onChange={(e) => setDraft(draft.map((l, i) => i === line.__idx ? { ...l, credit: e.target.value, debit: '' } : l))} className="w-28 px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200 font-mono" /> },
+                      { key: 'desc', header: 'بيان السطر', render: (line) => <input value={line.description} onChange={(e) => setDraft(draft.map((l, i) => i === line.__idx ? { ...l, description: e.target.value } : l))} className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200" /> },
+                      {
+                        key: 'del', header: '',
+                        render: (line) => (
+                          <button type="button" disabled={draft.length <= 2} onClick={() => setDraft(draft.filter((_, i) => i !== line.__idx))} className="p-1 rounded text-rose-500 hover:bg-rose-50 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5" /></button>
+                        ),
+                      },
+                    ]}
+                  />
                 <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-200">
                   <button type="button" onClick={() => setDraft([...draft, emptyLine()])} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">+ إضافة سطر</button>
                   <div className="flex items-center gap-4 text-[11px] font-bold">

@@ -45,7 +45,7 @@ export const ExecutiveDashboard: React.FC = () => {
   }, [refreshToken, refresh]);
 
   return (
-    <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`} dir="rtl">
+    <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
       {/* Header */}
       <div className="flex min-w-0 items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">

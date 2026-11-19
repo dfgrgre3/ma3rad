@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
 import { InventoryValuationService, type WarehouseValuation } from '../../../services/domains/inventory/InventoryValuationService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -56,7 +57,7 @@ export const InventoryValuationPage: React.FC = () => {
   });
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -114,27 +115,23 @@ export const InventoryValuationPage: React.FC = () => {
             <PieChart className="w-4 h-4 text-slate-500" />
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">توزيع وتقييم البضاعة حسب المخازن</h3>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                {['المخزن', 'عدد الأصناف', 'الكميات حسب الوحدة', 'القيمة بسعر الشراء', 'القيمة بسعر البيع', 'الربح المتوقع'].map(h => (
-                  <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {data.map((w) => (
-                <tr key={w.id} className="hover:bg-slate-100 transition">
-                  <td className="px-4 py-3 text-slate-900 font-medium">{w.name}</td>
-                  <td className="px-4 py-3 text-slate-700 font-semibold">{w.itemsCount} صنف</td>
-                  <td className="px-4 py-3 text-sky-600 font-bold">{w.quantitiesByUnit.map(({ unitLabel, quantity }) => <div key={unitLabel}>{new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(quantity)} {unitLabel}</div>)}</td>
-                  <td className="px-4 py-3 text-slate-600">{fmt(w.costValue)}</td>
-                  <td className="px-4 py-3 text-emerald-600 font-bold">{fmt(w.retailValue)}</td>
-                  <td className="px-4 py-3 text-violet-600 font-bold">{fmt(w.retailValue - w.costValue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="تقييم المخزون"
+            rows={data}
+            rowKey={(w: any) => String(w.id)}
+            tableClassName="text-sm"
+            columns={[
+              { key: 'name', header: 'المخزن', render: (w: any) => <span className="font-medium text-slate-900">{w.name}</span> },
+              { key: 'count', header: 'عدد الأصناف', render: (w: any) => <span className="font-semibold text-slate-700">{w.itemsCount} صنف</span> },
+              {
+                key: 'qty', header: 'الكميات حسب الوحدة',
+                render: (w: any) => <span className="block font-bold text-sky-600">{w.quantitiesByUnit.map(({ unitLabel, quantity }: any) => <span key={unitLabel} className="block">{new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(quantity)} {unitLabel}</span>)}</span>,
+              },
+              { key: 'cost', header: 'القيمة بسعر الشراء', render: (w: any) => <span className="text-slate-600">{fmt(w.costValue)}</span> },
+              { key: 'retail', header: 'القيمة بسعر البيع', render: (w: any) => <span className="font-bold text-emerald-600">{fmt(w.retailValue)}</span> },
+              { key: 'profit', header: 'الربح المتوقع', render: (w: any) => <span className="font-bold text-violet-600">{fmt(w.retailValue - w.costValue)}</span> },
+            ]}
+          />
         </div>
       </div>
     </div>

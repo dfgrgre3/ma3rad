@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -435,28 +436,20 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           <div className="mt-4">
             <h4 className="mb-2 text-sm font-bold text-slate-700">أعلى العملاء إيراداً</h4>
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-sm">
-                <thead>
-                  <tr className="text-[10.5px] text-slate-500">
-                    <th className="px-4 py-2 font-semibold">العميل</th>
-                    <th className="px-4 py-2 font-semibold">الكود</th>
-                    <th className="px-4 py-2 font-semibold">الحالة</th>
-                    <th className="px-4 py-2 font-semibold">الإيراد</th>
-                    <th className="px-4 py-2 font-semibold">الفواتير</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cm.topCustomersByRevenue.slice(0, 10).map((cust) => (
-                    <tr key={cust.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => window.location.href = `/platform/tenants/${cust.id}`}>
-                      <td className="px-4 py-2 text-[12px] font-semibold text-slate-700">{cust.name}</td>
-                      <td className="px-4 py-2 text-[11px] text-slate-500 font-mono">{cust.code}</td>
-                      <td className="px-4 py-2"><StatusBadge value={cust.status} /></td>
-                      <td className="px-4 py-2 text-[12px] font-bold text-emerald-700">{formatMoney(cust.revenue)}</td>
-                      <td className="px-4 py-2 text-[11px] text-slate-500">{cust.invoicesCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="أعلى العملاء إيراداً"
+                rows={cm.topCustomersByRevenue.slice(0, 10)}
+                rowKey={(cust) => cust.id}
+                onRowClick={(cust) => { window.location.href = `/platform/tenants/${cust.id}`; }}
+                tableClassName="text-sm"
+                columns={[
+                  { key: 'name', header: 'العميل', render: (cust) => <span className="text-[12px] font-semibold text-slate-700">{cust.name}</span> },
+                  { key: 'code', header: 'الكود', render: (cust) => <span className="text-[11px] text-slate-500 font-mono">{cust.code}</span> },
+                  { key: 'status', header: 'الحالة', render: (cust) => <StatusBadge value={cust.status} /> },
+                  { key: 'revenue', header: 'الإيراد', render: (cust) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(cust.revenue)}</span> },
+                  { key: 'invoices', header: 'الفواتير', render: (cust) => <span className="text-[11px] text-slate-500">{cust.invoicesCount}</span> },
+                ]}
+              />
             </div>
           </div>
         )}
@@ -778,24 +771,17 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       >
         {overview.revenueByPlan && overview.revenueByPlan.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead>
-                <tr className="text-[10.5px] text-slate-500">
-                  <th className="px-4 py-2 font-semibold">الخطة</th>
-                  <th className="px-4 py-2 font-semibold">العملاء</th>
-                  <th className="px-4 py-2 font-semibold">الإيراد</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.revenueByPlan.map((r, i) => (
-                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-2 text-[12px] font-semibold text-slate-700">{r.planName}</td>
-                    <td className="px-4 py-2 text-[11px] text-slate-500">{r.tenants}</td>
-                    <td className="px-4 py-2 text-[12px] font-bold text-emerald-700">{formatMoney(r.revenue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+            ariaLabel="الإيراد حسب الخطة"
+            rows={overview.revenueByPlan.map((r, i) => ({ ...r, __i: i }))}
+            rowKey={(r) => `${r.planName}-${r.__i}`}
+            tableClassName="text-sm"
+            columns={[
+              { key: 'plan', header: 'الخطة', render: (r) => <span className="text-[12px] font-semibold text-slate-700">{r.planName}</span> },
+              { key: 'tenants', header: 'العملاء', render: (r) => <span className="text-[11px] text-slate-500">{r.tenants}</span> },
+              { key: 'revenue', header: 'الإيراد', render: (r) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(r.revenue)}</span> },
+            ]}
+          />
           </div>
         ) : (
           <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد بيانات إيراد" />

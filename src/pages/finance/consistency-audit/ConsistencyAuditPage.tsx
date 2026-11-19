@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Play, RefreshCw, Loader2, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConsistencyAuditService } from '../../../services/domains/finance/ConsistencyAuditService';
 import { useToast } from '../../../components/ui/Toast';
@@ -120,7 +121,7 @@ export const ConsistencyAuditPage: React.FC = () => {
   }
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -162,110 +163,95 @@ export const ConsistencyAuditPage: React.FC = () => {
         ) : runs.length === 0 ? (
           <div className="p-10 text-center text-sm text-slate-400">لا توجد عمليات تدقيق مسجلة بعد.</div>
         ) : (
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-right font-semibold">وقت التشغيل</th>
-                <th className="px-4 py-3 text-right font-semibold">النوع</th>
-                <th className="px-4 py-3 text-right font-semibold">النطاق</th>
-                <th className="px-4 py-3 text-right font-semibold">الحالة</th>
-                <th className="px-4 py-3 text-right font-semibold">التفاصيل</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <React.Fragment key={run.id}>
-                  <tr
-                    className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer"
-                    onClick={() => toggleRun(run.id)}
-                  >
-                    <td className="px-4 py-3 text-slate-700">{fmtDateTime(run.startedAt)}</td>
-                    <td className="px-4 py-3 text-slate-600">{run.runType}</td>
-                    <td className="px-4 py-3 text-slate-600">{run.scope}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${STATUS_STYLE[run.status] || STATUS_STYLE.RUNNING}`}>
-                        {run.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {expanded === run.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </td>
-                  </tr>
-                  {expanded === run.id && (
-                    <tr className="border-t border-slate-100 bg-slate-50/60">
-                      <td colSpan={5} className="px-4 py-4">
-                        {!details[run.id] ? (
-                          <div className="text-xs text-slate-400 flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" /> جارٍ تحميل التفاصيل...
+          <DataTable
+            ariaLabel="عمليات التدقيق"
+            rows={runs}
+            rowKey={(run) => run.id}
+            loading={loading}
+            onRowClick={(run) => toggleRun(run.id)}
+            isRowExpanded={(run) => expanded === run.id}
+            expandedRowClassName="bg-slate-50/60"
+            rowClassName={() => 'border-t border-slate-100 hover:bg-slate-50 cursor-pointer'}
+            columns={[
+              { key: 'time', header: 'وقت التشغيل', render: (run) => <span className="text-slate-700">{fmtDateTime(run.startedAt)}</span> },
+              { key: 'type', header: 'النوع', render: (run) => <span className="text-slate-600">{run.runType}</span> },
+              { key: 'scope', header: 'النطاق', render: (run) => <span className="text-slate-600">{run.scope}</span> },
+              {
+                key: 'status', header: 'الحالة',
+                render: (run) => (
+                  <span className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${STATUS_STYLE[run.status] || STATUS_STYLE.RUNNING}`}>
+                    {run.status}
+                  </span>
+                ),
+              },
+              {
+                key: 'chevron', header: '',
+                render: (run) => expanded === run.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />,
+              },
+            ]}
+            renderExpandedRow={(run) => (
+              <div className="px-4 py-4">
+                {!details[run.id] ? (
+                  <div className="text-xs text-slate-400 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> جارٍ تحميل التفاصيل...
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {Object.entries(details[run.id].summary || {}).map(([key, result]) => (
+                        <div key={key} className="bg-white border border-slate-200 rounded-xl p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {CHECK_LABELS[key] || result.check || key}
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                result.status === 'PASS'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : result.status === 'DISCREPANCY'
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-red-50 text-red-700'
+                              }`}
+                            >
+                              {result.status}
+                            </span>
                           </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                              {Object.entries(details[run.id].summary || {}).map(([key, result]) => (
-                                <div key={key} className="bg-white border border-slate-200 rounded-xl p-3">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-slate-700">
-                                      {CHECK_LABELS[key] || result.check || key}
-                                    </span>
-                                    <span
-                                      className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                        result.status === 'PASS'
-                                          ? 'bg-emerald-50 text-emerald-700'
-                                          : result.status === 'DISCREPANCY'
-                                            ? 'bg-amber-50 text-amber-700'
-                                            : 'bg-red-50 text-red-700'
-                                      }`}
-                                    >
-                                      {result.status}
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 mt-1">
-                                    مفحوص: {result.scanned}
-                                    {result.error ? ` — ${result.error}` : ''}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            {(details[run.id].discrepancies || []).length > 0 && (
-                              <div className="bg-white border border-amber-200 rounded-xl overflow-hidden">
-                                <div className="px-3 py-2 bg-amber-50 text-amber-800 text-xs font-semibold">
-                                  الفروقات ({details[run.id].discrepancies.length})
-                                </div>
-                                <div className="max-h-64 overflow-auto">
-                                  <table className="w-full text-[11px]">
-                                    <thead className="bg-slate-50 text-slate-500">
-                                      <tr>
-                                        <th className="px-3 py-2 text-right">الفحص</th>
-                                        <th className="px-3 py-2 text-right">المفتاح</th>
-                                        <th className="px-3 py-2 text-right">متوقع</th>
-                                        <th className="px-3 py-2 text-right">فعلي</th>
-                                        <th className="px-3 py-2 text-right">الفرق</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {details[run.id].discrepancies.slice(0, 100).map((d, i) => (
-                                        <tr key={i} className="border-t border-slate-100">
-                                          <td className="px-3 py-1.5 text-slate-600">{CHECK_LABELS[d.check] || d.check}</td>
-                                          <td className="px-3 py-1.5 text-slate-500" dir="ltr">{d.key || '—'}</td>
-                                          <td className="px-3 py-1.5 text-slate-600" dir="ltr">{String(d.expected ?? '—')}</td>
-                                          <td className="px-3 py-1.5 text-slate-600" dir="ltr">{String(d.actual ?? '—')}</td>
-                                          <td className="px-3 py-1.5 text-slate-600" dir="ltr">{String(d.variance ?? '—')}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            )}
+                          <div className="text-[10px] text-slate-400 mt-1">
+                            مفحوص: {result.scanned}
+                            {result.error ? ` — ${result.error}` : ''}
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                        </div>
+                      ))}
+                    </div>
+                    {(details[run.id].discrepancies || []).length > 0 && (
+                      <div className="bg-white border border-amber-200 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-amber-50 text-amber-800 text-xs font-semibold">
+                          الفروقات ({details[run.id].discrepancies.length})
+                        </div>
+                        <div className="max-h-64 overflow-auto">
+                          <DataTable
+                                      ariaLabel="الفروقات"
+                                      rows={details[run.id].discrepancies.slice(0, 100).map((d, i) => ({ ...d, __i: i }))}
+                                      rowKey={(d) => String(d.__i)}
+                                      dense
+                                      tableClassName="text-[11px]"
+                                      columns={[
+                                        { key: 'check', header: 'الفحص', render: (d) => <span className="text-slate-600">{CHECK_LABELS[d.check] || d.check}</span> },
+                                        { key: 'key', header: 'المفتاح', render: (d) => <span className="text-slate-500" dir="ltr">{d.key || '—'}</span> },
+                                        { key: 'expected', header: 'متوقع', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.expected ?? '—')}</span> },
+                                        { key: 'actual', header: 'فعلي', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.actual ?? '—')}</span> },
+                                        { key: 'variance', header: 'الفرق', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.variance ?? '—')}</span> },
+                                      ]}
+                                    />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            emptyTitle="لا توجد عمليات تدقيق مسجلة بعد."
+          />
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ChevronDown, ChevronUp, RefreshCw,
   Sparkles, History, GitMerge, Clock, AlertCircle, X,
@@ -66,42 +67,41 @@ function resolvedStatusLabel(status: string): { label: string; cls: string } {
   return { label: status, cls: 'bg-amber-100 text-amber-700' };
 }
 
-// ─── FieldDiffRow component ──────────────────────────────────────────────────
+// ─── Field diff helpers ──────────────────────────────────────────────────────
 
-const FieldDiffRow: React.FC<{ diff: FieldDiff }> = ({ diff }) => {
-  const isConflict = diff.status === 'CONFLICT';
-  const rowCls = isConflict
-    ? 'bg-amber-50/70 border-amber-200'
+const diffBadge = (diff: FieldDiff) =>
+  diff.status === 'CONFLICT'
+    ? <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900">مختلف</span>
     : diff.status === 'LOCAL_ONLY'
-      ? 'bg-sky-50/50 border-sky-100'
+      ? <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">محلي فقط</span>
       : diff.status === 'REMOTE_ONLY'
-        ? 'bg-emerald-50/50 border-emerald-100'
-        : 'bg-white border-slate-100';
+        ? <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">وارد فقط</span>
+        : <span className="text-[10px] text-slate-400">متطابق</span>;
 
-  const badge =
-    diff.status === 'CONFLICT'
-      ? <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900">مختلف</span>
-      : diff.status === 'LOCAL_ONLY'
-        ? <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">محلي فقط</span>
-        : diff.status === 'REMOTE_ONLY'
-          ? <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">وارد فقط</span>
-          : <span className="text-[10px] text-slate-400">متطابق</span>;
+const diffRowClass = (diff: FieldDiff) =>
+  diff.status === 'CONFLICT'
+    ? 'bg-amber-50/70'
+    : diff.status === 'LOCAL_ONLY'
+      ? 'bg-sky-50/50'
+      : diff.status === 'REMOTE_ONLY'
+        ? 'bg-emerald-50/50'
+        : '';
 
-  const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="text-slate-300 italic">فارغ</span> : String(v));
+const fmtDiffValue = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="text-slate-300 italic">فارغ</span> : String(v));
 
-  return (
-    <tr className={`border-b transition-colors ${rowCls}`}>
-      <td className="p-3 font-semibold text-slate-700 text-xs">
-        <div className="flex items-center gap-2">
-          <span>{diff.label}</span>
-          {badge}
-        </div>
-      </td>
-      <td className="p-3 font-mono text-slate-900 text-xs">{fmt(diff.localValue)}</td>
-      <td className="p-3 font-mono text-slate-900 text-xs">{fmt(diff.remoteValue)}</td>
-    </tr>
-  );
-};
+const diffColumns = (localHeader: string, remoteHeader: string) => [
+  {
+    key: 'field', header: 'اسم الحقل',
+    render: (diff: FieldDiff) => (
+      <span className="flex items-center gap-2 font-semibold text-slate-700">
+        <span>{diff.label}</span>
+        {diffBadge(diff)}
+      </span>
+    ),
+  },
+  { key: 'local', header: localHeader, render: (diff: FieldDiff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.localValue)}</span> },
+  { key: 'remote', header: remoteHeader, render: (diff: FieldDiff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.remoteValue)}</span> },
+];
 
 // ─── MergePreviewModal ────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ interface MergePreviewModalProps {
 }
 
 const MergePreviewModal: React.FC<MergePreviewModalProps> = ({ conflict, diffs, onConfirm, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" dir="rtl">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
     <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-100 p-4 bg-slate-50">
         <div className="flex items-center gap-2">
@@ -132,20 +132,26 @@ const MergePreviewModal: React.FC<MergePreviewModalProps> = ({ conflict, diffs, 
       </div>
       <div className="p-4 max-h-[60vh] overflow-auto">
         <div className="rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-100 text-slate-600 text-xs">
-                <th className="p-2.5">الحقل</th>
-                <th className="p-2.5">البيانات المحلية</th>
-                <th className="p-2.5">بيانات الفرع الواردة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {diffs.filter(d => d.status === 'CONFLICT').map(diff => (
-                <FieldDiffRow key={diff.field} diff={diff} />
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+              ariaLabel="معاينة الدمج"
+              rows={diffs.filter(d => d.status === 'CONFLICT')}
+              rowKey={(diff) => diff.field}
+              rowClassName={diffRowClass}
+              dense
+              columns={[
+                {
+                  key: 'field', header: 'الحقل',
+                  render: (diff) => (
+                    <span className="flex items-center gap-2 font-semibold text-slate-700">
+                      <span>{diff.label}</span>
+                      {diffBadge(diff)}
+                    </span>
+                  ),
+                },
+                { key: 'local', header: 'البيانات المحلية', render: (diff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.localValue)}</span> },
+                { key: 'remote', header: 'بيانات الفرع الواردة', render: (diff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.remoteValue)}</span> },
+              ]}
+            />
         </div>
         <div className="mt-3 flex items-center justify-between text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <span>النوع: <strong>{entityLabels[conflict.entityType] ?? conflict.entityType}</strong></span>
@@ -322,7 +328,7 @@ export const SyncConflictsPage: React.FC = () => {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full overflow-auto bg-slate-50 p-4 text-slate-900 sm:p-6" dir="rtl">
+    <div className="h-full overflow-auto bg-slate-50 p-4 text-slate-900 sm:p-6">
       {/* ── Page Header ── */}
       <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -545,20 +551,14 @@ export const SyncConflictsPage: React.FC = () => {
 
                       {/* Visual Diff Table */}
                       <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                        <table className="w-full text-right">
-                          <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50 text-slate-600 text-xs">
-                              <th className="p-3">اسم الحقل</th>
-                              <th className="p-3 text-sky-800">البيانات الحالية على هذا الجهاز</th>
-                              <th className="p-3 text-emerald-800">البيانات الواردة من الفرع الآخر</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {diffs.map((diff) => (
-                              <FieldDiffRow key={diff.field} diff={diff} />
-                            ))}
-                          </tbody>
-                        </table>
+                        <DataTable
+                          ariaLabel="فروقات الحقول"
+                          rows={diffs}
+                          rowKey={(diff) => diff.field}
+                          rowClassName={diffRowClass}
+                          dense
+                          columns={diffColumns('البيانات الحالية على هذا الجهاز', 'البيانات الواردة من الفرع الآخر')}
+                        />
 
                         {conflictDiffs.length > 0 && (
                           <div className="border-t border-slate-100 bg-amber-50/50 px-3 py-2 text-[11px] text-amber-800 flex items-center justify-between">
@@ -617,35 +617,22 @@ export const SyncConflictsPage: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-500 bg-slate-50/50">
-                    <th className="p-3">نوع البيانات</th>
-                    <th className="p-3">معرّف السجل</th>
-                    <th className="p-3">الفرع المصدر</th>
-                    <th className="p-3">القرار المتخذ</th>
-                    <th className="p-3">السبب</th>
-                    <th className="p-3">تاريخ الحسم</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {resolvedConflicts.map((rc) => {
-                    const st = resolvedStatusLabel(rc.status);
-                    return (
-                      <tr key={rc.id} className="hover:bg-slate-50/60 transition">
-                        <td className="p-3 font-bold text-slate-700">{entityLabels[rc.entityType] ?? rc.entityType}</td>
-                        <td className="p-3 font-mono text-[11px] text-slate-600">{rc.entityId}</td>
-                        <td className="p-3 text-slate-600">{rc.sourceBranchId}</td>
-                        <td className="p-3">
-                          <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
-                        </td>
-                        <td className="p-3 text-slate-500 max-w-[240px] truncate">{rc.reason}</td>
-                        <td className="p-3 text-slate-400">{formatTimestamp(rc.resolvedAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="سجل القرارات المحسومة"
+                rows={resolvedConflicts}
+                rowKey={(rc) => rc.id}
+                dense
+                tableClassName="text-xs"
+                columns={[
+                  { key: 'type', header: 'نوع البيانات', render: (rc) => <span className="font-bold text-slate-700">{entityLabels[rc.entityType] ?? rc.entityType}</span> },
+                  { key: 'id', header: 'معرّف السجل', render: (rc) => <span className="font-mono text-[11px] text-slate-600">{rc.entityId}</span> },
+                  { key: 'branch', header: 'الفرع المصدر', render: (rc) => <span className="text-slate-600">{rc.sourceBranchId}</span> },
+                  { key: 'decision', header: 'القرار المتخذ', render: (rc) => { const st = resolvedStatusLabel(rc.status); return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>; } },
+                  { key: 'reason', header: 'السبب', render: (rc) => <span className="block max-w-[240px] truncate text-slate-500">{rc.reason}</span> },
+                  { key: 'date', header: 'تاريخ الحسم', render: (rc) => <span className="text-slate-400">{formatTimestamp(rc.resolvedAt)}</span> },
+                ]}
+                emptyTitle="لا توجد عمليات حسم سابقة مسجلة."
+              />
             </div>
           )}
         </div>

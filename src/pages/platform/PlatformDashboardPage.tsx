@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -540,26 +541,18 @@ export const PlatformDashboardPage: React.FC = () => {
             <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد مدفوعات مسجلة" description="ابدأ بإصدار فاتورة وتسجيل دفعة." />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-right">
-                <thead>
-                  <tr className="text-[10.5px] text-slate-500">
-                    <th className="px-4 py-2 font-semibold">العميل</th>
-                    <th className="px-4 py-2 font-semibold">الفاتورة</th>
-                    <th className="px-4 py-2 font-semibold">المبلغ</th>
-                    <th className="px-4 py-2 font-semibold">التاريخ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.recentPayments.map((payment) => (
-                    <tr key={payment.id} className="border-t border-slate-100">
-                      <td className="px-4 py-2 text-[12px] font-semibold text-slate-700">{payment.tenantName}</td>
-                      <td className="px-4 py-2 text-[11px] text-slate-500" dir="ltr">{payment.invoiceNumber || '—'}</td>
-                      <td className="px-4 py-2 text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</td>
-                      <td className="px-4 py-2 text-[11px] text-slate-500">{formatDate(payment.paidAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="أحدث المدفوعات"
+                rows={overview.recentPayments}
+                rowKey={(payment: any) => String(payment.id)}
+                dense
+                columns={[
+                  { key: 'tenant', header: 'العميل', render: (payment: any) => <span className="text-[12px] font-semibold text-slate-700">{payment.tenantName}</span> },
+                  { key: 'invoice', header: 'الفاتورة', render: (payment: any) => <span className="text-[11px] text-slate-500" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                  { key: 'amount', header: 'المبلغ', render: (payment: any) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
+                  { key: 'date', header: 'التاريخ', render: (payment: any) => <span className="text-[11px] text-slate-500">{formatDate(payment.paidAt)}</span> },
+                ]}
+              />
             </div>
           )}
         </Panel>

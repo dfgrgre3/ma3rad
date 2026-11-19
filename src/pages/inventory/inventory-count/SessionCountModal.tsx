@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { CheckCircle2, ClipboardList, Search, X } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { fmtCountCurrency } from './helpers';
@@ -25,14 +26,6 @@ interface SessionCountModalProps {
   onClose: () => void;
 }
 
-interface CountItemRowProps {
-  item: CountItem;
-  index: number;
-  session: CountSession;
-  onCountChange: (index: number, value: string) => void;
-  onDiscrepancyReasonChange: (index: number, value: string) => void;
-  onNoteChange: (index: number, value: string) => void;
-}
 
 const isBlindCounting = (session: CountSession) =>
   session.isBlind && session.status === 'COUNTING';
@@ -49,98 +42,12 @@ const FinancialVariance: React.FC<{ value: number }> = ({ value }) => {
   return <span className="text-slate-500">0 ج</span>;
 };
 
-const CountItemRow: React.FC<CountItemRowProps> = ({
-  item,
-  index,
-  session,
-  onCountChange,
-  onDiscrepancyReasonChange,
-  onNoteChange,
-}) => {
-  const blindCounting = isBlindCounting(session);
-  const isPosted = session.status !== 'COUNTING';
-  const isCounted = item.countedQuantityM2 !== null;
-  const hasVariance = item.varianceM2 !== 0 && isCounted;
-
-  return (
-    <tr className="hover:bg-slate-100 transition">
-      <td className="px-4 py-3 text-slate-900 font-semibold">{item.productName}</td>
-      <td className="px-4 py-3 font-mono text-slate-500 font-bold">
-        {blindCounting ? (
-          <span className="text-violet-600 bg-violet-50 px-2 py-0.5 rounded text-[10px] border border-violet-200">🔒 مخفي (عدّ أعمى)</span>
-        ) : (
-          formatProductQuantity(item.systemQuantityM2, item)
-        )}
-      </td>
-      <td className="px-4 py-2">
-        {isPosted ? (
-          <span className="font-mono text-slate-900 font-bold">{formatProductQuantity(Number(item.countedQuantityM2), item)}</span>
-        ) : (
-          <input
-            type="number"
-            step="0.01"
-            value={item.countedQuantityM2 ?? ''}
-            onChange={(e) => onCountChange(index, e.target.value)}
-            placeholder="أدخل الجرد الفعلي"
-            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono w-28 focus:outline-none focus:border-violet-500 text-slate-900"
-          />
-        )}
-      </td>
-      <td className="px-4 py-3 font-mono font-bold">
-        {blindCounting ? (
-          <span className="text-slate-400 text-[11px]">يحتسب بعد الإدخال</span>
-        ) : isCounted ? (
-          <QuantityVariance value={item.varianceM2} item={item} />
-        ) : (
-          <span className="text-slate-400">—</span>
-        )}
-      </td>
-      <td className="px-2 py-2">
-        {hasVariance ? (
-          isPosted ? (
-            <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'غير محدد'}</span>
-          ) : (
-            <select
-              value={item.discrepancyReason || ''}
-              onChange={(e) => onDiscrepancyReasonChange(index, e.target.value)}
-              className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:border-violet-500"
-            >
-              <option value="">-- سبب الفارق --</option>
-              <option value="BREAKAGE">كسر وتلف</option>
-              <option value="THEFT">عجز / فقد</option>
-              <option value="MISCOUNT">خطأ في العد</option>
-              <option value="INPUT_ERROR">خطأ إدخال سابق</option>
-              <option value="SUPPLIER_SHORTAGE">عجز توريد</option>
-              <option value="OTHER">أخرى</option>
-            </select>
-          )
-        ) : (
-          <span className="text-slate-300 text-xs">—</span>
-        )}
-      </td>
-      <td className="px-4 py-3 font-mono text-slate-500">{fmtCountCurrency(item.unitCost)}</td>
-      <td className="px-4 py-3 font-mono font-bold">
-        {blindCounting ? (
-          <span className="text-slate-400">—</span>
-        ) : isCounted ? (
-          <FinancialVariance value={item.varianceValue} />
-        ) : (
-          <span className="text-slate-500">—</span>
-        )}
-      </td>
-      <td className="px-2 py-2">
-        <input
-          value={item.notes}
-          disabled={isPosted}
-          onChange={(e) => onNoteChange(index, e.target.value)}
-          maxLength={250}
-          placeholder="ملاحظة"
-          className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs disabled:border-transparent"
-        />
-      </td>
-    </tr>
-  );
-};
+const countCellState = (item: CountItem, session: CountSession) => ({
+  blindCounting: isBlindCounting(session),
+  isPosted: session.status !== 'COUNTING',
+  isCounted: item.countedQuantityM2 !== null,
+  hasVariance: item.varianceM2 !== 0 && item.countedQuantityM2 !== null,
+});
 
 export const SessionCountModal: React.FC<SessionCountModalProps> = ({
   session,
@@ -197,29 +104,109 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 sticky top-0">
-                <tr>
-                  {['اسم الصنف', 'رصيد النظام', 'الجرد الفعلي', 'الفارق', 'سبب الفارق', 'سعر التكلفة', 'الفارق المالي', 'ملاحظات'].map(h => (
-                    <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {visibleItems.map(({ item, index }) => (
-                  <CountItemRow
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    session={session}
-                    onCountChange={onCountChange}
-                    onDiscrepancyReasonChange={onDiscrepancyReasonChange}
-                    onNoteChange={onNoteChange}
-                  />
-                ))}
-                {visibleItems.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">لا توجد أصناف تطابق البحث</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="أصناف جلسة الجرد"
+              rows={visibleItems}
+              rowKey={(row: any) => String(row.item.id)}
+              stickyHeader
+              tableClassName="text-xs"
+              columns={[
+                { key: 'name', header: 'اسم الصنف', render: (row: any) => <span className="font-semibold text-slate-900">{row.item.productName}</span> },
+                {
+                  key: 'system', header: 'رصيد النظام',
+                  render: (row: any) => {
+                    const { blindCounting } = countCellState(row.item, session);
+                    return blindCounting ? (
+                      <span className="rounded border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-600">🔒 مخفي (عدّ أعمى)</span>
+                    ) : (
+                      <span className="font-mono font-bold text-slate-500">{formatProductQuantity(row.item.systemQuantityM2, row.item)}</span>
+                    );
+                  },
+                },
+                {
+                  key: 'actual', header: 'الجرد الفعلي',
+                  render: (row: any) => {
+                    const { blindCounting, isPosted } = countCellState(row.item, session);
+                    const item = row.item;
+                    return isPosted ? (
+                      <span className="font-mono font-bold text-slate-900">{formatProductQuantity(Number(item.countedQuantityM2), item)}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={item.countedQuantityM2 ?? ''}
+                        onChange={(e) => onCountChange(row.index, e.target.value)}
+                        placeholder="أدخل الجرد الفعلي"
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-violet-500 focus:outline-none"
+                      />
+                    );
+                  },
+                },
+                {
+                  key: 'variance', header: 'الفارق',
+                  render: (row: any) => {
+                    const { blindCounting, isCounted } = countCellState(row.item, session);
+                    const item = row.item;
+                    if (blindCounting) return <span className="text-[11px] text-slate-400">يحتسب بعد الإدخال</span>;
+                    if (isCounted) return <QuantityVariance value={item.varianceM2} item={item} />;
+                    return <span className="font-mono font-bold text-slate-400">—</span>;
+                  },
+                },
+                {
+                  key: 'reason', header: 'سبب الفارق',
+                  render: (row: any) => {
+                    const { hasVariance, isPosted } = countCellState(row.item, session);
+                    const item = row.item;
+                    if (!hasVariance) return <span className="text-xs text-slate-300">—</span>;
+                    if (isPosted) return <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'غير محدد'}</span>;
+                    return (
+                      <select
+                        value={item.discrepancyReason || ''}
+                        onChange={(e) => onDiscrepancyReasonChange(row.index, e.target.value)}
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 focus:border-violet-500 focus:outline-none"
+                      >
+                        <option value="">-- سبب الفارق --</option>
+                        <option value="BREAKAGE">كسر وتلف</option>
+                        <option value="THEFT">عجز / فقد</option>
+                        <option value="MISCOUNT">خطأ في العد</option>
+                        <option value="INPUT_ERROR">خطأ إدخال سابق</option>
+                        <option value="SUPPLIER_SHORTAGE">عجز توريد</option>
+                        <option value="OTHER">أخرى</option>
+                      </select>
+                    );
+                  },
+                },
+                { key: 'cost', header: 'سعر التكلفة', render: (row: any) => <span className="font-mono text-slate-500">{fmtCountCurrency(row.item.unitCost)}</span> },
+                {
+                  key: 'finvar', header: 'الفارق المالي',
+                  render: (row: any) => {
+                    const { blindCounting, isCounted } = countCellState(row.item, session);
+                    const item = row.item;
+                    if (blindCounting) return <span className="font-mono font-bold text-slate-400">—</span>;
+                    if (isCounted) return <FinancialVariance value={item.varianceValue} />;
+                    return <span className="font-mono font-bold text-slate-500">—</span>;
+                  },
+                },
+                {
+                  key: 'notes', header: 'ملاحظات',
+                  render: (row: any) => {
+                    const { isPosted } = countCellState(row.item, session);
+                    const item = row.item;
+                    return (
+                      <input
+                        value={item.notes}
+                        disabled={isPosted}
+                        onChange={(e) => onNoteChange(row.index, e.target.value)}
+                        maxLength={250}
+                        placeholder="ملاحظة"
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs disabled:border-transparent"
+                      />
+                    );
+                  },
+                },
+              ]}
+              emptyTitle="لا توجد أصناف تطابق البحث"
+            />
           </div>
         </div>
 

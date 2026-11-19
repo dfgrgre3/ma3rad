@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Settings, Loader2, AlertTriangle, CheckCircle2, Bell, BellOff,
   Calendar, Clock, Building2, RefreshCw, Shield,
@@ -80,7 +81,7 @@ export const PayrollNotificationSettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600">
@@ -143,105 +144,67 @@ export const PayrollNotificationSettingsPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1200px] text-right text-sm">
-                  <thead className="border-b border-slate-200 bg-white sticky top-0">
-                    <tr>
-                      {[
-                        'الفرع', 'الحالة', 'تنبيه مستحق', 'أيام قبل الاستحقاق',
-                        'تنبيه متأخر', 'أيام بعد الاستحقاق', 'آخر تعديل', 'تم التعديل بواسطة', 'إجراءات',
-                      ].map((h) => (
-                        <th key={h} className="px-3 py-3 font-bold text-slate-500">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {settings.map((s) => (
-                      <tr key={s.branchId} className={`hover:bg-slate-50/70 ${!s.enabled ? 'bg-slate-25' : ''}`}>
-                        <td className="px-3 py-3 font-bold text-slate-800">
-                          {s.branchName}
-                        </td>
-                        <td className="px-3 py-3">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={s.enabled}
-                              onChange={() => toggleEnabled(s.branchId, s.enabled)}
-                              disabled={saving === s.branchId}
-                              className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            />
-                            <span className="text-xs font-medium">
-                              {s.enabled ? 'مُفعّلة' : 'مُعطّلة'}
-                            </span>
-                          </label>
-                        </td>
-                        <td className="px-3 py-3">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={s.enabled && s.notifyDue}
-                              onChange={() => toggleNotifyDue(s.branchId, s.notifyDue)}
-                              disabled={!s.enabled || saving === s.branchId}
-                              className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            />
-                            <span className={`text-xs ${s.enabled && s.notifyDue ? 'text-emerald-700' : 'text-slate-500'}`}>
-                              {s.enabled && s.notifyDue ? 'مُفعّلة' : 'مُعطّلة'}
-                            </span>
-                          </label>
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number"
-                            min="1"
-                            max="30"
-                            value={s.dueHorizonDays}
-                            onChange={(e) => handleDueDaysChange(s.branchId, e.target.value)}
-                            disabled={!s.enabled || !s.notifyDue || saving === s.branchId}
-                            className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-center text-xs font-mono disabled:bg-slate-50 disabled:cursor-not-allowed"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={s.enabled && s.notifyOverdue}
-                              onChange={() => toggleNotifyOverdue(s.branchId, s.notifyOverdue)}
-                              disabled={!s.enabled || saving === s.branchId}
-                              className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            />
-                            <span className={`text-xs ${s.enabled && s.notifyOverdue ? 'text-rose-700' : 'text-slate-500'}`}>
-                              {s.enabled && s.notifyOverdue ? 'مُفعّلة' : 'مُعطّلة'}
-                            </span>
-                          </label>
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number"
-                            min="0"
-                            max="30"
-                            value={s.overdueHorizonDays}
-                            onChange={(e) => handleOverdueDaysChange(s.branchId, e.target.value)}
-                            disabled={!s.enabled || !s.notifyOverdue || saving === s.branchId}
-                            className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-center text-xs font-mono disabled:bg-slate-50 disabled:cursor-not-allowed"
-                          />
-                        </td>
-                        <td className="px-3 py-3 text-slate-500 text-[10px] font-mono">
-                          {new Date(s.updatedAt).toLocaleDateString('ar-EG', {
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit',
-                          })}
-                        </td>
-                        <td className="px-3 py-3 text-slate-500 text-xs">
-                          {s.updatedByName || '—'}
-                        </td>
-                        <td className="px-3 py-3">
-                          {saving === s.branchId && (
-                            <Loader2 className="w-4 h-4 animate-spin text-sky-500 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="إعدادات إشعارات الرواتب لكل فرع"
+                  rows={settings}
+                  rowKey={(s: any) => s.branchId}
+                  minWidth={1200}
+                  tableClassName="text-sm"
+                  rowClassName={(s: any) => `hover:bg-slate-50/70 ${!s.enabled ? 'bg-slate-25' : ''}`}
+                  columns={[
+                    { key: 'branch', header: 'الفرع', render: (s: any) => <span className="font-bold text-slate-800">{s.branchName}</span> },
+                    {
+                      key: 'enabled', header: 'الحالة',
+                      render: (s: any) => (
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={s.enabled} onChange={() => toggleEnabled(s.branchId, s.enabled)} disabled={saving === s.branchId} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+                          <span className="text-xs font-medium">{s.enabled ? 'مُفعّلة' : 'مُعطّلة'}</span>
+                        </label>
+                      ),
+                    },
+                    {
+                      key: 'notifyDue', header: 'تنبيه مستحق',
+                      render: (s: any) => (
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={s.enabled && s.notifyDue} onChange={() => toggleNotifyDue(s.branchId, s.notifyDue)} disabled={!s.enabled || saving === s.branchId} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+                          <span className={`text-xs ${s.enabled && s.notifyDue ? 'text-emerald-700' : 'text-slate-500'}`}>{s.enabled && s.notifyDue ? 'مُفعّلة' : 'مُعطّلة'}</span>
+                        </label>
+                      ),
+                    },
+                    {
+                      key: 'dueDays', header: 'أيام قبل الاستحقاق',
+                      render: (s: any) => (
+                        <input type="number" min="1" max="30" value={s.dueHorizonDays} onChange={(e) => handleDueDaysChange(s.branchId, e.target.value)} disabled={!s.enabled || !s.notifyDue || saving === s.branchId} className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center font-mono text-xs disabled:cursor-not-allowed disabled:bg-slate-50" />
+                      ),
+                    },
+                    {
+                      key: 'notifyOverdue', header: 'تنبيه متأخر',
+                      render: (s: any) => (
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={s.enabled && s.notifyOverdue} onChange={() => toggleNotifyOverdue(s.branchId, s.notifyOverdue)} disabled={!s.enabled || saving === s.branchId} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+                          <span className={`text-xs ${s.enabled && s.notifyOverdue ? 'text-rose-700' : 'text-slate-500'}`}>{s.enabled && s.notifyOverdue ? 'مُفعّلة' : 'مُعطّلة'}</span>
+                        </label>
+                      ),
+                    },
+                    {
+                      key: 'overdueDays', header: 'أيام بعد الاستحقاق',
+                      render: (s: any) => (
+                        <input type="number" min="0" max="30" value={s.overdueHorizonDays} onChange={(e) => handleOverdueDaysChange(s.branchId, e.target.value)} disabled={!s.enabled || !s.notifyOverdue || saving === s.branchId} className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center font-mono text-xs disabled:cursor-not-allowed disabled:bg-slate-50" />
+                      ),
+                    },
+                    {
+                      key: 'updated', header: 'آخر تعديل',
+                      render: (s: any) => (
+                        <span className="font-mono text-[10px] text-slate-500">{new Date(s.updatedAt).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      ),
+                    },
+                    { key: 'by', header: 'تم التعديل بواسطة', render: (s: any) => <span className="text-xs text-slate-500">{s.updatedByName || '—'}</span> },
+                    {
+                      key: 'actions', header: 'إجراءات',
+                      render: (s: any) => saving === s.branchId ? <Loader2 className="mx-auto h-4 w-4 animate-spin text-sky-500" /> : null,
+                    },
+                  ]}
+                />
               </div>
             </div>
 

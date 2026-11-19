@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ShieldCheck, Users, MonitorSmartphone, AlertTriangle, Lock, RefreshCw,
   LogOut, Search, Loader2, Clock, KeyRound, FileWarning,
@@ -139,7 +140,7 @@ export const SecurityCenterPage: React.FC = () => {
   ] : [];
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
@@ -291,31 +292,35 @@ export const SecurityCenterPage: React.FC = () => {
                   <h3 className="text-sm font-black flex items-center gap-2"><MonitorSmartphone className="w-4 h-4 text-sky-600" /> الجلسات النشطة</h3>
                   <span className="text-[10px] font-bold text-slate-400">{sessions.length} جلسة</span>
                 </div>
-                <table className="w-full text-sm text-right">
-                  <thead className="bg-slate-50 text-[11px] text-slate-500 border-b border-slate-200">
-                    <tr><th className="px-3 py-2.5">المستخدم</th><th className="px-3 py-2.5">الجهاز</th><th className="px-3 py-2.5">آخر نشاط</th><th className="px-3 py-2.5">إجراء</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {sessions.map((session) => (
-                      <tr key={session.id} className="hover:bg-slate-50/70">
-                        <td className="px-3 py-2.5">
+                <DataTable
+                  ariaLabel="الجلسات النشطة"
+                  rows={sessions}
+                  rowKey={(session) => session.id}
+                  columns={[
+                    {
+                      key: 'user', header: 'المستخدم',
+                      render: (session) => (
+                        <span>
                           <span className="font-bold">{session.userName}</span>
                           {session.isCurrent && <span className="mr-2 text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">الحالية</span>}
                           <span className="block text-[10px] text-slate-400 font-mono">{session.username} · {session.role}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-slate-600">{session.deviceLabel || '—'}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-500">{fmtDate(session.lastSeenAt)}</td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-1">
-                            {canManageSessions && <button onClick={() => revoke(session)} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إنهاء الجلسة"><LogOut className="w-4 h-4" /></button>}
-                            {canManageSessions && !session.isCurrent && <button onClick={() => revokeAllForUser(session)} className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-100 border border-slate-200">كل الجلسات</button>}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {sessions.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-400">لا توجد جلسات نشطة</td></tr>}
-                  </tbody>
-                </table>
+                        </span>
+                      ),
+                    },
+                    { key: 'device', header: 'الجهاز', render: (session) => <span className="text-xs text-slate-600">{session.deviceLabel || '—'}</span> },
+                    { key: 'seen', header: 'آخر نشاط', render: (session) => <span className="text-xs text-slate-500">{fmtDate(session.lastSeenAt)}</span> },
+                    {
+                      key: 'action', header: 'إجراء',
+                      render: (session) => (
+                        <div className="flex items-center gap-1">
+                          {canManageSessions && <button onClick={() => revoke(session)} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إنهاء الجلسة"><LogOut className="w-4 h-4" /></button>}
+                          {canManageSessions && !session.isCurrent && <button onClick={() => revokeAllForUser(session)} className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-100 border border-slate-200">كل الجلسات</button>}
+                        </div>
+                      ),
+                    },
+                  ]}
+                  emptyTitle="لا توجد جلسات نشطة"
+                />
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -351,27 +356,26 @@ export const SecurityCenterPage: React.FC = () => {
                   </label>
                 </div>
               </div>
-              <table className="w-full text-sm text-right">
-                <thead className="bg-slate-50 text-[11px] text-slate-500 border-b border-slate-200">
-                  <tr><th className="px-3 py-2.5">المستخدم</th><th className="px-3 py-2.5">النتيجة</th><th className="px-3 py-2.5">السبب</th><th className="px-3 py-2.5">الجهاز</th><th className="px-3 py-2.5">التوقيت</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {history.map((record) => (
-                    <tr key={record.id} className="hover:bg-slate-50/70">
-                      <td className="px-3 py-2.5 font-semibold">{record.username}</td>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${record.succeeded ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                          {record.succeeded ? 'ناجح' : 'فاشل'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500 font-mono">{record.failureReason || '—'}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500">{record.deviceLabel || '—'}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-400">{fmtDate(record.createdAt)}</td>
-                    </tr>
-                  ))}
-                  {history.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-slate-400">لا توجد سجلات مطابقة</td></tr>}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="سجل محاولات الدخول"
+                rows={history}
+                rowKey={(record) => record.id}
+                columns={[
+                  { key: 'user', header: 'المستخدم', render: (record) => <span className="font-semibold">{record.username}</span> },
+                  {
+                    key: 'result', header: 'النتيجة',
+                    render: (record) => (
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${record.succeeded ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                        {record.succeeded ? 'ناجح' : 'فاشل'}
+                      </span>
+                    ),
+                  },
+                  { key: 'reason', header: 'السبب', render: (record) => <span className="text-[11px] text-slate-500 font-mono">{record.failureReason || '—'}</span> },
+                  { key: 'device', header: 'الجهاز', render: (record) => <span className="text-[11px] text-slate-500">{record.deviceLabel || '—'}</span> },
+                  { key: 'time', header: 'التوقيت', render: (record) => <span className="text-[11px] text-slate-400">{fmtDate(record.createdAt)}</span> },
+                ]}
+                emptyTitle="لا توجد سجلات مطابقة"
+              />
             </div>
           </>
         )}

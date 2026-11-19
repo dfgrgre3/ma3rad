@@ -5,6 +5,7 @@ import type { DynamicAttributeDataType } from '../../../services/domains/product
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { OperationalFieldsManager } from '../operational-fields/OperationalFieldsManager';
 
+import { useToast } from '../../../components/ui/Toast';
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
   TILE_GRADES: Shield, TILE_EDGES: Layers,
@@ -15,6 +16,7 @@ const DATA_TYPES: Record<DynamicAttributeDataType, string> = {
 };
 
 export const ProductAttributesPage: React.FC = () => {
+  const toast = useToast();
   const service = new AttributeService();
   const canManage = usePermission()('products.attributes.manage');
   const [categories, setCategories] = useState<AttributeCategory[]>([]);
@@ -64,13 +66,13 @@ export const ProductAttributesPage: React.FC = () => {
     if (!canManage) return;
     if (!activeCategory || !newValue.trim()) return;
     try { service.addValue(activeCategory.id, newValue); setNewValue(''); load(); }
-    catch (err: any) { alert(err?.message); }
+    catch (err: any) { toast.error(err?.message); }
   };
 
   const handleRemoveValue = (optionId: string) => {
     if (!canManage) return;
     if (!confirm('حذف هذه القيمة؟')) return;
-    try { service.removeValue(optionId); load(); } catch (err: any) { alert(err?.message); }
+    try { service.removeValue(optionId); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   const handleAddCategory = (e: React.FormEvent) => {
@@ -98,7 +100,7 @@ export const ProductAttributesPage: React.FC = () => {
         options: '',
       });
       load();
-    } catch (err: any) { alert(err?.message); }
+    } catch (err: any) { toast.error(err?.message); }
     finally { setSaving(false); }
   };
 
@@ -107,7 +109,7 @@ export const ProductAttributesPage: React.FC = () => {
   );
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600"><Ruler className="w-5 h-5" /></div>

@@ -13,6 +13,7 @@ import { InventoryService } from '../../../services/domains/inventory/InventoryS
 import { isWarehouseType, WAREHOUSE_TYPES, WAREHOUSE_TYPE_LABELS, type WarehouseType } from '../../../types/products/catalog';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 
+import { useToast } from '../../../components/ui/Toast';
 type WarehouseMetrics = {
   quantityByUnit: Record<string, number>;
   availableByUnit: Record<string, number>;
@@ -39,6 +40,7 @@ const formatQuantitiesByUnit = (quantities: Record<string, number>) => {
 };
 
 export const WarehousesPage: React.FC = () => {
+  const toast = useToast();
   const service = new OperationsService();
   const fieldService = new OperationalFieldService();
   const inventoryService = new InventoryService();
@@ -181,7 +183,7 @@ export const WarehousesPage: React.FC = () => {
       setEditingWarehouse(null);
       setForm({ name: '', location: '', branchId: '', warehouseType: 'BRANCH_WAREHOUSE' });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر حفظ بيانات المخزن.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر حفظ بيانات المخزن.'); }
     finally { setSaving(false); }
   };
 
@@ -208,20 +210,20 @@ export const WarehousesPage: React.FC = () => {
     try {
       service.setWarehouseActive(warehouse.id, !warehouse.isActive);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر تغيير حالة المخزن.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر تغيير حالة المخزن.'); }
   };
 
   const handleSetDefault = (warehouse: WarehouseRow) => {
     try {
       service.setDefaultWarehouse(warehouse.id);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر تعيين المخزن الافتراضي.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر تعيين المخزن الافتراضي.'); }
   };
 
   const openTransfer = (warehouse: WarehouseRow) => {
     const destination = warehouses.find((candidate) => candidate.isActive && candidate.id !== warehouse.id);
     if (!destination) {
-      alert('لا يوجد مخزن نشط آخر متاح لنقل الرصيد إليه.');
+      toast.warning('لا يوجد مخزن نشط آخر متاح لنقل الرصيد إليه.');
       return;
     }
     setTransferWarehouse(warehouse);
@@ -240,8 +242,8 @@ export const WarehousesPage: React.FC = () => {
       setTransferWarehouse(null);
       setTransferDestinationId('');
       load();
-      alert(`تم إنشاء طلب نقل الرصيد (${transferId}). سيظل المخزن نشطًا حتى اعتماد التحويل وإرساله واستلامه؛ بعد ذلك يمكنك تعطيله.`);
-    } catch (err: any) { alert(err?.message || 'تعذر نقل رصيد المخزن.'); }
+      toast.success(`تم إنشاء طلب نقل الرصيد (${transferId}). سيظل المخزن نشطًا حتى اعتماد التحويل وإرساله واستلامه؛ بعد ذلك يمكنك تعطيله.`);
+    } catch (err: any) { toast.error(err?.message || 'تعذر نقل رصيد المخزن.'); }
     finally { setTransferSaving(false); }
   };
 
@@ -252,7 +254,7 @@ export const WarehousesPage: React.FC = () => {
         warehouse.id === warehouseId ? { ...warehouse, warehouseType } : warehouse
       ));
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحديث نوع المخزن.');
+      toast.error(err?.message || 'تعذر تحديث نوع المخزن.');
     }
   };
 
@@ -283,7 +285,7 @@ export const WarehousesPage: React.FC = () => {
   }, [stockByWarehouse]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center"><Warehouse className="w-5 h-5 text-violet-600" /></div>

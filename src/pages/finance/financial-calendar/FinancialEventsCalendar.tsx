@@ -566,7 +566,7 @@ export const FinancialEventsCalendar: React.FC = () => {
       : canManage;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-100/70 p-4 text-slate-900 sm:p-6" dir="rtl">
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-100/70 p-4 text-slate-900 sm:p-6">
       <header className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between sm:p-5">
         <div className="flex items-center gap-3">
           <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2.5 text-cyan-300"><CalendarDays className="h-6 w-6" /></div>

@@ -64,7 +64,10 @@ test('Electron database initialization loads and persists through the registered
   const backupDir = path.join(appDataDir, 'backups');
   const dbFile = path.join(dataDir, 'ceramisys.sqlite');
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
-  const ipcMain = { handle: (name: string, handler: (...args: any[]) => Promise<any>) => handlers.set(name, handler) };
+  const ipcMain = {
+    handle: (name: string, handler: (...args: any[]) => Promise<any>) => handlers.set(name, handler),
+    on: (name: string, handler: (...args: any[]) => any) => handlers.set(name, handler),
+  };
   const ensureDirs = () => {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.mkdirSync(backupDir, { recursive: true });

@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../ui/DataTable';
 import {
   AlertTriangle, Ban, CreditCard, Eye, FileBarChart, FileDown, Loader2, Printer,
   Receipt, RotateCcw, Wallet, X,
@@ -155,34 +156,24 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[700px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-3 py-2">الصنف</th>
-                  <th className="px-3 py-2">المقاس / الفرز</th>
-                  <th className="px-3 py-2">الكمية</th>
-                  <th className="px-3 py-2">الكراتين</th>
-                  <th className="px-3 py-2">سعر الوحدة</th>
-                  <th className="px-3 py-2">الخصم</th>
-                  <th className="px-3 py-2">الإجمالي</th>
-                  <th className="px-3 py-2">الربح</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {selected.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 py-2 font-bold text-slate-800">{item.productName}</td>
-                    <td className="px-3 py-2 text-slate-500">{item.productType === 'GENERAL' ? getProductUnitLabel(item) : `${item.size} • ${item.productGrade}`}</td>
-                    <td className="px-3 py-2 font-mono">{formatProductQuantity(item.quantityM2, item)}</td>
-                    <td className="px-3 py-2 font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</td>
-                    <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)}</td>
-                    <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
-                    <td className="px-3 py-2 font-bold text-slate-900">{fmt(item.totalPrice)}</td>
-                    <td className={`px-3 py-2 font-bold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmt(item.profit)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="أصناف الفاتورة"
+              rows={selected.items}
+              rowKey={(item) => item.id}
+              minWidth={700}
+              dense
+              tableClassName="text-[11px]"
+              columns={[
+                { key: 'product', header: 'الصنف', render: (item) => <span className="font-bold text-slate-800">{item.productName}</span> },
+                { key: 'size', header: 'المقاس / الفرز', render: (item) => <span className="text-slate-500">{item.productType === 'GENERAL' ? getProductUnitLabel(item) : `${item.size} • ${item.productGrade}`}</span> },
+                { key: 'qty', header: 'الكمية', render: (item) => <span className="font-mono">{formatProductQuantity(item.quantityM2, item)}</span> },
+                { key: 'boxes', header: 'الكراتين', render: (item) => <span className="font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</span> },
+                { key: 'price', header: 'سعر الوحدة', render: (item) => <span className="font-mono">{fmt(item.unitPrice)}</span> },
+                { key: 'discount', header: 'الخصم', render: (item) => <span className="font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</span> },
+                { key: 'total', header: 'الإجمالي', render: (item) => <span className="font-bold text-slate-900">{fmt(item.totalPrice)}</span> },
+                { key: 'profit', header: 'الربح', render: (item) => <span className={`font-bold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmt(item.profit)}</span> },
+              ]}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -367,33 +358,23 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
             <button onClick={() => setStatement(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[680px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-3 py-2">التاريخ</th>
-                  <th className="px-3 py-2">المستند</th>
-                  <th className="px-3 py-2">البيان</th>
-                  <th className="px-3 py-2">مدين</th>
-                  <th className="px-3 py-2">دائن</th>
-                  <th className="px-3 py-2">الرصيد</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {statement.transactions.map((tx: any) => (
-                  <tr key={`${tx.type}-${tx.id}`}>
-                    <td className="px-3 py-2 font-mono text-slate-500">{tx.date}</td>
-                    <td className="px-3 py-2 font-mono font-bold text-slate-700">{tx.docNumber}</td>
-                    <td className="px-3 py-2 text-slate-600">{tx.description}</td>
-                    <td className="px-3 py-2 font-mono text-rose-600">{tx.debit ? fmt(tx.debit) : '—'}</td>
-                    <td className="px-3 py-2 font-mono text-emerald-600">{tx.credit ? fmt(tx.credit) : '—'}</td>
-                    <td className="px-3 py-2 font-mono font-bold text-slate-800">{fmt(tx.balanceAfter)}</td>
-                  </tr>
-                ))}
-                {statement.transactions.length === 0 && (
-                  <tr><td colSpan={6} className="py-10 text-center text-slate-400">لا توجد حركات على حساب العميل.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="حركات كشف الحساب"
+              rows={statement.transactions}
+              rowKey={(tx: any) => `${tx.type}-${tx.id}`}
+              minWidth={680}
+              dense
+              tableClassName="text-[11px]"
+              columns={[
+                { key: 'date', header: 'التاريخ', render: (tx: any) => <span className="font-mono text-slate-500">{tx.date}</span> },
+                { key: 'doc', header: 'المستند', render: (tx: any) => <span className="font-mono font-bold text-slate-700">{tx.docNumber}</span> },
+                { key: 'desc', header: 'البيان', render: (tx: any) => <span className="text-slate-600">{tx.description}</span> },
+                { key: 'debit', header: 'مدين', render: (tx: any) => <span className="font-mono text-rose-600">{tx.debit ? fmt(tx.debit) : '—'}</span> },
+                { key: 'credit', header: 'دائن', render: (tx: any) => <span className="font-mono text-emerald-600">{tx.credit ? fmt(tx.credit) : '—'}</span> },
+                { key: 'balance', header: 'الرصيد', render: (tx: any) => <span className="font-mono font-bold text-slate-800">{fmt(tx.balanceAfter)}</span> },
+              ]}
+              emptyTitle="لا توجد حركات على حساب العميل."
+            />
           </div>
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             {canExportCustomers && <CustomerStatementWhatsAppOptions

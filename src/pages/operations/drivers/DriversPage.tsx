@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Users, Plus, Search, Phone, Loader2, X, Power, Truck } from 'lucide-react';
 import { OperationsService, Driver } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
+import { useToast } from '../../../components/ui/Toast';
 export const DriversPage: React.FC = () => {
+  const toast = useToast();
   const service = new OperationsService();
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.drivers.drivers.create');
@@ -41,16 +44,16 @@ export const DriversPage: React.FC = () => {
       setModalOpen(false);
       setForm({ fullName: '', phone: '', licenseNumber: '', licenseExpiresAt: '', notes: '' });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر إضافة السائق.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر إضافة السائق.'); }
     finally { setSaving(false); }
   };
 
   const toggle = (d: Driver) => {
-    try { service.toggleDriver(d.id, !d.isActive); load(); } catch (e: any) { alert(e?.message); }
+    try { service.toggleDriver(d.id, !d.isActive); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center"><Users className="w-5 h-5 text-amber-600" /></div>
@@ -77,42 +80,52 @@ export const DriversPage: React.FC = () => {
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div> : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-4 py-3">السائق</th>
-                  <th className="px-4 py-3">الهاتف</th>
-                  <th className="px-4 py-3">رقم الرخصة</th>
-                  <th className="px-4 py-3">انتهاء الرخصة</th>
-                  <th className="px-4 py-3">الرحلات</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  {(canUpdate || canManage) && <th className="px-4 py-3"></th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {drivers.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{d.fullName}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{d.code}</div>
-                    </td>
-                    <td className="px-4 py-3"><a href={`tel:${d.phone}`} className="flex items-center gap-1 text-slate-600 hover:text-amber-600 font-mono"><Phone className="w-3 h-3" />{d.phone}</a></td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{d.licenseNumber || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.licenseExpiresAt ? new Date(d.licenseExpiresAt).toLocaleDateString('ar-EG') : '—'}</td>
-                    <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-slate-600"><Truck className="w-3 h-3" />{d.tripsCount || 0}</span></td>
-                    <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${d.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{d.isActive ? 'نشط' : 'معطل'}</span></td>
-                    {(canUpdate || canManage) && (
-                      <td className="px-4 py-3 text-left">
-                        <button onClick={() => toggle(d)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition ${d.isActive ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                          <Power className="w-3 h-3 inline ml-1" />{d.isActive ? 'تعطيل' : 'تفعيل'}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {drivers.length === 0 && <tr><td colSpan={7} className="py-16 text-center text-slate-400">لا يوجد سائقون مسجلون</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="السائقون"
+              rows={drivers}
+              rowKey={(d: any) => String(d.id)}
+              tableClassName="text-xs"
+              columns={[
+                {
+                  key: 'driver', header: 'السائق',
+                  render: (d: any) => (
+                    <span className="block">
+                      <span className="block font-bold text-slate-900">{d.fullName}</span>
+                      <span className="block font-mono text-[10px] text-slate-400">{d.code}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'phone', header: 'الهاتف',
+                  render: (d: any) => <a href={`tel:${d.phone}`} className="flex items-center gap-1 font-mono text-slate-600 hover:text-amber-600"><Phone className="h-3 w-3" />{d.phone}</a>,
+                },
+                { key: 'license', header: 'رقم الرخصة', render: (d: any) => <span className="font-mono text-slate-600">{d.licenseNumber || '—'}</span> },
+                { key: 'expiry', header: 'انتهاء الرخصة', render: (d: any) => <span className="text-slate-600">{d.licenseExpiresAt ? new Date(d.licenseExpiresAt).toLocaleDateString('ar-EG') : '—'}</span> },
+                {
+                  key: 'trips', header: 'الرحلات',
+                  render: (d: any) => <span className="inline-flex items-center gap-1 text-slate-600"><Truck className="h-3 w-3" />{d.tripsCount || 0}</span>,
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (d: any) => (
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${d.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                      {d.isActive ? 'نشط' : 'معطل'}
+                    </span>
+                  ),
+                },
+                ...(canUpdate || canManage ? [{
+                  key: 'actions', header: '',
+                  render: (d: any) => (
+                    <span className="block text-left">
+                      <button onClick={() => toggle(d)} className={`rounded-lg border px-3 py-1 text-[10px] font-bold transition ${d.isActive ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-emerald-200 bg-emerald-50 text-emerald-600'}`}>
+                        <Power className="ml-1 inline h-3 w-3" />{d.isActive ? 'تعطيل' : 'تفعيل'}
+                      </button>
+                    </span>
+                  ),
+                }] : []),
+              ]}
+              emptyTitle="لا يوجد سائقون مسجلون"
+            />
           </div>
         )}
       </div>

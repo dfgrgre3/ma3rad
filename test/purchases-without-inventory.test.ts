@@ -83,7 +83,7 @@ test('a custom business without stock tracking can record and delete a purchase 
   assert.equal(count(db, 'SELECT COUNT(*) AS count FROM inventory_cost_layers WHERE product_id = ?', [productId]), 0);
 
   // The last purchase cost stays available as an expense reference.
-  const product = db.query<{ costPrice: number }>('SELECT cost_price AS costPrice FROM products WHERE id = ?', [productId])[0];
+  const product = db.query<{ costPrice: number }>('SELECT cost_price / 100.0 AS costPrice FROM products WHERE id = ?', [productId])[0];
   assert.equal(Number(product.costPrice), 40);
 
   const purchaseCodes = ledgerCodes(db, 'PURCHASE_INVOICE', purchase.id);

@@ -26,7 +26,7 @@ export const SalesTrendCard: React.FC<SalesTrendCardProps> = ({ chartData }) => 
 
       {hasSales ? (
         <div className="h-44 min-w-0 w-full sm:h-52" dir="ltr">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 208 }}>
             <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -12, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
               <XAxis

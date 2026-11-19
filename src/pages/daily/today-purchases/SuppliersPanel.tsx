@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Truck } from 'lucide-react';
 import { timeOf } from './helpers';
 import { ShareBar } from './primitives';
@@ -36,35 +37,43 @@ export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({ supplierStats, o
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-right text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/70">
-              <tr>{['المورد', 'الهاتف', 'الفواتير', 'الأصناف', 'إجمالي التوريد', 'المدفوع', 'المتبقي', 'آخر توريد', 'الحصة'].map((heading) => <th key={heading} scope="col" className="whitespace-nowrap px-3 py-3 font-bold text-slate-500 dark:text-slate-400">{heading}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {supplierStats.map((supplier) => {
+          <DataTable
+          ariaLabel="موردو اليوم"
+          rows={supplierStats}
+          rowKey={(supplier: any) => String(supplier.id)}
+          minWidth={900}
+          dense
+          tableClassName="text-xs"
+          columns={[
+            {
+              key: 'supplier', header: 'المورد',
+              render: (supplier: any) => (
+                <span>
+                  <button type="button" onClick={() => onNavigate(supplier.id ? `/suppliers/${supplier.id}` : '/suppliers')} className="font-bold text-slate-900 hover:text-orange-700 dark:text-slate-100 dark:hover:text-orange-300">{supplier.name}</button>
+                  {supplier.unpaid > 0 && <span className="mt-0.5 block text-[10px] text-rose-600 dark:text-rose-400">{plain(supplier.unpaid)} فاتورة غير مسددة</span>}
+                </span>
+              ),
+            },
+            { key: 'phone', header: 'الهاتف', render: (supplier: any) => <span className="whitespace-nowrap text-slate-500 dark:text-slate-400" dir="ltr">{supplier.phone || '—'}</span> },
+            { key: 'invoices', header: 'الفواتير', render: (supplier: any) => <span className="tabular-nums text-slate-700 dark:text-slate-200">{plain(supplier.invoices)}</span> },
+            { key: 'items', header: 'الأصناف', render: (supplier: any) => <span className="tabular-nums text-slate-600 dark:text-slate-300">{plain(supplier.itemsCount)}</span> },
+            { key: 'total', header: 'إجمالي التوريد', render: (supplier: any) => <span className="whitespace-nowrap font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(supplier.total)}</span> },
+            { key: 'paid', header: 'المدفوع', render: (supplier: any) => <span className="whitespace-nowrap font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(supplier.paid)}</span> },
+            {
+              key: 'remaining', header: 'المتبقي',
+              render: (supplier: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${supplier.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-400'}`}>{fmt(supplier.remaining)}</span>,
+            },
+            { key: 'last', header: 'آخر توريد', render: (supplier: any) => <span className="whitespace-nowrap text-slate-500 dark:text-slate-400">{timeOf(supplier.lastTime)}</span> },
+            {
+              key: 'share', header: 'الحصة',
+              render: (supplier: any) => {
                 const grand = supplierStats.reduce((sum, row) => sum + row.total, 0);
                 const share = grand > 0 ? (supplier.total / grand) * 100 : 0;
-                return (
-                  <tr key={supplier.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                    <td className="px-3 py-2.5">
-                      <button type="button" onClick={() => onNavigate(supplier.id ? `/suppliers/${supplier.id}` : '/suppliers')} className="font-bold text-slate-900 hover:text-orange-700 dark:text-slate-100 dark:hover:text-orange-300">{supplier.name}</button>
-                      {supplier.unpaid > 0 && <div className="mt-0.5 text-[10px] text-rose-600 dark:text-rose-400">{plain(supplier.unpaid)} فاتورة غير مسددة</div>}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 dark:text-slate-400" dir="ltr">{supplier.phone || '—'}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-slate-700 dark:text-slate-200">{plain(supplier.invoices)}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-slate-600 dark:text-slate-300">{plain(supplier.itemsCount)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(supplier.total)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(supplier.paid)}</td>
-                    <td className={`whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums ${supplier.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-400'}`}>{fmt(supplier.remaining)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 dark:text-slate-400">{timeOf(supplier.lastTime)}</td>
-                    <td className="px-3 py-2.5">
-                      <ShareBar share={share} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                return <ShareBar share={share} />;
+              },
+            },
+          ]}
+        />
         </div>
       </>
     )}

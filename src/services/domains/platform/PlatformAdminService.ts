@@ -38,6 +38,7 @@ import { platformHealthService } from './PlatformHealthService';
 import { platformAnalyticsService } from './PlatformAnalyticsService';
 import { platformAuditService } from './PlatformAuditService';
 import { centralAuditService } from './CentralAuditService';
+import { platformAdminApiClient } from './PlatformAdminApiClient';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
@@ -695,8 +696,30 @@ export class PlatformAdminService {
     return { ...result, alerts, duplicateHwids, overLimitLicenses, suspiciousTransfers };
   }
 
-  public detectCloneDevicesCentral() {
-    return this.detectCloneDevices();
+  /**
+   * Cross-tenant clone detection through the central admin API. Returns null
+   * when this device has no platform session — tenant installs never do, and
+   * the central server runs its own scheduled detection for them.
+   */
+  public async detectCloneDevicesCentral(): Promise<ReturnType<PlatformAdminService['detectCloneDevices']> | null> {
+    if (!platformAdminApiClient.isAvailable() || !platformAdminApiClient.getAuthToken()) {
+      return null;
+    }
+    const result = await platformAdminApiClient.detectCloneDevices();
+    const groupsByHwid = new Map<string, PlatformDevice[]>();
+    for (const device of result.devices) {
+      const list = groupsByHwid.get(device.hardwareId) ?? [];
+      list.push(device);
+      groupsByHwid.set(device.hardwareId, list);
+    }
+    return {
+      suspected: result.devices,
+      groups: [...groupsByHwid.entries()].map(([hardwareId, devices]) => ({ hardwareId, devices })),
+      alerts: result.alerts.map((message) => ({ type: '', message, hardwareId: '', tenantName: '' })),
+      duplicateHwids: result.duplicateHwids,
+      overLimitLicenses: result.overLimitLicenses,
+      suspiciousTransfers: result.suspiciousTransfers,
+    };
   }
 
   // Support - Delegate to PlatformSupportService

@@ -8,6 +8,7 @@ const { app } = require('./app');
 const { initDatabase, getDb, bootstrapDefaults, seedPlatformRBAC } = require('./lib/db');
 const { initSigningKeys, signCertificate, verifyCertificate } = require('./lib/signing');
 const { recordAuditEvent } = require('./lib/audit');
+const { runCloneDetection } = require('./lib/cloneDetection');
 const { startOpsWorker } = require('./lib/opsWorker');
 
 const PORT = process.env.PORT || 3001;
@@ -184,6 +185,25 @@ async function checkExpiringLicensesAndSubscriptions() {
   console.log(`[${new Date().toISOString()}] Scheduled check completed.`);
 }
 
+/**
+ * Cross-tenant clone/license-abuse sweep. Runs without a platform session
+ * because it is a SYSTEM job; tenant-scoped notifications are created for
+ * every tenant touched by a finding.
+ */
+async function runScheduledCloneDetection() {
+  const result = await runCloneDetection({
+    actorName: 'System Scheduler',
+    userAgent: 'system-scheduler',
+    notifyTenants: true,
+  });
+  console.log(
+    `[${new Date().toISOString()}] Clone detection completed: ` +
+    `${result.alerts.length} alert(s), ${result.duplicateHwids.length} duplicated HWID group(s), ` +
+    `${result.overLimitLicenses.length} over-limit license(s), ${result.suspiciousTransfers.length} suspicious transfer(s)`
+  );
+  return result;
+}
+
 function scheduleJobs() {
   // Run every day at 09:00 server time.
   cron.schedule('0 9 * * *', async () => {
@@ -191,6 +211,11 @@ function scheduleJobs() {
       await checkExpiringLicensesAndSubscriptions();
     } catch (err) {
       console.error('Scheduled job failed:', err);
+    }
+    try {
+      await runScheduledCloneDetection();
+    } catch (err) {
+      console.error('Scheduled clone detection failed:', err);
     }
   });
 
@@ -205,6 +230,11 @@ function scheduleJobs() {
         await checkExpiringLicensesAndSubscriptions();
       } catch (err) {
         console.error('Initial check failed:', err);
+      }
+      try {
+        await runScheduledCloneDetection();
+      } catch (err) {
+        console.error('Initial clone detection failed:', err);
       }
     }, 5000).unref?.();
   }
@@ -247,4 +277,5 @@ module.exports = {
   signCertificate,
   verifyCertificate,
   checkExpiringLicensesAndSubscriptions,
+  runScheduledCloneDetection,
 };

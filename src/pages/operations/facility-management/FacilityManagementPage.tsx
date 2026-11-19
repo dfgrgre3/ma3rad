@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertTriangle, Building2, CalendarClock, Check, ClipboardCheck, FileText, MapPin,
   Plus, RefreshCw, Search, ShieldCheck, Wrench, X, Edit3, Trash2, Archive,
@@ -322,99 +323,88 @@ export const FacilityManagementPage: React.FC = () => {
   const renderLocationsBody = () => {
     const rows = locations.filter((item) => visible(`${item.name} ${item.code || ''} ${item.branchName}`));
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-right">
-          <thead>
-            <tr className="border-b border-slate-200 text-xs text-slate-500">
-              <th className="px-4 py-3 font-semibold">الموقع</th>
-              <th className="px-4 py-3 font-semibold">التصنيف</th>
-              <th className="px-4 py-3 font-semibold">الفرع</th>
-              <th className="px-4 py-3 font-semibold">المسؤول</th>
-              <th className="px-4 py-3 font-semibold">الحالة</th>
-              <th className="px-4 py-3 font-semibold text-center">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3">
-                  <div className={`font-bold text-slate-800 ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</div>
-                  <div className="text-xs text-slate-400">{item.code || 'بدون رمز'}</div>
-                  {item.archivedAt && <div className="text-xs text-rose-500">مؤرشف منذ {formatDate(item.archivedAt)}</div>}
-                </td>
-                <td className="px-4 py-3 text-sm">{typeLabels[item.locationType] || item.locationType}</td>
-                <td className="px-4 py-3 text-sm">{item.branchName}</td>
-                <td className="px-4 py-3 text-sm">{item.managerName || 'غير محدد'}</td>
-                <td className="px-4 py-3 text-sm">{item.archivedAt ? statusBadge('RETIRED') : statusBadge('ACTIVE')}</td>
-                <td className="px-4 py-3 text-center">
-                  {canManage && (
-                    <div className="flex flex-wrap justify-center gap-1">
-                      <button onClick={() => openEdit('locations', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
-                      {item.archivedAt ? (
-                        <button onClick={() => { service.restoreLocation(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
-                      ) : (
-                        <button onClick={() => { service.archiveLocation(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
-                      )}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+                ariaLabel="المواقع"
+                rows={rows}
+                rowKey={(item) => item.id}
+                minWidth={720}
+                columns={[
+                  {
+                    key: 'location', header: 'الموقع',
+                    render: (item) => (
+                      <span>
+                        <span className={`font-bold text-slate-800 block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
+                        <span className="text-xs text-slate-400">{item.code || 'بدون رمز'}</span>
+                        {item.archivedAt && <span className="text-xs text-rose-500 block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
+                      </span>
+                    ),
+                  },
+                  { key: 'type', header: 'التصنيف', render: (item) => typeLabels[item.locationType] || item.locationType },
+                  { key: 'branch', header: 'الفرع', render: (item) => item.branchName },
+                  { key: 'manager', header: 'المسؤول', render: (item) => item.managerName || 'غير محدد' },
+                  { key: 'status', header: 'الحالة', render: (item) => item.archivedAt ? statusBadge('RETIRED') : statusBadge('ACTIVE') },
+                  {
+                    key: 'actions', header: 'إجراءات', align: 'center',
+                    render: (item) => canManage ? (
+                      <div className="flex flex-wrap justify-center gap-1">
+                        <button onClick={() => openEdit('locations', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
+                        {item.archivedAt ? (
+                          <button onClick={() => { service.restoreLocation(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
+                        ) : (
+                          <button onClick={() => { service.archiveLocation(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
+                        )}
+                      </div>
+                    ) : null,
+                  },
+                ]}
+              />
+
     );
   };
 
   const renderAssetsBody = () => {
     const rows = assets.filter((item) => visible(`${item.name} ${item.code} ${item.locationName} ${item.serialNumber || ''}`));
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-right">
-          <thead>
-            <tr className="border-b border-slate-200 text-xs text-slate-500">
-              <th className="px-4 py-3 font-semibold">الأصل</th>
-              <th className="px-4 py-3 font-semibold">الموقع</th>
-              <th className="px-4 py-3 font-semibold">الفئة / الرقم التسلسلي</th>
-              <th className="px-4 py-3 font-semibold">المسؤول (موظف)</th>
-              <th className="px-4 py-3 font-semibold">الضمان</th>
-              <th className="px-4 py-3 font-semibold">الحالة</th>
-              <th className="px-4 py-3 font-semibold text-center">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3">
-                  <div className={`font-bold text-slate-800 ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</div>
-                  <div className="text-xs text-slate-400">{item.code}</div>
-                  {item.archivedAt && <div className="text-xs text-rose-500">مؤرشف منذ {formatDate(item.archivedAt)}</div>}
-                </td>
-                <td className="px-4 py-3 text-sm">{item.locationName}</td>
-                <td className="px-4 py-3 text-sm">{item.category}<div className="text-xs text-slate-400">{item.serialNumber || '—'}</div></td>
-                <td className="px-4 py-3 text-sm">{item.responsibleName || 'غير محدد'}</td>
-                <td className="px-4 py-3 text-sm">{formatDate(item.warrantyExpiresAt)}</td>
-                <td className="px-4 py-3">{statusBadge(item.status)}</td>
-                <td className="px-4 py-3 text-center">
-                  {canManage && (
-                    <div className="flex flex-wrap justify-center gap-1">
-                      <button onClick={() => openEdit('assets', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
-                      {item.status === 'RETIRED' ? (
-                        <button onClick={() => { service.restoreAsset(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
-                      ) : (
-                        <>
-                          <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
-                          <button onClick={() => { service.retireAsset(item.id); load(); }} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="استبعاد"><Trash2 size={14} /></button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+                ariaLabel="الأصول"
+                rows={rows}
+                rowKey={(item) => item.id}
+                minWidth={860}
+                columns={[
+                  {
+                    key: 'asset', header: 'الأصل',
+                    render: (item) => (
+                      <span>
+                        <span className={`font-bold text-slate-800 block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
+                        <span className="text-xs text-slate-400">{item.code}</span>
+                        {item.archivedAt && <span className="text-xs text-rose-500 block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
+                      </span>
+                    ),
+                  },
+                  { key: 'location', header: 'الموقع', render: (item) => item.locationName },
+                  { key: 'category', header: 'الفئة / الرقم التسلسلي', render: (item) => <span>{item.category}<span className="block text-xs text-slate-400">{item.serialNumber || '—'}</span></span> },
+                  { key: 'responsible', header: 'المسؤول (موظف)', render: (item) => item.responsibleName || 'غير محدد' },
+                  { key: 'warranty', header: 'الضمان', render: (item) => formatDate(item.warrantyExpiresAt) },
+                  { key: 'status', header: 'الحالة', render: (item) => statusBadge(item.status) },
+                  {
+                    key: 'actions', header: 'إجراءات', align: 'center',
+                    render: (item) => canManage ? (
+                      <div className="flex flex-wrap justify-center gap-1">
+                        <button onClick={() => openEdit('assets', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
+                        {item.status === 'RETIRED' ? (
+                          <button onClick={() => { service.restoreAsset(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
+                        ) : (
+                          <>
+                            <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
+                            <button onClick={() => { service.retireAsset(item.id); load(); }} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="استبعاد"><Trash2 size={14} /></button>
+                          </>
+                        )}
+                      </div>
+                    ) : null,
+                  },
+                ]}
+              />
+
     );
   };
 
@@ -478,38 +468,23 @@ export const FacilityManagementPage: React.FC = () => {
   const renderContractsBody = () => {
     const rows = contracts.filter((item) => visible(`${item.contractNumber} ${item.title} ${item.vendorName} ${item.locationName}`));
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px] text-right">
-          <thead>
-            <tr className="border-b border-slate-200 text-xs text-slate-500">
-              <th className="px-4 py-3 font-semibold">العقد</th>
-              <th className="px-4 py-3 font-semibold">النوع والموقع</th>
-              <th className="px-4 py-3 font-semibold">المورد</th>
-              <th className="px-4 py-3 font-semibold">الانتهاء</th>
-              <th className="px-4 py-3 font-semibold">الدفعة التالية</th>
-              <th className="px-4 py-3 font-semibold">قيمة الدفعة</th>
-              <th className="px-4 py-3 font-semibold">الحالة</th>
-              <th className="px-4 py-3 font-semibold text-center">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3"><div className="font-bold text-slate-800">{item.title}</div><div className="text-xs text-slate-400">{item.contractNumber}</div></td>
-                <td className="px-4 py-3 text-sm">{typeLabels[item.contractType]}<div className="text-xs text-slate-400">{item.locationName}</div></td>
-                <td className="px-4 py-3 text-sm">{item.vendorName}</td>
-                <td className="px-4 py-3 text-sm">{formatDate(item.endsAt)}</td>
-                <td className="px-4 py-3 text-sm">{formatDate(item.nextPaymentDate)}</td>
-                <td className="px-4 py-3 text-sm font-bold">{amountLabel(item.paymentAmount)} <span className="font-normal text-slate-400">/ {typeLabels[item.paymentCycle] || item.paymentCycle}</span></td>
-                <td className="px-4 py-3">{statusBadge(item.status)}</td>
-                <td className="px-4 py-3 text-center">
-                  {canManage && <button onClick={() => openEdit('contracts', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+                ariaLabel="العقود"
+                rows={rows}
+                rowKey={(item) => item.id}
+                minWidth={800}
+                columns={[
+                  { key: 'contract', header: 'العقد', render: (item) => <span><span className="font-bold text-slate-800 block">{item.title}</span><span className="text-xs text-slate-400">{item.contractNumber}</span></span> },
+                  { key: 'type', header: 'النوع والموقع', render: (item) => <span>{typeLabels[item.contractType]}<span className="block text-xs text-slate-400">{item.locationName}</span></span> },
+                  { key: 'vendor', header: 'المورد', render: (item) => item.vendorName },
+                  { key: 'ends', header: 'الانتهاء', render: (item) => formatDate(item.endsAt) },
+                  { key: 'next', header: 'الدفعة التالية', render: (item) => formatDate(item.nextPaymentDate) },
+                  { key: 'amount', header: 'قيمة الدفعة', render: (item) => <span className="font-bold">{amountLabel(item.paymentAmount)} <span className="font-normal text-slate-400">/ {typeLabels[item.paymentCycle] || item.paymentCycle}</span></span> },
+                  { key: 'status', header: 'الحالة', render: (item) => statusBadge(item.status) },
+                  { key: 'actions', header: 'إجراءات', align: 'center', render: (item) => canManage ? <button onClick={() => openEdit('contracts', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button> : null },
+                ]}
+              />
+
     );
   };
 
@@ -545,7 +520,7 @@ export const FacilityManagementPage: React.FC = () => {
 
   const activeTabInfo = tabs.find((tab) => tab.key === activeTab)!;
   return (
-    <main className="mx-auto max-w-[1500px] space-y-5 p-4 pb-10 md:p-6" dir="rtl">
+    <main className="mx-auto max-w-[1500px] space-y-5 p-4 pb-10 md:p-6">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="mb-1 flex items-center gap-2 text-sm font-bold text-teal-700"><Building2 size={17} /> إدارة المنشأة</div>

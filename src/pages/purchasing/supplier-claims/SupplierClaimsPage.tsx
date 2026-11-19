@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ShieldAlert, Plus, Search, ChevronDown, X, Layers,
 } from 'lucide-react';
@@ -194,7 +195,7 @@ export const SupplierClaimsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -309,30 +310,22 @@ export const SupplierClaimsPage: React.FC = () => {
                     <Layers className="w-4 h-4 text-rose-600" /> تفاصيل أصناف المطالبة والعيوب المرصودة:
                   </h4>
                   <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
-                    <table className="w-full text-xs text-right">
-                      <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                        <tr>
-                          <th className="p-3">الصنف</th>
-                          <th className="p-3">نوع العيب / المشكلة</th>
-                          <th className="p-3">الكمية المتضررة</th>
-                          <th className="p-3">سعر التكلفة</th>
-                          <th className="p-3">إجمالي قيمة الضرر</th>
-                          <th className="p-3">ملاحظات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {expandedDetails.items.map((it) => (
-                          <tr key={it.id}>
-                            <td className="p-3 font-bold text-slate-900">{it.productName}</td>
-                            <td className="p-3 text-rose-700 font-semibold">{it.defectType || 'كسر/تلف'}</td>
-                            <td className="p-3 font-bold text-slate-800">{it.quantityM2} م²</td>
-                            <td className="p-3">{fmt(it.unitCost)}</td>
-                            <td className="p-3 font-black text-rose-600">{fmt(it.totalAmount)}</td>
-                            <td className="p-3 text-slate-500">{it.notes || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      ariaLabel="أصناف مطالبة المورد"
+                      rows={expandedDetails.items}
+                      rowKey={(it: any) => String(it.id)}
+                      dense
+                      tableClassName="text-xs"
+                      rowClassName={() => 'transition hover:bg-slate-50'}
+                      columns={[
+                        { key: 'product', header: 'الصنف', render: (it: any) => <span className="font-bold text-slate-900">{it.productName}</span> },
+                        { key: 'defect', header: 'نوع العيب / المشكلة', render: (it: any) => <span className="font-semibold text-rose-700">{it.defectType || 'كسر/تلف'}</span> },
+                        { key: 'qty', header: 'الكمية المتضررة', render: (it: any) => <span className="font-bold text-slate-800">{it.quantityM2} م²</span> },
+                        { key: 'cost', header: 'سعر التكلفة', render: (it: any) => <span>{fmt(it.unitCost)}</span> },
+                        { key: 'total', header: 'إجمالي قيمة الضرر', render: (it: any) => <span className="font-black text-rose-600">{fmt(it.totalAmount)}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (it: any) => <span className="text-slate-500">{it.notes || '—'}</span> },
+                      ]}
+                    />
                   </div>
 
                   {expandedDetails.notes && (

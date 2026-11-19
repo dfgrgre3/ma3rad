@@ -31,7 +31,9 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformEmergencyCenterPage: React.FC = () => {
+  const toast = useToast();
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [apiKeys, setApiKeys] = useState<PlatformApiKey[]>([]);
   const [releases, setReleases] = useState<PlatformRelease[]>([]);
@@ -93,7 +95,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
     action: () => void
   ) => {
     if (!canManageEmergency) {
-      alert('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
+      toast.warning('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
       return;
     }
     setConfirmModal({
@@ -107,9 +109,9 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           action();
           setConfirmModal((prev) => ({ ...prev, open: false }));
           loadData();
-          alert('تم تنفيذ الإجراء الطارئ بنجاح.');
+          toast.success('تم تنفيذ الإجراء الطارئ بنجاح.');
         } catch (err) {
-          alert(err instanceof Error ? err.message : 'فشل تنفيذ الإجراء الطارئ.');
+          toast.error(err instanceof Error ? err.message : 'فشل تنفيذ الإجراء الطارئ.');
         }
       },
     });
@@ -204,10 +206,10 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
             variant="secondary"
             onClick={() => {
               if (!canManageEmergency) {
-                alert('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
+                toast.warning('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
                 return;
               }
-              alert('تم إرسال إشعار الصيانة الطارئة وتحديث حالة السيرفرات.');
+              toast.success('تم إرسال إشعار الصيانة الطارئة وتحديث حالة السيرفرات.');
             }}
             disabled={!canManageEmergency}
             leadingIcon={<AlertTriangle className="h-3.5 w-3.5" />}

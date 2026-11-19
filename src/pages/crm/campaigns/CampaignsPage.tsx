@@ -4,6 +4,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { v4 as uuidv4 } from 'uuid';
 
+import { useToast } from '../../../components/ui/Toast';
 type CampaignStatus = 'PLANNED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 type Channel = 'WHATSAPP' | 'SMS' | 'EMAIL' | 'PHONE' | 'SOCIAL' | 'WALK_IN' | 'REFERRAL' | 'OTHER';
 
@@ -36,6 +37,7 @@ const CHANNEL_LABELS: Record<Channel, string> = {
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 
 export const CampaignsPage: React.FC = () => {
+  const toast = useToast();
   const db = useMemo(() => DatabaseManager.getInstance(), []);
   const [rows, setRows] = useState<Campaign[]>([]);
   const [search, setSearch] = useState('');
@@ -107,23 +109,23 @@ export const CampaignsPage: React.FC = () => {
       }
       setModal(false);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر حفظ الحملة.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر حفظ الحملة.'); }
     finally { setSaving(false); }
   };
 
   const remove = (c: Campaign) => {
     if (!confirm(`حذف الحملة "${c.name}"؟ سيتم فصل العملاء المحتملين المرتبطين بها.`)) return;
     try { db.run('DELETE FROM campaigns WHERE id = ?', [c.id]); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر حذف الحملة.'); }
+    catch (err: any) { toast.error(err?.message || 'تعذر حذف الحملة.'); }
   };
 
   const setStatus = (c: Campaign, status: CampaignStatus) => {
     try { db.run('UPDATE campaigns SET status = ? WHERE id = ?', [status, c.id]); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر تحديث الحالة.'); }
+    catch (err: any) { toast.error(err?.message || 'تعذر تحديث الحالة.'); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-pink-50 border border-pink-200 flex items-center justify-center"><Megaphone className="w-5 h-5 text-pink-600" /></div>

@@ -65,7 +65,7 @@ export const NotesEditor: React.FC<{ compact?: boolean }> = ({ compact = false }
   };
 
   return (
-    <div className={`flex min-h-0 gap-3 ${compact ? 'h-[calc(100%-2.5rem)] flex-col sm:flex-row' : 'min-h-[22rem] flex-col sm:flex-row'}`} dir="rtl">
+    <div className={`flex min-h-0 gap-3 ${compact ? 'h-[calc(100%-2.5rem)] flex-col sm:flex-row' : 'min-h-[22rem] flex-col sm:flex-row'}`}>
       <aside className="flex min-h-28 flex-col gap-2 sm:w-56 sm:shrink-0">
         <div className="flex gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 dark:border-slate-700 dark:bg-slate-950">

@@ -29,6 +29,8 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
+import { useToast } from '../../../components/ui/Toast';
+import { DataTable } from '../../../components/ui/DataTable';
 const PAGE_SIZE = 15;
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
@@ -68,6 +70,7 @@ type ReturnLine = ReturnableItem & {
 };
 
 export const ReturnsPage: React.FC = () => {
+  const toast = useToast();
   const returnIdempotency = useIdempotencyKey();
   const location = useLocation() as { state?: { invoiceId?: string } };
   const service = useMemo(() => new SalesService(), []);
@@ -197,7 +200,7 @@ export const ReturnsPage: React.FC = () => {
         const exists = list.some((i) => i.id === presetInvoiceId);
         if (exists) pickInvoice(presetInvoiceId);
       }
-    } catch (e: any) { alert(e?.message); }
+    } catch (e: any) { toast.warning(e?.message); }
   }, [pickInvoice, service]);
 
   useEffect(() => {
@@ -274,11 +277,11 @@ export const ReturnsPage: React.FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const selected = lines.filter((l) => l.quantityM2 > 0);
-    if (!invoiceId) return alert('اختر الفاتورة الأصلية.');
-    if (selected.length === 0) return alert('حدد كمية لصنف واحد على الأقل.');
+    if (!invoiceId) return toast.warning('اختر الفاتورة الأصلية.');
+    if (selected.length === 0) return toast.warning('حدد كمية لصنف واحد على الأقل.');
     const over = selected.find((l) => l.quantityM2 > l.returnableM2 + 1e-6);
-    if (over) return alert(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${formatProductQuantity(over.returnableM2, over)}).`);
-    if (exchangeMode && newItems.length === 0) return alert('في وضع الاستبدال، أضف صنفاً بديلاً واحداً على الأقل.');
+    if (over) return toast.warning(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${formatProductQuantity(over.returnableM2, over)}).`);
+    if (exchangeMode && newItems.length === 0) return toast.warning('في وضع الاستبدال، أضف صنفاً بديلاً واحداً على الأقل.');
     setSaving(true);
     try {
       fieldService.validateRecordValues('sales_returns', operationalFieldValues, 'create');
@@ -328,7 +331,7 @@ export const ReturnsPage: React.FC = () => {
       setExchangeMode(false);
       setNewItems([]);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر تسجيل المرتجع.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر تسجيل المرتجع.'); }
     finally { setSaving(false); }
   };
 
@@ -372,7 +375,7 @@ export const ReturnsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center"><RotateCcw className="w-5 h-5 text-rose-600" /></div>
@@ -449,53 +452,50 @@ export const ReturnsPage: React.FC = () => {
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-rose-500" /></div> : (
           <>
             <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto shadow-sm">
-              <table className="w-full text-right text-xs min-w-[820px]">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                  <tr>
-                    <th className="px-4 py-3">رقم المرتجع</th>
-                    <th className="px-4 py-3">الفاتورة الأصلية</th>
-                    <th className="px-4 py-3">العميل</th>
-                    <th className="px-4 py-3">التاريخ</th>
-                    <th className="px-4 py-3">السبب</th>
-                    <th className="px-4 py-3">صافي قبل الضريبة</th>
-                    <th className="px-4 py-3">الضريبة</th>
-                    <th className="px-4 py-3">الإجمالي شامل الضريبة</th>
-                    <th className="px-4 py-3">نقدي / رصيد</th>
-                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
-                    <th className="px-4 py-3 text-left">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pageItems.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-mono font-bold text-rose-600">{r.returnNumber}</td>
-                      <td className="px-4 py-3 font-mono text-slate-700">{r.invoiceNumber || r.originalInvoiceNumber}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{r.customerName}</td>
-                      <td className="px-4 py-3 text-slate-600"><span className="inline-flex items-center gap-1"><Calendar className="w-3 h-3" />{r.date || '—'}</span></td>
-                      <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{r.reason}</td>
-                      <td className="px-4 py-3 font-black text-rose-600">{fmt(r.totalAmount)}</td>
-                      <td className="px-4 py-3 text-orange-700">{r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount)}</td>
-                      <td className="px-4 py-3 font-bold text-rose-700">{r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.totalAmount) + Number(r.returnTaxAmount))}</td>
-                      <td className="px-4 py-3 text-[10px] text-slate-500">
-                        <div>نقدي: {fmt(r.refundedAmount)}</div>
-                        <div>على الرصيد: {fmt(r.remainingToBalance)}</div>
-                        <div className="text-[9px] font-bold text-sky-600 mt-0.5">{REFUND_LABEL[r.refundMethod || 'CASH'] || r.refundMethod || 'نقدي'}</div>
-                      </td>
-                      {operationalFields.map((field) => {
-                        const raw = valuesByReturn[r.id]?.[field.id] || '';
-                        return <td key={field.id} className="px-4 py-3 text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</td>;
-                      })}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Btn onClick={() => setDetail(service.getReturnById(r.id))} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
-                          <Btn onClick={() => printService.printSalesReturn(service.getReturnById(r.id))} tone="slate"><Printer className="w-3.5 h-3.5" /></Btn>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {returns.length === 0 && <tr><td colSpan={10 + operationalFields.length} className="py-16 text-center text-slate-400">لا توجد مرتجعات مسجلة</td></tr>}
-                </tbody>
-              </table>
+              <DataTable
+                            ariaLabel="المرتجعات"
+                            rows={pageItems}
+                            rowKey={(r) => r.id}
+                            minWidth={820}
+                            columns={[
+                              { key: 'num', header: 'رقم المرتجع', render: (r) => <span className="font-mono font-bold text-rose-600">{r.returnNumber}</span> },
+                              { key: 'invoice', header: 'الفاتورة الأصلية', render: (r) => <span className="font-mono text-slate-700">{r.invoiceNumber || r.originalInvoiceNumber}</span> },
+                              { key: 'customer', header: 'العميل', render: (r) => <span className="font-bold text-slate-800">{r.customerName}</span> },
+                              { key: 'date', header: 'التاريخ', render: (r) => <span className="inline-flex items-center gap-1 text-slate-600"><Calendar className="w-3 h-3" />{r.date || '—'}</span> },
+                              { key: 'reason', header: 'السبب', render: (r) => <span className="text-slate-500 max-w-[200px] truncate block">{r.reason}</span> },
+                              { key: 'net', header: 'صافي قبل الضريبة', render: (r) => <span className="font-black text-rose-600">{fmt(r.totalAmount)}</span> },
+                              { key: 'tax', header: 'الضريبة', render: (r) => <span className="text-orange-700">{r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount)}</span> },
+                              { key: 'gross', header: 'الإجمالي شامل الضريبة', render: (r) => <span className="font-bold text-rose-700">{r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.totalAmount) + Number(r.returnTaxAmount))}</span> },
+                              {
+                                key: 'refund', header: 'نقدي / رصيد',
+                                render: (r) => (
+                                  <div className="text-[10px] text-slate-500">
+                                    <div>نقدي: {fmt(r.refundedAmount)}</div>
+                                    <div>على الرصيد: {fmt(r.remainingToBalance)}</div>
+                                    <div className="text-[9px] font-bold text-sky-600 mt-0.5">{REFUND_LABEL[r.refundMethod || 'CASH'] || r.refundMethod || 'نقدي'}</div>
+                                  </div>
+                                ),
+                              },
+                              ...operationalFields.map((field) => ({
+                                key: `op-${field.id}`, header: field.name,
+                                render: (r: (typeof pageItems)[number]) => {
+                                  const raw = valuesByReturn[r.id]?.[field.id] || '';
+                                  return <span className="text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</span>;
+                                },
+                              })),
+                              {
+                                key: 'actions', header: 'إجراءات', align: 'end',
+                                render: (r) => (
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <Btn onClick={() => setDetail(service.getReturnById(r.id))} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
+                                    <Btn onClick={() => printService.printSalesReturn(service.getReturnById(r.id))} tone="slate"><Printer className="w-3.5 h-3.5" /></Btn>
+                                  </div>
+                                ),
+                              },
+                            ]}
+                            emptyTitle="لا توجد مرتجعات مسجلة"
+                          />
+
             </div>
 
             {returns.length > PAGE_SIZE && (
@@ -534,73 +534,78 @@ export const ReturnsPage: React.FC = () => {
 
             {lines.length > 0 && (
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-right text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500 font-bold">
-                    <tr>
-                      <th className="px-3 py-2">الصنف</th>
-                      <th className="px-3 py-2">المباع</th>
-                      <th className="px-3 py-2">مُرجع سابقاً</th>
-                      <th className="px-3 py-2">القابل للإرجاع</th>
-                      <th className="px-3 py-2">سعر الوحدة</th>
-                      <th className="px-3 py-2 w-28">كمية الإرجاع</th>
-                      <th className="px-3 py-2 w-32">السبب</th>
-                      <th className="px-3 py-2 w-32">مصير المرتجع</th>
-                      <th className="px-3 py-2">الإجمالي</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {lines.map((l, idx) => (
-                      <tr key={l.invoiceItemId}>
-                        <td className="px-3 py-2 font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div><div className={`text-[9px] font-bold ${l.specialStockId ? 'text-amber-700' : 'text-sky-700'}`}>{l.specialStockId ? `مخزون مخفض • ${l.specialNumber || l.specialStockId}` : 'مخزون عادي'}</div></td>
-                        <td className="px-3 py-2 font-mono">{formatProductQuantity(l.soldM2, l)}</td>
-                        <td className="px-3 py-2 font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</td>
-                        <td className="px-3 py-2 font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</td>
-                        <td className="px-3 py-2 font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-slate-400">/{getUomLabel(l.entryUnit, l)}</span></td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min={0}
-                              max={entryQuantity({ ...l, quantityM2: l.returnableM2 })}
-                              step={isWholeUnit(l.entryUnit, l) ? 1 : 0.01}
-                              value={l.quantityM2 > 0 ? entryQuantity(l) : ''}
-                              onChange={(e) => setEntryQuantity(idx, Number.parseFloat(e.target.value))}
-                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono"
-                              aria-label={`كمية الإرجاع ${getUomLabel(l.entryUnit, l)}`}
-                            />
-                            {getSellableUnits(l).length > 1 && (
-                              <select
-                                value={l.entryUnit}
-                                onChange={(e) => setLine(idx, { entryUnit: e.target.value })}
-                                className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
-                                aria-label={`وحدة الإرجاع للصنف ${l.productName}`}
-                              >
-                                {getSellableUnits(l).map((unit) => (
-                                  <option key={unit} value={unit}>{getUomLabel(unit, l)}</option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                          {l.entryUnit !== (l.baseUnit || 'M2') && l.quantityM2 > 0 && (
-                            <div className="text-[9px] text-slate-400 mt-1 font-normal">
-                              = {formatProductQuantity(l.quantityM2, l)}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2"><input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /></td>
-                        <td className="px-3 py-2">
-                          <select value={l.disposition} onChange={(e) => setLine(idx, { disposition: e.target.value as ReturnLine['disposition'] })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold">
-                            <option value="RESTOCK">إعادة للمخزون</option>
-                            {l.specialStockId && <option value="SPECIAL_STOCK">إعادة للمخزون الخاص</option>}
-                            <option value="QUARANTINE">حجر / فحص</option>
-                            <option value="DAMAGED">تالف</option>
-                          </select>
-                        </td>
-                        <td className="px-3 py-2 font-bold text-rose-600">{fmt(lineReturnTotals[idx] || 0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                                ariaLabel="أصناف الإرجاع"
+                                rows={lines}
+                                rowKey={(l) => l.invoiceItemId}
+                                dense
+                                columns={[
+                                  {
+                                    key: 'product', header: 'الصنف',
+                                    render: (l) => (
+                                      <span className="font-semibold text-slate-800">
+                                        {l.productName}
+                                        <div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div>
+                                        <div className={`text-[9px] font-bold ${l.specialStockId ? 'text-amber-700' : 'text-sky-700'}`}>{l.specialStockId ? `مخزون مخفض • ${l.specialNumber || l.specialStockId}` : 'مخزون عادي'}</div>
+                                      </span>
+                                    ),
+                                  },
+                                  { key: 'sold', header: 'المباع', render: (l) => <span className="font-mono">{formatProductQuantity(l.soldM2, l)}</span> },
+                                  { key: 'prev', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</span> },
+                                  { key: 'avail', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</span> },
+                                  { key: 'price', header: 'سعر الوحدة', render: (l) => <span className="font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-slate-400">/{getUomLabel(l.entryUnit, l)}</span></span> },
+                                  {
+                                    key: 'qty', header: 'كمية الإرجاع',
+                                    render: (l, idx) => (
+                                      <div>
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            max={entryQuantity({ ...l, quantityM2: l.returnableM2 })}
+                                            step={isWholeUnit(l.entryUnit, l) ? 1 : 0.01}
+                                            value={l.quantityM2 > 0 ? entryQuantity(l) : ''}
+                                            onChange={(e) => setEntryQuantity(idx, Number.parseFloat(e.target.value))}
+                                            className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono"
+                                            aria-label={`كمية الإرجاع ${getUomLabel(l.entryUnit, l)}`}
+                                          />
+                                          {getSellableUnits(l).length > 1 && (
+                                            <select
+                                              value={l.entryUnit}
+                                              onChange={(e) => setLine(idx, { entryUnit: e.target.value })}
+                                              className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
+                                              aria-label={`وحدة الإرجاع للصنف ${l.productName}`}
+                                            >
+                                              {getSellableUnits(l).map((unit) => (
+                                                <option key={unit} value={unit}>{getUomLabel(unit, l)}</option>
+                                              ))}
+                                            </select>
+                                          )}
+                                        </div>
+                                        {l.entryUnit !== (l.baseUnit || 'M2') && l.quantityM2 > 0 && (
+                                          <div className="text-[9px] text-slate-400 mt-1 font-normal">
+                                            = {formatProductQuantity(l.quantityM2, l)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ),
+                                  },
+                                  { key: 'reason', header: 'السبب', render: (l, idx) => <input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /> },
+                                  {
+                                    key: 'disposition', header: 'مصير المرتجع',
+                                    render: (l, idx) => (
+                                      <select value={l.disposition} onChange={(e) => setLine(idx, { disposition: e.target.value as ReturnLine['disposition'] })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold">
+                                        <option value="RESTOCK">إعادة للمخزون</option>
+                                        {l.specialStockId && <option value="SPECIAL_STOCK">إعادة للمخزون الخاص</option>}
+                                        <option value="QUARANTINE">حجر / فحص</option>
+                                        <option value="DAMAGED">تالف</option>
+                                      </select>
+                                    ),
+                                  },
+                                  { key: 'total', header: 'الإجمالي', render: (l, idx) => <span className="font-bold text-rose-600">{fmt(lineReturnTotals[idx] || 0)}</span> },
+                                ]}
+                              />
+
               </div>
             )}
 
@@ -635,19 +640,22 @@ export const ReturnsPage: React.FC = () => {
                   }} className="px-3 py-1.5 bg-sky-600 text-white font-bold rounded-lg text-xs">إضافة للقائمة</button>
                 )}
                 {newItems.length > 0 && (
-                  <table className="w-full text-[11px]">
-                    <thead><tr className="text-slate-500"><th className="text-right py-1">الصنف</th><th className="text-center py-1">الكمية</th><th className="text-left py-1">السعر</th><th></th></tr></thead>
-                    <tbody>
-                      {newItems.map((n, i) => (
-                        <tr key={i} className="border-t border-slate-100">
-                          <td className="py-1">{n.productName}</td>
-                          <td className="text-center py-1">{n.quantityM2}</td>
-                          <td className="text-left py-1 font-bold">{fmt(n.quantityM2 * n.unitPrice)}</td>
-                          <td className="text-left py-1"><button type="button" onClick={() => setNewItems((prev) => prev.filter((_, j) => j !== i))} className="text-rose-600 hover:text-rose-800"><X className="w-3 h-3" /></button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable
+                                    ariaLabel="الأصناف البديلة"
+                                    rows={newItems.map((n, i) => ({ ...n, _i: i }))}
+                                    rowKey={(n) => String(n._i)}
+                                    dense
+                                    columns={[
+                                      { key: 'product', header: 'الصنف', render: (n) => <span>{n.productName}</span> },
+                                      { key: 'qty', header: 'الكمية', align: 'center', render: (n) => <span>{n.quantityM2}</span> },
+                                      { key: 'price', header: 'السعر', align: 'end', render: (n) => <span className="font-bold">{fmt(n.quantityM2 * n.unitPrice)}</span> },
+                                      {
+                                        key: 'actions', header: '', align: 'end',
+                                        render: (n, i) => <button type="button" onClick={() => setNewItems((prev) => prev.filter((_, j) => j !== i))} className="text-rose-600 hover:text-rose-800"><X className="w-3 h-3" /></button>,
+                                      },
+                                    ]}
+                                  />
+
                 )}
               </div>
             )}
@@ -719,20 +727,29 @@ export const ReturnsPage: React.FC = () => {
             }} />
           </div>
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[520px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">السعر</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {(detail.items || []).map((i) => (
-                  <tr key={i.id}>
-                    <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.grade}</div></td>
-                    <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
-                    <td className="px-3 py-2 font-mono">{i.boxesCount}</td>
-                    <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)}</td>
-                    <td className="px-3 py-2 font-bold">{fmt(i.totalRefund)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+                          ariaLabel="أصناف المرتجع"
+                          rows={detail.items || []}
+                          rowKey={(i) => i.id}
+                          minWidth={520}
+                          dense
+                          columns={[
+                            {
+                              key: 'product', header: 'الصنف',
+                              render: (i) => (
+                                <span className="font-bold text-slate-800">
+                                  {i.productName}
+                                  <div className="text-[9px] text-slate-400 font-normal">{i.grade}</div>
+                                </span>
+                              ),
+                            },
+                            { key: 'qty', header: 'الكمية', render: (i) => <span className="font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</span> },
+                            { key: 'boxes', header: 'الكراتين', render: (i) => <span className="font-mono">{i.boxesCount}</span> },
+                            { key: 'price', header: 'السعر', render: (i) => <span className="font-mono">{fmt(i.unitPrice)}</span> },
+                            { key: 'total', header: 'الإجمالي', render: (i) => <span className="font-bold">{fmt(i.totalRefund)}</span> },
+                          ]}
+                        />
+
           </div>
           <div className="flex justify-end pt-3 border-t border-slate-100">
             <button onClick={() => printService.printSalesReturn(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>

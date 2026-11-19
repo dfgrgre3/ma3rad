@@ -696,7 +696,7 @@ export const AppearanceCustomizationTab: React.FC<AppearanceCustomizationTabProp
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       <section className="win-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -1288,7 +1288,6 @@ export const AppearanceCustomizationTab: React.FC<AppearanceCustomizationTabProp
             aria-modal="true"
             aria-labelledby="appearance-color-dialog-title"
             tabIndex={-1}
-            dir="rtl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--cerami-border)] pb-3">

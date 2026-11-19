@@ -8,7 +8,7 @@ export const OperationalFieldsSummary: React.FC<{
   const filled = fields.filter((field) => values[field.id] !== undefined && values[field.id] !== '');
   if (!filled.length) return null;
   return (
-    <section className="rounded-xl border border-teal-200 bg-teal-50/40 p-3" dir="rtl">
+    <section className="rounded-xl border border-teal-200 bg-teal-50/40 p-3">
       <h4 className="mb-2 text-xs font-extrabold text-teal-900">الحقول الإضافية</h4>
       <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {filled.map((field) => {

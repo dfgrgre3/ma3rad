@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ArrowRight,
   BarChart2,
@@ -474,7 +475,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -723,7 +724,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                   </span>
                 </div>
                 <div className="h-72 w-full" dir="ltr">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 288 }}>
                     {chartKind === 'pie' ? (
                       <PieChart>
                         <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={42} label>
@@ -781,57 +782,42 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                 </span>
               </div>
               <div className="max-h-[60vh] overflow-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="sticky top-0 z-10 bg-white shadow-sm">
-                    <tr className="border-b border-slate-200">
-                      {columns.map((column) => (
-                        <th
-                          key={column.key}
-                          onClick={() => toggleSort(column.key)}
-                          className={`cursor-pointer whitespace-nowrap px-3 py-3 font-bold text-slate-500 transition hover:text-teal-700 ${
-                            column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent' ? 'text-left' : 'text-right'
-                          }`}
-                        >
-                          {column.label}
-                          {sort?.key === column.key ? (sort.direction === 'asc' ? ' ▲' : ' ▼') : ''}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {pagedRows.map((row, index) => (
-                      <tr key={index} onClick={handleRowClick} className={`transition hover:bg-slate-50/70 ${definition.drilldown ? 'cursor-pointer' : ''}`}>
-                        {columns.map((column) => {
-                          const value = row[column.key];
-                          const isNumeric = column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent';
-                          return (
-                            <td
-                              key={column.key}
-                              className={`px-3 py-2.5 ${isNumeric ? 'text-left font-mono font-bold' : 'text-right'} ${
-                                column.type === 'currency' && Number(value) < 0 ? 'text-rose-700' : ''
-                              }`}
-                            >
-                              {column.type === 'badge' ? (
-                                <span className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold ${badgeClass(value)}`}>
-                                  {String(value ?? '—')}
-                                </span>
-                              ) : (
-                                formatCell(value, column)
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                    {rows.length === 0 && (
-                      <tr>
-                        <td colSpan={Math.max(1, columns.length)} className="py-16 text-center text-sm font-bold text-slate-400">
-                          لا توجد بيانات مطابقة للفترة أو الفلاتر المحددة.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <DataTable
+                ariaLabel="بيانات التقرير"
+                rows={pagedRows.map((row: any, index: number) => ({ ...row, __i: index }))}
+                rowKey={(row: any) => String(row.__i)}
+                stickyHeader
+                tableClassName="text-xs"
+                onRowClick={definition.drilldown ? handleRowClick : undefined}
+                rowClassName={() => definition.drilldown ? 'cursor-pointer transition hover:bg-slate-50/70' : 'transition hover:bg-slate-50/70'}
+                columns={columns.map((column: any) => {
+                  const isNumeric = column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent';
+                  return {
+                    key: column.key,
+                    header: (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(column.key)}
+                        className={`w-full cursor-pointer whitespace-nowrap font-bold text-slate-500 transition hover:text-teal-700 ${isNumeric ? 'text-end' : 'text-start'}`}
+                      >
+                        {column.label}
+                        {sort?.key === column.key ? (sort?.direction === 'asc' ? ' ▲' : ' ▼') : ''}
+                      </button>
+                    ),
+                    align: isNumeric ? ('end' as const) : ('start' as const),
+                    className: isNumeric ? 'font-mono font-bold' : undefined,
+                    render: (row: any) => {
+                      const value = row[column.key];
+                      if (column.type === 'badge') {
+                        return <span className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold ${badgeClass(value)}`}>{String(value ?? '—')}</span>;
+                      }
+                      const text = formatCell(value, column);
+                      return <span className={column.type === 'currency' && Number(value) < 0 ? 'text-rose-700' : undefined}>{text}</span>;
+                    },
+                  };
+                })}
+                emptyTitle="لا توجد بيانات مطابقة للفترة أو الفلاتر المحددة."
+              />
               </div>
 
               {totalPages > 1 && (

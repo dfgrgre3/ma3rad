@@ -18,6 +18,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import type { ExtendedChequeStatus, ChequeStatusHistory, BankAccount } from '../../../types/finance';
 
+import { useToast } from '../../../components/ui/Toast';
 const TYPE_LABELS: Record<ChequeType, string> = { RECEIVED: 'شيك وارد (لنا)', ISSUED: 'شيك صادر (علينا)' };
 const STATUS_LABELS: Record<ExtendedChequeStatus, string> = {
   PENDING: 'معلق بالخزينة',
@@ -39,6 +40,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 const today = () => localDateString();
 
 export const ChequesPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new FinanceExtrasService(), []);
   const enterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
   const canManageCheques = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.cheques.approve');
@@ -165,7 +167,7 @@ export const ChequesPage: React.FC = () => {
       setModal(false);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حفظ الشيك.');
+      toast.error(err?.message || 'تعذر حفظ الشيك.');
     } finally {
       setSaving(false);
     }
@@ -184,7 +186,7 @@ export const ChequesPage: React.FC = () => {
       setTransitionTarget(null);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تنفيذ الإجراء المحاسبي على الشيك.');
+      toast.error(err?.message || 'تعذر تنفيذ الإجراء المحاسبي على الشيك.');
     } finally {
       setSaving(false);
     }
@@ -205,12 +207,12 @@ export const ChequesPage: React.FC = () => {
       service.deleteCheque(row.id);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حذف الشيك.');
+      toast.error(err?.message || 'تعذر حذف الشيك.');
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">

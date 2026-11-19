@@ -40,6 +40,10 @@ const expectedHrPermissions: Record<string, string> = {
   '/hr/clearance': 'employees.payroll.view',
   '/hr/social-insurance': 'employees.payroll.view',
   '/hr/attendance-devices': 'employees.payroll.view',
+  '/hr/alerts': 'employees.view',
+  '/employees/payroll/payslips': 'employees.payroll.view',
+  '/employees/payroll/calendar': 'employees.payroll.view',
+  '/employees/payroll/notification-settings': 'employees.payroll.manage',
   '/employees/contracts': 'hr.contracts.view',
   '/employees/documents': 'hr.documents.view',
   '/employees/recruitment': 'hr.recruitment.view',
@@ -131,10 +135,13 @@ test('default navigation order and customized HR item order survive migration', 
 test('every static non-alias page route has one primary navigation destination', () => {
   const paths = new Set(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.to)));
   const samePageAliases = new Set(['/products/catalog', '/inventory', '/crm/hub']);
+  // Hub tabs and standalone flows reached from another page, not primary nav.
+  const nonPrimaryRoutes = new Set(['/sales/e-invoicing', '/settings/approvals', '/central-activation']);
   const missing = appRoutes
     .filter((route) => !route.path.includes(':') && route.path !== '*')
     .filter((route) => !(React.isValidElement(route.element) && route.element.type === Navigate))
     .filter((route) => !samePageAliases.has(`/${route.path}`))
+    .filter((route) => !nonPrimaryRoutes.has(`/${route.path}`))
     .map((route) => `/${route.path}`)
     .filter((path) => !paths.has(path));
 

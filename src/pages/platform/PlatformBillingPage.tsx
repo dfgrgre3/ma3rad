@@ -30,7 +30,6 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import {
   EmptyState,
   Field,
@@ -42,6 +41,8 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { DataTable } from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 const INVOICE_STATUSES: PlatformInvoiceStatus[] = ['DRAFT', 'SENT', 'PARTIAL', 'PAID', 'OVERDUE', 'VOID'];
 const PAYMENT_METHODS: Array<{ value: PlatformPaymentMethod; label: string }> = [
   { value: 'CASH', label: 'نقدي' },
@@ -420,98 +421,75 @@ export const PlatformBillingPage: React.FC = () => {
           invoiceRows.length === 0 ? (
             <EmptyState icon={<ReceiptText className="h-5 w-5" />} title="لا توجد فواتير" description="أنشئ فاتورة جديدة لعميل." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-right">
-                <thead className="bg-slate-50">
-                  <tr className="text-[10.5px] text-slate-500">
-                    <th className="px-4 py-2.5 font-semibold">الرقم</th>
-                    <th className="px-4 py-2.5 font-semibold">العميل</th>
-                    <th className="px-4 py-2.5 font-semibold">الحالة</th>
-                    <th className="px-4 py-2.5 font-semibold">الإجمالي</th>
-                    <th className="px-4 py-2.5 font-semibold">المدفوع</th>
-                    <th className="px-4 py-2.5 font-semibold">المتبقي</th>
-                    <th className="px-4 py-2.5 font-semibold">الاستحقاق</th>
-                    <th className="px-4 py-2.5 font-semibold">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoiceRows.map((invoice) => {
-                    const remaining = invoice.total - invoice.paidAmount;
-                    return (
-                      <tr key={invoice.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                        <td className="px-4 py-2.5 font-mono text-[11px] font-bold text-slate-800" dir="ltr">{invoice.number}</td>
-                        <td className="px-4 py-2.5 text-[12px] font-semibold text-slate-700">{invoice.tenantName || '—'}</td>
-                        <td className="px-4 py-2.5"><StatusBadge value={invoice.status} label={PLATFORM_INVOICE_STATUS_LABELS[invoice.status]} /></td>
-                        <td className="px-4 py-2.5 text-[11.5px] font-bold text-slate-800">{formatMoney(invoice.total, invoice.currency)}</td>
-                        <td className="px-4 py-2.5 text-[11px] text-emerald-700">{formatMoney(invoice.paidAmount, invoice.currency)}</td>
-                        <td className={`px-4 py-2.5 text-[11px] font-bold ${remaining > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{formatMoney(remaining, invoice.currency)}</td>
-                        <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDate(invoice.dueDate)}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1">
-                            <button type="button" onClick={() => openDetail(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="عرض">
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            {canManageBilling && invoice.status === 'DRAFT' && (
-                              <button type="button" onClick={() => sendInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700" title="إرسال">
-                                <Send className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            {canManageBilling && invoice.status !== 'VOID' && invoice.status !== 'PAID' && remaining > 0 && (
-                              <button type="button" onClick={() => openPayment(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تسجيل دفعة">
-                                <Wallet className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            {canManageBilling && invoice.status !== 'VOID' && (
-                              <button type="button" onClick={() => voidInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء">
-                                <Ban className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                          ariaLabel="فواتير المنصة"
+                          rows={invoiceRows}
+                          rowKey={(invoice) => invoice.id}
+                          minWidth={900}
+                          dense
+                          columns={[
+                            { key: 'number', header: 'الرقم', render: (invoice) => <span className="font-mono text-[11px] font-bold text-slate-800" dir="ltr">{invoice.number}</span> },
+                            { key: 'tenant', header: 'العميل', render: (invoice) => <span className="text-[12px] font-semibold text-slate-700">{invoice.tenantName || '—'}</span> },
+                            { key: 'status', header: 'الحالة', render: (invoice) => <StatusBadge value={invoice.status} label={PLATFORM_INVOICE_STATUS_LABELS[invoice.status]} /> },
+                            { key: 'total', header: 'الإجمالي', render: (invoice) => <span className="text-[11.5px] font-bold text-slate-800">{formatMoney(invoice.total, invoice.currency)}</span> },
+                            { key: 'paid', header: 'المدفوع', render: (invoice) => <span className="text-[11px] text-emerald-700">{formatMoney(invoice.paidAmount, invoice.currency)}</span> },
+                            {
+                              key: 'remaining', header: 'المتبقي',
+                              render: (invoice) => {
+                                const remaining = invoice.total - invoice.paidAmount;
+                                return <span className={`text-[11px] font-bold ${remaining > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{formatMoney(remaining, invoice.currency)}</span>;
+                              },
+                            },
+                            { key: 'due', header: 'الاستحقاق', render: (invoice) => <span className="text-[11px] text-slate-600">{formatDate(invoice.dueDate)}</span> },
+                            {
+                              key: 'actions', header: 'إجراءات',
+                              render: (invoice) => {
+                                const remaining = invoice.total - invoice.paidAmount;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <button type="button" onClick={() => openDetail(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="عرض"><Eye className="h-3.5 w-3.5" /></button>
+                                    {canManageBilling && invoice.status === 'DRAFT' && (
+                                      <button type="button" onClick={() => sendInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700" title="إرسال"><Send className="h-3.5 w-3.5" /></button>
+                                    )}
+                                    {canManageBilling && invoice.status !== 'VOID' && invoice.status !== 'PAID' && remaining > 0 && (
+                                      <button type="button" onClick={() => openPayment(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تسجيل دفعة"><Wallet className="h-3.5 w-3.5" /></button>
+                                    )}
+                                    {canManageBilling && invoice.status !== 'VOID' && (
+                                      <button type="button" onClick={() => voidInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء"><Ban className="h-3.5 w-3.5" /></button>
+                                    )}
+                                  </div>
+                                );
+                              },
+                            },
+                          ]}
+                        />
+
           )
         ) : payments.length === 0 ? (
           <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد مدفوعات" description="سجّل دفعة من صفحة الفواتير." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-right">
-              <thead className="bg-slate-50">
-                <tr className="text-[10.5px] text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">التاريخ</th>
-                  <th className="px-4 py-2.5 font-semibold">العميل</th>
-                  <th className="px-4 py-2.5 font-semibold">الفاتورة</th>
-                  <th className="px-4 py-2.5 font-semibold">الطريقة</th>
-                  <th className="px-4 py-2.5 font-semibold">المرجع</th>
-                  <th className="px-4 py-2.5 font-semibold">المبلغ</th>
-                  <th className="px-4 py-2.5 font-semibold">إجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((payment) => (
-                  <tr key={payment.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDateTime(payment.paidAt)}</td>
-                    <td className="px-4 py-2.5 text-[12px] font-semibold text-slate-700">{payment.tenantName || '—'}</td>
-                    <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-600" dir="ltr">{payment.invoiceNumber || '—'}</td>
-                    <td className="px-4 py-2.5 text-[11px] text-slate-600">{PAYMENT_METHOD_LABELS[payment.method]}</td>
-                    <td className="px-4 py-2.5 font-mono text-[10.5px] text-slate-500" dir="ltr">{payment.reference || '—'}</td>
-                    <td className="px-4 py-2.5 text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</td>
-                    <td className="px-4 py-2.5">
-                      {canManageBilling && (
-                        <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الدفعة">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="مدفوعات المنصة"
+                      rows={payments}
+                      rowKey={(payment) => payment.id}
+                      minWidth={800}
+                      dense
+                      columns={[
+                        { key: 'date', header: 'التاريخ', render: (payment) => <span className="text-[11px] text-slate-600">{formatDateTime(payment.paidAt)}</span> },
+                        { key: 'tenant', header: 'العميل', render: (payment) => <span className="text-[12px] font-semibold text-slate-700">{payment.tenantName || '—'}</span> },
+                        { key: 'invoice', header: 'الفاتورة', render: (payment) => <span className="font-mono text-[10.5px] text-slate-600" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                        { key: 'method', header: 'الطريقة', render: (payment) => <span className="text-[11px] text-slate-600">{PAYMENT_METHOD_LABELS[payment.method]}</span> },
+                        { key: 'reference', header: 'المرجع', render: (payment) => <span className="font-mono text-[10.5px] text-slate-500" dir="ltr">{payment.reference || '—'}</span> },
+                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
+                        {
+                          key: 'action', header: 'إجراء',
+                          render: (payment) => canManageBilling ? (
+                            <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الدفعة"><Trash2 className="h-3.5 w-3.5" /></button>
+                          ) : null,
+                        },
+                      ]}
+                    />
+
         )}
       </section>
 
@@ -644,28 +622,19 @@ export const PlatformBillingPage: React.FC = () => {
               <div><span className="text-slate-500">المدفوع:</span> <b className="text-emerald-700">{formatMoney(detail.paidAmount, detail.currency)}</b></div>
               <div><span className="text-slate-500">المتبقي:</span> <b className="text-rose-600">{formatMoney(detail.total - detail.paidAmount, detail.currency)}</b></div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full text-right">
-                <thead className="bg-slate-50 text-[10px] text-slate-500">
-                  <tr>
-                    <th className="px-2 py-2">الوصف</th>
-                    <th className="px-2 py-2">الكمية</th>
-                    <th className="px-2 py-2">السعر</th>
-                    <th className="px-2 py-2">الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detail.items ?? []).map((item, index) => (
-                    <tr key={item.id ?? index} className="border-t border-slate-100 text-[11px]">
-                      <td className="px-2 py-1.5">{item.description}</td>
-                      <td className="px-2 py-1.5">{item.quantity}</td>
-                      <td className="px-2 py-1.5">{formatMoney(item.unitPrice, detail.currency)}</td>
-                      <td className="px-2 py-1.5 font-bold">{formatMoney(item.total ?? item.quantity * item.unitPrice, detail.currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                            ariaLabel="بنود الفاتورة"
+                            rows={detail.items ?? []}
+                            rowKey={(item: any) => item.id ?? String(item.description)}
+                            dense
+                            columns={[
+                              { key: 'desc', header: 'الوصف', render: (item: any) => item.description },
+                              { key: 'qty', header: 'الكمية', render: (item: any) => item.quantity },
+                              { key: 'price', header: 'السعر', render: (item: any) => formatMoney(item.unitPrice, detail.currency) },
+                              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-bold">{formatMoney(item.total ?? item.quantity * item.unitPrice, detail.currency)}</span> },
+                            ]}
+                          />
+
             {detail.notes && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{detail.notes}</p>}
           </div>
         )}

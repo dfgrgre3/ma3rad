@@ -39,7 +39,7 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
     min_selling_price_m2, min_stock_level, is_active
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`, [
     prodId, 'SKU-CYC-1', 'BAR-CYC-1', 'بلاط بورسلين رمادي 60*60', 'cat_floor', 'br_cleo',
-    'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 150, 130, 120, 50
+    'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10000, 15000, 13000, 12000, 50
   ]);
 
   // Ensure warehouse stock is below reorder point (10 m2 vs min 50 m2)
@@ -174,8 +174,8 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   assert.equal(inv.supplierInvoiceNumber, 'INV-SUP-1001');
 
   const grnLayer = db.query<any>(`
-    SELECT quantity_received AS quantityReceived, unit_cost AS unitCost,
-           original_unit_cost AS originalUnitCost, landed_cost_share AS landedCostShare,
+    SELECT quantity_received AS quantityReceived, unit_cost / 100.0 AS unitCost,
+           original_unit_cost / 100.0 AS originalUnitCost, landed_cost_share / 100.0 AS landedCostShare,
            purchase_invoice_id AS purchaseInvoiceId
     FROM inventory_cost_layers
     WHERE goods_receipt_id = ? AND product_id = ?
@@ -191,7 +191,7 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
     WHERE pi.id = ?
   `, [inv.id])[0];
   assert.equal(invoiceDueDate.dueDate, invoiceDueDate.expectedDueDate);
-  const costAfterGrnInvoice = Number(db.query<any>(`SELECT cost_price FROM products WHERE id = ?`, [prodId])[0].costPrice);
+  const costAfterGrnInvoice = Number(db.query<any>(`SELECT cost_price / 100.0 AS costPrice FROM products WHERE id = ?`, [prodId])[0].costPrice);
   assert.equal(costAfterGrnInvoice, 106.63, 'Weighted-average cost must include the GRN quantity only once');
 
   // Duplicate invoice check: Attempting to create another invoice with same number throws
@@ -280,7 +280,7 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   });
   assert.equal(purchaseReturn.totalAmount, 214);
   const returnLedger = db.query<{ code: string; debit: number; credit: number }>(`
-    SELECT coa.code, jel.debit, jel.credit
+    SELECT coa.code, jel.debit / 100.0 AS debit, jel.credit / 100.0 AS credit
     FROM journal_entries je
     JOIN journal_entry_lines jel ON jel.entry_id = je.id
     JOIN chart_of_accounts coa ON coa.id = jel.account_id

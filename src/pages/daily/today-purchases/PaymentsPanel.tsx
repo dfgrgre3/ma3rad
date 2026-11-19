@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Wallet } from 'lucide-react';
 import type { DailySupplierPaymentRow } from '../../../services/domains/operations/DailyOperationsService';
 import { METHOD_STYLE, PAY_LABEL } from './constants';
@@ -27,29 +28,31 @@ export const PaymentsPanel: React.FC<PaymentsPanelProps> = ({ payments, fmt, pla
       </div>
     ) : (
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-right text-xs">
-          <thead className="bg-slate-50 dark:bg-slate-800/70">
-            <tr>{['السند', 'المورد', 'الفواتير', 'المبلغ', 'طريقة السداد', 'بواسطة', 'ملاحظات'].map((heading) => <th key={heading} scope="col" className="whitespace-nowrap px-3 py-3 font-bold text-slate-500 dark:text-slate-400">{heading}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {payments.map((payment) => (
-              <tr key={payment.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                <td className="whitespace-nowrap px-3 py-2.5 font-mono font-bold text-emerald-700 dark:text-emerald-300">{payment.receiptNumber}</td>
-                <td className="px-3 py-2.5 font-semibold text-slate-900 dark:text-slate-100">{payment.supplierName || '—'}</td>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">{payment.invoiceNumbers || '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(payment.amount)}</td>
-                <td className="px-3 py-2.5">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${METHOD_STYLE[payment.paymentType]?.text || 'text-slate-600 dark:text-slate-300'} bg-slate-100 dark:bg-slate-800`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${METHOD_STYLE[payment.paymentType]?.dot || 'bg-slate-400'}`} />
-                    {PAY_LABEL[payment.paymentType] || payment.paymentType}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{payment.performedByName || '—'}</td>
-                <td className="max-w-[220px] truncate px-3 py-2.5 text-slate-500 dark:text-slate-400" title={payment.notes || ''}>{payment.notes || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="سندات سداد الموردين"
+          rows={payments}
+          rowKey={(payment: any) => String(payment.id)}
+          minWidth={820}
+          dense
+          tableClassName="text-xs"
+          columns={[
+            { key: 'receipt', header: 'السند', render: (payment: any) => <span className="whitespace-nowrap font-mono font-bold text-emerald-700 dark:text-emerald-300">{payment.receiptNumber}</span> },
+            { key: 'supplier', header: 'المورد', render: (payment: any) => <span className="font-semibold text-slate-900 dark:text-slate-100">{payment.supplierName || '—'}</span> },
+            { key: 'invoices', header: 'الفواتير', render: (payment: any) => <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{payment.invoiceNumbers || '—'}</span> },
+            { key: 'amount', header: 'المبلغ', render: (payment: any) => <span className="whitespace-nowrap font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(payment.amount)}</span> },
+            {
+              key: 'method', header: 'طريقة السداد',
+              render: (payment: any) => (
+                <span className={`inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold dark:bg-slate-800 ${METHOD_STYLE[payment.paymentType]?.text || 'text-slate-600 dark:text-slate-300'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${METHOD_STYLE[payment.paymentType]?.dot || 'bg-slate-400'}`} />
+                  {PAY_LABEL[payment.paymentType] || payment.paymentType}
+                </span>
+              ),
+            },
+            { key: 'by', header: 'بواسطة', render: (payment: any) => <span className="text-slate-600 dark:text-slate-300">{payment.performedByName || '—'}</span> },
+            { key: 'notes', header: 'ملاحظات', render: (payment: any) => <span className="block max-w-[220px] truncate text-slate-500 dark:text-slate-400" title={payment.notes || ''}>{payment.notes || '—'}</span> },
+          ]}
+        />
       </div>
     )}
   </div>

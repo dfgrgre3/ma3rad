@@ -105,7 +105,7 @@ test('previews conflicts and merges XLSX and encrypted backup records', async ()
   assert.deepEqual(
     db.query<{ id: string; accountName: string; amount: number }>(
       `SELECT id, account_name, amount FROM data_import_test ORDER BY id`
-    ),
+    ).map((row) => ({ id: row.id, accountName: row.accountName, amount: row.amount })),
     [
       { id: 'existing', accountName: 'بعد', amount: 25 },
       { id: 'new', accountName: 'جديد', amount: 50 },

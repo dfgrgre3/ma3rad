@@ -49,7 +49,7 @@ export const ApprovalSettingsPage: React.FC = () => {
   const categories = [...new Set(visibleOperations.map(({ category }) => category))];
 
   return (
-    <div className="erp-page space-y-4" dir="rtl">
+    <div className="erp-page space-y-4">
       <PageHeader title="إعدادات الاعتمادات والموافقات" description="سياسات العمليات وصلاحيات التنفيذ والاعتماد." />
       {!canManage ? <section className="erp-card text-sm">لا تملك صلاحية إدارة سياسات الموافقات.</section> : (
         <>

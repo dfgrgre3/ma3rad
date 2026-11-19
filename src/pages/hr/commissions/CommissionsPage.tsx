@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { CommissionService, CommissionRow, CommissionStats } from '../../../services/domains/hr/CommissionService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -89,7 +90,7 @@ export const CommissionsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
@@ -136,34 +137,35 @@ export const CommissionsPage: React.FC = () => {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50 text-[11px] text-slate-500 border-b border-slate-200">
-              <tr><th className="px-3 py-3">الموظف</th><th className="px-3 py-3">الفاتورة</th><th className="px-3 py-3">الأساس</th><th className="px-3 py-3">النسبة</th><th className="px-3 py-3">العمولة</th><th className="px-3 py-3">الحالة</th><th className="px-3 py-3">إجراءات</th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/70">
-                  <td className="px-3 py-2.5 font-bold">{row.employeeName}</td>
-                  <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500">{row.invoiceNumber || row.sourceId || '—'}</td>
-                  <td className="px-3 py-2.5 font-mono">{fmt(row.baseAmount)}</td>
-                  <td className="px-3 py-2.5 font-mono">{row.percentage}%</td>
-                  <td className="px-3 py-2.5 font-mono font-black">{fmt(row.commissionAmount)}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${statusStyles[row.status]}`}>{statusLabels[row.status]}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1">
-                      {canApprovePayroll && row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50" title="اعتماد"><Check className="w-4 h-4" /></button>}
-                      {canApprovePayroll && row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="صرف"><Banknote className="w-4 h-4" /></button>}
-                      {canManagePayroll && row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إلغاء"><X className="w-4 h-4" /></button>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && !loading && <tr><td colSpan={7} className="py-12 text-center text-slate-400">لا توجد عمولات لهذا الشهر. اضغط «احتساب الشهر».</td></tr>}
-              {loading && <tr><td colSpan={7} className="py-12 text-center"><Loader2 className="w-5 h-5 animate-spin text-indigo-500 mx-auto" /></td></tr>}
-            </tbody>
-          </table>
+          <DataTable
+              ariaLabel="عمولات الموظفين"
+              rows={rows}
+              rowKey={(row: any) => String(row.id)}
+              tableClassName="text-sm"
+              columns={[
+                { key: 'emp', header: 'الموظف', render: (row: any) => <span className="font-bold">{row.employeeName}</span> },
+                { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono text-[11px] text-slate-500">{row.invoiceNumber || row.sourceId || '—'}</span> },
+                { key: 'base', header: 'الأساس', render: (row: any) => <span className="font-mono">{fmt(row.baseAmount)}</span> },
+                { key: 'pct', header: 'النسبة', render: (row: any) => <span className="font-mono">{row.percentage}%</span> },
+                { key: 'comm', header: 'العمولة', render: (row: any) => <span className="font-mono font-black">{fmt(row.commissionAmount)}</span> },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (row: any) => <span className={`rounded border px-2 py-0.5 text-[10px] font-bold ${statusStyles[row.status]}`}>{statusLabels[row.status]}</span>,
+                },
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (row: any) => (
+                    <span className="flex items-center gap-1">
+                      {canApprovePayroll && row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="rounded-lg p-1.5 text-sky-600 hover:bg-sky-50" title="اعتماد"><Check className="h-4 w-4" /></button>}
+                      {canApprovePayroll && row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" title="صرف"><Banknote className="h-4 w-4" /></button>}
+                      {canManagePayroll && row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50" title="إلغاء"><X className="h-4 w-4" /></button>}
+                    </span>
+                  ),
+                },
+              ]}
+              loading={loading}
+              emptyTitle="لا توجد عمولات لهذا الشهر. اضغط «احتساب الشهر»."
+            />
         </div>
       </div>
     </div>

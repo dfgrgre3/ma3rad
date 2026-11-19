@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { GRANULAR_PERMISSIONS } from '../../config/permissionMatrix';
 import { ROUTE_PERMISSIONS } from '../../config/routePermissions';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -116,7 +117,7 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-bold text-slate-900">منصة المستخدمين — صفحات وصلاحيات</h1>
         <p className="mt-1 text-sm text-slate-600">
@@ -157,28 +158,24 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">خريطة صلاحيات المسارات</h2>
         <div className="overflow-auto max-h-72 rounded-lg border border-slate-100">
-          <table className="min-w-full text-xs">
-            <thead className="bg-slate-50 sticky top-0">
-              <tr>
-                <th className="px-3 py-2 text-right">إظهار</th>
-                <th className="px-3 py-2 text-right">المسار</th>
-                <th className="px-3 py-2 text-right">all</th>
-                <th className="px-3 py-2 text-right">any</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hiddenRouteRules.map(({ rule, hidden }, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="px-3 py-1 text-center">
-                    <input type="checkbox" checked={!hidden} onChange={() => toggleHidden(rule.path)} aria-label={`إظهار ${rule.path}`} />
-                  </td>
-                  <td className="px-3 py-1 font-mono">{rule.path}</td>
-                  <td className="px-3 py-1">{(rule.all || []).join(', ')}</td>
-                  <td className="px-3 py-1">{(rule.any || []).join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="خريطة صلاحيات المسارات"
+            rows={hiddenRouteRules.map(({ rule, hidden }, i) => ({ rule, hidden, __i: i }))}
+            rowKey={(row) => `${row.rule.path}-${row.__i}`}
+            dense
+            stickyHeader
+            columns={[
+              {
+                key: 'show', header: 'إظهار', align: 'center',
+                render: ({ rule, hidden }) => (
+                  <input type="checkbox" checked={!hidden} onChange={() => toggleHidden(rule.path)} aria-label={`إظهار ${rule.path}`} />
+                ),
+              },
+              { key: 'path', header: 'المسار', render: ({ rule }) => <span className="font-mono">{rule.path}</span> },
+              { key: 'all', header: 'all', render: ({ rule }) => (rule.all || []).join(', ') },
+              { key: 'any', header: 'any', render: ({ rule }) => (rule.any || []).join(', ') },
+            ]}
+          />
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -233,26 +230,19 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
               <span className="text-xs text-slate-500">{info.module} · {info.perms.length} صلاحية</span>
             </div>
             <div className="overflow-auto max-h-96 rounded-lg border border-slate-100">
-              <table className="min-w-full text-xs">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-right">الكود</th>
-                    <th className="px-3 py-2 text-right">الاسم</th>
-                    <th className="px-3 py-2 text-right">النوع</th>
-                    <th className="px-3 py-2 text-right">القسم</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {info.perms.map((p) => (
-                    <tr key={p.code} className="border-t border-slate-100">
-                      <td className="px-3 py-1 font-mono">{p.code}</td>
-                      <td className="px-3 py-1">{p.name}</td>
-                      <td className="px-3 py-1">{p.kind}</td>
-                      <td className="px-3 py-1">{p.group}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="صلاحيات المسار"
+                rows={info.perms}
+                rowKey={(p) => p.code}
+                dense
+                stickyHeader
+                columns={[
+                  { key: 'code', header: 'الكود', render: (p) => <span className="font-mono">{p.code}</span> },
+                  { key: 'name', header: 'الاسم', render: (p) => p.name },
+                  { key: 'kind', header: 'النوع', render: (p) => p.kind },
+                  { key: 'group', header: 'القسم', render: (p) => p.group },
+                ]}
+              />
             </div>
           </div>
         ))}

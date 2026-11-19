@@ -88,7 +88,7 @@ test('payroll run adds monthly allowances to gross and deducts due loan installm
   );
   assert.equal(paidInstallments.length, 1, 'exactly the September installment is settled');
   assert.equal(paidInstallments[0].txId, paidItem.payoutTransactionId);
-  const loanRow = q('SELECT remaining_balance AS remaining, status FROM hr_loans')[0];
+  const loanRow = q('SELECT remaining_balance / 100.0 AS remaining, status FROM hr_loans')[0];
   assert.equal(loanRow.remaining, 200, 'the remaining balance drops by the paid installment');
   assert.equal(loanRow.status, 'ACTIVE');
 });
@@ -98,7 +98,7 @@ test('approved leave settlement posts a payroll bonus transaction', async () => 
   HrBenefitsService.approveLeaveSettlement(settlement.id);
   assert.equal(HrBenefitsService.getLeaveSettlements(employeeId)[0].status, 'APPROVED');
   const bonus = q(
-    "SELECT amount, type FROM payroll_transactions WHERE employee_id = ? AND type = 'BONUS'", [employeeId]
+    "SELECT amount / 100.0 AS amount, type FROM payroll_transactions WHERE employee_id = ? AND type = 'BONUS'", [employeeId]
   )[0];
   assert.ok(bonus, 'settlement approval creates a payroll bonus');
   assert.equal(Number(bonus.amount), 250);

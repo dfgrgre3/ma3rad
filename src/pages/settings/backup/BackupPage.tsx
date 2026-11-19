@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Download, Upload, HardDrive, ShieldCheck, CheckCircle2,
   AlertTriangle, RefreshCw, FileText, Lock, X, Eye, EyeOff, Key
@@ -325,7 +326,7 @@ export const BackupPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-10 shadow-lg">
         <div className="flex items-center gap-3">
@@ -506,37 +507,33 @@ export const BackupPage: React.FC = () => {
 
           {centralBackups.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-right text-slate-500">
-                    <th className="px-2 py-2 font-bold">الاسم</th>
-                    <th className="px-2 py-2 font-bold">الجهاز</th>
-                    <th className="px-2 py-2 font-bold">الحجم</th>
-                    <th className="px-2 py-2 font-bold">تاريخ الرفع</th>
-                    <th className="px-2 py-2 font-bold">حالة الاستعادة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {centralBackups.map((backup) => (
-                    <tr key={backup.id} className="border-b border-slate-100">
-                      <td className="px-2 py-2 font-medium text-slate-800">{backup.name || backup.id}</td>
-                      <td className="px-2 py-2 text-slate-600">{backup.deviceName || backup.deviceId || '—'}</td>
-                      <td className="px-2 py-2 text-slate-600">{formatSize(backup.sizeBytes ?? 0)}</td>
-                      <td className="px-2 py-2 text-slate-600" dir="ltr">{backup.createdAt ? new Date(backup.createdAt).toLocaleString('ar') : '—'}</td>
-                      <td className="px-2 py-2">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          backup.restoreStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
-                          : backup.restoreStatus === 'FAILED' ? 'bg-rose-100 text-rose-700'
-                          : backup.restoreStatus === 'NONE' ? 'bg-slate-100 text-slate-600'
-                          : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {backup.restoreStatus || 'NONE'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="النسخ الاحتياطية المركزية"
+                rows={centralBackups}
+                rowKey={(backup: any) => String(backup.id)}
+                dense
+                tableClassName="text-xs"
+                rowClassName={() => 'border-b border-slate-100'}
+                columns={[
+                  { key: 'name', header: 'الاسم', render: (backup: any) => <span className="font-medium text-slate-800">{backup.name || backup.id}</span> },
+                  { key: 'device', header: 'الجهاز', render: (backup: any) => <span className="text-slate-600">{backup.deviceName || backup.deviceId || '—'}</span> },
+                  { key: 'size', header: 'الحجم', render: (backup: any) => <span className="text-slate-600">{formatSize(backup.sizeBytes ?? 0)}</span> },
+                  { key: 'date', header: 'تاريخ الرفع', render: (backup: any) => <span className="text-slate-600" dir="ltr">{backup.createdAt ? new Date(backup.createdAt).toLocaleString('ar') : '—'}</span> },
+                  {
+                    key: 'restore', header: 'حالة الاستعادة',
+                    render: (backup: any) => (
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        backup.restoreStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
+                        : backup.restoreStatus === 'FAILED' ? 'bg-rose-100 text-rose-700'
+                        : backup.restoreStatus === 'NONE' ? 'bg-slate-100 text-slate-600'
+                        : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {backup.restoreStatus || 'NONE'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
           )}
         </section>
@@ -578,7 +575,7 @@ export const BackupPage: React.FC = () => {
 
       {/* Export Password Modal */}
       {canManage && isExportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -696,7 +693,7 @@ export const BackupPage: React.FC = () => {
 
       {/* Restore Password Modal */}
       {canManage && isRestoreModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -829,7 +826,7 @@ export const BackupPage: React.FC = () => {
       )}
 
       {canManage && isRecoveryExportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
           <form onSubmit={handleConfirmRecoveryKeyExport} className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">تصدير ملف مفتاح الاسترداد</h3>

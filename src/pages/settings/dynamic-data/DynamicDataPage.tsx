@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { ArrowDownAZ, Download, FilePlus2, Pencil, RotateCcw, Search, Trash2 } from 'lucide-react';
@@ -33,7 +34,7 @@ export const DynamicDataPage: React.FC = () => {
   const addRelation=()=>{if(!canManage||!selected||!newRelation.name.trim()||!newRelation.sourceField||!newRelation.targetEntityId)return;try{const next=[...selected.relations,{...newRelation}];service.updateEntityRelations(selected.id,next);refresh();setNewRelation({name:'',sourceField:'',targetEntityId:'',targetField:''});setMessage('تم حفظ تعريف العلاقة.');}catch(e:any){setMessage(e.message);}};
   const rollback=(batchId:string)=>{if(!canManage)return;if(!window.confirm('سيتم حذف كل السجلات التي أضافتها هذه الدفعة. متابعة؟'))return;try{const count=service.rollbackBatch(batchId);setMessage(`تم التراجع عن الدفعة وحذف ${count} سجل.`);loadRecords();setBatches(service.getBatches(entityId));refresh();}catch(e:any){setMessage(e.message);}};
 
-  return <div className="w-full space-y-5 p-4 md:p-8" dir="rtl">
+  return <div className="w-full space-y-5 p-4 md:p-8">
     {/* Sub Navigation Bar */}
     <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
       <Link
@@ -75,13 +76,48 @@ export const DynamicDataPage: React.FC = () => {
               <span className="text-xs text-slate-500">{sorted.length} ظاهر · تم تحميل {records.length} من {totalRecords} سجل</span>
             </div>
             <div className="overflow-auto">
-              <table className="min-w-full text-right text-xs">
-                <thead className="bg-slate-50"><tr><th className="p-3">إجراءات</th>{selected.fields.map(f=><th key={f.key} className="max-w-52 p-3">{f.label}</th>)}</tr></thead>
-                <tbody>
-                  {editing==='__new__'&&<tr className="border-b border-emerald-200 bg-emerald-50"><td className="whitespace-nowrap p-2"><button onClick={saveEdit} className="ml-2 font-black text-emerald-700">حفظ</button><button onClick={()=>setEditing(null)} className="font-bold text-slate-500">إلغاء</button></td>{selected.fields.map(f=><td key={f.key} className="min-w-32 p-2"><input type={f.type==='number'?'number':f.type==='date'?'date':'text'} value={String(draft[f.key]??'')} onChange={e=>setDraft({...draft,[f.key]:f.type==='number'?Number(e.target.value):e.target.value})} className="w-full rounded border px-2 py-1.5"/></td>)}</tr>}
-                  {sorted.map(record=><tr key={record.id} className="border-t border-slate-100">{editing===record.id?<><td className="whitespace-nowrap p-2"><button onClick={saveEdit} className="ml-2 font-black text-emerald-700">حفظ</button><button onClick={()=>setEditing(null)} className="font-bold text-slate-500">إلغاء</button></td>{selected.fields.map(f=><td key={f.key} className="min-w-32 p-2"><input type={f.type==='number'?'number':f.type==='date'?'date':'text'} value={String(draft[f.key]??'')} onChange={e=>setDraft({...draft,[f.key]:f.type==='number'?Number(e.target.value):e.target.value})} className="w-full rounded border px-2 py-1.5"/></td>)}</>:<><td className="whitespace-nowrap p-2"><button onClick={()=>beginEdit(record)} disabled={!canManage} className="ml-2 text-sky-700" title="تعديل"><Pencil className="h-4 w-4"/></button><button onClick={()=>deleteRecord(record)} disabled={!canManage} className="text-rose-700" title="حذف"><Trash2 className="h-4 w-4"/></button></td>{selected.fields.map(f=><td key={f.key} className="max-w-52 truncate p-3">{typeof record.values[f.key]==='object'?JSON.stringify(record.values[f.key]):String(record.values[f.key]??'')}</td>)}</>}</tr>)}
-                </tbody>
-              </table>
+              <DataTable
+              ariaLabel="البيانات الديناميكية"
+              rows={(editing === '__new__' ? [{ __new: true, id: '__new__' } as any, ...sorted] : sorted) as any[]}
+              rowKey={(record: any) => String(record.id)}
+                            tableClassName="text-xs"
+              rowClassName={(record: any) => record.__new ? 'border-b border-emerald-200 bg-emerald-50' : ''}
+              columns={[
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (record: any) => editing === record.id || record.__new ? (
+                    <span className="whitespace-nowrap">
+                      <button onClick={saveEdit} className="ml-2 font-black text-emerald-700">حفظ</button>
+                      <button onClick={() => setEditing(null)} className="font-bold text-slate-500">إلغاء</button>
+                    </span>
+                  ) : (
+                    <span className="whitespace-nowrap">
+                      <button onClick={() => beginEdit(record)} disabled={!canManage} className="ml-2 text-sky-700" title="تعديل"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => deleteRecord(record)} disabled={!canManage} className="text-rose-700" title="حذف"><Trash2 className="h-4 w-4" /></button>
+                    </span>
+                  ),
+                },
+                ...selected.fields.map((f: any) => ({
+                  key: f.key,
+                  header: f.label,
+                  headerClassName: 'max-w-52',
+                  className: 'max-w-52 min-w-32 truncate p-2',
+                  render: (record: any) => {
+                    if (record.__new || editing === record.id) {
+                      return (
+                        <input
+                          type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                          value={String(draft[f.key] ?? '')}
+                          onChange={(e) => setDraft({ ...draft, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
+                          className="w-full rounded border px-2 py-1.5"
+                        />
+                      );
+                    }
+                    return <span>{typeof record.values[f.key] === 'object' ? JSON.stringify(record.values[f.key]) : String(record.values[f.key] ?? '')}</span>;
+                  },
+                })),
+              ]}
+            />
               {!records.length&&editing!=='__new__'&&<p className="p-8 text-center text-sm text-slate-500">لا توجد سجلات مطابقة.</p>}
             </div>
             {records.length<totalRecords&&<div className="border-t border-slate-100 p-3 text-center"><button type="button" onClick={loadMore} className="rounded-lg bg-sky-50 px-4 py-2 text-xs font-black text-sky-800 hover:bg-sky-100">تحميل المزيد ({records.length} من {totalRecords})</button></div>}

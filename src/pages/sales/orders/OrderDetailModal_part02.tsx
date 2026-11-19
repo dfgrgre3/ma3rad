@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { X, Printer, MessageCircle, History, PackageCheck, ChevronLeft, Receipt, Ban } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { Modal, Info } from './ui';
@@ -37,32 +38,44 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       <Info label="حالة العملية" value={detail.deliveryStatus === 'DELIVERED' ? 'التسليم كامل' : detail.deliveryStatus === 'PARTIAL' ? 'تسليم جزئي' : 'لم يبدأ التسليم'} sub={detail.billingStatus === 'INVOICED' ? `تمت الفوترة (${detail.invoiceNumber || ''})` : 'لم تصدر فاتورة'} />
     </div>
     <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-      <table className="w-full text-right text-[11px] min-w-[600px]">
-        <thead className="bg-slate-50 text-slate-500 font-bold">
-          <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">المسلّم</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">السعر</th><th className="px-3 py-2">الخصم</th><th className="px-3 py-2">الإجمالي</th></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {(detail.items || []).map((item) => {
+      <DataTable
+      ariaLabel="بنود الطلب"
+      rows={detail.items || []}
+      rowKey={(item: any) => String(item.id)}
+      dense
+      minWidth={600}
+      tableClassName="text-[11px]"
+      columns={[
+        {
+          key: 'product', header: 'الصنف',
+          render: (item: any) => (
+            <span className="font-bold text-slate-800">
+              {item.productName}
+              <div className="text-[9px] font-normal text-slate-400">{item.size} • {item.grade}</div>
+            </span>
+          ),
+        },
+        { key: 'qty', header: 'الكمية', render: (item: any) => <span className="font-mono">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
+        {
+          key: 'delivered', header: 'المسلّم',
+          render: (item: any) => {
             const remaining = Math.max(0, Number(item.quantityM2) - Number(item.deliveredM2 || 0));
             return (
-            <tr key={item.id}>
-              <td className="px-3 py-2 font-bold text-slate-800">{item.productName}<div className="text-[9px] text-slate-400 font-normal">{item.size} • {item.grade}</div></td>
-              <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(item.quantityM2), item)}</td>
-              <td className="px-3 py-2 font-mono">
-                <span className={remaining <= 0 ? 'text-emerald-600 font-bold' : 'text-sky-600'}>
+              <span className="font-mono">
+                <span className={remaining <= 0 ? 'font-bold text-emerald-600' : 'text-sky-600'}>
                   {formatProductQuantity(Number(item.deliveredM2 || 0), item)}
                 </span>
                 {remaining > 0 && <div className="text-[9px] text-slate-400">متبقي {remaining.toFixed(2)}</div>}
-              </td>
-              <td className="px-3 py-2 font-mono">{item.boxesCount}</td>
-              <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)}</td>
-              <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
-              <td className="px-3 py-2 font-bold">{fmt(item.totalPrice)}</td>
-            </tr>
+              </span>
             );
-          })}
-        </tbody>
-      </table>
+          },
+        },
+        { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="font-mono">{item.boxesCount}</span> },
+        { key: 'price', header: 'السعر', render: (item: any) => <span className="font-mono">{fmt(item.unitPrice)}</span> },
+        { key: 'disc', header: 'الخصم', render: (item: any) => <span className="font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</span> },
+        { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-bold">{fmt(item.totalPrice)}</span> },
+      ]}
+    />
     </div>
     <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
       <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>

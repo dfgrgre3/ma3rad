@@ -20,7 +20,13 @@ import {
   DetailsModal, VoidModal, type PaymentTarget,
 } from '../../../components/daily/DailyModals';
 import { TodayPurchasesPage as PurchasesPage } from '../today-purchases/TodayPurchasesPage';
+import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: string }> = ({ label, value, hint, tone }) => (
+  <UiStatCard label={label} value={<span className={tone || 'text-slate-900'}>{value}</span>} hint={hint} />
+);
 type DailyKind = 'sales' | 'purchases' | 'expenses' | 'debts';
 
 const META: Record<DailyKind, { title: string; subtitle: string; icon: React.ElementType; color: string; perm: string }> = {
@@ -72,13 +78,6 @@ const PAY_STYLE: Record<string, string> = {
   UNPAID: 'bg-rose-50 text-rose-600',
 };
 
-const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: string }> = ({ label, value, hint, tone }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-4">
-    <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-    <p className={`text-xl font-black mt-1 ${tone || 'text-slate-900'}`}>{value}</p>
-    {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
-  </div>
-);
 
 const SalesMetric: React.FC<{
   label: string;
@@ -156,30 +155,33 @@ const SalesPulse: React.FC<{ rows: any[]; format: (value: number) => string }> =
   );
 };
 
-const Table: React.FC<{ title?: string; headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ title, headers, rows, empty }) => (
-  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-    {title && (
-      <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-        <h3 className="text-xs font-bold text-slate-700">{title}</h3>
-        <span className="text-[11px] text-slate-500">{rows.length} سجل</span>
-      </div>
-    )}
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm text-right min-w-[640px]">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr>{headers.map((h) => <th key={h} className="px-4 py-2.5 text-[11px] font-bold text-slate-500 whitespace-nowrap">{h}</th>)}</tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.length === 0 ? (
-            <tr><td colSpan={headers.length} className="py-12 text-center text-slate-400">{empty}</td></tr>
-          ) : rows.map((cells, i) => (
-            <tr key={i} className="hover:bg-slate-50/70">{cells.map((cell, j) => <td key={j} className="px-4 py-2.5 whitespace-nowrap">{cell}</td>)}</tr>
-          ))}
-        </tbody>
-      </table>
+const Table: React.FC<{ title?: string; headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ title, headers, rows, empty }) => {
+  const body = rows.map((cells, i) => ({ __cells: cells, __i: i }));
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {title && (
+        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-700">{title}</h3>
+          <span className="text-[11px] text-slate-500">{rows.length} سجل</span>
+        </div>
+      )}
+      <UiDataTable
+        ariaLabel={headers.join(' ')}
+        rows={body}
+        rowKey={(r) => String(r.__i)}
+        minWidth={640}
+        dense
+        tableClassName="text-sm"
+        columns={headers.map((h, j) => ({
+          key: `c${j}`,
+          header: h,
+          render: (r: { __cells: React.ReactNode[] }) => <span className="whitespace-nowrap">{r.__cells[j] ?? null}</span>,
+        }))}
+        emptyTitle={empty}
+      />
     </div>
-  </div>
-);
+  );
+};
 
 const time = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—');
 const moveDate = (value: string, days: number) => {
@@ -414,7 +416,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   };
 
   return (
-    <div className={`h-full flex flex-col overflow-hidden ${kind === 'sales' ? 'bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100' : 'bg-slate-50 text-slate-900'}`} dir="rtl">
+    <div className={`h-full flex flex-col overflow-hidden ${kind === 'sales' ? 'bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {kind === 'sales' ? (
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
           <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -650,30 +652,38 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                       </article>
                     ))}
                   </div>
-                  <div className="hidden overflow-x-auto xl:block">
-                    <table className="w-full min-w-[1120px] text-right text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-800/70">
-                        <tr>{['الفاتورة', 'الوقت', 'العميل', 'الأصناف', 'الإجمالي', 'المدفوع', 'المتبقي', 'الحالة', 'الربح', 'الضريبة / الخصم', 'إجراءات'].map((heading) => <th key={heading} scope="col" className="whitespace-nowrap px-3 py-3 font-bold text-slate-500 dark:text-slate-400">{heading}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {filteredRows.map((row: any) => (
-                          <tr key={row.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                            <td className="px-3 py-3 font-mono font-bold text-sky-700 dark:text-sky-300">{row.invoiceNumber}</td>
-                            <td className="whitespace-nowrap px-3 py-3 text-slate-500 dark:text-slate-400">{time(row.createdAt)}</td>
-                            <td className="px-3 py-3"><div className="font-semibold text-slate-900 dark:text-slate-100">{row.customerName || 'عميل نقدي'}</div>{row.customerPhone && <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">{row.customerPhone}</div>}</td>
-                            <td className="px-3 py-3 tabular-nums text-slate-600 dark:text-slate-300">{plain(row.itemsCount)}</td>
-                            <td className="whitespace-nowrap px-3 py-3 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</td>
-                            <td className="whitespace-nowrap px-3 py-3 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</td>
-                            <td className={`whitespace-nowrap px-3 py-3 font-semibold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</td>
-                            <td className="px-3 py-3">{payBadge(row.paymentStatus, true)}</td>
-                            <td className={`whitespace-nowrap px-3 py-3 font-semibold tabular-nums ${row.profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>{fmt(row.profit)}</td>
-                            <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300"><span className="font-semibold">{fmt(row.tax)}</span><span className="mx-1 text-slate-400">/</span><span>{fmt(row.discount)}</span></td>
-                            <td className="px-3 py-2">{saleActions(row)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <div className="hidden xl:block">
+                  <UiDataTable
+                    ariaLabel="مبيعات اليوم"
+                    rows={filteredRows}
+                    rowKey={(row: any) => row.id}
+                    minWidth={1120}
+                    dense
+                    tableClassName="text-xs"
+                    rowClassName={() => 'transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50'}
+                    columns={[
+                      { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono font-bold text-sky-700 dark:text-sky-300">{row.invoiceNumber}</span> },
+                      { key: 'time', header: 'الوقت', render: (row: any) => <span className="whitespace-nowrap text-slate-500 dark:text-slate-400">{time(row.createdAt)}</span> },
+                      {
+                        key: 'customer', header: 'العميل',
+                        render: (row: any) => (
+                          <span>
+                            <span className="block font-semibold text-slate-900 dark:text-slate-100">{row.customerName || 'عميل نقدي'}</span>
+                            {row.customerPhone && <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">{row.customerPhone}</span>}
+                          </span>
+                        ),
+                      },
+                      { key: 'items', header: 'الأصناف', render: (row: any) => <span className="tabular-nums text-slate-600 dark:text-slate-300">{plain(row.itemsCount)}</span> },
+                      { key: 'total', header: 'الإجمالي', render: (row: any) => <span className="whitespace-nowrap font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</span> },
+                      { key: 'paid', header: 'المدفوع', render: (row: any) => <span className="whitespace-nowrap font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</span> },
+                      { key: 'remaining', header: 'المتبقي', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</span> },
+                      { key: 'status', header: 'الحالة', render: (row: any) => payBadge(row.paymentStatus, true) },
+                      { key: 'profit', header: 'الربح', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>{fmt(row.profit)}</span> },
+                      { key: 'tax', header: 'الضريبة / الخصم', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300"><span className="font-semibold">{fmt(row.tax)}</span><span className="mx-1 text-slate-400">/</span><span>{fmt(row.discount)}</span></span> },
+                      { key: 'actions', header: 'إجراءات', render: (row: any) => saleActions(row) },
+                    ]}
+                  />
+                </div>
                 </>
               )}
             </section>

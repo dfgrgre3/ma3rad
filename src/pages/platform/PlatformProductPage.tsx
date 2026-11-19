@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Boxes,
   Plus,
@@ -33,7 +34,6 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import {
   EmptyState,
   Field,
@@ -43,6 +43,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const TABS = [
   { id: 'modules', label: 'الوحدات', icon: SlidersHorizontal },
   { id: 'features', label: 'المزايا والرايات (Feature Flags)', icon: Sparkles },
@@ -488,75 +489,77 @@ export const PlatformProductPage: React.FC = () => {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-right">
-                <thead className="bg-slate-50">
-                  <tr className="text-[10.5px] text-slate-500">
-                    <th className="px-4 py-2.5 font-semibold">الميزة والرمز</th>
-                    <th className="px-4 py-2.5 font-semibold">الفئة</th>
-                    <th className="px-4 py-2.5 font-semibold">نسبة الإتاحة والتجربة</th>
-                    <th className="px-4 py-2.5 font-semibold">تخصيص العملاء</th>
-                    <th className="px-4 py-2.5 font-semibold">الحالة</th>
-                    <th className="px-4 py-2.5 font-semibold">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {features.map((flag) => (
-                    <tr key={flag.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[12px] font-bold text-slate-800">{flag.name}</p>
-                          {flag.isStagingOnly && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
-                              بيئة اختبار (Staging)
-                            </span>
-                          )}
-                        </div>
-                        <p className="font-mono text-[9.5px] text-slate-400" dir="ltr">
-                          {flag.code}
-                        </p>
-                        {flag.description && <p className="text-[10px] text-slate-500">{flag.description}</p>}
-                      </td>
-                      <td className="px-4 py-2.5 text-[11px] text-slate-600">{flag.category || '—'}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200">
-                            <div className="h-full rounded-full bg-sky-500" style={{ width: `${flag.rolloutPercent}%` }} />
-                          </div>
-                          <span className="text-[10.5px] font-semibold text-slate-600">{flag.rolloutPercent}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => openOverridesModal(flag)}
-                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-                        >
-                          <Users className="h-3 w-3 text-sky-600" />
-                          <span>{flag.overridesCount || 0} عملاء مخصصين</span>
-                        </button>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`text-[10.5px] font-bold ${flag.isEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {flag.isEnabled ? 'مفعّلة' : 'معطّلة'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Toggle checked={flag.isEnabled} onChange={() => toggleFeature(flag)} disabled={!canManageProduct} label={flag.name} />
-                          <button
-                            type="button"
-                            onClick={() => openFeature(flag)}
-                            className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
-                            title="تعديل"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+              ariaLabel="مزايا المنتج"
+              rows={features}
+              rowKey={(flag) => flag.id}
+              minWidth={900}
+              tableClassName="text-[10.5px]"
+              columns={[
+                {
+                  key: 'feature', header: 'الميزة والرمز',
+                  render: (flag) => (
+                    <span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[12px] font-bold text-slate-800">{flag.name}</span>
+                        {flag.isStagingOnly && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                            بيئة اختبار (Staging)
+                          </span>
+                        )}
+                      </span>
+                      <span className="block font-mono text-[9.5px] text-slate-400" dir="ltr">{flag.code}</span>
+                      {flag.description && <span className="block text-[10px] text-slate-500">{flag.description}</span>}
+                    </span>
+                  ),
+                },
+                { key: 'category', header: 'الفئة', render: (flag) => <span className="text-[11px] text-slate-600">{flag.category || '—'}</span> },
+                {
+                  key: 'rollout', header: 'نسبة الإتاحة والتجربة',
+                  render: (flag) => (
+                    <span className="flex items-center gap-2">
+                      <span className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200">
+                        <span className="block h-full rounded-full bg-sky-500" style={{ width: `${flag.rolloutPercent}%` }} />
+                      </span>
+                      <span className="text-[10.5px] font-semibold text-slate-600">{flag.rolloutPercent}%</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'overrides', header: 'تخصيص العملاء',
+                  render: (flag) => (
+                    <button
+                      type="button"
+                      onClick={() => openOverridesModal(flag)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                    >
+                      <Users className="h-3 w-3 text-sky-600" />
+                      <span>{flag.overridesCount || 0} عملاء مخصصين</span>
+                    </button>
+                  ),
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (flag) => <span className={`text-[10.5px] font-bold ${flag.isEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>{flag.isEnabled ? 'مفعّلة' : 'معطّلة'}</span>,
+                },
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (flag) => (
+                    <span className="flex items-center gap-2">
+                      <Toggle checked={flag.isEnabled} onChange={() => toggleFeature(flag)} disabled={!canManageProduct} label={flag.name} />
+                      <button
+                        type="button"
+                        onClick={() => openFeature(flag)}
+                        className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
+                        title="تعديل"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ),
+                },
+              ]}
+            />
             </div>
           )}
         </section>
@@ -796,42 +799,33 @@ export const PlatformProductPage: React.FC = () => {
                 لا توجد تخصيصات خاصة لهذه الميزة بعد. تنطبق عليها قواعد الإتاحة العامة.
               </div>
             ) : (
-              <table className="w-full text-right text-[11px]">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-2">العميل المستهدف</th>
-                    <th className="px-3 py-2">الحالة المفروضة</th>
-                    <th className="px-3 py-2">تاريخ التخصيص</th>
-                    <th className="px-3 py-2">إجراء</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {featureOverrides.map((ov) => (
-                    <tr key={ov.id} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2 font-bold text-slate-800">{ov.targetName || ov.targetId}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-                            ov.isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                          }`}
-                        >
-                          {ov.isEnabled ? 'مفعّل دائماً' : 'محجوب تماماً'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-slate-400">{formatDate(ov.createdAt)}</td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => removeOverride(ov.id)}
-                          className="rounded px-2 py-1 text-rose-600 hover:bg-rose-50 font-semibold"
-                        >
-                          حذف
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+              ariaLabel="تخصيصات الميزة"
+              rows={featureOverrides}
+              rowKey={(ov) => ov.id}
+              dense
+              tableClassName="text-[11px]"
+              columns={[
+                { key: 'target', header: 'العميل المستهدف', render: (ov) => <span className="font-bold text-slate-800">{ov.targetName || ov.targetId}</span> },
+                {
+                  key: 'state', header: 'الحالة المفروضة',
+                  render: (ov) => (
+                    <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${ov.isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {ov.isEnabled ? 'مفعّل دائماً' : 'محجوب تماماً'}
+                    </span>
+                  ),
+                },
+                { key: 'date', header: 'تاريخ التخصيص', render: (ov) => <span className="text-slate-400">{formatDate(ov.createdAt)}</span> },
+                {
+                  key: 'action', header: 'إجراء',
+                  render: (ov) => (
+                    <button type="button" onClick={() => removeOverride(ov.id)} className="rounded px-2 py-1 text-rose-600 hover:bg-rose-50 font-semibold">
+                      حذف
+                    </button>
+                  ),
+                },
+              ]}
+            />
             )}
           </div>
         </div>

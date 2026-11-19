@@ -1,7 +1,8 @@
 import React from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { DataTable } from '../../../components/ui/DataTable';
+import { ChevronDown, ChevronUp, Loader2, User } from 'lucide-react';
 import type { AuditLogEntry } from '../../../services/domains/security/AuditService';
-import { AuditTableRow } from './AuditTableRow';
+import { formatJson, getModuleColor } from '../../../types/admin/audit';
 
 interface Props {
   logs: AuditLogEntry[];
@@ -33,38 +34,84 @@ export const AuditTable: React.FC<Props> = ({
           </div>
         )}
 
-        <table className="w-full text-right text-xs whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 sticky top-0 z-[1]">
-            <tr>
-              <th className="p-3.5 w-10 text-center">#</th>
-              <th className="p-3.5">التاريخ والوقت</th>
-              <th className="p-3.5">المستخدم</th>
-              <th className="p-3.5">الإجراء</th>
-              <th className="p-3.5">الوحدة</th>
-              <th className="p-3.5">معرف السجل</th>
-              <th className="p-3.5 w-10"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {logs.length === 0 && !isLoading ? (
-              <tr>
-                <td colSpan={7} className="py-20 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-                  <Search className="w-10 h-10 opacity-20" />
-                  <span>لا توجد سجلات مطابقة لمعايير البحث الحالية</span>
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => (
-                <AuditTableRow
-                  key={log.id}
-                  log={log}
-                  isExpanded={expandedLog === log.id}
-                  onToggleExpand={() => onToggleExpand(log.id)}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="سجل المراجعة"
+          rows={logs}
+          rowKey={(log) => log.id}
+          loading={isLoading}
+          dense
+          stickyHeader
+          tableClassName="text-xs whitespace-nowrap"
+          isRowExpanded={(log) => expandedLog === log.id}
+          rowClassName={(log) => (expandedLog === log.id ? 'bg-slate-50' : '')}
+          renderExpandedRow={(log) => (
+            <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
+              {log.oldValues && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-red-600/80">
+                    <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                    القيم السابقة (قبل التعديل)
+                  </div>
+                  <pre className="overflow-x-auto rounded-xl border border-red-100 bg-white p-4 font-mono text-[11px] leading-relaxed text-slate-600 shadow-sm">
+                    {formatJson(log.oldValues)}
+                  </pre>
+                </div>
+              )}
+              {log.newValues && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-600/80">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    القيم الجديدة (بعد التعديل)
+                  </div>
+                  <pre className="overflow-x-auto rounded-xl border border-emerald-100 bg-white p-4 font-mono text-[11px] leading-relaxed text-slate-600 shadow-sm">
+                    {formatJson(log.newValues)}
+                  </pre>
+                </div>
+              )}
+              {!log.oldValues && !log.newValues && (
+                <div className="col-span-full py-4 text-center text-xs italic text-slate-500">
+                  لا توجد تفاصيل إضافية مسجلة لهذا الإجراء
+                </div>
+              )}
+            </div>
+          )}
+          columns={[
+            {
+              key: 'toggle', header: '#', align: 'center',
+              render: (log) => {
+                const isExpanded = expandedLog === log.id;
+                return (
+                  <button
+                    onClick={() => onToggleExpand(log.id)}
+                    className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-200"
+                  >
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                );
+              },
+            },
+            { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="font-mono text-[11px] tabular-nums text-slate-500">{log.createdAt}</span> },
+            {
+              key: 'user', header: 'المستخدم',
+              render: (log) => (
+                <span className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <User className="h-4 w-4" />
+                  </span>
+                  <span className="font-bold text-slate-900">{log.userName}</span>
+                </span>
+              ),
+            },
+            { key: 'action', header: 'الإجراء', render: (log) => <span className="font-bold text-slate-800">{log.action}</span> },
+            {
+              key: 'module', header: 'الوحدة',
+              render: (log) => <span className={`rounded-md border px-2.5 py-1 text-[10px] font-bold ${getModuleColor(log.module)}`}>{log.module}</span>,
+            },
+            { key: 'record', header: 'معرف السجل', render: (log) => <span className="select-all font-mono text-[10px] text-slate-500">{log.recordId || '-'}</span> },
+            { key: 'empty', header: '', align: 'center', render: () => null },
+          ]}
+          emptyTitle="لا توجد سجلات مطابقة لمعايير البحث الحالية"
+        />
       </div>
 
       {totalPages > 1 && (

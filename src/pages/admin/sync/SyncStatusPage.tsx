@@ -26,7 +26,7 @@ export const SyncStatusPage: React.FC = () => {
   const isOwner = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50">

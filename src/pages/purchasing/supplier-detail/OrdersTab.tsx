@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
@@ -26,46 +27,30 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ orders }) => {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs text-right min-w-[700px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr>
-              <th className="p-3">رقم الأمر</th>
-              <th className="p-3">تاريخ الأمر</th>
-              <th className="p-3">تاريخ التسليم المتوقع</th>
-              <th className="p-3">الإجمالي التقديري</th>
-              <th className="p-3">حالة الأمر</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {orders.map((ord) => (
-              <tr key={ord.id} className="hover:bg-slate-50">
-                <td className="p-3 font-mono font-bold text-slate-900">{ord.order_number}</td>
-                <td className="p-3 text-slate-600">{ord.date}</td>
-                <td className="p-3 text-slate-600">{ord.expected_delivery_date || '—'}</td>
-                <td className="p-3 font-bold text-slate-900">
-                  {CeramicMath.formatCurrency(ord.total_amount)}
-                </td>
-                <td className="p-3">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                      ORDER_STATUS_BADGES[ord.status]?.className ||
-                      'bg-slate-100 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {ORDER_STATUS_BADGES[ord.status]?.label || ord.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {orders.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-10 text-center text-slate-400">
-                  لا توجد أوامر شراء مسجلة لهذا المورد.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="أوامر شراء المورد"
+          rows={orders}
+          rowKey={(ord: any) => String(ord.id)}
+          minWidth={700}
+          dense
+          tableClassName="text-xs"
+          rowClassName={() => 'transition hover:bg-slate-50'}
+          columns={[
+            { key: 'num', header: 'رقم الأمر', render: (ord: any) => <span className="font-mono font-bold text-slate-900">{ord.order_number}</span> },
+            { key: 'date', header: 'تاريخ الأمر', render: (ord: any) => <span className="text-slate-600">{ord.date}</span> },
+            { key: 'expected', header: 'تاريخ التسليم المتوقع', render: (ord: any) => <span className="text-slate-600">{ord.expected_delivery_date || '—'}</span> },
+            { key: 'total', header: 'الإجمالي التقديري', render: (ord: any) => <span className="font-bold text-slate-900">{CeramicMath.formatCurrency(ord.total_amount)}</span> },
+            {
+              key: 'status', header: 'حالة الأمر',
+              render: (ord: any) => (
+                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${ORDER_STATUS_BADGES[ord.status as keyof typeof ORDER_STATUS_BADGES]?.className || 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                  {ORDER_STATUS_BADGES[ord.status as keyof typeof ORDER_STATUS_BADGES]?.label || ord.status}
+                </span>
+              ),
+            },
+          ]}
+          emptyTitle="لا توجد أوامر شراء مسجلة لهذا المورد."
+        />
       </div>
     </div>
   );

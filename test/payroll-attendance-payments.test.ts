@@ -133,7 +133,7 @@ test('bulk payroll pays cash, bank transfer and wallet with references, proofs a
   db.run(
     `INSERT INTO bank_accounts
        (id, account_name, bank_name, account_number, opening_balance, current_balance, gl_account_id, branch_id, is_active)
-     VALUES ('bank_payroll_test', 'حساب الرواتب', 'بنك الاختبار', 'BANK-100', 10000, 10000, 'acc_1102', ?, 1)`,
+     VALUES ('bank_payroll_test', 'حساب الرواتب', 'بنك الاختبار', 'BANK-100', 1000000, 1000000, 'acc_1102', ?, 1)`,
     [bankEmployee.branchId]
   );
 
@@ -187,12 +187,12 @@ test('bulk payroll pays cash, bank transfer and wallet with references, proofs a
   assert.equal(transactions.find((row) => row.employeeId === walletEmployee.id)?.paymentMethod, 'WALLET');
   assert.equal(transactions.find((row) => row.employeeId === cashEmployee.id)?.paymentMethod, 'CASH');
   assert.equal(
-    q("SELECT current_balance AS balance FROM bank_accounts WHERE id='bank_payroll_test'")[0].balance,
+    q("SELECT current_balance / 100.0 AS balance FROM bank_accounts WHERE id='bank_payroll_test'")[0].balance,
     10000 - bankItem.netAmount
   );
 
   const bankCredit = q(
-    `SELECT COALESCE(SUM(l.credit),0) AS amount FROM journal_entry_lines l
+    `SELECT COALESCE(SUM(l.credit),0) / 100.0 AS amount FROM journal_entry_lines l
      JOIN journal_entries e ON e.id=l.entry_id
      JOIN chart_of_accounts a ON a.id=l.account_id
      WHERE e.reference_id = ? AND a.code='1102'`,
@@ -200,7 +200,7 @@ test('bulk payroll pays cash, bank transfer and wallet with references, proofs a
   )[0].amount;
   assert.equal(bankCredit, bankItem.netAmount, 'bank payout credits the bank ledger account');
   const walletCredit = q(
-    `SELECT COALESCE(SUM(l.credit),0) AS amount FROM journal_entry_lines l
+    `SELECT COALESCE(SUM(l.credit),0) / 100.0 AS amount FROM journal_entry_lines l
      JOIN journal_entries e ON e.id=l.entry_id
      JOIN chart_of_accounts a ON a.id=l.account_id
      WHERE e.reference_id = ? AND a.code='1107'`,

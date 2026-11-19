@@ -122,7 +122,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <DashboardRefreshContext.Provider value={refreshContextValue}>
-      <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
+      <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]">
         <div className="space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
         <DashboardHeader
           today={today}

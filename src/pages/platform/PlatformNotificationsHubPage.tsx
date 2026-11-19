@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { Bell, Send, CheckCircle2, Clock, XCircle, Filter } from 'lucide-react';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
@@ -184,46 +185,46 @@ export const PlatformNotificationsHubPage: React.FC = () => {
       {/* Logs Table */}
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-right text-xs">
-            <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-              <tr>
-                <th className="px-4 py-3">القناة / المستلم</th>
-                <th className="px-4 py-3">القالب والموضوع</th>
-                <th className="px-4 py-3">الحالة</th>
-                <th className="px-4 py-3">وقت التسليم</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="font-bold text-slate-100">{STATUS_LABELS[log.status] || log.status}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{log.channel}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-200">{log.subject}</div>
-                    <div className="text-[10px] font-mono text-slate-500">{log.template}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {log.status === 'SENT' || log.status === 'DELIVERED' ? (
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم
-                      </span>
-                    ) : log.status === 'FAILED' ? (
-                      <span className="text-red-400 font-bold flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5" /> فشل التسليم
-                      </span>
-                    ) : (
-                      <span className="text-amber-300 font-bold flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status] || log.status}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-400">{formatDateTime(log.sentAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+              ariaLabel="سجل الإشعارات"
+              rows={filteredLogs}
+              rowKey={(log: any) => String(log.id)}
+              minWidth={850}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              columns={[
+                {
+                  key: 'channel', header: 'القناة / المستلم',
+                  render: (log: any) => (
+                    <span className="block">
+                      <span className="block font-bold text-slate-100">{STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                      <span className="block font-mono text-[11px] text-slate-400">{log.channel}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'template', header: 'القالب والموضوع',
+                  render: (log: any) => (
+                    <span className="block">
+                      <span className="block font-semibold text-slate-200">{log.subject}</span>
+                      <span className="block font-mono text-[10px] text-slate-500">{log.template}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (log: any) => log.status === 'SENT' || log.status === 'DELIVERED' ? (
+                    <span className="flex items-center gap-1 font-bold text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم</span>
+                  ) : log.status === 'FAILED' ? (
+                    <span className="flex items-center gap-1 font-bold text-red-400"><XCircle className="h-3.5 w-3.5" /> فشل التسليم</span>
+                  ) : (
+                    <span className="flex items-center gap-1 font-bold text-amber-300"><Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                  ),
+                },
+                { key: 'sent', header: 'وقت التسليم', render: (log: any) => <span className="text-slate-400">{formatDateTime(log.sentAt)}</span> },
+              ]}
+            />
           {!loading && filteredLogs.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">لا توجد إشعارات مسجلة بعد.</div>
           ) : null}

@@ -340,7 +340,7 @@ export const BranchesPage: React.FC = () => {
     warehouse.isActive && !warehouse.branchId && !branchWarehouses.some((row) => row.warehouseId === warehouse.id)
   );
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <header className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-600">

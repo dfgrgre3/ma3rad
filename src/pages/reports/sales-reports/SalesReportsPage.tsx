@@ -431,7 +431,7 @@ export const SalesReportsPage: React.FC = () => {
 
   if (!canView) {
     return (
-      <div className="h-full flex items-center justify-center" dir="rtl">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-3" />
           <p className="text-slate-600 font-bold">لا تملك صلاحية مشاهدة التقارير</p>
@@ -441,7 +441,7 @@ export const SalesReportsPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">

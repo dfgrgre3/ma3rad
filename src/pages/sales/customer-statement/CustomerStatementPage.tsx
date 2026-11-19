@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   FileText, Search, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
   Users, RefreshCw, Eye, X, Printer, Download, MessageCircle,
@@ -82,48 +83,38 @@ const StatementTable: React.FC<StatementTableProps> = ({
     ) : (
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-              <tr>
-                {['التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'].map(h => (
-                  <th key={h} className="text-right font-bold text-slate-500 dark:text-slate-400 px-3 py-2.5 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rows.map((row, i) => (
-                <tr key={i} className={`transition-colors ${
-                  row.type === 'invoice' ? 'hover:bg-rose-50/30 dark:hover:bg-rose-900/10' :
-                  row.type === 'return' ? 'hover:bg-amber-50/30 dark:hover:bg-amber-900/10' :
-                  'hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10'
-                }`}>
-                  <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.date}</td>
-                  <td className="px-3 py-2.5 font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">{row.reference}</td>
-                  <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{row.description}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                    {row.debit > 0 ? fmt(row.debit) : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                    {row.credit > 0 ? fmt(row.credit) : '—'}
-                  </td>
-                  <td className={`px-3 py-2.5 text-right font-bold whitespace-nowrap ${row.balance > 0 ? 'text-rose-700 dark:text-rose-400' : row.balance < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
-                    {fmt(Math.abs(row.balance))}
-                    {row.balance !== 0 && <span className="text-[10px] mr-1">{row.balance > 0 ? 'م' : 'د'}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-slate-100 dark:bg-slate-800">
-              <tr>
-                <td colSpan={3} className="px-3 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">الإجمالي</td>
-                <td className="px-3 py-3 font-bold text-rose-700 dark:text-rose-400 text-xs whitespace-nowrap">{fmt(totalDebit)}</td>
-                <td className="px-3 py-3 font-bold text-emerald-700 dark:text-emerald-400 text-xs whitespace-nowrap">{fmt(totalCredit)}</td>
-                <td className={`px-3 py-3 font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                  {fmt(Math.abs(netBalance))} {netBalance > 0 ? '(مدين)' : netBalance < 0 ? '(دائن)' : '(مصفّى)'}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+          <DataTable
+                    ariaLabel="حركات كشف الحساب"
+                    rows={[...rows.map((r, i) => ({ ...r, _i: i })), { __total: true } as any]}
+                    rowKey={(row: any) => row.__total ? '__total__' : String(row._i)}
+                    rowClassName={(row: any) => row.__total ? 'bg-slate-100 dark:bg-slate-800 font-bold' : `transition-colors ${
+                      row.type === 'invoice' ? 'hover:bg-rose-50/30 dark:hover:bg-rose-900/10' :
+                      row.type === 'return' ? 'hover:bg-amber-50/30 dark:hover:bg-amber-900/10' :
+                      'hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10'
+                    }`}
+                    dense
+                    columns={[
+                      { key: 'date', header: 'التاريخ', render: (row: any) => row.__total ? '' : <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.date}</span> },
+                      { key: 'ref', header: 'المرجع', render: (row: any) => row.__total ? '' : <span className="font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">{row.reference}</span> },
+                      { key: 'desc', header: 'البيان', render: (row: any) => row.__total ? <span className="text-xs text-slate-700 dark:text-slate-300">الإجمالي</span> : <span className="text-slate-700 dark:text-slate-300">{row.description}</span> },
+                      { key: 'debit', header: 'مدين', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-rose-700 dark:text-rose-400 text-xs whitespace-nowrap">{fmt(totalDebit)}</span> : <span className="font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">{row.debit > 0 ? fmt(row.debit) : '—'}</span> },
+                      { key: 'credit', header: 'دائن', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-emerald-700 dark:text-emerald-400 text-xs whitespace-nowrap">{fmt(totalCredit)}</span> : <span className="font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{row.credit > 0 ? fmt(row.credit) : '—'}</span> },
+                      {
+                        key: 'balance', header: 'الرصيد', align: 'end',
+                        render: (row: any) => row.__total ? (
+                          <span className={`font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                            {fmt(Math.abs(netBalance))} {netBalance > 0 ? '(مدين)' : netBalance < 0 ? '(دائن)' : '(مصفّى)'}
+                          </span>
+                        ) : (
+                          <span className={`font-bold whitespace-nowrap ${row.balance > 0 ? 'text-rose-700 dark:text-rose-400' : row.balance < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
+                            {fmt(Math.abs(row.balance))}
+                            {row.balance !== 0 && <span className="text-[10px] mr-1">{row.balance > 0 ? 'م' : 'د'}</span>}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+
         </div>
       </div>
     )}
@@ -228,7 +219,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
     const headers = ['التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'];
     const tableRows = rows.map(r => [r.date, r.reference, r.description, r.debit > 0 ? fmt(r.debit) : '', r.credit > 0 ? fmt(r.credit) : '', fmt(r.balance)]);
     const html = `
-      <div dir="rtl" style="font-family: Arial; padding: 20px;">
+      <div style="font-family: Arial; padding: 20px;">
         <h2 style="text-align: center; margin-bottom: 4px;">كشف حساب عميل</h2>
         <p style="text-align: center; color: #666; margin-bottom: 16px;">${customer.name} — ${customer.code} | الفترة: ${dateFrom} إلى ${dateTo}</p>
         <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse: collapse; font-size: 12px;">
@@ -275,7 +266,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto" dir="rtl">
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto">
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
           {/* Header */}
           <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-l from-sky-600/5 to-transparent">
@@ -470,7 +461,7 @@ export const CustomerStatementPage: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950" dir="rtl">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between gap-4">
@@ -539,72 +530,78 @@ export const CustomerStatementPage: React.FC = () => {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
-                    <tr>
-                      {['العميل', 'النوع', 'الرصيد الحالي', 'حد الائتمان', 'إجمالي المشتريات', 'متأخرات', 'آخر فاتورة', 'إجراءات'].map(h => (
-                        <th key={h} className="text-right text-xs font-bold text-slate-500 dark:text-slate-400 px-4 py-3 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {customers.map(c => (
-                      <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-900 dark:text-slate-100">{c.name}</p>
-                          <p className="text-xs text-slate-500">{c.code} {c.phone && `• ${c.phone}`}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                            {CUSTOMER_TYPES[c.customerType] || c.customerType}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`font-bold text-sm ${c.currentBalance > 0 ? 'text-rose-600 dark:text-rose-400' : c.currentBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
-                              {fmtAbs(c.currentBalance)}
-                            </span>
-                            {c.currentBalance !== 0 && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${c.currentBalance > 0 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
-                                {c.currentBalance > 0 ? 'مدين' : 'دائن'}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sky-600 dark:text-sky-400 font-semibold whitespace-nowrap">{fmt(c.creditLimit)}</td>
-                        <td className="px-4 py-3 text-violet-600 dark:text-violet-400 font-semibold whitespace-nowrap">{fmt(c.totalPurchases)}</td>
-                        <td className="px-4 py-3">
-                          {c.overdueInvoices > 0 ? (
-                            <div className="flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                              <div>
-                                <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{c.overdueInvoices} فاتورة</p>
-                                <p className="text-[10px] text-rose-500">{fmt(c.overdueAmount)}</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span className="text-xs font-semibold">لا متأخرات</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {c.lastInvoiceDate || '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => setSelected(c)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 text-xs font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all border border-violet-200 dark:border-violet-800"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            الكشف
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                                    ariaLabel="أرصدة العملاء"
+                                    rows={customers}
+                                    rowKey={(c) => c.id}
+                                    columns={[
+                                      {
+                                        key: 'customer', header: 'العميل',
+                                        render: (c) => (
+                                          <div>
+                                            <p className="font-bold text-slate-900 dark:text-slate-100">{c.name}</p>
+                                            <p className="text-xs text-slate-500">{c.code} {c.phone && `• ${c.phone}`}</p>
+                                          </div>
+                                        ),
+                                      },
+                                      {
+                                        key: 'type', header: 'النوع',
+                                        render: (c) => (
+                                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                            {CUSTOMER_TYPES[c.customerType] || c.customerType}
+                                          </span>
+                                        ),
+                                      },
+                                      {
+                                        key: 'balance', header: 'الرصيد الحالي',
+                                        render: (c) => (
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`font-bold text-sm ${c.currentBalance > 0 ? 'text-rose-600 dark:text-rose-400' : c.currentBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
+                                              {fmtAbs(c.currentBalance)}
+                                            </span>
+                                            {c.currentBalance !== 0 && (
+                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${c.currentBalance > 0 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                                                {c.currentBalance > 0 ? 'مدين' : 'دائن'}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ),
+                                      },
+                                      { key: 'limit', header: 'حد الائتمان', render: (c) => <span className="text-sky-600 dark:text-sky-400 font-semibold whitespace-nowrap">{fmt(c.creditLimit)}</span> },
+                                      { key: 'purchases', header: 'إجمالي المشتريات', render: (c) => <span className="text-violet-600 dark:text-violet-400 font-semibold whitespace-nowrap">{fmt(c.totalPurchases)}</span> },
+                                      {
+                                        key: 'overdue', header: 'متأخرات',
+                                        render: (c) => c.overdueInvoices > 0 ? (
+                                          <div className="flex items-center gap-1.5">
+                                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                            <div>
+                                              <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{c.overdueInvoices} فاتورة</p>
+                                              <p className="text-[10px] text-rose-500">{fmt(c.overdueAmount)}</p>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            <span className="text-xs font-semibold">لا متأخرات</span>
+                                          </div>
+                                        ),
+                                      },
+                                      { key: 'last', header: 'آخر فاتورة', render: (c) => <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{c.lastInvoiceDate || '—'}</span> },
+                                      {
+                                        key: 'actions', header: 'إجراءات',
+                                        render: (c) => (
+                                          <button
+                                            onClick={() => setSelected(c)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 text-xs font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all border border-violet-200 dark:border-violet-800"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                            الكشف
+                                          </button>
+                                        ),
+                                      },
+                                    ]}
+                                  />
+
               </div>
 
               {/* Pagination */}

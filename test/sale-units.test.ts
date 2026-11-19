@@ -7,8 +7,8 @@ import { CustomerService } from '../src/services/domains/customers/CustomerServi
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
-import {
 import { CashierService } from '../src/services/domains/finance/CashierService.ts';
+import {
   basePriceFromUnitPrice,
   getSellableUnits,
   pricePerUnit,

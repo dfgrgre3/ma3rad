@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertTriangle, Briefcase, CheckCircle2, ClipboardList, Plus, RefreshCw, Scale,
   Trash2, TrendingDown, TrendingUp, Users,
@@ -10,7 +11,15 @@ import {
 import { EmployeeOrganizationService, EmployeeDepartment } from '../../../services/domains/hr/EmployeeOrganizationService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; icon?: React.ReactNode; tone?: string }> = ({ label, value, hint, icon, tone }: any) => (
+  <UiStatCard label={label} value={value} hint={hint} icon={icon} tone={statTone(tone || '')} />
+);
 type Tab = 'plans' | 'requisitions' | 'comparison';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -53,16 +62,6 @@ const statusTone = (status: string): string => {
 
 const money = (value: number) => Number(value || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 });
 
-const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: React.ReactNode; tone: string }> = ({ label, value, hint, icon, tone }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-bold text-slate-500">{label}</span>
-      <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${tone}`}>{icon}</span>
-    </div>
-    <div className="mt-2 text-xl font-black tabular-nums">{value}</div>
-    {hint && <div className="mt-0.5 text-[10px] font-semibold text-slate-400">{hint}</div>}
-  </div>
-);
 
 export const WorkforcePlanningPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('plans');
@@ -273,7 +272,7 @@ export const WorkforcePlanningPage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50">
           <Briefcase className="h-5 w-5 text-violet-600" />
@@ -333,67 +332,66 @@ export const WorkforcePlanningPage: React.FC = () => {
                   <div className="border-b border-slate-100 px-4 py-3">
                     <h2 className="text-sm font-black">الخطط ({plans.length})</h2>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-right text-xs">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2 font-bold">الفترة</th>
-                          <th className="px-3 py-2 font-bold">الفرع / القسم</th>
-                          <th className="px-3 py-2 font-bold">المخطط</th>
-                          <th className="px-3 py-2 font-bold">الفعلي</th>
-                          <th className="px-3 py-2 font-bold">النقص / الفائض</th>
-                          <th className="px-3 py-2 font-bold">التكلفة</th>
-                          <th className="px-3 py-2 font-bold">الحالة</th>
-                          <th className="px-3 py-2 font-bold">إجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {plans.map((plan) => (
-                          <tr key={plan.id} className="hover:bg-slate-50/70">
-                            <td className="px-3 py-3 font-bold tabular-nums">{plan.periodMonth}</td>
-                            <td className="px-3 py-3">
-                              <div className="font-bold">{plan.departmentName}</div>
-                              <div className="text-[10px] text-slate-500">{plan.branchName}</div>
-                              {plan.jobPlans.length > 0 && (
-                                <div className="mt-1 text-[10px] text-slate-400">{plan.jobPlans.length} وظيفة مخططة</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 font-bold tabular-nums">{money(plan.plannedHeadcount)}</td>
-                            <td className="px-3 py-3 tabular-nums">{money(plan.actualHeadcount)}</td>
-                            <td className="px-3 py-3">
-                              {plan.shortage > 0 && <span className="font-bold text-rose-600">-{plan.shortage}</span>}
-                              {plan.surplus > 0 && <span className="font-bold text-amber-600">+{plan.surplus}</span>}
-                              {plan.shortage === 0 && plan.surplus === 0 && <span className="text-emerald-600">مطابق</span>}
-                            </td>
-                            <td className="px-3 py-3 tabular-nums">
-                              <div>{money(plan.expectedEmployeeCost)}</div>
-                              <div className="text-[10px] text-slate-400">ميزانية {money(plan.approvedRecruitmentBudget)}</div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(plan.status)}`}>{planStatusLabel[plan.status]}</span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                {plan.status === 'DRAFT' && (
-                                  <>
-                                    <button onClick={() => startEdit(plan)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50">تعديل</button>
-                                    <button onClick={() => run(() => WorkforcePlanningService.approveWorkforcePlan(plan.id), 'تم اعتماد الخطة.')} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
-                                    <button onClick={() => { if (window.confirm('حذف خطة القوى العاملة؟')) run(() => WorkforcePlanningService.deleteWorkforcePlan(plan.id), 'تم حذف الخطة.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
-                                  </>
-                                )}
-                                {plan.status !== 'CLOSED' && (
-                                  <button onClick={() => { if (window.confirm('إغلاق الخطة؟ لن يمكن تعديلها بعد ذلك.')) run(() => WorkforcePlanningService.closeWorkforcePlan(plan.id), 'تم إغلاق الخطة.'); }} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">إغلاق</button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {!plans.length && (
-                          <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد خطط مسجلة للفترة المحددة.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                                        ariaLabel="خطط القوى العاملة"
+                                        rows={plans}
+                                        rowKey={(plan) => plan.id}
+                                        dense
+                                        columns={[
+                                          { key: 'period', header: 'الفترة', render: (plan) => <span className="font-bold tabular-nums">{plan.periodMonth}</span> },
+                                          {
+                                            key: 'dept', header: 'الفرع / القسم',
+                                            render: (plan) => (
+                                              <span>
+                                                <span className="font-bold block">{plan.departmentName}</span>
+                                                <span className="text-[10px] text-slate-500">{plan.branchName}</span>
+                                                {plan.jobPlans.length > 0 && <span className="mt-1 block text-[10px] text-slate-400">{plan.jobPlans.length} وظيفة مخططة</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'planned', header: 'المخطط', render: (plan) => <span className="font-bold tabular-nums">{money(plan.plannedHeadcount)}</span> },
+                                          { key: 'actual', header: 'الفعلي', render: (plan) => <span className="tabular-nums">{money(plan.actualHeadcount)}</span> },
+                                          {
+                                            key: 'diff', header: 'النقص / الفائض',
+                                            render: (plan) => (
+                                              <span>
+                                                {plan.shortage > 0 && <span className="font-bold text-rose-600">-{plan.shortage}</span>}
+                                                {plan.surplus > 0 && <span className="font-bold text-amber-600">+{plan.surplus}</span>}
+                                                {plan.shortage === 0 && plan.surplus === 0 && <span className="text-emerald-600">مطابق</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          {
+                                            key: 'cost', header: 'التكلفة',
+                                            render: (plan) => (
+                                              <span className="tabular-nums">
+                                                <span className="block">{money(plan.expectedEmployeeCost)}</span>
+                                                <span className="text-[10px] text-slate-400">ميزانية {money(plan.approvedRecruitmentBudget)}</span>
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'status', header: 'الحالة', render: (plan) => <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(plan.status)}`}>{planStatusLabel[plan.status]}</span> },
+                                          {
+                                            key: 'actions', header: 'إجراءات',
+                                            render: (plan) => (
+                                              <div className="flex flex-wrap gap-1">
+                                                {plan.status === 'DRAFT' && (
+                                                  <>
+                                                    <button onClick={() => startEdit(plan)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50">تعديل</button>
+                                                    <button onClick={() => run(() => WorkforcePlanningService.approveWorkforcePlan(plan.id), 'تم اعتماد الخطة.')} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
+                                                    <button onClick={() => { if (window.confirm('حذف خطة القوى العاملة؟')) run(() => WorkforcePlanningService.deleteWorkforcePlan(plan.id), 'تم حذف الخطة.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
+                                                  </>
+                                                )}
+                                                {plan.status !== 'CLOSED' && (
+                                                  <button onClick={() => { if (window.confirm('إغلاق الخطة؟ لن يمكن تعديلها بعد ذلك.')) run(() => WorkforcePlanningService.closeWorkforcePlan(plan.id), 'تم إغلاق الخطة.'); }} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">إغلاق</button>
+                                                )}
+                                              </div>
+                                            ),
+                                          },
+                                        ]}
+                                        emptyTitle="لا توجد خطط مسجلة للفترة المحددة."
+                                      />
+
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -470,63 +468,47 @@ export const WorkforcePlanningPage: React.FC = () => {
                   <div className="border-b border-slate-100 px-4 py-3">
                     <h2 className="text-sm font-black">طلبات التوظيف ({requisitions.length})</h2>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-right text-xs">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2 font-bold">الرقم</th>
-                          <th className="px-3 py-2 font-bold">الوظيفة</th>
-                          <th className="px-3 py-2 font-bold">الفرع / القسم</th>
-                          <th className="px-3 py-2 font-bold">الشواغر</th>
-                          <th className="px-3 py-2 font-bold">الراتب التقديري</th>
-                          <th className="px-3 py-2 font-bold">طلب بواسطة</th>
-                          <th className="px-3 py-2 font-bold">الحالة</th>
-                          <th className="px-3 py-2 font-bold">إجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {requisitions.map((req) => (
-                          <tr key={req.id} className="hover:bg-slate-50/70">
-                            <td className="px-3 py-3 font-mono text-[10px]">{req.requisitionNumber}</td>
-                            <td className="px-3 py-3">
-                              <div className="font-bold">{req.jobTitle}</div>
-                              <div className="text-[10px] text-slate-500">{req.employmentType}</div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div>{req.departmentName}</div>
-                              <div className="text-[10px] text-slate-500">{req.branchName}</div>
-                            </td>
-                            <td className="px-3 py-3 font-bold tabular-nums">{req.openings}</td>
-                            <td className="px-3 py-3 tabular-nums">{money(req.estimatedMonthlySalary)}</td>
-                            <td className="px-3 py-3 text-[10px]">
-                              <div>{req.requestedByName || '—'}</div>
-                              <div className="text-slate-400">{req.requestedAt?.slice(0, 10)}</div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(req.status)}`}>{requisitionStatusLabel[req.status]}</span>
-                              {req.decisionNote && <div className="mt-1 max-w-[140px] truncate text-[10px] text-slate-400" title={req.decisionNote}>{req.decisionNote}</div>}
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                {req.status === 'PENDING' && (
-                                  <>
-                                    <button onClick={() => decideRequisition(req, true)} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
-                                    <button onClick={() => decideRequisition(req, false)} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50">رفض</button>
-                                  </>
-                                )}
-                                {(req.status === 'APPROVED' || req.status === 'REJECTED') && (
-                                  <button onClick={() => run(() => WorkforcePlanningService.closeHiringRequisition(req.id), 'تم إغلاق الطلب.')} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">إغلاق</button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {!requisitions.length && (
-                          <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد طلبات توظيف.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                                        ariaLabel="طلبات التوظيف"
+                                        rows={requisitions}
+                                        rowKey={(req) => req.id}
+                                        dense
+                                        columns={[
+                                          { key: 'number', header: 'الرقم', render: (req) => <span className="font-mono text-[10px]">{req.requisitionNumber}</span> },
+                                          { key: 'job', header: 'الوظيفة', render: (req) => <span><span className="font-bold block">{req.jobTitle}</span><span className="text-[10px] text-slate-500">{req.employmentType}</span></span> },
+                                          { key: 'dept', header: 'الفرع / القسم', render: (req) => <span><span className="block">{req.departmentName}</span><span className="text-[10px] text-slate-500">{req.branchName}</span></span> },
+                                          { key: 'openings', header: 'الشواغر', render: (req) => <span className="font-bold tabular-nums">{req.openings}</span> },
+                                          { key: 'salary', header: 'الراتب التقديري', render: (req) => <span className="tabular-nums">{money(req.estimatedMonthlySalary)}</span> },
+                                          { key: 'requested', header: 'طلب بواسطة', render: (req) => <span className="text-[10px]"><span className="block">{req.requestedByName || '—'}</span><span className="text-slate-400">{req.requestedAt?.slice(0, 10)}</span></span> },
+                                          {
+                                            key: 'status', header: 'الحالة',
+                                            render: (req) => (
+                                              <span>
+                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(req.status)}`}>{requisitionStatusLabel[req.status]}</span>
+                                                {req.decisionNote && <span className="mt-1 block max-w-[140px] truncate text-[10px] text-slate-400" title={req.decisionNote}>{req.decisionNote}</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          {
+                                            key: 'actions', header: 'إجراءات',
+                                            render: (req) => (
+                                              <div className="flex flex-wrap gap-1">
+                                                {req.status === 'PENDING' && (
+                                                  <>
+                                                    <button onClick={() => decideRequisition(req, true)} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
+                                                    <button onClick={() => decideRequisition(req, false)} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50">رفض</button>
+                                                  </>
+                                                )}
+                                                {(req.status === 'APPROVED' || req.status === 'REJECTED') && (
+                                                  <button onClick={() => run(() => WorkforcePlanningService.closeHiringRequisition(req.id), 'تم إغلاق الطلب.')} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">إغلاق</button>
+                                                )}
+                                              </div>
+                                            ),
+                                          },
+                                        ]}
+                                        emptyTitle="لا توجد طلبات توظيف."
+                                      />
+
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -594,41 +576,32 @@ export const WorkforcePlanningPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-right text-xs">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2 font-bold">الفرع</th>
-                          <th className="px-3 py-2 font-bold">القسم</th>
-                          <th className="px-3 py-2 font-bold">المخطط</th>
-                          <th className="px-3 py-2 font-bold">الفعلي</th>
-                          <th className="px-3 py-2 font-bold">النقص</th>
-                          <th className="px-3 py-2 font-bold">الفائض</th>
-                          <th className="px-3 py-2 font-bold">التنبيه</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(summary?.comparisons || []).map((row) => (
-                          <tr key={`${row.branchId}-${row.departmentId}`} className="hover:bg-slate-50/70">
-                            <td className="px-3 py-2.5 text-slate-600">{row.branchName}</td>
-                            <td className="px-3 py-2.5 font-bold">{row.departmentName}</td>
-                            <td className="px-3 py-2.5 tabular-nums">{row.plannedHeadcount}</td>
-                            <td className="px-3 py-2.5 tabular-nums">{row.actualHeadcount}</td>
-                            <td className="px-3 py-2.5 font-bold text-rose-600">{row.shortage || '—'}</td>
-                            <td className="px-3 py-2.5 font-bold text-amber-600">{row.surplus || '—'}</td>
-                            <td className="px-3 py-2.5">
-                              {row.alert === 'OK' && <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">مطابق</span>}
-                              {row.alert === 'SHORTAGE' && <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">نقص</span>}
-                              {row.alert === 'SURPLUS' && <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">فائض</span>}
-                            </td>
-                          </tr>
-                        ))}
-                        {!summary?.comparisons?.length && (
-                          <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد أقسام للمقارنة في هذه الفترة.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                                      ariaLabel="مقارنة النقص والفائض"
+                                      rows={summary?.comparisons || []}
+                                      rowKey={(row) => `${row.branchId}-${row.departmentId}`}
+                                      dense
+                                      columns={[
+                                        { key: 'branch', header: 'الفرع', render: (row) => <span className="text-slate-600">{row.branchName}</span> },
+                                        { key: 'dept', header: 'القسم', render: (row) => <span className="font-bold">{row.departmentName}</span> },
+                                        { key: 'planned', header: 'المخطط', render: (row) => <span className="tabular-nums">{row.plannedHeadcount}</span> },
+                                        { key: 'actual', header: 'الفعلي', render: (row) => <span className="tabular-nums">{row.actualHeadcount}</span> },
+                                        { key: 'shortage', header: 'النقص', render: (row) => <span className="font-bold text-rose-600">{row.shortage || '—'}</span> },
+                                        { key: 'surplus', header: 'الفائض', render: (row) => <span className="font-bold text-amber-600">{row.surplus || '—'}</span> },
+                                        {
+                                          key: 'alert', header: 'التنبيه',
+                                          render: (row) => (
+                                            <span>
+                                              {row.alert === 'OK' && <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">مطابق</span>}
+                                              {row.alert === 'SHORTAGE' && <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">نقص</span>}
+                                              {row.alert === 'SURPLUS' && <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">فائض</span>}
+                                            </span>
+                                          ),
+                                        },
+                                      ]}
+                                      emptyTitle="لا توجد أقسام للمقارنة في هذه الفترة."
+                                    />
+
                 </div>
               </div>
             )}

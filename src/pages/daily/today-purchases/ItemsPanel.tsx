@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Package } from 'lucide-react';
 import type { DailyPurchaseItemRow } from '../../../services/domains/operations/DailyOperationsService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
@@ -33,39 +34,47 @@ export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, p
           <span className="text-slate-500 dark:text-slate-400">{plain(items.reduce((sum, item) => sum + (Number(item.boxesCount) || 0), 0))} كرتونة</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-right text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/70">
-              <tr>{['الصنف', 'الكود', 'الفاتورة', 'المورد', 'الكمية', 'الكراتين', 'تكلفة الوحدة', 'الإجمالي', 'النسبة'].map((heading) => <th key={heading} scope="col" className="whitespace-nowrap px-3 py-3 font-bold text-slate-500 dark:text-slate-400">{heading}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {items.map((item) => {
-                const grand = items.reduce((sum, entry) => sum + (Number(entry.totalCost) || 0), 0);
-                const share = grand > 0 ? (Number(item.totalCost) / grand) * 100 : 0;
-                return (
-                  <tr key={item.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                    <td className="px-3 py-2.5">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">{item.productName}</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400">{item.grade}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">{item.sku || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <button type="button" onClick={() => onDetails(item.purchaseId)} className="font-mono font-bold text-orange-700 hover:underline dark:text-orange-300">
-                        {item.invoiceNumber}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{item.supplierName || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-700 dark:text-slate-200">{formatProductQuantity(Number(item.quantityM2), item)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-600 dark:text-slate-300">{plain(item.boxesCount)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-600 dark:text-slate-300">{fmt(item.unitCost)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmt(item.totalCost)}</td>
-                    <td className="px-3 py-2.5">
-                      <ShareBar share={share} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="أصناف التوريد"
+            rows={items}
+            rowKey={(item: any) => String(item.id)}
+            minWidth={860}
+            dense
+            tableClassName="text-xs"
+            columns={[
+              {
+                key: 'product', header: 'الصنف',
+                render: (item: any) => (
+                  <span>
+                    <span className="block font-semibold text-slate-900 dark:text-slate-100">{item.productName}</span>
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">{item.grade}</span>
+                  </span>
+                ),
+              },
+              { key: 'sku', header: 'الكود', render: (item: any) => <span className="whitespace-nowrap font-mono text-[11px] text-slate-500 dark:text-slate-400">{item.sku || '—'}</span> },
+              {
+                key: 'invoice', header: 'الفاتورة',
+                render: (item: any) => (
+                  <button type="button" onClick={() => onDetails(item.purchaseId)} className="whitespace-nowrap font-mono font-bold text-orange-700 hover:underline dark:text-orange-300">
+                    {item.invoiceNumber}
+                  </button>
+                ),
+              },
+              { key: 'supplier', header: 'المورد', render: (item: any) => <span className="text-slate-600 dark:text-slate-300">{item.supplierName || '—'}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-200">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
+              { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-300">{plain(item.boxesCount)}</span> },
+              { key: 'unitCost', header: 'تكلفة الوحدة', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-300">{fmt(item.unitCost)}</span> },
+              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="whitespace-nowrap font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmt(item.totalCost)}</span> },
+              {
+                key: 'share', header: 'النسبة',
+                render: (item: any) => {
+                  const grand = items.reduce((sum, entry) => sum + (Number(entry.totalCost) || 0), 0);
+                  const share = grand > 0 ? (Number(item.totalCost) / grand) * 100 : 0;
+                  return <ShareBar share={share} />;
+                },
+              },
+            ]}
+          />
         </div>
       </>
     )}

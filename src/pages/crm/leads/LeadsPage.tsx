@@ -9,6 +9,7 @@ import { OperationalFieldsFilter, matchesOperationalFieldFilters, type Operation
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
+import { useToast } from '../../../components/ui/Toast';
 const STATUS_LABELS: Record<LeadStage, { label: string; color: string }> = {
   NEW: { label: 'عميل محتمل جديد', color: 'bg-slate-100 text-slate-600 border-slate-300' },
   CONTACTED: { label: 'تم التواصل', color: 'bg-sky-50 text-sky-600 border-sky-200' },
@@ -42,6 +43,7 @@ const LEAD_TYPES = [
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const LeadsPage: React.FC = () => {
+  const toast = useToast();
   const service = new CrmService();
   const fieldService = new OperationalFieldService();
   const user = AuthService.getCurrentUser();
@@ -110,7 +112,7 @@ export const LeadsPage: React.FC = () => {
       setForm({ name: '', phone: '', email: '', city: '', source: 'WALK_IN', leadType: 'RETAIL', estimatedValue: '', notes: '' });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إضافة العميل المحتمل.');
+      toast.error(err?.message || 'تعذر إضافة العميل المحتمل.');
     } finally {
       setSaving(false);
     }
@@ -121,7 +123,7 @@ export const LeadsPage: React.FC = () => {
       service.updateLead(lead.id, { stage });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحديث المرحلة.');
+      toast.error(err?.message || 'تعذر تحديث المرحلة.');
     }
   };
 
@@ -131,7 +133,7 @@ export const LeadsPage: React.FC = () => {
       service.deleteLead(lead.id);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حذف العميل.');
+      toast.error(err?.message || 'تعذر حذف العميل.');
     }
   };
 
@@ -141,12 +143,12 @@ export const LeadsPage: React.FC = () => {
       service.convertLeadToCustomer(lead.id);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحويل العميل.');
+      toast.error(err?.message || 'تعذر تحويل العميل.');
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-pink-50 border border-pink-200 flex items-center justify-center">

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   CheckCircle2, Cpu, Download, Fingerprint, Plus, RefreshCw, Smartphone,
   Trash2, Upload,
@@ -11,7 +12,15 @@ import {
 import { EmployeeService, Employee } from '../../../services/domains/hr/EmployeeService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; icon?: React.ReactNode; tone?: string }> = ({ label, value, hint, icon, tone }: any) => (
+  <UiStatCard label={label} value={value} hint={hint} icon={icon} tone={statTone(tone || '')} />
+);
 type Tab = 'devices' | 'records' | 'import' | 'mobile';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -66,16 +75,6 @@ const statusTone = (status: string): string => {
 
 const money = (value: number) => Number(value || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 });
 
-const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: React.ReactNode; tone: string }> = ({ label, value, hint, icon, tone }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-bold text-slate-500">{label}</span>
-      <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${tone}`}>{icon}</span>
-    </div>
-    <div className="mt-2 text-xl font-black tabular-nums">{value}</div>
-    {hint && <div className="mt-0.5 text-[10px] font-semibold text-slate-400">{hint}</div>}
-  </div>
-);
 
 const emptyDeviceForm = (): AttendanceDeviceInput & { port: number | null } => ({
   branchId: '', deviceName: '', deviceType: 'FINGERPRINT', deviceCode: '',
@@ -319,7 +318,7 @@ export const AttendanceDevicesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50">
           <Cpu className="h-5 w-5 text-cyan-600" />
@@ -366,51 +365,57 @@ export const AttendanceDevicesPage: React.FC = () => {
                   <div className="border-b border-slate-100 px-4 py-3">
                     <h2 className="text-sm font-black">الأجهزة ({devices.length})</h2>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-right text-xs">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2 font-bold">الجهاز</th>
-                          <th className="px-3 py-2 font-bold">النوع</th>
-                          <th className="px-3 py-2 font-bold">الفرع</th>
-                          <th className="px-3 py-2 font-bold">الاتصال</th>
-                          <th className="px-3 py-2 font-bold">الحالة</th>
-                          <th className="px-3 py-2 font-bold">آخر مزامنة</th>
-                          <th className="px-3 py-2 font-bold">إجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {devices.map((device) => (
-                          <tr key={device.id} className="hover:bg-slate-50/70">
-                            <td className="px-3 py-3">
-                              <div className="font-bold">{device.deviceName}</div>
-                              <div className="font-mono text-[10px] text-slate-500">{device.deviceCode}</div>
-                            </td>
-                            <td className="px-3 py-3 text-[10px]">{deviceTypeLabel[device.deviceType] || device.deviceType}</td>
-                            <td className="px-3 py-3 text-[10px]">{device.branchName}</td>
-                            <td className="px-3 py-3 text-[10px]">
-                              <div>{device.ipAddress || '—'}{device.port ? `:${device.port}` : ''}</div>
-                              {device.geoFenceRadiusMeters > 0 && <div className="text-slate-400">نطاق {money(device.geoFenceRadiusMeters)} م</div>}
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${device.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{device.isActive ? 'نشط' : 'موقوف'}</span>
-                              <div className={`mt-1 text-[10px] font-bold ${device.syncStatus === 'ERROR' ? 'text-rose-600' : 'text-slate-400'}`}>{syncStatusLabel[device.syncStatus]}</div>
-                              {device.lastError && <div className="mt-0.5 max-w-[140px] truncate text-[10px] text-rose-500" title={device.lastError}>{device.lastError}</div>}
-                            </td>
-                            <td className="px-3 py-3 text-[10px] tabular-nums">{device.lastSyncAt ? device.lastSyncAt.slice(0, 16).replace('T', ' ') : '—'}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                <button onClick={() => startEditDevice(device)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50">تعديل</button>
-                                <button onClick={() => run(() => AttendanceDeviceService.updateAttendanceDevice(device.id, { isActive: !device.isActive }), device.isActive ? 'تم إيقاف الجهاز.' : 'تم تفعيل الجهاز.')} className="rounded border border-cyan-200 px-2 py-1 text-[10px] font-bold text-cyan-700 hover:bg-cyan-50">{device.isActive ? 'إيقاف' : 'تفعيل'}</button>
-                                <button onClick={() => { if (window.confirm('حذف الجهاز؟')) run(() => AttendanceDeviceService.deleteAttendanceDevice(device.id), 'تم حذف الجهاز.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {!devices.length && <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد أجهزة مسجلة.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                                        ariaLabel="الأجهزة"
+                                        rows={devices}
+                                        rowKey={(device) => device.id}
+                                        dense
+                                        columns={[
+                                          {
+                                            key: 'device', header: 'الجهاز',
+                                            render: (device) => (
+                                              <span>
+                                                <span className="font-bold block">{device.deviceName}</span>
+                                                <span className="font-mono text-[10px] text-slate-500">{device.deviceCode}</span>
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'type', header: 'النوع', render: (device) => deviceTypeLabel[device.deviceType] || device.deviceType },
+                                          { key: 'branch', header: 'الفرع', render: (device) => device.branchName },
+                                          {
+                                            key: 'conn', header: 'الاتصال',
+                                            render: (device) => (
+                                              <span>
+                                                <span className="block">{device.ipAddress || '—'}{device.port ? `:${device.port}` : ''}</span>
+                                                {device.geoFenceRadiusMeters > 0 && <span className="text-slate-400">نطاق {money(device.geoFenceRadiusMeters)} م</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          {
+                                            key: 'status', header: 'الحالة',
+                                            render: (device) => (
+                                              <span>
+                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${device.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{device.isActive ? 'نشط' : 'موقوف'}</span>
+                                                <span className={`mt-1 block text-[10px] font-bold ${device.syncStatus === 'ERROR' ? 'text-rose-600' : 'text-slate-400'}`}>{syncStatusLabel[device.syncStatus]}</span>
+                                                {device.lastError && <span className="mt-0.5 block max-w-[140px] truncate text-[10px] text-rose-500" title={device.lastError}>{device.lastError}</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'sync', header: 'آخر مزامنة', render: (device) => <span className="tabular-nums">{device.lastSyncAt ? device.lastSyncAt.slice(0, 16).replace('T', ' ') : '—'}</span> },
+                                          {
+                                            key: 'actions', header: 'إجراءات',
+                                            render: (device) => (
+                                              <div className="flex flex-wrap gap-1">
+                                                <button onClick={() => startEditDevice(device)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50">تعديل</button>
+                                                <button onClick={() => run(() => AttendanceDeviceService.updateAttendanceDevice(device.id, { isActive: !device.isActive }), device.isActive ? 'تم إيقاف الجهاز.' : 'تم تفعيل الجهاز.')} className="rounded border border-cyan-200 px-2 py-1 text-[10px] font-bold text-cyan-700 hover:bg-cyan-50">{device.isActive ? 'إيقاف' : 'تفعيل'}</button>
+                                                <button onClick={() => { if (window.confirm('حذف الجهاز؟')) run(() => AttendanceDeviceService.deleteAttendanceDevice(device.id), 'تم حذف الجهاز.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
+                                              </div>
+                                            ),
+                                          },
+                                        ]}
+                                        emptyTitle="لا توجد أجهزة مسجلة."
+                                      />
+
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -489,45 +494,39 @@ export const AttendanceDevicesPage: React.FC = () => {
                   <span className="mr-auto text-[10px] font-semibold text-slate-400">{records.length} سجل</span>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-right text-xs">
-                      <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2 font-bold">الموظف</th>
-                          <th className="px-3 py-2 font-bold">الجهاز</th>
-                          <th className="px-3 py-2 font-bold">وقت البصمة</th>
-                          <th className="px-3 py-2 font-bold">الحدث</th>
-                          <th className="px-3 py-2 font-bold">الموقع</th>
-                          <th className="px-3 py-2 font-bold">الحالة</th>
-                          <th className="px-3 py-2 font-bold">ملاحظات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {records.map((record) => (
-                          <tr key={record.id} className="hover:bg-slate-50/70">
-                            <td className="px-3 py-2.5">
-                              <div className="font-bold">{record.employeeName || 'غير مرتبط'}</div>
-                              <div className="font-mono text-[10px] text-slate-500">{record.employeeCode || '—'}</div>
-                            </td>
-                            <td className="px-3 py-2.5 text-[10px]">{record.deviceName}</td>
-                            <td className="px-3 py-2.5 text-[10px] tabular-nums">{record.deviceTimestamp.slice(0, 16).replace('T', ' ')}</td>
-                            <td className="px-3 py-2.5 text-[10px]">{eventTypeLabel[record.deviceEventType] || record.deviceEventType}</td>
-                            <td className="px-3 py-2.5 text-[10px]">
-                              {record.latitude && record.longitude ? `${record.latitude}, ${record.longitude}` : '—'}
-                              {record.accuracyMeters != null && <div className="text-slate-400">دقة {money(record.accuracyMeters)} م</div>}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(record.processingStatus)}`}>{processingStatusLabel[record.processingStatus]}</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-[10px] text-slate-500">
-                              {record.processingError || (record.processedAt ? `عولج في ${record.processedAt.slice(0, 10)}` : '—')}
-                            </td>
-                          </tr>
-                        ))}
-                        {!records.length && <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد سجلات بصمة مطابقة.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                                        ariaLabel="سجلات البصمة"
+                                        rows={records}
+                                        rowKey={(record) => record.id}
+                                        dense
+                                        columns={[
+                                          {
+                                            key: 'employee', header: 'الموظف',
+                                            render: (record) => (
+                                              <span>
+                                                <span className="font-bold block">{record.employeeName || 'غير مرتبط'}</span>
+                                                <span className="font-mono text-[10px] text-slate-500">{record.employeeCode || '—'}</span>
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'device', header: 'الجهاز', render: (record) => record.deviceName },
+                                          { key: 'time', header: 'وقت البصمة', render: (record) => <span className="tabular-nums">{record.deviceTimestamp.slice(0, 16).replace('T', ' ')}</span> },
+                                          { key: 'event', header: 'الحدث', render: (record) => eventTypeLabel[record.deviceEventType] || record.deviceEventType },
+                                          {
+                                            key: 'location', header: 'الموقع',
+                                            render: (record) => (
+                                              <span>
+                                                {record.latitude && record.longitude ? `${record.latitude}, ${record.longitude}` : '—'}
+                                                {record.accuracyMeters != null && <span className="block text-slate-400">دقة {money(record.accuracyMeters)} م</span>}
+                                              </span>
+                                            ),
+                                          },
+                                          { key: 'status', header: 'الحالة', render: (record) => <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(record.processingStatus)}`}>{processingStatusLabel[record.processingStatus]}</span> },
+                                          { key: 'notes', header: 'ملاحظات', render: (record) => <span className="text-slate-500">{record.processingError || (record.processedAt ? `عولج في ${record.processedAt.slice(0, 10)}` : '—')}</span> },
+                                        ]}
+                                        emptyTitle="لا توجد سجلات بصمة مطابقة."
+                                      />
+
                 </div>
               </div>
             )}
@@ -590,50 +589,50 @@ export const AttendanceDevicesPage: React.FC = () => {
                     <span className="mr-auto text-[10px] font-semibold text-slate-400">{mobileSessions.length} جلسة</span>
                   </div>
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-right text-xs">
-                        <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2 font-bold">الموظف</th>
-                            <th className="px-3 py-2 font-bold">النوع</th>
-                            <th className="px-3 py-2 font-bold">الوقت</th>
-                            <th className="px-3 py-2 font-bold">الموقع</th>
-                            <th className="px-3 py-2 font-bold">الحالة</th>
-                            <th className="px-3 py-2 font-bold">إجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {mobileSessions.map((session) => (
-                            <tr key={session.id} className="hover:bg-slate-50/70">
-                              <td className="px-3 py-2.5 font-bold">{session.employeeName}</td>
-                              <td className="px-3 py-2.5 text-[10px]">{session.sessionType === 'CHECK_IN' ? 'حضور' : 'انصراف'}</td>
-                              <td className="px-3 py-2.5 text-[10px] tabular-nums">{session.recordedAt.slice(0, 16).replace('T', ' ')}</td>
-                              <td className="px-3 py-2.5 text-[10px]">
-                                {session.latitude}, {session.longitude}
-                                {session.accuracyMeters != null && <div className="text-slate-400">دقة {money(session.accuracyMeters)} م</div>}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${session.status === 'VERIFIED' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : session.status === 'REJECTED' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                                  {session.status === 'VERIFIED' ? 'معتمد' : session.status === 'REJECTED' ? 'مرفوض' : 'بالانتظار'}
-                                </span>
-                                {session.rejectionReason && <div className="mt-1 max-w-[140px] truncate text-[10px] text-rose-500" title={session.rejectionReason}>{session.rejectionReason}</div>}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {session.status === 'PENDING' ? (
-                                  <div className="flex gap-1">
-                                    <button onClick={() => decideMobile(session, true)} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
-                                    <button onClick={() => decideMobile(session, false)} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50">رفض</button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-slate-400">{session.verifiedByName || '—'}</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                          {!mobileSessions.length && <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-slate-400">لا توجد جلسات حضور من الجوال.</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
+                    <DataTable
+                                            ariaLabel="جلسات الحضور من الجوال"
+                                            rows={mobileSessions}
+                                            rowKey={(session) => session.id}
+                                            dense
+                                            columns={[
+                                              { key: 'employee', header: 'الموظف', render: (session) => <span className="font-bold">{session.employeeName}</span> },
+                                              { key: 'type', header: 'النوع', render: (session) => session.sessionType === 'CHECK_IN' ? 'حضور' : 'انصراف' },
+                                              { key: 'time', header: 'الوقت', render: (session) => <span className="tabular-nums">{session.recordedAt.slice(0, 16).replace('T', ' ')}</span> },
+                                              {
+                                                key: 'location', header: 'الموقع',
+                                                render: (session) => (
+                                                  <span>
+                                                    {session.latitude}, {session.longitude}
+                                                    {session.accuracyMeters != null && <span className="block text-slate-400">دقة {money(session.accuracyMeters)} م</span>}
+                                                  </span>
+                                                ),
+                                              },
+                                              {
+                                                key: 'status', header: 'الحالة',
+                                                render: (session) => (
+                                                  <span>
+                                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${session.status === 'VERIFIED' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : session.status === 'REJECTED' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                                                      {session.status === 'VERIFIED' ? 'معتمد' : session.status === 'REJECTED' ? 'مرفوض' : 'بالانتظار'}
+                                                    </span>
+                                                    {session.rejectionReason && <span className="mt-1 block max-w-[140px] truncate text-[10px] text-rose-500" title={session.rejectionReason}>{session.rejectionReason}</span>}
+                                                  </span>
+                                                ),
+                                              },
+                                              {
+                                                key: 'actions', header: 'إجراءات',
+                                                render: (session) => session.status === 'PENDING' ? (
+                                                  <div className="flex gap-1">
+                                                    <button onClick={() => decideMobile(session, true)} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">اعتماد</button>
+                                                    <button onClick={() => decideMobile(session, false)} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-50">رفض</button>
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-[10px] text-slate-400">{session.verifiedByName || '—'}</span>
+                                                ),
+                                              },
+                                            ]}
+                                            emptyTitle="لا توجد جلسات حضور من الجوال."
+                                          />
+
                   </div>
                 </div>
 

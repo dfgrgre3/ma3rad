@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { FileText, Trash2, Upload } from 'lucide-react';
 import { ProductExtraService, ProductDocument } from '../../../services/domains/products/ProductExtraService';
 import { DOC_TYPES } from './constants';
 
+import { useToast } from '../../../components/ui/Toast';
 interface DocumentsTabProps {
   productId: string;
   canCreate: boolean;
@@ -10,6 +12,7 @@ interface DocumentsTabProps {
 }
 
 export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canCreate, canArchive }) => {
+  const toast = useToast();
   const service = useMemo(() => new ProductExtraService(), []);
   const [rows, setRows] = useState<ProductDocument[]>([]);
   const [form, setForm] = useState({ filePath: '', fileName: '', documentType: 'OTHER' });
@@ -24,12 +27,12 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canCreate
       service.addDocument(productId, form.filePath.trim(), form.fileName.trim() || form.filePath.split(/[\\/]/).pop() || 'ملف', form.documentType);
       setForm({ filePath: '', fileName: '', documentType: 'OTHER' });
       load();
-    } catch (err: any) { alert(err?.message); }
+    } catch (err: any) { toast.error(err?.message); }
   };
 
   const remove = (id: string) => {
     if (!confirm('حذف هذا المستند؟')) return;
-    try { service.deleteDocument(id); load(); } catch (err: any) { alert(err?.message); }
+    try { service.deleteDocument(id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   return (
@@ -59,20 +62,20 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canCreate
       )}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {rows.length === 0 ? <div className="text-center text-slate-500 py-12 text-sm">لا توجد مستندات لهذا المنتج</div> : (
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50"><tr>{['المستند', 'النوع', 'المسار', 'التاريخ', ...(canArchive ? ['حذف'] : [])].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50/70">
-                  <td className="px-4 py-3 font-bold text-slate-900 flex items-center gap-2"><FileText className="w-4 h-4 text-sky-500" /> {d.fileName}</td>
-                  <td className="px-4 py-3 text-slate-600">{DOC_TYPES[d.documentType] || d.documentType}</td>
-                  <td className="px-4 py-3 text-xs font-mono text-slate-500 max-w-[260px] truncate">{d.filePath}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ar-EG') : '—'}</td>
-                  {canArchive && <td className="px-4 py-3"><button onClick={() => remove(d.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="مستندات المنتج"
+            rows={rows}
+            rowKey={(d: any) => String(d.id)}
+            tableClassName="text-sm"
+            rowClassName={() => 'transition hover:bg-slate-50/70'}
+            columns={[
+              { key: 'doc', header: 'المستند', render: (d: any) => <span className="flex items-center gap-2 font-bold text-slate-900"><FileText className="h-4 w-4 text-sky-500" /> {d.fileName}</span> },
+              { key: 'type', header: 'النوع', render: (d: any) => <span className="text-slate-600">{DOC_TYPES[d.documentType as keyof typeof DOC_TYPES] || d.documentType}</span> },
+              { key: 'path', header: 'المسار', render: (d: any) => <span className="block max-w-[260px] truncate font-mono text-xs text-slate-500">{d.filePath}</span> },
+              { key: 'date', header: 'التاريخ', render: (d: any) => <span className="text-xs text-slate-500">{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ar-EG') : '—'}</span> },
+              ...(canArchive ? [{ key: 'del', header: 'حذف', render: (d: any) => <button onClick={() => remove(d.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button> }] : []),
+            ]}
+          />
         )}
       </div>
     </div>

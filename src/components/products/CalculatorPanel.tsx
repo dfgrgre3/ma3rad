@@ -114,7 +114,7 @@ export const CalculatorPanel: React.FC<{ onClose?: () => void; floating?: boolea
     : '\u00a0';
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${floating ? '' : 'mx-auto w-full max-w-4xl'}`} dir="rtl" aria-label="الآلة الحاسبة"
+    <section className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${floating ? '' : 'mx-auto w-full max-w-4xl'}`} aria-label="الآلة الحاسبة"
       style={floating ? { position: 'relative', boxSizing: 'border-box', width: maximized ? 'calc(100vw - 2rem)' : `${size.width}px`, height: maximized ? 'calc(100vh - 2rem)' : minimized ? 'auto' : `${size.height}px`, maxWidth: 'calc(100vw - 2rem)', maxHeight: 'calc(100vh - 2rem)', minWidth: '17rem', minHeight: minimized ? undefined : '20rem', overflow: 'auto', transform: maximized ? undefined : `translate(${offset.x}px, ${offset.y}px)` } : undefined}
       onPointerMove={floating ? (event) => {
         const resize = resizeStart.current;
@@ -147,7 +147,7 @@ export const CalculatorPanel: React.FC<{ onClose?: () => void; floating?: boolea
           <div className="min-h-4 truncate text-xs text-slate-500" aria-hidden="true">{pendingExpression}</div>
           <div className="min-h-10 truncate text-3xl font-bold tabular-nums" aria-live="polite" aria-atomic="true">{display}</div>
         </div>
-        <p className="mb-3 text-left text-[10px] text-slate-400" dir="rtl">لوحة المفاتيح: الأرقام · إدخال للحساب · مسافة للخلف للحذف · هروب للمسح</p>
+        <p className="mb-3 text-left text-[10px] text-slate-400">لوحة المفاتيح: الأرقام · إدخال للحساب · مسافة للخلف للحذف · هروب للمسح</p>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-1" dir="ltr">
           {keys.map(({ key, label = key, kind = 'number' }) => <button key={key} onClick={() => press(key)} aria-label={label} className={`min-h-14 rounded-lg border border-slate-200 px-2 py-3 text-xl font-medium transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800 ${key === '0' ? 'col-span-2' : ''} ${kind === 'equals' ? 'bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800' : kind === 'operator' ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>{key}</button>)}
         </div>

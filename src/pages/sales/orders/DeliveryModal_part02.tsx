@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { X, PackageCheck, Loader2 } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { Modal } from './ui';
@@ -22,42 +23,53 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
         يمكن التسليم على دفعات. عدّل الكميات المسلّمة الآن وسيتم خصمها من المتبقي لكل بند.
       </div>
       <div className="border border-slate-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-right text-[11px] min-w-[620px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr>
-              <th className="px-3 py-2">الصنف</th>
-              <th className="px-3 py-2">المطلوب</th>
-              <th className="px-3 py-2">المسلّم سابقاً</th>
-              <th className="px-3 py-2">المتبقي</th>
-              <th className="px-3 py-2 w-32">تسليم الآن</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {(deliveryTarget.items || []).map((item) => {
+        <DataTable
+        ariaLabel="بنود التسليم"
+        rows={deliveryTarget.items || []}
+        rowKey={(item: any) => String(item.id)}
+        dense
+        minWidth={620}
+        tableClassName="text-[11px]"
+        rowClassName={(item: any) => Number(item.deliveredM2 || 0) >= Number(item.quantityM2) ? 'opacity-50' : ''}
+        columns={[
+          {
+            key: 'product', header: 'الصنف',
+            render: (item: any) => (
+              <span className="font-bold text-slate-800">
+                {item.productName}
+                <div className="text-[9px] font-normal text-slate-400">{item.size} • {item.grade}</div>
+              </span>
+            ),
+          },
+          { key: 'req', header: 'المطلوب', render: (item: any) => <span className="font-mono">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
+          { key: 'delivered', header: 'المسلّم سابقاً', render: (item: any) => <span className="font-mono text-emerald-600">{Number(item.deliveredM2 || 0).toFixed(2)}</span> },
+          {
+            key: 'remaining', header: 'المتبقي',
+            render: (item: any) => {
+              const remaining = Math.max(0, Number(item.quantityM2) - Number(item.deliveredM2 || 0));
+              return <span className="font-mono text-amber-600">{remaining.toFixed(2)}</span>;
+            },
+          },
+          {
+            key: 'now', header: 'تسليم الآن', width: 128,
+            render: (item: any) => {
               const delivered = Number(item.deliveredM2 || 0);
               const remaining = Math.max(0, Number(item.quantityM2) - delivered);
               return (
-                <tr key={item.id} className={remaining <= 0 ? 'opacity-50' : ''}>
-                  <td className="px-3 py-2 font-bold text-slate-800">{item.productName}<div className="text-[9px] text-slate-400 font-normal">{item.size} • {item.grade}</div></td>
-                  <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(item.quantityM2), item)}</td>
-                  <td className="px-3 py-2 font-mono text-emerald-600">{delivered.toFixed(2)}</td>
-                  <td className="px-3 py-2 font-mono text-amber-600">{remaining.toFixed(2)}</td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number" min={0} max={remaining} step="0.01" disabled={remaining <= 0}
-                      value={deliveryLines[item.id] ?? ''}
-                      onChange={(e) => setDeliveryLines((prev) => ({
-                        ...prev,
-                        [item.id]: Math.min(remaining, Number(e.target.value) || 0),
-                      }))}
-                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono disabled:bg-slate-100"
-                    />
-                  </td>
-                </tr>
+                <input
+                  type="number" min={0} max={remaining} step="0.01" disabled={remaining <= 0}
+                  value={deliveryLines[item.id] ?? ''}
+                  onChange={(e) => setDeliveryLines((prev) => ({
+                    ...prev,
+                    [item.id]: Math.min(remaining, Number(e.target.value) || 0),
+                  }))}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono disabled:bg-slate-100"
+                />
               );
-            })}
-          </tbody>
-        </table>
+            },
+          },
+        ]}
+      />
       </div>
       <div className="flex items-center justify-between gap-2">
         <button

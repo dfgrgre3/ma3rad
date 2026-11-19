@@ -502,7 +502,7 @@ export class InventoryTransferTrackingService {
         id, product_id, warehouse_id, batch_number, tone_shade, caliber, grade,
         production_date, received_date, supplier_id, cost_price,
         quantity_m2, quantity_remaining_m2, notes, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
     `, [
       id,
       input.productId,

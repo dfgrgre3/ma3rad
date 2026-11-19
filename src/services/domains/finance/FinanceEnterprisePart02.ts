@@ -95,7 +95,7 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
 
       const balances = tx.query<{ code: string; type: string; balance: number }>(`
         SELECT a.code, a.type,
-               ROUND(SUM(l.debit - l.credit), 2) as balance
+               ROUND(SUM(l.debit - l.credit) / 100.0, 2) as balance
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id

@@ -368,8 +368,8 @@ export class HistoricalReturnReconciliationService {
                GROUP_CONCAT(DISTINCT je.id) AS entry_ids,
                GROUP_CONCAT(DISTINCT je.entry_number) AS entry_numbers,
                COUNT(DISTINCT je.id) AS entry_count,
-               GROUP_CONCAT(coa.code || ' D' || printf('%.2f', jel.debit) ||
-                 ' C' || printf('%.2f', jel.credit), ' | ') AS lines_summary,
+               GROUP_CONCAT(coa.code || ' D' || printf('%.2f', jel.debit / 100.0) ||
+                 ' C' || printf('%.2f', jel.credit / 100.0), ' | ') AS lines_summary,
                SUM(CASE WHEN coa.code IN ('1101','1102','1105','1106')
                    THEN jel.credit - jel.debit ELSE 0 END) / 100.0 AS cash_amount,
                SUM(CASE WHEN coa.code = '4101' THEN jel.debit - jel.credit ELSE 0 END) / 100.0 AS revenue_amount,

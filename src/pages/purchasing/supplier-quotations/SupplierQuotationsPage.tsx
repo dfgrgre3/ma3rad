@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Plus, Search, TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
   X, Award, FileSpreadsheet,
@@ -200,7 +201,7 @@ export const SupplierQuotationsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -403,24 +404,17 @@ export const SupplierQuotationsPage: React.FC = () => {
 
                               {/* Item prices table */}
                               <div className="border border-slate-100 rounded-xl overflow-hidden mb-4 text-xs">
-                                <table className="w-full text-right">
-                                  <thead className="bg-slate-50 text-[10px] text-slate-500 font-bold">
-                                    <tr>
-                                      <th className="p-2">الصنف</th>
-                                      <th className="p-2">سعر الوحدة</th>
-                                      <th className="p-2">الإجمالي</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {(q.items || []).map((it) => (
-                                      <tr key={it.id} className="border-t border-slate-100">
-                                        <td className="p-2 font-medium">{it.productName}</td>
-                                        <td className="p-2 font-bold text-slate-900">{fmt(it.unitCost)} / {getProductUnitLabel(it)}</td>
-                                        <td className="p-2 font-black text-orange-600">{fmt(it.totalCost)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                <DataTable
+                                  ariaLabel="أصناف عرض السعر"
+                                  rows={q.items || []}
+                                  rowKey={(it: any) => String(it.id)}
+                                  dense
+                                  columns={[
+                                    { key: 'product', header: 'الصنف', render: (it: any) => <span className="font-medium">{it.productName}</span> },
+                                    { key: 'price', header: 'سعر الوحدة', render: (it: any) => <span className="font-bold text-slate-900">{fmt(it.unitCost)} / {getProductUnitLabel(it)}</span> },
+                                    { key: 'total', header: 'الإجمالي', render: (it: any) => <span className="font-black text-orange-600">{fmt(it.totalCost)}</span> },
+                                  ]}
+                                />
                               </div>
                             </div>
 

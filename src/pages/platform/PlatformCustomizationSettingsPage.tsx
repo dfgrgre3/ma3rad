@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Layout,
   Eye,
@@ -33,6 +34,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 type CustomizationTab = 'pages' | 'actions' | 'fields' | 'profiles' | 'history';
 
 // Common pages catalogue
@@ -77,6 +79,7 @@ const SYSTEM_FIELDS = [
 ];
 
 export const PlatformCustomizationSettingsPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<CustomizationTab>('pages');
   const canManageCustomization = canPlatform('customization');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
@@ -182,7 +185,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   };
 
   const handleApplyProfile = (profile: PlatformUiProfile) => {
-    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
+    if (!canManageCustomization) { toast.warning('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!confirm(`هل تريد تطبيق قالب "${profile.name}" على هذا العميل؟ سيتم استبدال تخصيصات الصفحات والأزرار الحالية.`)) return;
     setHiddenPages(profile.hiddenPages);
     setHiddenActions(profile.hiddenActions);
@@ -192,7 +195,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
+    if (!canManageCustomization) { toast.warning('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!selectedTenantId) return;
     setSaving(true);
     setSavedSuccess(false);
@@ -223,14 +226,14 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       setTimeout(() => setSavedSuccess(false), 3000);
       loadTenantUi(selectedTenantId);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleRollback = async (ver: number) => {
-    if (!canManageCustomization) { alert('لا تملك صلاحية تخصيص الواجهة'); return; }
+    if (!canManageCustomization) { toast.warning('لا تملك صلاحية تخصيص الواجهة'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع تخصيصات الواجهة للإصدار #${ver}؟`)) return;
     const centralState = getCentralDataSourceState();
     try {
@@ -240,9 +243,9 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         platformAdminService.rollbackTenantUi(selectedTenantId, ver);
       }
       loadTenantUi(selectedTenantId);
-      alert(`تم استرجاع الإصدار #${ver} بنجاح.`);
+      toast.success(`تم استرجاع الإصدار #${ver} بنجاح.`);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
@@ -256,7 +259,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   }, [searchQuery]);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
         title="تخصيص الواجهة وقوالب النشاط (UI Customization)"
@@ -489,49 +492,43 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                <tr>
-                  <th className="py-3 px-4">اسم الحقل</th>
-                  <th className="py-3 px-4">القسم / النموذج</th>
-                  <th className="py-3 px-4">حالة الظهور</th>
-                  <th className="py-3 px-4 text-left">إجراء</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {SYSTEM_FIELDS.map((field) => {
-                  const rule = formFieldRules[field.id] ?? { visible: true };
-                  return (
-                    <tr key={field.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4 font-medium text-zinc-200">{field.label}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">{field.module}</td>
-                      <td className="py-3 px-4">
-                        {rule.visible ? (
-                          <span className="text-xs px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            مُفعل وظاهر
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                            مخفي
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-left">
-                        {canManageCustomization && (
-                          <Button
-                            variant={rule.visible ? 'danger' : 'success'}
-                            size="sm"
-                            onClick={() => handleToggleField(field.id)}
-                          >
-                            {rule.visible ? 'إخفاء الحقل' : 'إظهار الحقل'}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
+            <DataTable
+            ariaLabel="حقول النماذج القابلة للتخصيص"
+            rows={SYSTEM_FIELDS}
+            rowKey={(field: any) => String(field.id)}
+            tableClassName="text-sm"
+            rowClassName={() => 'transition-colors hover:bg-zinc-800/20'}
+            columns={[
+              { key: 'label', header: 'اسم الحقل', render: (field: any) => <span className="font-medium text-zinc-200">{field.label}</span> },
+              { key: 'module', header: 'القسم / النموذج', render: (field: any) => <span className="text-xs text-zinc-400">{field.module}</span> },
+              {
+                key: 'visible', header: 'حالة الظهور',
+                render: (field: any) => {
+                  const rule = formFieldRules[field.id as keyof typeof formFieldRules] ?? { visible: true };
+                  return rule.visible ? (
+                    <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">مُفعل وظاهر</span>
+                  ) : (
+                    <span className="rounded bg-zinc-800 px-2.5 py-0.5 text-xs text-zinc-400">مخفي</span>
                   );
-                })}
-              </tbody>
-            </table>
+                },
+              },
+              {
+                key: 'action', header: 'إجراء',
+                render: (field: any) => {
+                  const rule = formFieldRules[field.id as keyof typeof formFieldRules] ?? { visible: true };
+                  return canManageCustomization ? (
+                    <Button
+                      variant={rule.visible ? 'danger' : 'success'}
+                      size="sm"
+                      onClick={() => handleToggleField(field.id)}
+                    >
+                      {rule.visible ? 'إخفاء الحقل' : 'إظهار الحقل'}
+                    </Button>
+                  ) : null;
+                },
+              },
+            ]}
+          />
           </div>
         </div>
       )}

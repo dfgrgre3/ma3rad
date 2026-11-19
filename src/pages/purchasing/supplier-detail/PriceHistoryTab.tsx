@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { TrendingDown } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { PurchasePriceHistoryRow } from '../../../types/purchasing/supplierDetailPage';
@@ -27,59 +28,31 @@ export const PriceHistoryTab: React.FC<PriceHistoryTabProps> = ({ priceHistory }
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-right">
-            <thead className="bg-slate-50 text-slate-600 font-bold">
-              <tr>
-                <th className="p-3">التاريخ</th>
-                <th className="p-3">رقم الفاتورة</th>
-                <th className="p-3">اسم المنتج / الصنف</th>
-                <th className="p-3">الكمية (م² / قطعة)</th>
-                <th className="p-3">سعر التوريد الفاتورة</th>
-                <th className="p-3 text-indigo-700">تكلفة الوصول الفعلية</th>
-                <th className="p-3">حالة المطابقة</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {priceHistory.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td className="p-3 font-mono text-slate-600">{row.date}</td>
-                  <td className="p-3 font-mono font-bold text-slate-900">{row.invoiceNumber}</td>
-                  <td className="p-3 font-bold text-slate-800">{row.productName}</td>
-                  <td className="p-3 font-mono font-bold text-slate-700">{row.quantityM2}</td>
-                  <td className="p-3 font-bold text-slate-800">
-                    {CeramicMath.formatCurrency(row.unitCost)}
-                  </td>
-                  <td className="p-3 font-black text-indigo-700">
-                    {CeramicMath.formatCurrency(row.effectiveUnitCost)}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        row.matchingStatus === 'MATCHED'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : row.matchingStatus === 'DISCREPANCY'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {row.matchingStatus === 'MATCHED'
-                        ? 'مطابق'
-                        : row.matchingStatus === 'DISCREPANCY'
-                        ? 'يوجد فروق'
-                        : 'مستقل'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {priceHistory.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    لا يوجد سجل أسعار مسجل لهذا المورد حتى الآن.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable
+          ariaLabel="سجل أسعار التوريد"
+          rows={priceHistory.map((row: any, idx: number) => ({ ...row, __i: idx }))}
+          rowKey={(row: any) => String(row.__i)}
+          dense
+          tableClassName="text-xs"
+          rowClassName={() => 'transition hover:bg-slate-50'}
+          columns={[
+            { key: 'date', header: 'التاريخ', render: (row: any) => <span className="font-mono text-slate-600">{row.date}</span> },
+            { key: 'inv', header: 'رقم الفاتورة', render: (row: any) => <span className="font-mono font-bold text-slate-900">{row.invoiceNumber}</span> },
+            { key: 'product', header: 'اسم المنتج / الصنف', render: (row: any) => <span className="font-bold text-slate-800">{row.productName}</span> },
+            { key: 'qty', header: 'الكمية (م² / قطعة)', render: (row: any) => <span className="font-mono font-bold text-slate-700">{row.quantityM2}</span> },
+            { key: 'cost', header: 'سعر التوريد الفاتورة', render: (row: any) => <span className="font-bold text-slate-800">{CeramicMath.formatCurrency(row.unitCost)}</span> },
+            { key: 'eff', header: 'تكلفة الوصول الفعلية', headerClassName: 'text-indigo-700', render: (row: any) => <span className="font-black text-indigo-700">{CeramicMath.formatCurrency(row.effectiveUnitCost)}</span> },
+            {
+              key: 'match', header: 'حالة المطابقة',
+              render: (row: any) => (
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${row.matchingStatus === 'MATCHED' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : row.matchingStatus === 'DISCREPANCY' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                  {row.matchingStatus === 'MATCHED' ? 'مطابق' : row.matchingStatus === 'DISCREPANCY' ? 'يوجد فروق' : 'مستقل'}
+                </span>
+              ),
+            },
+          ]}
+          emptyTitle="لا يوجد سجل أسعار مسجل لهذا المورد حتى الآن."
+        />
         </div>
       </div>
     </div>

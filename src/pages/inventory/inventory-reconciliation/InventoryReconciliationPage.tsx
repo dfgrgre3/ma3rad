@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { 
   Scale, CheckCircle2, AlertTriangle, RefreshCw, BookmarkCheck, Building2,
   ShieldCheck, Database, Layers, Check
@@ -71,7 +72,7 @@ export const InventoryReconciliationPage: React.FC = () => {
     && reconciliation?.ledgerComparable === true;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -238,69 +239,62 @@ export const InventoryReconciliationPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-[11px] font-black text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-3 py-3">تاريخ المحضر</th>
-                  <th className="px-3 py-3">المستودع</th>
-                  <th className="px-3 py-3 text-center">المخزون الفعلي</th>
-                  <th className="px-3 py-3 text-center">طبقات FIFO</th>
-                  <th className="px-3 py-3 text-center">الأستاذ العام (1104)</th>
-                  <th className="px-3 py-3 text-center">الفروقات والنطاق</th>
-                  <th className="px-3 py-3 text-center">الحالة</th>
-                  <th className="px-3 py-3">المحقق / ملاحظات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {historyLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/70 transition">
-                    <td className="px-3 py-2.5 font-bold text-slate-900">{log.reconciliationDate}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600 font-bold">{log.warehouseName || 'جميع المخازن'}</td>
-                    <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-900">{fmt(log.totalPhysicalCost)}</td>
-                    <td className="px-3 py-2.5 text-center font-mono font-bold text-violet-700">{fmt(log.totalFifoLayerCost)}</td>
-                    <td className="px-3 py-2.5 text-center font-mono font-bold text-emerald-700">{fmt(log.totalGlInventoryCost)}</td>
-                    <td className="px-3 py-2.5 text-center font-mono text-xs font-black">
-                      <div>قيمة فعلي/FIFO: {fmt(log.variancePhysicalVsFifo)}</div>
-                      <div>كمية فعلي/FIFO: {log.variancePhysicalVsFifoQty == null
+            <DataTable
+              ariaLabel="محاضر مطابقة المخزون"
+              rows={historyLogs}
+              rowKey={(log: any) => String(log.id)}
+              tableClassName="text-sm"
+              columns={[
+                { key: 'date', header: 'تاريخ المحضر', render: (log: any) => <span className="font-bold text-slate-900">{log.reconciliationDate}</span> },
+                { key: 'wh', header: 'المستودع', render: (log: any) => <span className="text-xs font-bold text-slate-600">{log.warehouseName || 'جميع المخازن'}</span> },
+                { key: 'physical', header: 'المخزون الفعلي', align: 'center', render: (log: any) => <span className="font-mono font-bold text-slate-900">{fmt(log.totalPhysicalCost)}</span> },
+                { key: 'fifo', header: 'طبقات FIFO', align: 'center', render: (log: any) => <span className="font-mono font-bold text-violet-700">{fmt(log.totalFifoLayerCost)}</span> },
+                { key: 'gl', header: 'الأستاذ العام (1104)', align: 'center', render: (log: any) => <span className="font-mono font-bold text-emerald-700">{fmt(log.totalGlInventoryCost)}</span> },
+                {
+                  key: 'variance', header: 'الفروقات والنطاق', align: 'center',
+                  render: (log: any) => (
+                    <span className="block font-mono text-xs font-black">
+                      <span className="block">قيمة فعلي/FIFO: {fmt(log.variancePhysicalVsFifo)}</span>
+                      <span className="block">كمية فعلي/FIFO: {log.variancePhysicalVsFifoQty == null
                         ? 'غير مسجلة'
-                        : Number(log.variancePhysicalVsFifoQty).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</div>
-                      <div className="text-amber-700">FIFO/GL: {log.ledgerComparable
+                        : Number(log.variancePhysicalVsFifoQty).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
+                      <span className="block text-amber-700">FIFO/GL: {log.ledgerComparable
                         ? fmt(log.varianceFifoVsGl)
-                        : 'نطاق الفرع/الشركة'}</div>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {log.status === 'BALANCED'
-                        && Boolean(log.ledgerComparable)
-                        && log.variancePhysicalVsFifoQty != null
-                        && Math.abs(Number(log.variancePhysicalVsFifoQty)) < 0.01
-                        && Math.abs(Number(log.variancePhysicalVsFifo)) < 0.05
-                        && Math.abs(Number(log.varianceFifoVsGl)) < 0.05 ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                          <Check className="w-3 h-3" /> مطابق وموزون
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          <AlertTriangle className="w-3 h-3" /> {log.variancePhysicalVsFifoQty == null || !log.ledgerComparable
-                            ? 'مطابقة غير مكتملة'
-                            : 'يوجد فروقات'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">
-                      <div className="font-bold text-slate-700">{log.performedByName || 'المشرف المالي'}</div>
-                      {log.notes && <div className="text-[11px] text-slate-500 mt-0.5">{log.notes}</div>}
-                    </td>
-                  </tr>
-                ))}
-                {historyLogs.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="py-10 text-center text-slate-400 text-xs">
-                      لا توجد محاضر مطابقة مؤرشفة سابقة. اضغط "توثيق محضر مطابقة دوري" لحفظ أول محضر.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                        : 'نطاق الفرع/الشركة'}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status', header: 'الحالة', align: 'center',
+                  render: (log: any) => log.status === 'BALANCED'
+                    && Boolean(log.ledgerComparable)
+                    && log.variancePhysicalVsFifoQty != null
+                    && Math.abs(Number(log.variancePhysicalVsFifoQty)) < 0.01
+                    && Math.abs(Number(log.variancePhysicalVsFifo)) < 0.05
+                    && Math.abs(Number(log.varianceFifoVsGl)) < 0.05 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-700">
+                        <Check className="h-3 w-3" /> مطابق وموزون
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-700">
+                        <AlertTriangle className="h-3 w-3" /> {log.variancePhysicalVsFifoQty == null || !log.ledgerComparable
+                          ? 'مطابقة غير مكتملة'
+                          : 'يوجد فروقات'}
+                      </span>
+                    ),
+                },
+                {
+                  key: 'inspector', header: 'المحقق / ملاحظات',
+                  render: (log: any) => (
+                    <span className="block text-xs">
+                      <span className="block font-bold text-slate-700">{log.performedByName || 'المشرف المالي'}</span>
+                      {log.notes && <span className="mt-0.5 block text-[11px] text-slate-500">{log.notes}</span>}
+                    </span>
+                  ),
+                },
+              ]}
+              emptyTitle={'لا توجد محاضر مطابقة مؤرشفة سابقة. اضغط "توثيق محضر مطابقة دوري" لحفظ أول محضر.'}
+            />
           </div>
         </div>
       </div>

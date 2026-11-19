@@ -6,6 +6,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel } from '../../../utils/export/export';
+import { DataTable } from '../../../components/ui/DataTable';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
@@ -160,7 +161,7 @@ export function PosReportsPage() {
   });
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2"><BarChart3 className="w-6 h-6 text-sky-600" /> تقارير نقطة البيع (POS)</h1>
         <div className="flex items-center gap-2">
@@ -222,19 +223,18 @@ export function PosReportsPage() {
             <h2 className="font-bold text-slate-900 flex items-center gap-2"><CreditCard className="w-4 h-4 text-sky-600" /> توزيع طرق الدفع</h2>
             <button onClick={exportPaymentMix} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
-          <table className="w-full text-sm">
-            <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">الطريقة</th><th className="text-center py-1">عدد</th><th className="text-left py-1">المبلغ</th></tr></thead>
-            <tbody>
-              {paymentMix.map((r) => (
-                <tr key={r.method} className="border-t border-slate-100">
-                  <td className="py-1.5">{PAYMENT_LABELS[r.method] || r.method}</td>
-                  <td className="text-center py-1.5">{fmt(r.count)}</td>
-                  <td className="text-left py-1.5 font-bold">{fmtMoney(r.amount)}</td>
-                </tr>
-              ))}
-              {paymentMix.length === 0 && <tr><td colSpan={3} className="text-center py-4 text-slate-400">لا توجد بيانات</td></tr>}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="توزيع طرق الدفع"
+            rows={paymentMix}
+            rowKey={(r) => r.method}
+            dense
+            columns={[
+              { key: 'method', header: 'الطريقة', render: (r) => PAYMENT_LABELS[r.method] || r.method },
+              { key: 'count', header: 'عدد', align: 'center', render: (r) => fmt(r.count) },
+              { key: 'amount', header: 'المبلغ', align: 'end', render: (r) => <span className="font-bold">{fmtMoney(r.amount)}</span> },
+            ]}
+            emptyTitle="لا توجد بيانات"
+          />
         </div>
 
         {/* Hourly */}
@@ -267,39 +267,37 @@ export function PosReportsPage() {
             <h2 className="font-bold text-slate-900 flex items-center gap-2"><Package className="w-4 h-4 text-sky-600" /> الأصناف الأكثر مبيعاً (أفضل 15)</h2>
             <button onClick={exportTopItems} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
-          <table className="w-full text-sm">
-            <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">#</th><th className="text-right py-1">الصنف</th><th className="text-center py-1">الكمية</th><th className="text-left py-1">المبلغ</th></tr></thead>
-            <tbody>
-              {topItems.map((r, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="py-1.5 text-slate-400">{i + 1}</td>
-                  <td className="py-1.5">{r.name}</td>
-                  <td className="text-center py-1.5">{fmt(r.qty)}</td>
-                  <td className="text-left py-1.5 font-bold">{fmtMoney(r.amount)}</td>
-                </tr>
-              ))}
-              {topItems.length === 0 && <tr><td colSpan={4} className="text-center py-4 text-slate-400">لا توجد بيانات</td></tr>}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="الأصناف الأكثر مبيعاً"
+            rows={topItems.map((r, i) => ({ ...r, _i: i }))}
+            rowKey={(r) => String(r._i)}
+            dense
+            columns={[
+              { key: 'rank', header: '#', render: (r) => <span className="text-slate-400">{r._i + 1}</span> },
+              { key: 'name', header: 'الصنف', render: (r) => r.name },
+              { key: 'qty', header: 'الكمية', align: 'center', render: (r) => fmt(r.qty) },
+              { key: 'amount', header: 'المبلغ', align: 'end', render: (r) => <span className="font-bold">{fmtMoney(r.amount)}</span> },
+            ]}
+            emptyTitle="لا توجد بيانات"
+          />
         </div>
 
         {/* Cashier performance */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <h2 className="font-bold text-slate-900 flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-sky-600" /> أداء الكاشيرات</h2>
-          <table className="w-full text-sm">
-            <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">منشئ الفاتورة</th><th className="text-center py-1">فواتير</th><th className="text-left py-1">الإجمالي</th><th className="text-left py-1">النقد المسجل بالفواتير</th></tr></thead>
-            <tbody>
-              {cashiers.map((r, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="py-1.5">{r.name}</td>
-                  <td className="text-center py-1.5">{fmt(r.invoices)}</td>
-                  <td className="text-left py-1.5 font-bold">{fmtMoney(r.amount)}</td>
-                  <td className="text-left py-1.5">{fmtMoney(r.cash)}</td>
-                </tr>
-              ))}
-              {cashiers.length === 0 && <tr><td colSpan={4} className="text-center py-4 text-slate-400">لا توجد بيانات</td></tr>}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="أداء الكاشيرات"
+            rows={cashiers.map((r, i) => ({ ...r, _i: i }))}
+            rowKey={(r) => String(r._i)}
+            dense
+            columns={[
+              { key: 'name', header: 'منشئ الفاتورة', render: (r) => r.name },
+              { key: 'invoices', header: 'فواتير', align: 'center', render: (r) => fmt(r.invoices) },
+              { key: 'amount', header: 'الإجمالي', align: 'end', render: (r) => <span className="font-bold">{fmtMoney(r.amount)}</span> },
+              { key: 'cash', header: 'النقد المسجل بالفواتير', align: 'end', render: (r) => fmtMoney(r.cash) },
+            ]}
+            emptyTitle="لا توجد بيانات"
+          />
         </div>
       </div>
     </div>

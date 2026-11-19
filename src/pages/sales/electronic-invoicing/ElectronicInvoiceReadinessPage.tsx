@@ -11,7 +11,7 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 p-5 sm:p-8" dir="rtl">
+    <div className="mx-auto w-full max-w-5xl space-y-5 p-5 sm:p-8">
       <header className="flex items-start gap-3">
         <span className="rounded-xl bg-sky-100 p-3 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
           <FileWarning className="h-6 w-6" />

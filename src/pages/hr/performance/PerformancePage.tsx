@@ -3,6 +3,7 @@ import { Target, ListChecks, Award, ClipboardList, TrendingUp, Gift } from 'luci
 import { PerformanceService, PerformanceCycle, PerformanceKpi, PerformanceGoal, PerformanceEvaluation, PerformancePip, PerformanceReward } from '../../../services/domains/hr/PerformanceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
+import { useToast } from '../../../components/ui/Toast';
 type Tab = 'cycles' | 'kpis' | 'goals' | 'evaluations' | 'pips' | 'rewards';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -16,6 +17,7 @@ const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
 
 
 export const PerformancePage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('cycles');
   const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
   const anyTabAllowed = (['cycles', 'kpis', 'goals', 'evaluations', 'pips', 'rewards'] as Tab[]).some(canTab);
@@ -84,7 +86,7 @@ export const PerformancePage: React.FC = () => {
     try {
       const count = PerformanceService.autoCreateEvaluations(autoCycleId.trim(), type);
       setError(null);
-      alert(`تم إنشاء ${count} تقييم (${type}).`);
+      toast.success(`تم إنشاء ${count} تقييم (${type}).`);
       load();
     } catch (e: any) { setError(e?.message || 'تعذر إنشاء التقييمات.'); }
   };
@@ -93,7 +95,7 @@ export const PerformancePage: React.FC = () => {
     try {
       const score = PerformanceService.syncAttendanceKpi(syncForm.evaluationId.trim(), syncForm.employeeId.trim(), syncForm.from, syncForm.to);
       setError(null);
-      alert(`تمت مزامنة KPI الحضور. الدرجة: ${score}`);
+      toast.warning(`تمت مزامنة KPI الحضور. الدرجة: ${score}`);
       load();
     } catch (e: any) { setError(e?.message || 'تعذر المزامنة.'); }
   };
@@ -102,7 +104,7 @@ export const PerformancePage: React.FC = () => {
     try {
       const count = PerformanceService.autoScoreAllAttendance(autoCycleId.trim(), syncForm.from, syncForm.to);
       setError(null);
-      alert(`تمت مزامنة ${count} تقييم.`);
+      toast.error(`تمت مزامنة ${count} تقييم.`);
       load();
     } catch (e: any) { setError(e?.message || 'تعذر المزامنة.'); }
   };
@@ -119,7 +121,7 @@ export const PerformancePage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
           <Target className="w-5 h-5 text-indigo-600" />

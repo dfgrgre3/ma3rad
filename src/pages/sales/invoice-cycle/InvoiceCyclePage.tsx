@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   FileText, CheckCircle2, Truck, DollarSign, AlertTriangle,
   Search, Eye, Printer, RefreshCw, ChevronLeft, ChevronRight,
@@ -118,7 +119,7 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
         <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
@@ -241,7 +242,7 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 left-0 z-50 w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col" dir="rtl">
+      <div className="fixed inset-y-0 left-0 z-50 w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col">
         {/* Header */}
         <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-l from-sky-600/5 to-transparent">
           <div>
@@ -493,7 +494,7 @@ export const InvoiceCyclePage: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950" dir="rtl">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between gap-4">
@@ -620,50 +621,58 @@ export const InvoiceCyclePage: React.FC = () => {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
-                    <tr>
-                      {['رقم الفاتورة', 'التاريخ', 'العميل', 'مرحلة الدورة', 'الإجمالي', 'المحصّل', 'المتبقي', 'حالة السداد', 'إجراءات'].map(h => (
-                        <th key={h} className="text-right text-xs font-bold text-slate-500 dark:text-slate-400 px-4 py-3 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {invoices.map(inv => {
+                <DataTable
+                ariaLabel="فواتير دورة الفوترة"
+                rows={invoices}
+                rowKey={(inv: any) => String(inv.id)}
+                tableClassName="text-sm"
+                rowClassName={() => 'transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50'}
+                columns={[
+                  { key: 'num', header: 'رقم الفاتورة', render: (inv: any) => <span className="whitespace-nowrap font-bold text-sky-600 dark:text-sky-400">{inv.invoiceNumber}</span> },
+                  { key: 'date', header: 'التاريخ', render: (inv: any) => <span className="whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{inv.date}</span> },
+                  {
+                    key: 'customer', header: 'العميل',
+                    render: (inv: any) => (
+                      <div className="max-w-[160px]">
+                        <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{inv.customerName}</p>
+                        {inv.customerPhone && <p className="truncate text-xs text-slate-500">{inv.customerPhone}</p>}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'stage', header: 'مرحلة الدورة',
+                    render: (inv: any) => {
                       const stage = deriveStage(inv);
                       const stepInfo = CYCLE_STEPS.find(s => s.id === stage);
                       const StageIcon = stepInfo?.icon || FileText;
-                      const ps = PAYMENT_STATUS_MAP[inv.paymentStatus];
                       return (
-                        <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                          <td className="px-4 py-3 font-bold text-sky-600 dark:text-sky-400 whitespace-nowrap">{inv.invoiceNumber}</td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap text-xs">{inv.date}</td>
-                          <td className="px-4 py-3 text-slate-900 dark:text-slate-100 max-w-[160px]">
-                            <p className="truncate font-semibold">{inv.customerName}</p>
-                            {inv.customerPhone && <p className="text-xs text-slate-500 truncate">{inv.customerPhone}</p>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${stepInfo?.bgColor} ${stepInfo?.color} ${stepInfo?.borderColor}`}>
-                              <StageIcon className="w-3.5 h-3.5" />
-                              {stepInfo?.label}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmt(inv.totalAmount)}</td>
-                          <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{fmt(inv.paidAmount)}</td>
-                          <td className="px-4 py-3 font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">{fmt(inv.remainingAmount)}</td>
-                          <td className="px-4 py-3">
-                            {ps && <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${ps.color}`}>{ps.label}</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => setSelected(inv)} className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
+                        <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${stepInfo?.bgColor} ${stepInfo?.color} ${stepInfo?.borderColor}`}>
+                          <StageIcon className="h-3.5 w-3.5" />
+                          {stepInfo?.label}
+                        </span>
                       );
-                    })}
-                  </tbody>
-                </table>
+                    },
+                  },
+                  { key: 'total', header: 'الإجمالي', render: (inv: any) => <span className="whitespace-nowrap font-bold text-slate-900 dark:text-slate-100">{fmt(inv.totalAmount)}</span> },
+                  { key: 'paid', header: 'المحصّل', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-emerald-600 dark:text-emerald-400">{fmt(inv.paidAmount)}</span> },
+                  { key: 'rem', header: 'المتبقي', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-rose-600 dark:text-rose-400">{fmt(inv.remainingAmount)}</span> },
+                  {
+                    key: 'paystatus', header: 'حالة السداد',
+                    render: (inv: any) => {
+                      const ps = PAYMENT_STATUS_MAP[inv.paymentStatus];
+                      return ps ? <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${ps.color}`}>{ps.label}</span> : null;
+                    },
+                  },
+                  {
+                    key: 'actions', header: 'إجراءات', align: 'center',
+                    render: (inv: any) => (
+                      <button onClick={() => setSelected(inv)} className="rounded-lg p-1.5 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-900/20">
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    ),
+                  },
+                ]}
+              />
               </div>
 
               {/* Pagination */}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Palette, Plus, X, Trash2, Loader2 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { BatchService } from '../../../services/domains/inventory/BatchService';
@@ -6,6 +7,7 @@ import { ProductBatch } from '../../../types';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 
+import { useToast } from '../../../components/ui/Toast';
 interface BatchesTabProps {
   productId: string;
   canEdit: boolean;
@@ -14,6 +16,7 @@ interface BatchesTabProps {
 }
 
 export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canViewCosts, canUpdatePricing }) => {
+  const toast = useToast();
   const batchService = useMemo(() => new BatchService(), []);
   const db = useMemo(() => DatabaseManager.getInstance(), []);
   const branchAccess = useMemo(() => new BranchAccessService(), []);
@@ -65,13 +68,13 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
       setForm({ warehouseId: form.warehouseId, batchNumber: '', toneShade: '', caliber: '0', grade: '', quantityM2: '', costPrice: '', receivedDate: '', productionDate: '', notes: '' });
       setFormOpen(false);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر إضافة الدفعة'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر إضافة الدفعة'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = (id: string, batchNumber: string) => {
     if (!confirm(`حذف الدفعة "${batchNumber}"؟`)) return;
-    try { batchService.deleteBatch(id); load(); } catch (err: any) { alert(err?.message); }
+    try { batchService.deleteBatch(id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   // تجميع الدفعات حسب مجموعات النغمة/العيار/الفرز لعرض الملخص
@@ -189,60 +192,66 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
             <p className="text-xs text-slate-400 mt-1">تسجيل الدفعة ينشئ استلاماً مخزنياً ويحدّث الرصيد ودفتر الحركة وطبقة التكلفة تلقائياً</p>
           </div>
         ) : (
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50">
-              <tr>
-                {['المخزن', 'رقم الدفعة', 'نغمة اللون', 'العيار', 'الفرز', 'تاريخ الاستلام', 'الكمية (م²)', 'المتبقي (م²)', ...(canViewCosts ? ['التكلفة/م²'] : []), ...(canEdit ? ['حذف'] : [])].map((h) => (
-                  <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500 text-right">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {batches.map((b) => {
-                const consumedPct = b.quantityM2 > 0 ? ((b.quantityM2 - b.quantityRemainingM2) / b.quantityM2) * 100 : 0;
-                const isEmpty = b.quantityRemainingM2 <= 0.001;
-                return (
-                  <tr key={b.id} className={`hover:bg-slate-50/70 ${isEmpty ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-3 text-slate-600 text-xs">{b.warehouseName || '—'}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-slate-800 text-xs">{b.batchNumber}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700">
-                        <Palette className="w-3 h-3" /> {b.toneShade}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-amber-700 font-bold">{b.caliber || '0'}</td>
-                    <td className="px-4 py-3 text-xs">{b.grade ? <span className="inline-flex px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-700">{b.grade}</span> : <span className="text-slate-400">—</span>}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{b.receivedDate ? new Date(b.receivedDate).toLocaleDateString('ar-EG') : (b.createdAt ? new Date(b.createdAt).toLocaleDateString('ar-EG') : '—')}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700">{fmtM2(b.quantityM2)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-mono font-bold ${isEmpty ? 'text-slate-400' : 'text-emerald-600'}`}>{fmtM2(b.quantityRemainingM2)}</span>
-                        {!isEmpty && (
-                          <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.max(0, 100 - consumedPct)}%` }} />
-                          </div>
-                        )}
-                        {isEmpty && <span className="text-[10px] text-slate-400 font-bold">مُستهلكة</span>}
-                      </div>
-                    </td>
-                    {canViewCosts && <td className="px-4 py-3 font-mono text-rose-600 text-xs">{b.costPrice > 0 ? `${b.costPrice.toFixed(2)} ج.م` : '—'}</td>}
-                    {canEdit && (
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleDelete(b.id, b.batchNumber)}
-                          disabled={!isEmpty}
-                          title={isEmpty ? 'حذف الدفعة' : 'لا يمكن الحذف — يوجد رصيد'}
-                          className={`p-1.5 rounded-lg transition ${isEmpty ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50' : 'text-slate-200 cursor-not-allowed'}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="دفعات المنتج"
+            rows={batches}
+            rowKey={(b: any) => String(b.id)}
+            tableClassName="text-sm"
+            rowClassName={(b: any) => `transition hover:bg-slate-50/70 ${b.quantityRemainingM2 <= 0.001 ? 'opacity-50' : ''}`}
+            columns={[
+              { key: 'wh', header: 'المخزن', render: (b: any) => <span className="text-xs text-slate-600">{b.warehouseName || '—'}</span> },
+              { key: 'num', header: 'رقم الدفعة', render: (b: any) => <span className="font-mono text-xs font-bold text-slate-800">{b.batchNumber}</span> },
+              {
+                key: 'tone', header: 'نغمة اللون',
+                render: (b: any) => <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700"><Palette className="h-3 w-3" /> {b.toneShade}</span>,
+              },
+              { key: 'cal', header: 'العيار', render: (b: any) => <span className="font-mono text-xs font-bold text-amber-700">{b.caliber || '0'}</span> },
+              {
+                key: 'grade', header: 'الفرز',
+                render: (b: any) => b.grade ? <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">{b.grade}</span> : <span className="text-slate-400">—</span>,
+              },
+              {
+                key: 'date', header: 'تاريخ الاستلام',
+                render: (b: any) => <span className="text-xs text-slate-500">{b.receivedDate ? new Date(b.receivedDate).toLocaleDateString('ar-EG') : (b.createdAt ? new Date(b.createdAt).toLocaleDateString('ar-EG') : '—')}</span>,
+              },
+              { key: 'qty', header: 'الكمية (م²)', render: (b: any) => <span className="font-mono text-slate-700">{fmtM2(b.quantityM2)}</span> },
+              {
+                key: 'remain', header: 'المتبقي (م²)',
+                render: (b: any) => {
+                  const consumedPct = b.quantityM2 > 0 ? ((b.quantityM2 - b.quantityRemainingM2) / b.quantityM2) * 100 : 0;
+                  const isEmpty = b.quantityRemainingM2 <= 0.001;
+                  return (
+                    <span className="flex items-center gap-2">
+                      <span className={`font-mono font-bold ${isEmpty ? 'text-slate-400' : 'text-emerald-600'}`}>{fmtM2(b.quantityRemainingM2)}</span>
+                      {!isEmpty && (
+                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
+                          <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(0, 100 - consumedPct)}%` }} />
+                        </span>
+                      )}
+                      {isEmpty && <span className="text-[10px] font-bold text-slate-400">مُستهلكة</span>}
+                    </span>
+                  );
+                },
+              },
+              ...(canViewCosts ? [{ key: 'cost', header: 'التكلفة/م²', render: (b: any) => <span className="font-mono text-xs text-rose-600">{b.costPrice > 0 ? `${b.costPrice.toFixed(2)} ج.م` : '—'}</span> }] : []),
+              ...(canEdit ? [{
+                key: 'del', header: 'حذف',
+                render: (b: any) => {
+                  const isEmpty = b.quantityRemainingM2 <= 0.001;
+                  return (
+                    <button
+                      onClick={() => handleDelete(b.id, b.batchNumber)}
+                      disabled={!isEmpty}
+                      title={isEmpty ? 'حذف الدفعة' : 'لا يمكن الحذف — يوجد رصيد'}
+                      className={`rounded-lg p-1.5 transition ${isEmpty ? 'text-slate-400 hover:bg-rose-50 hover:text-rose-600' : 'cursor-not-allowed text-slate-200'}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  );
+                },
+              }] : []),
+            ]}
+          />
         )}
       </div>
     </div>

@@ -59,7 +59,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`win-sidebar flex h-full min-h-0 flex-col select-none ${isCollapsed ? 'w-12' : 'w-[232px]'} ${mobile ? 'w-[280px]' : ''}`}
-      dir="rtl"
       aria-label="التنقل الجانبي"
     >
       <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-2" aria-label="أقسام النظام">

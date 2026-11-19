@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
@@ -32,54 +33,34 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, canViewFinan
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs text-right min-w-[700px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr>
-              <th className="p-3">رقم الفاتورة</th>
-              <th className="p-3">التاريخ</th>
-              <th className="p-3">الإجمالي</th>
-              {canViewFinancials && <th className="p-3">المدفوع</th>}
-              {canViewFinancials && <th className="p-3">المتبقي</th>}
-              {canViewFinancials && <th className="p-3">حالة السداد</th>}
-              <th className="p-3">ملاحظات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="hover:bg-slate-50">
-                <td className="p-3 font-mono font-bold text-slate-900">{inv.invoice_number}</td>
-                <td className="p-3 text-slate-600">{inv.date}</td>
-                <td className="p-3 font-black text-slate-900">
-                  {CeramicMath.formatCurrency(inv.total_amount)}
-                </td>
-                {canViewFinancials && <td className="p-3 font-bold text-emerald-700">
-                  {CeramicMath.formatCurrency(inv.paid_amount)}
-                </td>}
-                {canViewFinancials && <td className="p-3 font-bold text-rose-700">
-                  {CeramicMath.formatCurrency(inv.remaining_amount)}
-                </td>}
-                {canViewFinancials && <td className="p-3">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                      PAY_STATUS_BADGES[inv.payment_status]?.className ||
-                      'bg-slate-100 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
+        <DataTable
+          ariaLabel="فواتير المورد"
+          rows={invoices}
+          rowKey={(inv: any) => String(inv.id)}
+          minWidth={700}
+          dense
+          tableClassName="text-xs"
+          rowClassName={() => 'transition hover:bg-slate-50'}
+          columns={[
+            { key: 'num', header: 'رقم الفاتورة', render: (inv: any) => <span className="font-mono font-bold text-slate-900">{inv.invoice_number}</span> },
+            { key: 'date', header: 'التاريخ', render: (inv: any) => <span className="text-slate-600">{inv.date}</span> },
+            { key: 'total', header: 'الإجمالي', render: (inv: any) => <span className="font-black text-slate-900">{CeramicMath.formatCurrency(inv.total_amount)}</span> },
+            ...(canViewFinancials ? [
+              { key: 'paid', header: 'المدفوع', render: (inv: any) => <span className="font-bold text-emerald-700">{CeramicMath.formatCurrency(inv.paid_amount)}</span> },
+              { key: 'rem', header: 'المتبقي', render: (inv: any) => <span className="font-bold text-rose-700">{CeramicMath.formatCurrency(inv.remaining_amount)}</span> },
+              {
+                key: 'paystatus', header: 'حالة السداد',
+                render: (inv: any) => (
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${PAY_STATUS_BADGES[inv.payment_status as keyof typeof PAY_STATUS_BADGES]?.className || 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                    {PAY_STATUS_BADGES[inv.payment_status as keyof typeof PAY_STATUS_BADGES]?.label || inv.payment_status}
                   </span>
-                </td>}
-                <td className="p-3 text-slate-500">{inv.notes || '—'}</td>
-              </tr>
-            ))}
-            {invoices.length === 0 && (
-              <tr>
-                <td colSpan={canViewFinancials ? 7 : 4} className="p-10 text-center text-slate-400">
-                  لا توجد فواتير مسجلة لهذا المورد.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                ),
+              },
+            ] : []),
+            { key: 'notes', header: 'ملاحظات', render: (inv: any) => <span className="text-slate-500">{inv.notes || '—'}</span> },
+          ]}
+          emptyTitle="لا توجد فواتير مسجلة لهذا المورد."
+        />
       </div>
     </div>
   );

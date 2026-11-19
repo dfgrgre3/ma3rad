@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../ui/DataTable';
 import type { PartyOption, PartyStatement } from '../../../services/domains/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
@@ -92,51 +93,55 @@ export function SubledgerPanel({
           )}
 
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">التاريخ</th>
-                  <th className="px-4 py-3">رقم القيد</th>
-                  <th className="px-4 py-3">المصدر</th>
-                  <th className="px-4 py-3">البيان</th>
-                  <th className="px-4 py-3">مدين</th>
-                  <th className="px-4 py-3">دائن</th>
-                  <th className="px-4 py-3">الرصيد</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr className="bg-slate-50/60">
-                  <td className="px-4 py-2.5 text-slate-500">{statement.from}</td>
-                  <td className="px-4 py-2.5">—</td>
-                  <td className="px-4 py-2.5">—</td>
-                  <td className="px-4 py-2.5 font-bold">الرصيد الافتتاحي</td>
-                  <td className="px-4 py-2.5" colSpan={2} />
-                  <td className="px-4 py-2.5 font-mono font-bold">{formatCurrency(statement.opening)}</td>
-                </tr>
-                {statement.lines.map((line, index) => (
-                  <tr key={`${line.entryNumber}-${index}`}>
-                    <td className="px-4 py-2.5 text-slate-500">{line.date}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-teal-700">{line.entryNumber}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {sourceLabels[line.referenceType] || line.referenceType}
-                    </td>
-                    <td className="px-4 py-2.5">{line.description}</td>
-                    <td className="px-4 py-2.5 font-mono">{line.debit ? formatCurrency(line.debit) : '—'}</td>
-                    <td className="px-4 py-2.5 font-mono">{line.credit ? formatCurrency(line.credit) : '—'}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold">{formatCurrency(line.balance)}</td>
-                  </tr>
-                ))}
-                {statement.lines.length === 0 && (
-                  <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد حركات على هذا الطرف في الفترة</td></tr>
-                )}
-              </tbody>
-              <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-black">
-                <tr>
+            <DataTable
+              ariaLabel="كشف حساب الطرف"
+              rows={[
+                { __opening: true, date: statement.from },
+                ...statement.lines.map((line: any, index: number) => ({ ...line, __index: index })),
+              ]}
+              rowKey={(row: any) => row.__opening ? '__opening__' : `${row.entryNumber}-${row.__index}`}
+              rowClassName={(row: any) => (row as any).__opening ? 'bg-slate-50/60' : ''}
+              tableClassName="text-sm"
+              columns={[
+                { key: 'date', header: 'التاريخ', render: (row: any) => <span className="text-slate-500">{row.date}</span> },
+                {
+                  key: 'entry', header: 'رقم القيد',
+                  render: (row: any) => row.__opening ? '—' : <span className="font-mono font-bold text-teal-700">{row.entryNumber}</span>,
+                },
+                {
+                  key: 'ref', header: 'المصدر',
+                  render: (row: any) => row.__opening ? '—' : <span className="text-xs text-slate-500">{sourceLabels[row.referenceType] || row.referenceType}</span>,
+                },
+                {
+                  key: 'desc', header: 'البيان',
+                  render: (row: any) => row.__opening
+                    ? <span className="font-bold">الرصيد الافتتاحي</span>
+                    : row.description,
+                },
+                {
+                  key: 'debit', header: 'مدين',
+                  render: (row: any) => row.__opening ? null : <span className="font-mono">{row.debit ? formatCurrency(row.debit) : '—'}</span>,
+                },
+                {
+                  key: 'credit', header: 'دائن',
+                  render: (row: any) => row.__opening ? null : <span className="font-mono">{row.credit ? formatCurrency(row.credit) : '—'}</span>,
+                },
+                {
+                  key: 'balance', header: 'الرصيد',
+                  render: (row: any) => <span className="font-mono font-bold">{formatCurrency(row.__opening ? statement.opening : row.balance)}</span>,
+                },
+              ]}
+              footer={
+                <tr className="bg-slate-50 border-t-2 border-slate-200 font-black">
                   <td colSpan={6} className="px-4 py-3 text-xs text-slate-600">الرصيد الختامي</td>
                   <td className="px-4 py-3 font-mono">{formatCurrency(statement.closing)}</td>
                 </tr>
-              </tfoot>
-            </table>
+              }
+              emptyTitle="لا توجد حركات على هذا الطرف في الفترة"
+            />
+            {statement.lines.length === 0 && (
+              <p className="py-6 text-center text-sm text-slate-400">لا توجد حركات على هذا الطرف في الفترة</p>
+            )}
           </div>
         </>
       )}

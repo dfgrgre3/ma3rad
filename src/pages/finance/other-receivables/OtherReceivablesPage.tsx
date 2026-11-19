@@ -375,7 +375,7 @@ export const OtherReceivablesPage: React.FC = () => {
     link.click();
   };
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
       <header className="bg-white border-b p-5 flex items-center gap-3">
         <div>
           <h1 className="text-lg font-black">المستحقات الأخرى</h1>

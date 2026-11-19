@@ -8,17 +8,18 @@ export function reclassifyInventoryAdjustment(
 ): void {
   if (adjustment.adjustment_type === 'OPENING_BALANCE') return;
   if (queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT_POLICY' AND reference_id=?`, [adjustment.id]).length) return;
-  const entry = queryLedgerRows<{ id: string; date: string; created_by: string }>(
-    db, `SELECT id,date,created_by FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`, [adjustment.id]
+  const entry = queryLedgerRows<{ id: string; date: string; created_by: string; branch_id: string | null }>(
+    db, `SELECT id,date,created_by,branch_id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`, [adjustment.id]
   )[0];
   if (!entry) return;
+  // journal_entry_lines amounts are stored in minor units; convert back to major.
   const gain = Number(queryLedgerRows<{ amount: number }>(db, `
-    SELECT COALESCE(SUM(l.credit),0) AS amount FROM journal_entry_lines l
+    SELECT COALESCE(SUM(l.credit),0) / 100.0 AS amount FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id=l.account_id
     WHERE l.entry_id=? AND a.code='4190'
   `, [entry.id])[0]?.amount || 0);
   const loss = Number(queryLedgerRows<{ amount: number }>(db, `
-    SELECT COALESCE(SUM(l.debit),0) AS amount FROM journal_entry_lines l
+    SELECT COALESCE(SUM(l.debit),0) / 100.0 AS amount FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id=l.account_id
     WHERE l.entry_id=? AND a.code='5290'
   `, [entry.id])[0]?.amount || 0);
@@ -44,6 +45,7 @@ export function reclassifyInventoryAdjustment(
     description: `Reclassify inventory adjustment ${adjustment.id}`,
     referenceType: 'INVENTORY_ADJUSTMENT_POLICY',
     referenceId: adjustment.id,
+    branchId: entry.branch_id,
     createdBy,
     lines,
   });

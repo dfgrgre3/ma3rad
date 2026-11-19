@@ -153,7 +153,7 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
   );
 
   return (
-    <div dir="rtl" className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">
       {currentUser.mustChangePassword && <PlatformStaffForcePasswordChange currentUser={currentUser} />}
       {/* Sidebar */}
       <aside className="hidden w-[262px] shrink-0 flex-col bg-slate-950 lg:flex">

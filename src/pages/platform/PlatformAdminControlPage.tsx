@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   ShieldCheck,
   Users,
@@ -47,6 +48,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 type ActiveTab = 'STAFF' | 'TENANTS';
 
 const ROLE_BADGE_STYLE: Record<PlatformStaffRole, { bg: string; text: string; label: string }> = {
@@ -59,6 +61,7 @@ const ROLE_BADGE_STYLE: Record<PlatformStaffRole, { bg: string; text: string; la
 };
 
 export const PlatformAdminControlPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>('STAFF');
 
   // Staff State
@@ -201,15 +204,15 @@ export const PlatformAdminControlPage: React.FC = () => {
   // Save Staff
   const handleSaveStaff = async () => {
     if (!canManageStaff) {
-      alert('لا تملك صلاحية إدارة موظفي المنصة.');
+      toast.warning('لا تملك صلاحية إدارة موظفي المنصة.');
       return;
     }
     if (!editingStaff && (!staffForm.password || staffForm.password.length < 8)) {
-      alert('كلمة مرور موظف المنصة مطلوبة ويجب أن تكون 8 أحرف على الأقل.');
+      toast.warning('كلمة مرور موظف المنصة مطلوبة ويجب أن تكون 8 أحرف على الأقل.');
       return;
     }
     if (editingStaff && staffForm.password && staffForm.password.length > 0 && staffForm.password.length < 8) {
-      alert('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+      toast.warning('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
       return;
     }
     const centralState = getCentralDataSourceState();
@@ -234,14 +237,14 @@ export const PlatformAdminControlPage: React.FC = () => {
       setIsStaffModalOpen(false);
       loadStaff();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت العملية.');
+      toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
   // Toggle Staff Active
   const handleToggleStaffActive = async (staff: PlatformStaff) => {
     if (!canManageStaff) {
-      alert('لا تملك صلاحية إدارة موظفي المنصة.');
+      toast.warning('لا تملك صلاحية إدارة موظفي المنصة.');
       return;
     }
     const centralState = getCentralDataSourceState();
@@ -253,14 +256,14 @@ export const PlatformAdminControlPage: React.FC = () => {
       }
       loadStaff();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تغيير حالة الموظف.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تغيير حالة الموظف.');
     }
   };
 
   // Delete Staff
   const handleDeleteStaff = async (staff: PlatformStaff) => {
     if (!canDeleteStaff) {
-      alert('لا تملك صلاحية حذف موظفي المنصة.');
+      toast.warning('لا تملك صلاحية حذف موظفي المنصة.');
       return;
     }
     if (!confirm(`هل أنت متأكد من حذف موظف المنصة (${staff.fullName})؟`)) return;
@@ -273,7 +276,7 @@ export const PlatformAdminControlPage: React.FC = () => {
       }
       loadStaff();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر حذف الموظف.');
+      toast.error(err instanceof Error ? err.message : 'تعذر حذف الموظف.');
     }
   };
 
@@ -307,7 +310,7 @@ export const PlatformAdminControlPage: React.FC = () => {
   const handleSaveTenantUser = async () => {
     if (!selectedTenantId) return;
     if (!canManageTenantUsers) {
-      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      toast.warning('لا تملك صلاحية إدارة مستخدمي العملاء.');
       return;
     }
     try {
@@ -323,19 +326,19 @@ export const PlatformAdminControlPage: React.FC = () => {
         if (result.inviteCode) parts.push(`كود الدعوة: ${result.inviteCode}`);
         if (result.temporaryPassword) parts.push(`كلمة المرور المؤقتة: ${result.temporaryPassword}`);
         if (result.user.identityUserId) parts.push(`معرّف الهوية: ${result.user.identityUserId}`);
-        alert(parts.join('\n'));
+        toast.warning(parts.join('\n'));
       }
       setIsTenantUserModalOpen(false);
       loadTenantUsers(selectedTenantId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت العملية.');
+      toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
   // Toggle Tenant User Active
   const handleToggleTenantUserActive = async (user: PlatformTenantUser) => {
     if (!canManageTenantUsers) {
-      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      toast.warning('لا تملك صلاحية إدارة مستخدمي العملاء.');
       return;
     }
     const centralState = getCentralDataSourceState();
@@ -347,14 +350,14 @@ export const PlatformAdminControlPage: React.FC = () => {
       }
       if (selectedTenantId) loadTenantUsers(selectedTenantId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تغيير حالة المستخدم.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تغيير حالة المستخدم.');
     }
   };
 
   // Delete Tenant User
   const handleDeleteTenantUser = async (user: PlatformTenantUser) => {
     if (!canManageTenantUsers) {
-      alert('لا تملك صلاحية إدارة مستخدمي العملاء.');
+      toast.warning('لا تملك صلاحية إدارة مستخدمي العملاء.');
       return;
     }
     if (!confirm(`هل أنت متأكد من حذف مستخدم العميل (${user.fullName})؟`)) return;
@@ -367,7 +370,7 @@ export const PlatformAdminControlPage: React.FC = () => {
       }
       if (selectedTenantId) loadTenantUsers(selectedTenantId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر حذف المستخدم.');
+      toast.error(err instanceof Error ? err.message : 'تعذر حذف المستخدم.');
     }
   };
 
@@ -475,136 +478,111 @@ export const PlatformAdminControlPage: React.FC = () => {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-right">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">الموظف والبريد الإلكتروني</th>
-                      <th className="px-4 py-3">الدور الوظيفي بالمنصة</th>
-                      <th className="px-4 py-3">الصلاحيات المتاحة والمقيدة</th>
-                      <th className="px-4 py-3">الحالة</th>
-                      <th className="px-4 py-3">تاريخ الإضافة</th>
-                      <th className="px-4 py-3 text-center">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {staffList.map((staff) => {
-                      const badge = ROLE_BADGE_STYLE[staff.role] || {
-                        bg: 'bg-slate-800',
-                        text: 'text-slate-300',
-                        label: staff.role,
-                      };
-                      const isOwner = staff.role === 'SUPER_ADMIN';
-
-                      return (
-                        <tr key={staff.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-300 font-bold text-xs">
-                                {staff.fullName.charAt(0)}
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                                  {staff.fullName}
-                                  {isOwner && (
-                                    <span title="مالك المنصة" className="inline-flex items-center"><BadgeCheck className="h-3.5 w-3.5 text-purple-400" /></span>
-                                  )}
-                                </p>
-                                <p className="text-[11px] text-slate-400">{staff.email}</p>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-bold ${badge.bg} ${badge.text}`}
-                            >
-                              {badge.label}
+                <DataTable
+                  ariaLabel="موظفو المنصة"
+                  rows={staffList}
+                  rowKey={(staff) => staff.id}
+                  minWidth={850}
+                  columns={[
+                    {
+                      key: 'staff', header: 'الموظف والبريد الإلكتروني',
+                      render: (staff) => {
+                        const isOwner = staff.role === 'SUPER_ADMIN';
+                        return (
+                          <span className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-300 font-bold text-xs">
+                              {staff.fullName.charAt(0)}
                             </span>
-                          </td>
-
-                          <td className="px-4 py-3.5 text-xs text-slate-400">
-                            {isOwner ? (
-                              <span className="text-purple-300 font-semibold">وصول كامل لكافة الأنظمة (*)</span>
-                            ) : staff.role === 'SUPPORT_AGENT' ? (
-                              <span>تذاكر الدعم · جلسات Remote · التشخيص (مقيد الفواتير والأسعار)</span>
-                            ) : staff.role === 'OPERATIONS_ENGINEER' ? (
-                              <span>العمليات · النسخ الاحتياطي · المزامنة (مقيد الفواتير والتراخيص)</span>
-                            ) : staff.role === 'BILLING_SPECIALIST' ? (
-                              <span>الفوترة والمدفوعات · الاشتراكات (مقيد البنية والتراخيص)</span>
-                            ) : staff.role === 'LICENSE_MANAGER' ? (
-                              <span>إصدار التراخيص · الأجهزة والربط (مقيد الفواتير والعمليات)</span>
-                            ) : (
-                              <span>إدارة منصة عامة</span>
+                            <span>
+                              <span className="block text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                                {staff.fullName}
+                                {isOwner && (
+                                  <span title="مالك المنصة" className="inline-flex items-center"><BadgeCheck className="h-3.5 w-3.5 text-purple-400" /></span>
+                                )}
+                              </span>
+                              <span className="block text-[11px] text-slate-400">{staff.email}</span>
+                            </span>
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: 'role', header: 'الدور الوظيفي بالمنصة',
+                      render: (staff) => {
+                        const badge = ROLE_BADGE_STYLE[staff.role] || { bg: 'bg-slate-800', text: 'text-slate-300', label: staff.role };
+                        return (
+                          <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-bold ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: 'perms', header: 'الصلاحيات المتاحة والمقيدة',
+                      render: (staff) => {
+                        if (staff.role === 'SUPER_ADMIN') return <span className="text-xs text-slate-400">وصول كامل لكافة الأنظمة (*)</span>;
+                        if (staff.role === 'SUPPORT_AGENT') return <span className="text-xs text-slate-400">تذاكر الدعم · جلسات Remote · التشخيص (مقيد الفواتير والأسعار)</span>;
+                        if (staff.role === 'OPERATIONS_ENGINEER') return <span className="text-xs text-slate-400">العمليات · النسخ الاحتياطي · المزامنة (مقيد الفواتير والتراخيص)</span>;
+                        if (staff.role === 'BILLING_SPECIALIST') return <span className="text-xs text-slate-400">الفوترة والمدفوعات · الاشتراكات (مقيد البنية والتراخيص)</span>;
+                        if (staff.role === 'LICENSE_MANAGER') return <span className="text-xs text-slate-400">إصدار التراخيص · الأجهزة والربط (مقيد الفواتير والعمليات)</span>;
+                        return <span className="text-xs text-slate-400">إدارة منصة عامة</span>;
+                      },
+                    },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (staff) => (
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${staff.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {staff.isActive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                          {staff.isActive ? 'نشط' : 'معطل'}
+                        </span>
+                      ),
+                    },
+                    { key: 'created', header: 'تاريخ الإضافة', render: (staff) => <span className="text-xs text-slate-400">{formatDateTime(staff.createdAt)}</span> },
+                    {
+                      key: 'actions', header: 'الإجراءات', align: 'center',
+                      render: (staff) => {
+                        const isOwner = staff.role === 'SUPER_ADMIN';
+                        return (
+                          <div className="flex items-center justify-center gap-1.5">
+                            {canManageStaff && (
+                              <button
+                                onClick={() => openStaffModal(staff)}
+                                title="تعديل الموظف"
+                                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
                             )}
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                                staff.isActive ? 'text-emerald-400' : 'text-rose-400'
-                              }`}
-                            >
-                              {staff.isActive ? (
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              ) : (
-                                <XCircle className="h-3.5 w-3.5" />
-                              )}
-                              {staff.isActive ? 'نشط' : 'معطل'}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3.5 text-xs text-slate-400">
-                            {formatDateTime(staff.createdAt)}
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {canManageStaff && (
+                            {!isOwner && canManageStaff && (
+                              <>
                                 <button
-                                  onClick={() => openStaffModal(staff)}
-                                  title="تعديل الموظف"
-                                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                                  onClick={() => handleToggleStaffActive(staff)}
+                                  title={staff.isActive ? 'تعطيل الحساب' : 'تنشيط الحساب'}
+                                  className={`rounded p-1 transition-colors ${
+                                    staff.isActive
+                                      ? 'text-amber-400 hover:bg-amber-950/40'
+                                      : 'text-emerald-400 hover:bg-emerald-950/40'
+                                  }`}
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
+                                  {staff.isActive ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                                 </button>
-                              )}
-
-                              {!isOwner && canManageStaff && (
-                                <>
+                                {canDeleteStaff && (
                                   <button
-                                    onClick={() => handleToggleStaffActive(staff)}
-                                    title={staff.isActive ? 'تعطيل الحساب' : 'تنشيط الحساب'}
-                                    className={`rounded p-1 transition-colors ${
-                                      staff.isActive
-                                        ? 'text-amber-400 hover:bg-amber-950/40'
-                                        : 'text-emerald-400 hover:bg-emerald-950/40'
-                                    }`}
+                                    onClick={() => handleDeleteStaff(staff)}
+                                    title="حذف الموظف"
+                                    className="rounded p-1 text-rose-400 hover:bg-rose-950/40 transition-colors"
                                   >
-                                    {staff.isActive ? (
-                                      <Lock className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <Unlock className="h-3.5 w-3.5" />
-                                    )}
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </button>
-
-                                  {canDeleteStaff && (
-                                    <button
-                                      onClick={() => handleDeleteStaff(staff)}
-                                      title="حذف الموظف"
-                                      className="rounded p-1 text-rose-400 hover:bg-rose-950/40 transition-colors"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      },
+                    },
+                  ]}
+                />
               </div>
             )}
           </section>
@@ -691,90 +669,62 @@ export const PlatformAdminControlPage: React.FC = () => {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-right">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">اسم المستخدم</th>
-                      <th className="px-4 py-3">اسم الدخول / البريد</th>
-                      <th className="px-4 py-3">رقم الهاتف</th>
-                      <th className="px-4 py-3">الدور في ERP</th>
-                      <th className="px-4 py-3">الحالة</th>
-                      <th className="px-4 py-3 text-center">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {tenantUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3.5 text-xs font-bold text-slate-100">{user.fullName}</td>
-                        <td className="px-4 py-3.5 text-xs text-slate-300">
-                          {user.email || user.username || '—'}
-                        </td>
-                        <td className="px-4 py-3.5 text-xs text-slate-400">{user.phone || '—'}</td>
-                        <td className="px-4 py-3.5">
-                          <span className="inline-flex rounded-md bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-xs font-bold text-slate-200">
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                              user.status === 'ACTIVE'
-                                ? 'text-emerald-400'
-                                : user.status === 'INVITED'
-                                ? 'text-amber-400'
-                                : 'text-rose-400'
-                            }`}
-                          >
-                            {user.status === 'ACTIVE'
-                              ? 'نشط'
-                              : user.status === 'INVITED'
-                              ? 'في انتظار التفعيل'
-                              : 'معطل'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {canManageTenantUsers && (
-                              <>
-                                <button
-                                  onClick={() => openTenantUserModal(user)}
-                                  title="تعديل المستخدم"
-                                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-
-                                <button
-                                  onClick={() => handleToggleTenantUserActive(user)}
-                                  title={user.status === 'ACTIVE' ? 'تعطيل الحساب' : 'تنشيط الحساب'}
-                                  className={`rounded p-1 ${
-                                    user.status === 'ACTIVE'
-                                      ? 'text-amber-400 hover:bg-amber-950/40'
-                                      : 'text-emerald-400 hover:bg-emerald-950/40'
-                                  }`}
-                                >
-                                  {user.status === 'ACTIVE' ? (
-                                    <Lock className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <Unlock className="h-3.5 w-3.5" />
-                                  )}
-                                </button>
-
-                                <button
-                                  onClick={() => handleDeleteTenantUser(user)}
-                                  title="حذف المستخدم"
-                                  className="rounded p-1 text-rose-400 hover:bg-rose-950/40"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="مستخدمو العميل"
+                  rows={tenantUsers}
+                  rowKey={(user) => user.id}
+                  minWidth={800}
+                  columns={[
+                    { key: 'name', header: 'اسم المستخدم', render: (user) => <span className="text-xs font-bold text-slate-100">{user.fullName}</span> },
+                    { key: 'login', header: 'اسم الدخول / البريد', render: (user) => <span className="text-xs text-slate-300">{user.email || user.username || '—'}</span> },
+                    { key: 'phone', header: 'رقم الهاتف', render: (user) => <span className="text-xs text-slate-400">{user.phone || '—'}</span> },
+                    { key: 'role', header: 'الدور في ERP', render: (user) => <span className="inline-flex rounded-md bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-xs font-bold text-slate-200">{user.role}</span> },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (user) => (
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                          user.status === 'ACTIVE' ? 'text-emerald-400' : user.status === 'INVITED' ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {user.status === 'ACTIVE' ? 'نشط' : user.status === 'INVITED' ? 'في انتظار التفعيل' : 'معطل'}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'actions', header: 'الإجراءات', align: 'center',
+                      render: (user) => (
+                        <div className="flex items-center justify-center gap-1.5">
+                          {canManageTenantUsers && (
+                            <>
+                              <button
+                                onClick={() => openTenantUserModal(user)}
+                                title="تعديل المستخدم"
+                                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleToggleTenantUserActive(user)}
+                                title={user.status === 'ACTIVE' ? 'تعطيل الحساب' : 'تنشيط الحساب'}
+                                className={`rounded p-1 ${
+                                  user.status === 'ACTIVE' ? 'text-amber-400 hover:bg-amber-950/40' : 'text-emerald-400 hover:bg-emerald-950/40'
+                                }`}
+                              >
+                                {user.status === 'ACTIVE' ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTenantUser(user)}
+                                title="حذف المستخدم"
+                                className="rounded p-1 text-rose-400 hover:bg-rose-950/40"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ),
+                    },
+                  ]}
+                />
               </div>
             )}
           </section>

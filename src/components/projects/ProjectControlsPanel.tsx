@@ -21,6 +21,7 @@ import {
   type ProjectTimeSummary,
 } from '../../services/domains/projects/ProjectService';
 import { useToast } from '../ui/Toast';
+import { DataTable } from '../ui/DataTable';
 import { localDateString } from '../../utils/shared/date';
 
 const money = (n: number) =>
@@ -313,7 +314,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
   }
 
   return (
-    <div className="space-y-3" dir="rtl">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2">
         <div className="flex flex-wrap gap-1">
           {TABS.map((item) => (
@@ -336,82 +337,79 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
       {tab === 'tasks' && (
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-            <table className="w-full text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="p-2.5 font-bold">المهمة</th>
-                  <th className="p-2.5 font-bold">المسؤول</th>
-                  <th className="p-2.5 font-bold">الأولوية</th>
-                  <th className="p-2.5 font-bold">الاستحقاق</th>
-                  <th className="p-2.5 font-bold">التبعيات</th>
-                  <th className="p-2.5 font-bold">الحالة</th>
-                  <th className="p-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-slate-50">
-                    <td className="p-2.5">
-                      <p className="font-bold text-slate-800">{task.title}</p>
-                      {task.description && <p className="text-[10px] text-slate-400">{task.description}</p>}
-                    </td>
-                    <td className="p-2.5 text-slate-600">{task.assigneeName || '—'}</td>
-                    <td className="p-2.5 text-slate-600">{TASK_PRIORITY_LABELS[task.priority]}</td>
-                    <td className="p-2.5 font-mono text-slate-600">{task.dueDate || '—'}</td>
-                    <td className="p-2.5">
-                      <div className="flex flex-wrap gap-1">
-                        {(task.dependencyIds || []).map((dependencyId) => {
-                          const dependency = tasks.find((item) => item.id === dependencyId);
-                          if (!dependency) return null;
-                          return (
-                            <span key={dependencyId} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">
-                              <GitBranch className="h-3 w-3" />
-                              {dependency.title}
-                              {canUpdate && (
-                                <button
-                                  onClick={() => removeDependency(task.id, dependencyId)}
-                                  className="text-slate-400 hover:text-rose-600"
-                                  title="حذف التبعية"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </span>
-                          );
-                        })}
-                        {(task.dependencyIds || []).length === 0 && <span className="text-slate-400">—</span>}
-                      </div>
-                    </td>
-                    <td className="p-2.5">
-                      {canUpdate ? (
-                        <select
-                          value={task.status}
-                          onChange={(event) => setTaskStatus(task, event.target.value as ProjectTaskStatus)}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold"
-                        >
-                          {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[10px] font-bold">{TASK_STATUS_LABELS[task.status]}</span>
-                      )}
-                      <span className="mr-1 text-[10px] text-slate-400">{task.progress}%</span>
-                    </td>
-                    <td className="p-2.5">
-                      {canUpdate && (
-                        <button onClick={() => removeTask(task)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {tasks.length === 0 && (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">لا توجد مهام مسجلة.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+                        ariaLabel="مهام المشروع"
+                        rows={tasks}
+                        rowKey={(task) => task.id}
+                        dense
+                        columns={[
+                          {
+                            key: 'task', header: 'المهمة',
+                            render: (task) => (
+                              <div>
+                                <p className="font-bold text-slate-800">{task.title}</p>
+                                {task.description && <p className="text-[10px] text-slate-400">{task.description}</p>}
+                              </div>
+                            ),
+                          },
+                          { key: 'assignee', header: 'المسؤول', render: (task) => <span className="text-slate-600">{task.assigneeName || '—'}</span> },
+                          { key: 'priority', header: 'الأولوية', render: (task) => <span className="text-slate-600">{TASK_PRIORITY_LABELS[task.priority]}</span> },
+                          { key: 'due', header: 'الاستحقاق', render: (task) => <span className="font-mono text-slate-600">{task.dueDate || '—'}</span> },
+                          {
+                            key: 'deps', header: 'التبعيات',
+                            render: (task) => (
+                              <div className="flex flex-wrap gap-1">
+                                {(task.dependencyIds || []).map((dependencyId) => {
+                                  const dependency = tasks.find((item) => item.id === dependencyId);
+                                  if (!dependency) return null;
+                                  return (
+                                    <span key={dependencyId} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">
+                                      <GitBranch className="h-3 w-3" />
+                                      {dependency.title}
+                                      {canUpdate && (
+                                        <button onClick={() => removeDependency(task.id, dependencyId)} className="text-slate-400 hover:text-rose-600" title="حذف التبعية">
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </span>
+                                  );
+                                })}
+                                {(task.dependencyIds || []).length === 0 && <span className="text-slate-400">—</span>}
+                              </div>
+                            ),
+                          },
+                          {
+                            key: 'status', header: 'الحالة',
+                            render: (task) => (
+                              <div>
+                                {canUpdate ? (
+                                  <select
+                                    value={task.status}
+                                    onChange={(event) => setTaskStatus(task, event.target.value as ProjectTaskStatus)}
+                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold"
+                                  >
+                                    {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
+                                      <option key={value} value={value}>{label}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="text-[10px] font-bold">{TASK_STATUS_LABELS[task.status]}</span>
+                                )}
+                                <span className="mr-1 text-[10px] text-slate-400">{task.progress}%</span>
+                              </div>
+                            ),
+                          },
+                          {
+                            key: 'actions', header: '',
+                            render: (task) => canUpdate ? (
+                              <button onClick={() => removeTask(task)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null,
+                          },
+                        ]}
+                      />
+
           </div>
 
           {canUpdate && (
@@ -485,52 +483,43 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
           )}
           <div className="grid gap-3 lg:grid-cols-3">
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-              <table className="w-full text-right text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="p-2.5 font-bold">البند</th>
-                    <th className="p-2.5 font-bold">الوصف</th>
-                    <th className="p-2.5 font-bold">المخطط</th>
-                    <th className="p-2.5 font-bold">الفعلي</th>
-                    <th className="p-2.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {budgetLines.map((line) => (
-                    <tr key={line.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-bold text-slate-800">{line.category}</td>
-                      <td className="p-2.5 text-slate-500">{line.description || '—'}</td>
-                      <td className="p-2.5 font-mono">{money(line.plannedAmount)}</td>
-                      <td className="p-2.5">
-                        {canUpdate ? (
-                          <input type="number" min="0" step="0.01" defaultValue={line.actualAmount}
-                            onBlur={(event) => {
-                              const value = Number(event.target.value);
-                              if (value !== line.actualAmount) {
-                                try { service.updateBudgetLine(line.id, { actualAmount: value }); load(); }
-                                catch (error: any) { fail(error, 'تعذر تحديث المبلغ الفعلي.'); }
-                              }
-                            }}
-                            className="w-24 rounded-lg border border-slate-200 px-2 py-1 font-mono" />
-                        ) : money(line.actualAmount)}
-                      </td>
-                      <td className="p-2.5">
-                        {canUpdate && (
-                          <button onClick={() => {
-                            if (!window.confirm(`حذف بند الميزانية "${line.category}"؟`)) return;
-                            try { service.deleteBudgetLine(line.id); load(); } catch (error: any) { fail(error, 'تعذر حذف البند.'); }
-                          }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {budgetLines.length === 0 && (
-                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">لا توجد بنود ميزانية.</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+                            ariaLabel="بنود ميزانية المشروع"
+                            rows={budgetLines}
+                            rowKey={(line) => line.id}
+                            dense
+                            columns={[
+                              { key: 'category', header: 'البند', render: (line) => <span className="font-bold text-slate-800">{line.category}</span> },
+                              { key: 'desc', header: 'الوصف', render: (line) => <span className="text-slate-500">{line.description || '—'}</span> },
+                              { key: 'planned', header: 'المخطط', render: (line) => <span className="font-mono">{money(line.plannedAmount)}</span> },
+                              {
+                                key: 'actual', header: 'الفعلي',
+                                render: (line) => canUpdate ? (
+                                  <input type="number" min="0" step="0.01" defaultValue={line.actualAmount}
+                                    onBlur={(event) => {
+                                      const value = Number(event.target.value);
+                                      if (value !== line.actualAmount) {
+                                        try { service.updateBudgetLine(line.id, { actualAmount: value }); load(); }
+                                        catch (error: any) { fail(error, 'تعذر تحديث المبلغ الفعلي.'); }
+                                      }
+                                    }}
+                                    className="w-24 rounded-lg border border-slate-200 px-2 py-1 font-mono" />
+                                ) : money(line.actualAmount),
+                              },
+                              {
+                                key: 'actions', header: '',
+                                render: (line) => canUpdate ? (
+                                  <button onClick={() => {
+                                    if (!window.confirm(`حذف بند الميزانية "${line.category}"؟`)) return;
+                                    try { service.deleteBudgetLine(line.id); load(); } catch (error: any) { fail(error, 'تعذر حذف البند.'); }
+                                  }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null,
+                              },
+                            ]}
+                          />
+
             </div>
             {canUpdate && (
               <form onSubmit={submitBudget} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
@@ -574,41 +563,30 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
           )}
           <div className="grid gap-3 lg:grid-cols-3">
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-              <table className="w-full text-right text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="p-2.5 font-bold">التاريخ</th>
-                    <th className="p-2.5 font-bold">المهمة</th>
-                    <th className="p-2.5 font-bold">الموظف</th>
-                    <th className="p-2.5 font-bold">الساعات</th>
-                    <th className="p-2.5 font-bold">الفوترة</th>
-                    <th className="p-2.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {timeEntries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-mono text-slate-600">{entry.entryDate}</td>
-                      <td className="p-2.5 text-slate-600">{entry.taskTitle || '—'}</td>
-                      <td className="p-2.5 text-slate-600">{entry.employeeName || '—'}</td>
-                      <td className="p-2.5 font-bold">{entry.hours}</td>
-                      <td className="p-2.5">{Number(entry.billable) === 1 ? 'نعم' : 'لا'}</td>
-                      <td className="p-2.5">
-                        {canUpdate && (
-                          <button onClick={() => {
-                            try { service.deleteTimeEntry(entry.id); load(); } catch (error: any) { fail(error, 'تعذر حذف سجل الوقت.'); }
-                          }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {timeEntries.length === 0 && (
-                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">لا توجد سجلات وقت.</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+                            ariaLabel="سجلات وقت المشروع"
+                            rows={timeEntries}
+                            rowKey={(entry) => entry.id}
+                            dense
+                            columns={[
+                              { key: 'date', header: 'التاريخ', render: (entry) => <span className="font-mono text-slate-600">{entry.entryDate}</span> },
+                              { key: 'task', header: 'المهمة', render: (entry) => <span className="text-slate-600">{entry.taskTitle || '—'}</span> },
+                              { key: 'employee', header: 'الموظف', render: (entry) => <span className="text-slate-600">{entry.employeeName || '—'}</span> },
+                              { key: 'hours', header: 'الساعات', render: (entry) => <span className="font-bold">{entry.hours}</span> },
+                              { key: 'billable', header: 'الفوترة', render: (entry) => <span>{Number(entry.billable) === 1 ? 'نعم' : 'لا'}</span> },
+                              {
+                                key: 'actions', header: '',
+                                render: (entry) => canUpdate ? (
+                                  <button onClick={() => {
+                                    try { service.deleteTimeEntry(entry.id); load(); } catch (error: any) { fail(error, 'تعذر حذف سجل الوقت.'); }
+                                  }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null,
+                              },
+                            ]}
+                          />
+
             </div>
             {canUpdate && (
               <form onSubmit={submitTime} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
@@ -646,58 +624,53 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
       {tab === 'risks' && (
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-            <table className="w-full text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="p-2.5 font-bold">الخطر</th>
-                  <th className="p-2.5 font-bold">الخطورة</th>
-                  <th className="p-2.5 font-bold">الاحتمالية</th>
-                  <th className="p-2.5 font-bold">المسؤول</th>
-                  <th className="p-2.5 font-bold">الحالة</th>
-                  <th className="p-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {risks.map((risk) => (
-                  <tr key={risk.id} className="hover:bg-slate-50">
-                    <td className="p-2.5">
-                      <p className="font-bold text-slate-800">{risk.title}</p>
-                      {risk.mitigation && <p className="text-[10px] text-slate-400">التخفيف: {risk.mitigation}</p>}
-                    </td>
-                    <td className="p-2.5 text-slate-600">{RISK_SEVERITY_LABELS[risk.severity]}</td>
-                    <td className="p-2.5 text-slate-600">{RISK_PROBABILITY_LABELS[risk.probability]}</td>
-                    <td className="p-2.5 text-slate-600">{risk.ownerName || '—'}</td>
-                    <td className="p-2.5">
-                      {canUpdate ? (
-                        <select value={risk.status}
-                          onChange={(event) => {
-                            try { service.updateRisk(risk.id, { status: event.target.value as ProjectRiskStatus }); load(); }
-                            catch (error: any) { fail(error, 'تعذر تحديث الخطر.'); }
-                          }}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
-                          {Object.entries(RISK_STATUS_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      ) : RISK_STATUS_LABELS[risk.status]}
-                    </td>
-                    <td className="p-2.5">
-                      {canUpdate && (
-                        <button onClick={() => {
-                          if (!window.confirm(`حذف الخطر "${risk.title}"؟`)) return;
-                          try { service.deleteRisk(risk.id); load(); } catch (error: any) { fail(error, 'تعذر حذف الخطر.'); }
-                        }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {risks.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">لا توجد مخاطر مسجلة.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+                        ariaLabel="مخاطر المشروع"
+                        rows={risks}
+                        rowKey={(risk) => risk.id}
+                        dense
+                        columns={[
+                          {
+                            key: 'risk', header: 'الخطر',
+                            render: (risk) => (
+                              <div>
+                                <p className="font-bold text-slate-800">{risk.title}</p>
+                                {risk.mitigation && <p className="text-[10px] text-slate-400">التخفيف: {risk.mitigation}</p>}
+                              </div>
+                            ),
+                          },
+                          { key: 'severity', header: 'الخطورة', render: (risk) => <span className="text-slate-600">{RISK_SEVERITY_LABELS[risk.severity]}</span> },
+                          { key: 'prob', header: 'الاحتمالية', render: (risk) => <span className="text-slate-600">{RISK_PROBABILITY_LABELS[risk.probability]}</span> },
+                          { key: 'owner', header: 'المسؤول', render: (risk) => <span className="text-slate-600">{risk.ownerName || '—'}</span> },
+                          {
+                            key: 'status', header: 'الحالة',
+                            render: (risk) => canUpdate ? (
+                              <select value={risk.status}
+                                onChange={(event) => {
+                                  try { service.updateRisk(risk.id, { status: event.target.value as ProjectRiskStatus }); load(); }
+                                  catch (error: any) { fail(error, 'تعذر تحديث الخطر.'); }
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
+                                {Object.entries(RISK_STATUS_LABELS).map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                              </select>
+                            ) : RISK_STATUS_LABELS[risk.status],
+                          },
+                          {
+                            key: 'actions', header: '',
+                            render: (risk) => canUpdate ? (
+                              <button onClick={() => {
+                                if (!window.confirm(`حذف الخطر "${risk.title}"؟`)) return;
+                                try { service.deleteRisk(risk.id); load(); } catch (error: any) { fail(error, 'تعذر حذف الخطر.'); }
+                              }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null,
+                          },
+                        ]}
+                      />
+
           </div>
           {canUpdate && (
             <form onSubmit={submitRisk} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
@@ -735,52 +708,49 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
       {tab === 'changes' && (
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-            <table className="w-full text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="p-2.5 font-bold">الطلب</th>
-                  <th className="p-2.5 font-bold">الأثر المالي</th>
-                  <th className="p-2.5 font-bold">الأثر الزمني</th>
-                  <th className="p-2.5 font-bold">مقدم الطلب</th>
-                  <th className="p-2.5 font-bold">الحالة</th>
-                  <th className="p-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {changes.map((change) => (
-                  <tr key={change.id} className="hover:bg-slate-50">
-                    <td className="p-2.5">
-                      <p className="font-bold text-slate-800">{change.title}</p>
-                      {change.description && <p className="text-[10px] text-slate-400">{change.description}</p>}
-                      {change.decisionNote && <p className="text-[10px] text-slate-400">قرار: {change.decisionNote}</p>}
-                    </td>
-                    <td className="p-2.5 font-mono">{money(change.costImpact)}</td>
-                    <td className="p-2.5">{change.timeImpactDays} يوم</td>
-                    <td className="p-2.5 text-slate-600">{change.requesterName || '—'}</td>
-                    <td className="p-2.5">
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusBadge[change.status] || statusBadge.PENDING}`}>
-                        {CHANGE_STATUS_LABELS[change.status]}
-                      </span>
-                    </td>
-                    <td className="p-2.5">
-                      {canApprove && change.status === 'PENDING' && (
-                        <div className="flex gap-1">
-                          <button onClick={() => decideChange(change, 'APPROVED')} className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد">
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
-                          <button onClick={() => decideChange(change, 'REJECTED')} className="rounded bg-rose-50 p-1 text-rose-700" title="رفض">
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {changes.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">لا توجد طلبات تغيير.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+                        ariaLabel="طلبات تغيير المشروع"
+                        rows={changes}
+                        rowKey={(change) => change.id}
+                        dense
+                        columns={[
+                          {
+                            key: 'change', header: 'الطلب',
+                            render: (change) => (
+                              <div>
+                                <p className="font-bold text-slate-800">{change.title}</p>
+                                {change.description && <p className="text-[10px] text-slate-400">{change.description}</p>}
+                                {change.decisionNote && <p className="text-[10px] text-slate-400">قرار: {change.decisionNote}</p>}
+                              </div>
+                            ),
+                          },
+                          { key: 'cost', header: 'الأثر المالي', render: (change) => <span className="font-mono">{money(change.costImpact)}</span> },
+                          { key: 'time', header: 'الأثر الزمني', render: (change) => <span>{change.timeImpactDays} يوم</span> },
+                          { key: 'requester', header: 'مقدم الطلب', render: (change) => <span className="text-slate-600">{change.requesterName || '—'}</span> },
+                          {
+                            key: 'status', header: 'الحالة',
+                            render: (change) => (
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusBadge[change.status] || statusBadge.PENDING}`}>
+                                {CHANGE_STATUS_LABELS[change.status]}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: 'actions', header: '',
+                            render: (change) => canApprove && change.status === 'PENDING' ? (
+                              <div className="flex gap-1">
+                                <button onClick={() => decideChange(change, 'APPROVED')} className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد">
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button onClick={() => decideChange(change, 'REJECTED')} className="rounded bg-rose-50 p-1 text-rose-700" title="رفض">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : null,
+                          },
+                        ]}
+                      />
+
           </div>
           {canUpdate && (
             <form onSubmit={submitChange} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
@@ -809,56 +779,52 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
       {tab === 'deliverables' && (
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-            <table className="w-full text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="p-2.5 font-bold">المخرج</th>
-                  <th className="p-2.5 font-bold">الاستحقاق</th>
-                  <th className="p-2.5 font-bold">التسليم</th>
-                  <th className="p-2.5 font-bold">الحالة</th>
-                  <th className="p-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deliverables.map((deliverable) => (
-                  <tr key={deliverable.id} className="hover:bg-slate-50">
-                    <td className="p-2.5">
-                      <p className="font-bold text-slate-800">{deliverable.title}</p>
-                      {deliverable.description && <p className="text-[10px] text-slate-400">{deliverable.description}</p>}
-                    </td>
-                    <td className="p-2.5 font-mono text-slate-600">{deliverable.dueDate || '—'}</td>
-                    <td className="p-2.5 font-mono text-slate-600">{deliverable.deliveredAt?.slice(0, 10) || '—'}</td>
-                    <td className="p-2.5">
-                      {canUpdate ? (
-                        <select value={deliverable.status}
-                          onChange={(event) => {
-                            try { service.updateDeliverable(deliverable.id, { status: event.target.value as ProjectDeliverableStatus }); load(); }
-                            catch (error: any) { fail(error, 'تعذر تحديث المخرج.'); }
-                          }}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
-                          {Object.entries(DELIVERABLE_STATUS_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      ) : DELIVERABLE_STATUS_LABELS[deliverable.status]}
-                    </td>
-                    <td className="p-2.5">
-                      {canUpdate && (
-                        <button onClick={() => {
-                          if (!window.confirm(`حذف المخرج "${deliverable.title}"؟`)) return;
-                          try { service.deleteDeliverable(deliverable.id); load(); } catch (error: any) { fail(error, 'تعذر حذف المخرج.'); }
-                        }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {deliverables.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">لا توجد مخرجات مسجلة.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+                        ariaLabel="مخرجات المشروع"
+                        rows={deliverables}
+                        rowKey={(deliverable) => deliverable.id}
+                        dense
+                        columns={[
+                          {
+                            key: 'deliverable', header: 'المخرج',
+                            render: (deliverable) => (
+                              <div>
+                                <p className="font-bold text-slate-800">{deliverable.title}</p>
+                                {deliverable.description && <p className="text-[10px] text-slate-400">{deliverable.description}</p>}
+                              </div>
+                            ),
+                          },
+                          { key: 'due', header: 'الاستحقاق', render: (deliverable) => <span className="font-mono text-slate-600">{deliverable.dueDate || '—'}</span> },
+                          { key: 'delivered', header: 'التسليم', render: (deliverable) => <span className="font-mono text-slate-600">{deliverable.deliveredAt?.slice(0, 10) || '—'}</span> },
+                          {
+                            key: 'status', header: 'الحالة',
+                            render: (deliverable) => canUpdate ? (
+                              <select value={deliverable.status}
+                                onChange={(event) => {
+                                  try { service.updateDeliverable(deliverable.id, { status: event.target.value as ProjectDeliverableStatus }); load(); }
+                                  catch (error: any) { fail(error, 'تعذر تحديث المخرج.'); }
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
+                                {Object.entries(DELIVERABLE_STATUS_LABELS).map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                              </select>
+                            ) : DELIVERABLE_STATUS_LABELS[deliverable.status],
+                          },
+                          {
+                            key: 'actions', header: '',
+                            render: (deliverable) => canUpdate ? (
+                              <button onClick={() => {
+                                if (!window.confirm(`حذف المخرج "${deliverable.title}"؟`)) return;
+                                try { service.deleteDeliverable(deliverable.id); load(); } catch (error: any) { fail(error, 'تعذر حذف المخرج.'); }
+                              }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null,
+                          },
+                        ]}
+                      />
+
           </div>
           {canUpdate && (
             <form onSubmit={submitDeliverable} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">

@@ -272,13 +272,13 @@ test('accounting reports and journal entries are scoped by the owning company', 
   const limitedPnl = new AccountingService().getProfitAndLossReport();
   assert.equal(limitedPnl.revenue, 100, 'only the main company revenue is visible');
   const revenueAccount = db.query<{ id: string }>(`SELECT id FROM chart_of_accounts WHERE code = '4101'`)[0];
-  const limitedGl = limitedLedger.getGeneralLedger(revenueAccount.id);
+  const limitedGl = await limitedLedger.getGeneralLedger(revenueAccount.id);
   assert.equal(limitedGl.closing, -100, 'general ledger must apply the company scope');
 
   asUser(admin);
   const adminPnl = new AccountingService().getProfitAndLossReport();
   assert.equal(adminPnl.revenue, 100, 'central access still uses the selected branch');
-  assert.equal(new FinancialStatementsService().getGeneralLedger(revenueAccount.id).closing, -100);
+  assert.equal((await new FinancialStatementsService().getGeneralLedger(revenueAccount.id)).closing, -100);
 
   // The enterprise P&L and the journal browser must apply the same scope.
   asUser(limitedUser());

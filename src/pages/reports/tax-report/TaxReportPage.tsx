@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { ReceiptText, Loader2, Download, CalendarDays } from 'lucide-react';
 import { FinanceExtrasService } from '../../../services/domains/finance/FinanceExtrasService';
 import { localDateString } from '../../../utils/shared/date';
@@ -44,7 +45,7 @@ export const TaxReportPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center"><ReceiptText className="w-5 h-5 text-teal-600" /></div>
@@ -119,25 +120,26 @@ export const TaxReportPage: React.FC = () => {
                 <h3 className="text-sm font-black">التفصيل الشهري</h3>
                 <span className="text-[10px] text-slate-400">{months.length} شهر</span>
               </div>
-              <table className="w-full text-sm text-right">
-                <thead className="bg-white border-b border-slate-200">
-                  <tr>{['الشهر', 'ضريبة المخرجات', 'ضريبة المدخلات', 'الصافي'].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {months.map((m) => {
+              <DataTable
+              ariaLabel="تقرير الضرائب الشهري"
+              rows={months}
+              rowKey={(m: any) => String(m.month)}
+              tableClassName="text-sm"
+              rowClassName={() => 'transition hover:bg-slate-50/70'}
+              columns={[
+                { key: 'month', header: 'الشهر', render: (m: any) => <span className="font-mono font-bold text-slate-700">{m.month}</span> },
+                { key: 'out', header: 'ضريبة المخرجات', render: (m: any) => <span className="font-mono text-emerald-700">{fmt(Number(m.outputTax))}</span> },
+                { key: 'in', header: 'ضريبة المدخلات', render: (m: any) => <span className="font-mono text-rose-700">{fmt(Number(m.inputTax))}</span> },
+                {
+                  key: 'net', header: 'الصافي',
+                  render: (m: any) => {
                     const net = Number(m.outputTax || 0) - Number(m.inputTax || 0);
-                    return (
-                      <tr key={m.month} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3 font-mono font-bold text-slate-700">{m.month}</td>
-                        <td className="px-4 py-3 font-mono text-emerald-700">{fmt(Number(m.outputTax))}</td>
-                        <td className="px-4 py-3 font-mono text-rose-700">{fmt(Number(m.inputTax))}</td>
-                        <td className={`px-4 py-3 font-mono font-black ${net >= 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{fmt(net)}</td>
-                      </tr>
-                    );
-                  })}
-                  {months.length === 0 && <tr><td colSpan={4} className="py-16 text-center text-slate-400">لا توجد حركات ضريبية في الفترة المحددة</td></tr>}
-                </tbody>
-              </table>
+                    return <span className={`font-mono font-black ${net >= 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{fmt(net)}</span>;
+                  },
+                },
+              ]}
+              emptyTitle="لا توجد حركات ضريبية في الفترة المحددة"
+            />
             </div>
           </>
         )}

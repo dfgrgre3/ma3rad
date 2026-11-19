@@ -576,6 +576,9 @@ export class DatabaseManager {
       durationMs: Math.round((performance.now() - persistenceStartedAt) * 100) / 100,
       databaseChanged,
     }));
+    // Worker sync during flush can replay connection pragmas onto this
+    // connection; foreign-key enforcement is a hard requirement, so re-assert it.
+    this.getDatabase().run('PRAGMA foreign_keys = ON');
     this.forceFreshAfterRecovery = false;
     this.initializedSuccessfully = true;
     console.info('[performance] Database initialization completed', JSON.stringify({
@@ -816,7 +819,6 @@ export class DatabaseManager {
     if (isFreshDatabase) {
       this.seedInitialData();
     }
-
     if (!databaseChanged) return;
     this.markDirty();
     this.saveToStorage();
@@ -1433,6 +1435,9 @@ export class DatabaseManager {
       candidate.close();
       throw error;
     }
+    // Connection-scoped pragmas do not survive an export/import round-trip;
+    // re-apply them or the replacement connection silently loses FK enforcement.
+    this.applyPerformancePragmas(candidate);
     this.db = candidate;
     this.databaseFacade = null;
     this.databaseFacadeTarget = null;

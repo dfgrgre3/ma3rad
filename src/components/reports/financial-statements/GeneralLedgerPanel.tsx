@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../ui/DataTable';
 import type { LedgerLine } from '../../../services/domains/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
@@ -27,25 +28,22 @@ export function GeneralLedgerPanel({ accounts, accountId, ledger, onAccountChang
             <div className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-xs text-slate-500 font-bold">الرصيد الختامي</p><p className="text-lg font-black font-mono">{formatCurrency(ledger.closing)}</p></div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
-                <tr><th className="px-4 py-3">التاريخ</th><th className="px-4 py-3">رقم القيد</th><th className="px-4 py-3">المصدر</th><th className="px-4 py-3">البيان</th><th className="px-4 py-3">مدين</th><th className="px-4 py-3">دائن</th><th className="px-4 py-3">الرصيد</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {ledger.lines.map((line, index) => (
-                  <tr key={`${line.entryNumber}-${index}`}>
-                    <td className="px-4 py-2.5 text-slate-500">{line.date}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-teal-700">{line.entryNumber}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">{line.referenceType || '—'}</td>
-                    <td className="px-4 py-2.5">{line.description}</td>
-                    <td className="px-4 py-2.5 font-mono">{formatCurrency(line.debit)}</td>
-                    <td className="px-4 py-2.5 font-mono">{formatCurrency(line.credit)}</td>
-                    <td className="px-4 py-2.5 font-mono font-bold">{formatCurrency(line.balance)}</td>
-                  </tr>
-                ))}
-                {ledger.lines.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-400">لا توجد حركات على هذا الحساب في الفترة</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="الأستاذ العام"
+              rows={ledger.lines.map((line, index) => ({ ...line, __index: index }))}
+              rowKey={(line: any) => `${line.entryNumber}-${line.__index}`}
+              tableClassName="text-sm"
+              columns={[
+                { key: 'date', header: 'التاريخ', render: (line: any) => <span className="text-slate-500">{line.date}</span> },
+                { key: 'entry', header: 'رقم القيد', render: (line: any) => <span className="font-mono font-bold text-teal-700">{line.entryNumber}</span> },
+                { key: 'ref', header: 'المصدر', render: (line: any) => <span className="text-xs text-slate-500">{line.referenceType || '—'}</span> },
+                { key: 'desc', header: 'البيان', render: (line: any) => line.description },
+                { key: 'debit', header: 'مدين', render: (line: any) => <span className="font-mono">{formatCurrency(line.debit)}</span> },
+                { key: 'credit', header: 'دائن', render: (line: any) => <span className="font-mono">{formatCurrency(line.credit)}</span> },
+                { key: 'balance', header: 'الرصيد', render: (line: any) => <span className="font-mono font-bold">{formatCurrency(line.balance)}</span> },
+              ]}
+              emptyTitle="لا توجد حركات على هذا الحساب في الفترة"
+            />
           </div>
         </>
       )}

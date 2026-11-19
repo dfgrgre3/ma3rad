@@ -7,10 +7,16 @@ import { SalesInvoice } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import { exportToExcel, exportToPdf, ExportOptions } from '../../utils/export/export';
+import { useToast } from '../ui/Toast';
+import { PageHeader } from '../ui/PageHeader';
+import { Button } from '../ui/Button';
+import { StatCard } from '../ui/Card';
+import { DataTable } from '../ui/DataTable';
 
 type ReportTab = 'sales' | 'purchases' | 'expenses' | 'inventory' | 'category' | 'brand';
 
 export const ReportsView: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<ReportTab>('sales');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -129,17 +135,18 @@ export const ReportsView: React.FC = () => {
   const handleExport = (type: 'excel' | 'pdf') => {
     const options = getExportOptions();
     if (!options) return;
-    if (options.rows.length === 0) return alert('لا توجد بيانات لتصديرها.');
+    if (options.rows.length === 0) { toast.warning('لا توجد بيانات لتصديرها.'); return; }
     const guarded = { ...options, permission: 'reports.export' };
     if (type === 'excel') exportToExcel(guarded); else exportToPdf(guarded);
   };
 
   return (
-    <div className="erp-page" dir="rtl">
-      <div>
-        <h2 className="text-xl font-extrabold text-slate-900">مركز التقارير</h2>
-        <p className="text-xs text-slate-500">تقارير شاملة للمبيعات والمشتريات والمصروفات والأرباح والمالية</p>
-      </div>
+    <div className="erp-page">
+      <PageHeader
+        title="مركز التقارير"
+        description="تقارير شاملة للمبيعات والمشتريات والمصروفات والأرباح والمالية"
+        icon={<BarChart3 className="h-5 w-5" />}
+      />
 
       {/* Quick access to advanced report pages */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -152,114 +159,83 @@ export const ReportsView: React.FC = () => {
           const Icon = card.icon;
           return (
             <Link key={card.href} to={card.href.replace(/^#/, '')}
-              className={`bg-gradient-to-br ${card.color} text-white rounded-2xl p-4 block hover:opacity-90 hover:shadow-lg transition-all`}
+              className="erp-card erp-card--compact flex items-start gap-3 transition hover:border-[var(--win-accent)]"
             >
-              <Icon className="w-6 h-6 mb-2 opacity-90" />
-              <p className="text-sm font-black">{card.label}</p>
-              <p className="text-xs opacity-70 mt-0.5">{card.desc}</p>
+              <span className="erp-card__icon shrink-0" aria-hidden="true"><Icon className="h-4 w-4" /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-black text-[var(--win-text)]">{card.label}</span>
+                <span className="mt-0.5 block text-xs text-[var(--cerami-muted)]">{card.desc}</span>
+              </span>
             </Link>
           );
         })}
       </div>
 
-      <div className="border-t border-slate-200 pt-2">
-        <h3 className="text-sm font-black text-slate-700 mb-3">التقارير التفصيلية المباشرة</h3>
+      <div className="border-t border-[var(--win-border)] pt-2">
+        <h3 className="text-sm font-black text-[var(--win-text)] mb-3">التقارير التفصيلية المباشرة</h3>
       </div>
 
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-xl overflow-x-auto">
+      <div className="flex gap-1 border border-[var(--win-border)] bg-[var(--win-surface-sunken)] p-1 rounded-[var(--ui-radius-md)] overflow-x-auto">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              className={`px-4 py-2 rounded-[var(--ui-radius-sm)] text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id ? 'bg-[var(--win-surface)] text-[var(--win-accent)] shadow-sm' : 'text-[var(--cerami-muted)] hover:text-[var(--win-text)]'}`}>
               <Icon className="w-4 h-4" />{tab.label}
             </button>
           );
         })}
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-4 text-xs font-bold">
+      <div className="erp-card flex flex-wrap items-center gap-4 text-xs font-bold">
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-500" />
-          <span className="text-slate-500">من:</span>
+          <Calendar className="w-4 h-4 text-[var(--cerami-muted)]" />
+          <span className="text-[var(--cerami-muted)]">من:</span>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 " />
+            className="ui-input px-3 py-1.5" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-slate-500">إلى:</span>
+          <span className="text-[var(--cerami-muted)]">إلى:</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 " />
+            className="ui-input px-3 py-1.5" />
         </div>
         <button onClick={() => { setDateFrom(''); setDateTo(''); }}
-          className="px-3 py-1.5 bg-slate-100 rounded-xl text-slate-600 ">إعادة ضبط</button>
+          className="erp-btn erp-btn--secondary erp-btn--sm">إعادة ضبط</button>
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        <button onClick={() => handleExport('excel')} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition">
-          <FileSpreadsheet className="w-4 h-4" /> تصدير جدول بيانات
-        </button>
-        <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition">
-          <FileDown className="w-4 h-4" /> تصدير مستند
-        </button>
+        <Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => handleExport('excel')}>تصدير جدول بيانات</Button>
+        <Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => handleExport('pdf')}>تصدير مستند</Button>
       </div>
 
       {activeTab === 'sales' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">إجمالي المبيعات</div>
-              <div className="text-xl font-black text-slate-900 mt-1">{CeramicMath.formatCurrency(totalSales)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">تكلفة البضاعة (COGS)</div>
-              <div className="text-xl font-black text-slate-600 mt-1">{CeramicMath.formatCurrency(totalCost)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">الربح المحقق</div>
-              <div className="text-xl font-black text-emerald-600 mt-1">{CeramicMath.formatCurrency(totalGrossProfit)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">المديونيات المتبقية</div>
-              <div className="text-xl font-black text-amber-600 mt-1">{CeramicMath.formatCurrency(totalRemaining)}</div>
-            </div>
+            <StatCard label="إجمالي المبيعات" value={CeramicMath.formatCurrency(totalSales)} tone="default" />
+            <StatCard label="تكلفة البضاعة (COGS)" value={CeramicMath.formatCurrency(totalCost)} tone="default" />
+            <StatCard label="الربح المحقق" value={CeramicMath.formatCurrency(totalGrossProfit)} tone="success" />
+            <StatCard label="المديونيات المتبقية" value={CeramicMath.formatCurrency(totalRemaining)} tone="warning" />
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 ">
-              <h3 className="font-extrabold text-sm text-slate-900">تفاصيل فواتير المبيعات</h3>
+          <div className="erp-card erp-card--flush overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--win-border)]">
+              <h3 className="font-extrabold text-sm text-[var(--win-text)]">تفاصيل فواتير المبيعات</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">رقم الفاتورة</th>
-                    <th className="p-3.5">التاريخ</th>
-                    <th className="p-3.5">العميل</th>
-                    <th className="p-3.5">الإجمالي</th>
-                    <th className="p-3.5">التكلفة</th>
-                    <th className="p-3.5">الربح</th>
-                    <th className="p-3.5">المسدد</th>
-                    <th className="p-3.5">المتبقي</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 ">
-                  {invoices.length === 0 ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-slate-500">لا توجد فواتير.</td></tr>
-                  ) : invoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-slate-100">
-                      <td className="p-3.5 font-mono font-bold">{inv.invoiceNumber}</td>
-                      <td className="p-3.5 font-mono text-slate-500">{inv.date}</td>
-                      <td className="p-3.5 font-bold">{inv.customerName}</td>
-                      <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(inv.totalAmount)}</td>
-                      <td className="p-3.5 font-mono text-slate-500">{CeramicMath.formatCurrency(inv.totalCost)}</td>
-                      <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(inv.grossProfit)}</td>
-                      <td className="p-3.5 font-bold text-emerald-600">{CeramicMath.formatCurrency(inv.paidAmount)}</td>
-                      <td className="p-3.5 font-bold text-amber-600">{CeramicMath.formatCurrency(inv.remainingAmount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <DataTable
+                        ariaLabel="تفاصيل فواتير المبيعات"
+                        rows={invoices}
+                        rowKey={(inv) => inv.id}
+                        columns={[
+                          { key: 'num', header: 'رقم الفاتورة', render: (inv) => <span className="font-mono font-bold">{inv.invoiceNumber}</span> },
+                          { key: 'date', header: 'التاريخ', render: (inv) => <span className={`font-mono text-[var(--cerami-muted)]`}>{inv.date}</span> },
+                          { key: 'customer', header: 'العميل', render: (inv) => <span className="font-bold">{inv.customerName}</span> },
+                          { key: 'total', header: 'الإجمالي', render: (inv) => <span className="font-bold">{CeramicMath.formatCurrency(inv.totalAmount)}</span> },
+                          { key: 'cost', header: 'التكلفة', render: (inv) => <span className={`font-mono text-[var(--cerami-muted)]`}>{CeramicMath.formatCurrency(inv.totalCost)}</span> },
+                          { key: 'profit', header: 'الربح', render: (inv) => <span className="font-black text-[var(--win-success-text)]">{CeramicMath.formatCurrency(inv.grossProfit)}</span> },
+                          { key: 'paid', header: 'المسدد', render: (inv) => <span className="font-bold text-[var(--win-success-text)]">{CeramicMath.formatCurrency(inv.paidAmount)}</span> },
+                          { key: 'remaining', header: 'المتبقي', render: (inv) => <span className="font-bold text-[var(--win-warning-text)]">{CeramicMath.formatCurrency(inv.remainingAmount)}</span> },
+                        ]}
+                      />
           </div>
         </div>
       )}
@@ -267,54 +243,29 @@ export const ReportsView: React.FC = () => {
       {activeTab === 'purchases' && purchaseReport && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">إجمالي المشتريات</div>
-              <div className="text-xl font-black text-slate-900 mt-1">{CeramicMath.formatCurrency(purchaseReport.totalPurchases)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">المسدد للموردين</div>
-              <div className="text-xl font-black text-emerald-600 mt-1">{CeramicMath.formatCurrency(purchaseReport.totalPaid)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">المستحق للموردين</div>
-              <div className="text-xl font-black text-amber-600 mt-1">{CeramicMath.formatCurrency(purchaseReport.totalRemaining)}</div>
-            </div>
+            <StatCard label="إجمالي المشتريات" value={CeramicMath.formatCurrency(purchaseReport.totalPurchases)} tone="default" />
+            <StatCard label="المسدد للموردين" value={CeramicMath.formatCurrency(purchaseReport.totalPaid)} tone="success" />
+            <StatCard label="المستحق للموردين" value={CeramicMath.formatCurrency(purchaseReport.totalRemaining)} tone="warning" />
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 ">
-              <h3 className="font-extrabold text-sm text-slate-900">تفاصيل فواتير المشتريات</h3>
+          <div className="erp-card erp-card--flush overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--win-border)]">
+              <h3 className="font-extrabold text-sm text-[var(--win-text)]">تفاصيل فواتير المشتريات</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">رقم الفاتورة</th>
-                    <th className="p-3.5">التاريخ</th>
-                    <th className="p-3.5">المورد</th>
-                    <th className="p-3.5">المخزن</th>
-                    <th className="p-3.5">الإجمالي</th>
-                    <th className="p-3.5">المسدد</th>
-                    <th className="p-3.5">المتبقي</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 ">
-                  {purchaseReport.invoices.length === 0 ? (
-                    <tr><td colSpan={7} className="py-12 text-center text-slate-500">لا توجد فواتير مشتريات.</td></tr>
-                  ) : purchaseReport.invoices.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-slate-100">
-                      <td className="p-3.5 font-mono font-bold">{inv.invoiceNumber}</td>
-                      <td className="p-3.5 font-mono text-slate-500">{inv.date}</td>
-                      <td className="p-3.5 font-bold">{inv.supplierName}</td>
-                      <td className="p-3.5 text-sky-600">{inv.warehouseName}</td>
-                      <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(inv.totalAmount)}</td>
-                      <td className="p-3.5 font-bold text-emerald-600">{CeramicMath.formatCurrency(inv.paidAmount)}</td>
-                      <td className="p-3.5 font-bold text-amber-600">{CeramicMath.formatCurrency(inv.remainingAmount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <DataTable
+                        ariaLabel="تفاصيل فواتير المشتريات"
+                        rows={purchaseReport.invoices}
+                        rowKey={(inv: any) => inv.id}
+                        columns={[
+                          { key: 'num', header: 'رقم الفاتورة', render: (inv: any) => <span className="font-mono font-bold">{inv.invoiceNumber}</span> },
+                          { key: 'date', header: 'التاريخ', render: (inv: any) => <span className={`font-mono text-[var(--cerami-muted)]`}>{inv.date}</span> },
+                          { key: 'supplier', header: 'المورد', render: (inv: any) => <span className="font-bold">{inv.supplierName}</span> },
+                          { key: 'warehouse', header: 'المخزن', render: (inv: any) => <span className="text-[var(--cerami-primary-readable)]">{inv.warehouseName}</span> },
+                          { key: 'total', header: 'الإجمالي', render: (inv: any) => <span className="font-bold">{CeramicMath.formatCurrency(inv.totalAmount)}</span> },
+                          { key: 'paid', header: 'المسدد', render: (inv: any) => <span className="font-bold text-[var(--win-success-text)]">{CeramicMath.formatCurrency(inv.paidAmount)}</span> },
+                          { key: 'remaining', header: 'المتبقي', render: (inv: any) => <span className="font-bold text-[var(--win-warning-text)]">{CeramicMath.formatCurrency(inv.remainingAmount)}</span> },
+                        ]}
+                      />
           </div>
         </div>
       )}
@@ -322,32 +273,26 @@ export const ReportsView: React.FC = () => {
       {activeTab === 'expenses' && expenseReport && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">إجمالي المصروفات</div>
-              <div className="text-xl font-black text-red-600 mt-1">{CeramicMath.formatCurrency(expenseReport.totalExpenses)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">عدد التصنيفات</div>
-              <div className="text-xl font-black text-indigo-600 mt-1">{expenseReport.byCategory.length}</div>
-            </div>
+            <StatCard label="إجمالي المصروفات" value={CeramicMath.formatCurrency(expenseReport.totalExpenses)} tone="danger" />
+            <StatCard label="عدد التصنيفات" value={expenseReport.byCategory.length} tone="default" />
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-extrabold text-sm text-slate-900 mb-4">المصروفات حسب التصنيف</h3>
+          <div className="erp-card">
+            <h3 className="font-extrabold text-sm text-[var(--win-text)] mb-4">المصروفات حسب التصنيف</h3>
             {expenseReport.byCategory.length > 0 ? (
               <div className="space-y-3">
                 {expenseReport.byCategory.map((cat: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 ">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-[var(--ui-radius-sm)] bg-[var(--win-surface-sunken)]">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 font-bold text-xs flex items-center justify-center">{idx + 1}</div>
-                      <span className="font-bold text-sm text-slate-900">{cat.category}</span>
+                      <div className="w-8 h-8 rounded-[var(--ui-radius-sm)] bg-[var(--win-danger-soft)] text-[var(--win-danger-text)] font-bold text-xs flex items-center justify-center">{idx + 1}</div>
+                      <span className="font-bold text-sm text-[var(--win-text)]">{cat.category}</span>
                     </div>
                     <span className="font-black text-rose-600">{CeramicMath.formatCurrency(cat.total)}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-slate-500 text-xs">لا توجد مصروفات.</div>
+              <div className="text-center py-8 text-[var(--cerami-muted)] text-xs">لا توجد مصروفات.</div>
             )}
           </div>
         </div>
@@ -356,116 +301,70 @@ export const ReportsView: React.FC = () => {
       {activeTab === 'inventory' && inventoryReport && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">قيمة المخزون (سعر الشراء)</div>
-              <div className="text-xl font-black text-slate-900 mt-1">{CeramicMath.formatCurrency(inventoryReport.totalCostValue)}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-xs font-bold text-slate-500">قيمة المخزون (سعر البيع)</div>
-              <div className="text-xl font-black text-emerald-600 mt-1">{CeramicMath.formatCurrency(inventoryReport.totalSaleValue)}</div>
-            </div>
+            <StatCard label="قيمة المخزون (سعر الشراء)" value={CeramicMath.formatCurrency(inventoryReport.totalCostValue)} tone="default" />
+            <StatCard label="قيمة المخزون (سعر البيع)" value={CeramicMath.formatCurrency(inventoryReport.totalSaleValue)} tone="success" />
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 ">
-              <h3 className="font-extrabold text-sm text-slate-900">قيمة المخزون حسب المخزن</h3>
+          <div className="erp-card erp-card--flush overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--win-border)]">
+              <h3 className="font-extrabold text-sm text-[var(--win-text)]">قيمة المخزون حسب المخزن</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">المخزن</th>
-                    <th className="p-3.5">عدد الأصناف</th>
-                    <th className="p-3.5">قيمة الشراء</th>
-                    <th className="p-3.5">قيمة البيع</th>
-                    <th className="p-3.5">الربح المحتمل</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 ">
-                  {inventoryReport.byWarehouse.map((wh: any) => (
-                    <tr key={wh.warehouseName} className="hover:bg-slate-100">
-                      <td className="p-3.5 font-bold">{wh.warehouseName}</td>
-                      <td className="p-3.5 text-center font-bold text-sky-600">{wh.items}</td>
-                      <td className="p-3.5 font-mono">{CeramicMath.formatCurrency(wh.costValue)}</td>
-                      <td className="p-3.5 font-mono text-emerald-600">{CeramicMath.formatCurrency(wh.saleValue)}</td>
-                      <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(wh.saleValue - wh.costValue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <DataTable
+                        ariaLabel="قيمة المخزون حسب المخزن"
+                        rows={inventoryReport.byWarehouse}
+                        rowKey={(wh: any) => wh.warehouseName}
+                        columns={[
+                          { key: 'wh', header: 'المخزن', render: (wh: any) => <span className="font-bold">{wh.warehouseName}</span> },
+                          { key: 'items', header: 'عدد الأصناف', align: 'center', render: (wh: any) => <span className="font-bold text-[var(--cerami-primary-readable)]">{wh.items}</span> },
+                          { key: 'cost', header: 'قيمة الشراء', render: (wh: any) => <span className="font-mono">{CeramicMath.formatCurrency(wh.costValue)}</span> },
+                          { key: 'sale', header: 'قيمة البيع', render: (wh: any) => <span className="font-mono text-[var(--win-success-text)]">{CeramicMath.formatCurrency(wh.saleValue)}</span> },
+                          { key: 'profit', header: 'الربح المحتمل', render: (wh: any) => <span className="font-black text-[var(--win-success-text)]">{CeramicMath.formatCurrency(wh.saleValue - wh.costValue)}</span> },
+                        ]}
+                      />
           </div>
         </div>
       )}
 
       {activeTab === 'category' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 ">
-              <h3 className="font-extrabold text-sm text-slate-900">أرباح المبيعات حسب التصنيف</h3>
+          <div className="erp-card erp-card--flush overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--win-border)]">
+              <h3 className="font-extrabold text-sm text-[var(--win-text)]">أرباح المبيعات حسب التصنيف</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">التصنيف</th>
-                    <th className="p-3.5">الكمية المباعة</th>
-                    <th className="p-3.5">إجمالي الإيراد</th>
-                    <th className="p-3.5">الربح</th>
-                    <th className="p-3.5">نسبة الربح</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 ">
-                  {categoryReport.length === 0 ? (
-                    <tr><td colSpan={5} className="py-12 text-center text-slate-500">لا توجد بيانات.</td></tr>
-                  ) : categoryReport.map((cat, idx) => (
-                    <tr key={idx} className="hover:bg-slate-100">
-                      <td className="p-3.5 font-bold">{cat.categoryName}</td>
-                      <td className="p-3.5">{formatProductQuantity(cat.quantityM2, cat)}</td>
-                      <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(cat.totalRevenue)}</td>
-                      <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(cat.profit)}</td>
-                      <td className="p-3.5 font-bold text-sky-600">{cat.totalRevenue > 0 ? ((cat.profit / cat.totalRevenue) * 100).toFixed(1) : 0}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <DataTable
+                        ariaLabel="أرباح المبيعات حسب التصنيف"
+                        rows={categoryReport}
+                        rowKey={(cat: any) => cat.categoryName}
+                        columns={[
+                          { key: 'name', header: 'التصنيف', render: (cat: any) => <span className="font-bold">{cat.categoryName}</span> },
+                          { key: 'qty', header: 'الكمية المباعة', render: (cat: any) => <span>{formatProductQuantity(cat.quantityM2, cat)}</span> },
+                          { key: 'revenue', header: 'إجمالي الإيراد', render: (cat: any) => <span className="font-bold">{CeramicMath.formatCurrency(cat.totalRevenue)}</span> },
+                          { key: 'profit', header: 'الربح', render: (cat: any) => <span className="font-black text-[var(--win-success-text)]">{CeramicMath.formatCurrency(cat.profit)}</span> },
+                          { key: 'margin', header: 'نسبة الربح', render: (cat: any) => <span className="font-bold text-[var(--cerami-primary-readable)]">{cat.totalRevenue > 0 ? ((cat.profit / cat.totalRevenue) * 100).toFixed(1) : 0}%</span> },
+                        ]}
+                      />
           </div>
         </div>
       )}
 
       {activeTab === 'brand' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 ">
-              <h3 className="font-extrabold text-sm text-slate-900">أرباح المبيعات حسب الماركة</h3>
+          <div className="erp-card erp-card--flush overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--win-border)]">
+              <h3 className="font-extrabold text-sm text-[var(--win-text)]">أرباح المبيعات حسب الماركة</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">الماركة</th>
-                    <th className="p-3.5">الكمية المباعة</th>
-                    <th className="p-3.5">إجمالي الإيراد</th>
-                    <th className="p-3.5">الربح</th>
-                    <th className="p-3.5">نسبة الربح</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 ">
-                  {brandReport.length === 0 ? (
-                    <tr><td colSpan={5} className="py-12 text-center text-slate-500">لا توجد بيانات.</td></tr>
-                  ) : brandReport.map((br, idx) => (
-                    <tr key={idx} className="hover:bg-slate-100">
-                      <td className="p-3.5 font-bold">{br.brandName}</td>
-                      <td className="p-3.5">{formatProductQuantity(br.quantityM2, br)}</td>
-                      <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(br.totalRevenue)}</td>
-                      <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(br.profit)}</td>
-                      <td className="p-3.5 font-bold text-sky-600">{br.totalRevenue > 0 ? ((br.profit / br.totalRevenue) * 100).toFixed(1) : 0}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <DataTable
+                        ariaLabel="أرباح المبيعات حسب الماركة"
+                        rows={brandReport}
+                        rowKey={(br: any) => br.brandName}
+                        columns={[
+                          { key: 'name', header: 'الماركة', render: (br: any) => <span className="font-bold">{br.brandName}</span> },
+                          { key: 'qty', header: 'الكمية المباعة', render: (br: any) => <span>{formatProductQuantity(br.quantityM2, br)}</span> },
+                          { key: 'revenue', header: 'إجمالي الإيراد', render: (br: any) => <span className="font-bold">{CeramicMath.formatCurrency(br.totalRevenue)}</span> },
+                          { key: 'profit', header: 'الربح', render: (br: any) => <span className="font-black text-[var(--win-success-text)]">{CeramicMath.formatCurrency(br.profit)}</span> },
+                          { key: 'margin', header: 'نسبة الربح', render: (br: any) => <span className="font-bold text-[var(--cerami-primary-readable)]">{br.totalRevenue > 0 ? ((br.profit / br.totalRevenue) * 100).toFixed(1) : 0}%</span> },
+                        ]}
+                      />
           </div>
         </div>
       )}

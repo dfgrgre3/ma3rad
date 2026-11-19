@@ -9,7 +9,7 @@ export const FinancialCalendarPage: React.FC = () => {
   const canViewFinance = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.calendar.view');
 
   return (
-    <div className="min-h-full space-y-4 bg-slate-50 p-4 text-slate-900 sm:p-6" dir="rtl">
+    <div className="min-h-full space-y-4 bg-slate-50 p-4 text-slate-900 sm:p-6">
       {canViewFinance && (
         <nav aria-label="صفحات التقويم المالي" className="flex justify-start">
           <Link

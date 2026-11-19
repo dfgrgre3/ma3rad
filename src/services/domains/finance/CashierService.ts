@@ -101,21 +101,23 @@ export class CashierService {
       JOIN users u ON cs.user_id = u.id
       WHERE cs.register_id = ? AND cs.status = 'CLOSED'
       ORDER BY cs.closed_at DESC LIMIT 1
-    `, [registerId]);
+    `, [registerId])
+      .map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS));
     return rows[0] || null;
   }
 
   public async getLastClosedShiftAsync(registerId: string): Promise<CashShift | null> {
     const actor = AuthService.requireAuth();
     this.branchAccess.requireRegisterAccess(registerId, actor);
-    const rows = await this.db.queryAsync<CashShift>(`
+    const rows = (await this.db.queryAsync<CashShift>(`
       SELECT cs.*, cs.branch_id AS branchId, cr.name as registerName, u.full_name as userName
       FROM cash_shifts cs
       JOIN cash_registers cr ON cs.register_id = cr.id
       JOIN users u ON cs.user_id = u.id
       WHERE cs.register_id = ? AND cs.status = 'CLOSED'
       ORDER BY cs.closed_at DESC LIMIT 1
-    `, [registerId]);
+    `, [registerId]))
+      .map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS));
     return rows[0] || null;
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Activity,
   Server,
@@ -33,9 +34,11 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, formatDateTime, formatNumber } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 type HealthViewMode = 'cloud_server' | 'local_client';
 
 export const PlatformSystemHealthPage: React.FC = () => {
+  const toast = useToast();
   const canManageSystemHealth = canPlatform('system-health', 'platform.system-health.update');
   const centralActive = getCentralDataSourceState().active;
   const [viewMode, setViewMode] = useState<HealthViewMode>('cloud_server');
@@ -79,7 +82,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
   }, [centralActive, loadCentral]);
 
   const handleTriggerCentralBackup = async () => {
-    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
+    if (!canManageSystemHealth) { toast.warning('لا تملك صلاحية إدارة صحة النظام'); return; }
     setTriggeringBackup(true);
     setBackupSuccess(false);
     try {
@@ -88,7 +91,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
       setTimeout(() => setBackupSuccess(false), 3000);
       loadCentral();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setTriggeringBackup(false);
     }
@@ -103,7 +106,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
 
   const handleTriggerBackup = async () => {
     if (centralActive) { await handleTriggerCentralBackup(); return; }
-    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
+    if (!canManageSystemHealth) { toast.warning('لا تملك صلاحية إدارة صحة النظام'); return; }
     setTriggeringBackup(true);
     setBackupSuccess(false);
     try {
@@ -111,23 +114,23 @@ export const PlatformSystemHealthPage: React.FC = () => {
       setBackupSuccess(true);
       setTimeout(() => setBackupSuccess(false), 3000);
       if (!created.integrityCheckPassed) {
-        alert('تم إنشاء نسخة احتياطية محلية مشفرة، لكن لم يتم التحقق من نسخة خارج الموقع.');
+        toast.success('تم إنشاء نسخة احتياطية محلية مشفرة، لكن لم يتم التحقق من نسخة خارج الموقع.');
       }
       loadHealth();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setTriggeringBackup(false);
     }
   };
 
   const handleResolveIncident = (id: string) => {
-    if (!canManageSystemHealth) { alert('لا تملك صلاحية إدارة صحة النظام'); return; }
+    if (!canManageSystemHealth) { toast.warning('لا تملك صلاحية إدارة صحة النظام'); return; }
     try {
       platformAdminService.resolveServiceIncident(id);
       loadHealth();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
@@ -154,7 +157,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
     const lastBackup = centralBackups[0];
 
     return (
-      <div className="space-y-6" dir="rtl">
+      <div className="space-y-6">
         <PageHeader
           title="صحة النظام — الخادم المركزي (System Health)"
           description="مراقبة حية للنسخ الاحتياطية المركزية، مهام التشغيل، والأخطاء المفتوحة على خادم المنصة."
@@ -213,34 +216,30 @@ export const PlatformSystemHealthPage: React.FC = () => {
               <EmptyState title="لا توجد نسخ احتياطية" description="أنشئ أول نسخة من زر «نسخة احتياطية مركزية الآن»." />
             ) : (
               <div className="overflow-x-auto bg-zinc-900/40 rounded-xl border border-zinc-800">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                    <tr>
-                      <th className="py-3 px-4">الاسم</th>
-                      <th className="py-3 px-4">النوع</th>
-                      <th className="py-3 px-4">الحالة</th>
-                      <th className="py-3 px-4">التاريخ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {centralBackups.slice(0, 20).map((bk) => (
-                      <tr key={bk.id} className="hover:bg-zinc-800/20 transition-colors">
-                        <td className="py-3 px-4 font-semibold text-zinc-200">{bk.name ?? bk.id}</td>
-                        <td className="py-3 px-4 text-zinc-400">{bk.type}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            bk.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : bk.status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                          }`}>
-                            {backupStatusLabel[bk.status] ?? bk.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-[11px] text-zinc-500">{formatDateTime(bk.createdAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="النسخ الاحتياطية المركزية"
+                  rows={centralBackups.slice(0, 20)}
+                  rowKey={(bk) => bk.id}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'name', header: 'الاسم', render: (bk) => <span className="font-semibold text-zinc-200">{bk.name ?? bk.id}</span> },
+                    { key: 'type', header: 'النوع', render: (bk) => <span className="text-zinc-400">{bk.type}</span> },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (bk) => (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          bk.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : bk.status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        }`}>
+                          {backupStatusLabel[bk.status] ?? bk.status}
+                        </span>
+                      ),
+                    },
+                    { key: 'date', header: 'التاريخ', render: (bk) => <span className="text-[11px] text-zinc-500">{formatDateTime(bk.createdAt)}</span> },
+                  ]}
+                />
               </div>
             )}
           </div>
@@ -310,7 +309,7 @@ export const PlatformSystemHealthPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         title="صحة النظام وتشخيص المنصة المركزية (System Health)"
@@ -511,38 +510,30 @@ export const PlatformSystemHealthPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto bg-zinc-900/40 rounded-xl border border-zinc-800">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                    <tr>
-                      <th className="py-3 px-4">اسم ملف النسخة</th>
-                      <th className="py-3 px-4">الحجم</th>
-                      <th className="py-3 px-4">فحص التكامل</th>
-                      <th className="py-3 px-4">تاريخ النسخ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {health?.recentBackups.map((bk) => (
-                      <tr key={bk.id} className="hover:bg-zinc-800/20 transition-colors">
-                        <td className="py-3 px-4 font-semibold text-zinc-200">{bk.filename}</td>
-                        <td className="py-3 px-4 text-zinc-400">
-                          {Math.round(bk.sizeBytes / (1024 * 1024))} MB
-                        </td>
-                        <td className="py-3 px-4 font-sans">
-                          {bk.integrityCheckPassed ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                              <CheckCircle2 className="w-3 h-3" /> مطابق ومحمي
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                              <XCircle className="w-3 h-3" /> فشل الفحص
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-[11px] text-zinc-500 font-sans">{formatDateTime(bk.createdAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="فحص سلامة النسخ الاحتياطية"
+                  rows={health?.recentBackups ?? []}
+                  rowKey={(bk) => bk.id}
+                  dense
+                  tableClassName="text-xs font-mono"
+                  columns={[
+                    { key: 'file', header: 'اسم ملف النسخة', render: (bk) => <span className="font-semibold text-zinc-200">{bk.filename}</span> },
+                    { key: 'size', header: 'الحجم', render: (bk) => <span className="text-zinc-400">{Math.round(bk.sizeBytes / (1024 * 1024))} MB</span> },
+                    {
+                      key: 'integrity', header: 'فحص التكامل',
+                      render: (bk) => bk.integrityCheckPassed ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-sans">
+                          <CheckCircle2 className="w-3 h-3" /> مطابق ومحمي
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 font-sans">
+                          <XCircle className="w-3 h-3" /> فشل الفحص
+                        </span>
+                      ),
+                    },
+                    { key: 'date', header: 'تاريخ النسخ', render: (bk) => <span className="text-[11px] text-zinc-500 font-sans">{formatDateTime(bk.createdAt)}</span> },
+                  ]}
+                />
               </div>
             </div>
 

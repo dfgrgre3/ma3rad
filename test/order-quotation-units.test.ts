@@ -8,6 +8,7 @@ import { InventoryService } from '../src/services/domains/inventory/InventorySer
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { QuotationService } from '../src/services/domains/sales/QuotationService.ts';
 import { OrderService } from '../src/services/domains/sales/OrderService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { getQuantity, getRoomLineTotal, getRoomMeasures } from '../src/pages/construction/estimateCalculations.ts';
 
 async function boot(): Promise<DatabaseManager> {
@@ -16,6 +17,11 @@ async function boot(): Promise<DatabaseManager> {
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
   { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  const __open = manager.query<{ id: string }>(
+    `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`,
+    [AuthService.getCurrentUser()!.id]
+  )[0];
+  if (!__open) new CashierService().openShift('cr_main', AuthService.getCurrentUser()!.id, 0);
   return manager;
 }
 
@@ -41,7 +47,11 @@ test('apartment estimate deducts openings and applies waste, discount, and profi
     materialQuantity: 13.2,
     materialCost: 264,
     laborCost: 60,
+    equipmentCost: 0,
+    expenseCost: 0,
+    cost: 324,
     beforeAdjustments: 324,
+    profitAmount: 25.92,
     total: 349.92,
   });
   assert.equal(getQuantity({ ...line, measure: 'manual', manualQuantity: 8 }, room, 2), 4);
@@ -179,7 +189,7 @@ test('a quotation priced per box is stored and invoiced in base units without ch
   });
 
   const stored = manager.query<{ quantityM2: number; unitPrice: number; totalPrice: number }>(
-    `SELECT quantity_m2 AS quantityM2, unit_price AS unitPrice, total_price AS totalPrice
+    `SELECT quantity_m2 AS quantityM2, unit_price / 100.0 AS unitPrice, total_price / 100.0 AS totalPrice
      FROM quotation_items WHERE quotation_id = ?`,
     [quotation.id]
   )[0];
@@ -225,7 +235,7 @@ test('a quotation priced per box becomes an order with the same base-unit line',
 
   const orderLine = order.items![0];
   assert.equal(orderLine.quantityM2, 4.32);
-  assert.ok(Math.abs(orderLine.unitPrice - 104.166667) < 1e-6, 'the base-unit price keeps enough precision');
+  assert.equal(orderLine.unitPrice, 104.17, 'the base-unit price is stored in piastres');
   assert.equal(orderLine.totalPrice, 450);
   assert.equal(order.totalAmount, 450);
   assert.equal(stockOf(productId), 100, 'a quotation/order only reserves stock, it does not consume it');

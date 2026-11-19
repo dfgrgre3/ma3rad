@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   PackageCheck, Plus, Search, CheckCircle2,
   AlertTriangle, ShieldAlert, ChevronDown, X,
@@ -272,7 +273,7 @@ export const GoodsReceiptsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -377,38 +378,26 @@ export const GoodsReceiptsPage: React.FC = () => {
                     <Sparkles className="w-4 h-4 text-amber-600" /> تقرير الفحص المخزني وتفاصيل الدفعات والتشغيلات:
                   </h4>
                   <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
-                    <table className="w-full text-xs text-right">
-                      <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                        <tr>
-                          <th className="p-3">الصنف</th>
-                          <th className="p-3">رقم التشغيلة (Lot)</th>
-                          <th className="p-3">الشيد (Tone)</th>
-                          <th className="p-3">الكاليبر</th>
-                          <th className="p-3">الفرز</th>
-                          <th className="p-3">المستلم</th>
-                          <th className="p-3">السليم (المقبول)</th>
-                          <th className="p-3">التالف</th>
-                          <th className="p-3">العجز</th>
-                          <th className="p-3">ملاحظات الفحص</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {expandedDetails.items.map((it) => (
-                          <tr key={it.id}>
-                            <td className="p-3 font-bold text-slate-900">{it.productName}</td>
-                            <td className="p-3 font-mono font-bold text-slate-700">{it.batchNumber || '—'}</td>
-                            <td className="p-3 font-bold text-indigo-700">{it.toneShade || 'STD'}</td>
-                            <td className="p-3 font-bold text-slate-700">{it.caliber || '0'}</td>
-                            <td className="p-3">{it.grade}</td>
-                            <td className="p-3 font-semibold">{formatProductQuantity(Number(it.receivedQuantityM2), it)}</td>
-                            <td className="p-3 font-black text-emerald-700">{formatProductQuantity(Number(it.acceptedQuantityM2), it)}</td>
-                            <td className="p-3 font-bold text-rose-600">{it.damagedQuantityM2 > 0 ? formatProductQuantity(Number(it.damagedQuantityM2), it) : '—'}</td>
-                            <td className="p-3 font-bold text-amber-600">{it.shortageQuantityM2 > 0 ? formatProductQuantity(Number(it.shortageQuantityM2), it) : '—'}</td>
-                            <td className="p-3 text-slate-500">{it.inspectionNotes || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      ariaLabel="أصناف إذن الاستلام"
+                      rows={expandedDetails.items}
+                      rowKey={(it: any) => String(it.id)}
+                      dense
+                      tableClassName="text-xs"
+                      rowClassName={() => 'transition hover:bg-slate-50'}
+                      columns={[
+                        { key: 'product', header: 'الصنف', render: (it: any) => <span className="font-bold text-slate-900">{it.productName}</span> },
+                        { key: 'lot', header: 'رقم التشغيلة (Lot)', render: (it: any) => <span className="font-mono font-bold text-slate-700">{it.batchNumber || '—'}</span> },
+                        { key: 'tone', header: 'الشيد (Tone)', render: (it: any) => <span className="font-bold text-indigo-700">{it.toneShade || 'STD'}</span> },
+                        { key: 'cal', header: 'الكاليبر', render: (it: any) => <span className="font-bold text-slate-700">{it.caliber || '0'}</span> },
+                        { key: 'grade', header: 'الفرز', render: (it: any) => <span>{it.grade}</span> },
+                        { key: 'recv', header: 'المستلم', render: (it: any) => <span className="font-semibold">{formatProductQuantity(Number(it.receivedQuantityM2), it)}</span> },
+                        { key: 'ok', header: 'السليم (المقبول)', render: (it: any) => <span className="font-black text-emerald-700">{formatProductQuantity(Number(it.acceptedQuantityM2), it)}</span> },
+                        { key: 'dmg', header: 'التالف', render: (it: any) => <span className="font-bold text-rose-600">{it.damagedQuantityM2 > 0 ? formatProductQuantity(Number(it.damagedQuantityM2), it) : '—'}</span> },
+                        { key: 'short', header: 'العجز', render: (it: any) => <span className="font-bold text-amber-600">{it.shortageQuantityM2 > 0 ? formatProductQuantity(Number(it.shortageQuantityM2), it) : '—'}</span> },
+                        { key: 'notes', header: 'ملاحظات الفحص', render: (it: any) => <span className="text-slate-500">{it.inspectionNotes || '—'}</span> },
+                      ]}
+                    />
                   </div>
 
                   {/* Claim Button if defects */}

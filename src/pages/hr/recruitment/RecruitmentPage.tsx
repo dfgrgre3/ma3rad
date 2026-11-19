@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   BriefcaseBusiness, CalendarPlus, Clock3, FilePlus2, Loader2, Plus, RefreshCw,
   Search, UserRound, UserRoundCheck, Users, X,
@@ -455,7 +456,7 @@ export const RecruitmentPage: React.FC = () => {
   const openJobs = jobs.filter((job) => job.status === 'OPEN');
 
   return (
-    <div className="space-y-5 p-4 md:p-6" dir="rtl">
+    <div className="space-y-5 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
@@ -649,7 +650,7 @@ export const RecruitmentPage: React.FC = () => {
 
       {workflowCandidate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <section className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl" dir="rtl">
+          <section className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-900">استكمال إجراءات {workflowCandidate.fullName}</h2>
@@ -758,7 +759,7 @@ export const RecruitmentPage: React.FC = () => {
 
       {candidateToHire && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <form onSubmit={submitHire} className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl" dir="rtl">
+          <form onSubmit={submitHire} className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-900">إتمام تعيين {candidateToHire.fullName}</h2>
@@ -873,106 +874,107 @@ export const RecruitmentPage: React.FC = () => {
         )
       ) : visibleCandidates.length ? (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="min-w-full text-right text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">المرشح</th>
-                <th className="px-4 py-3 font-semibold">الوظيفة</th>
-                <th className="px-4 py-3 font-semibold">التواصل</th>
-                <th className="px-4 py-3 font-semibold">المصدر</th>
-                <th className="px-4 py-3 font-semibold">تاريخ التقديم</th>
-                <th className="px-4 py-3 font-semibold">المرحلة</th>
-                <th className="px-4 py-3 font-semibold">الإجراء</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {visibleCandidates.map((candidate) => (
-                <tr key={candidate.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
-                      <div>
-                        <p className="font-semibold text-slate-800">{candidate.fullName}</p>
-                        {candidate.notes && <p className="mt-0.5 max-w-48 truncate text-xs text-slate-400">{candidate.notes}</p>}
-                        {candidate.resumeStorageName && (
-                          <button type="button" onClick={() => openResume(candidate)} className="mt-1 text-xs font-medium text-sky-700 hover:text-sky-900">
-                            السيرة الذاتية: {candidate.resumeFileName || 'فتح الملف'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{candidate.jobTitle}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{candidate.phone || candidate.email}</td>
-                  <td className="px-4 py-3 text-slate-500">{candidate.source || '—'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-500">{formatDate(candidate.appliedAt)}</td>
-                  <td className="px-4 py-3">
-                    {candidate.status === 'HIRED' ? (
-                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${candidateStatusStyles[candidate.status]}`}>{candidateStatusLabels[candidate.status]}</span>
-                    ) : canManage && candidate.status !== 'OFFER' ? (
-                      <select
-                        aria-label={`مرحلة المرشح ${candidate.fullName}`}
-                        className={`rounded-full border px-2.5 py-1.5 text-xs font-semibold ${candidateStatusStyles[candidate.status]}`}
-                        value={candidate.status}
-                        onChange={(event) => changeCandidateStatus(candidate, event.target.value as RecruitmentCandidateStatus)}
+          <DataTable
+            ariaLabel="المرشحون"
+            rows={visibleCandidates}
+            rowKey={(candidate: any) => String(candidate.id)}
+            tableClassName="text-sm"
+            rowClassName={() => 'transition hover:bg-slate-50'}
+            columns={[
+              {
+                key: 'candidate', header: 'المرشح',
+                render: (candidate: any) => (
+                  <span className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span>
+                      <span className="block font-semibold text-slate-800">{candidate.fullName}</span>
+                      {candidate.notes && <span className="mt-0.5 block max-w-48 truncate text-xs text-slate-400">{candidate.notes}</span>}
+                      {candidate.resumeStorageName && (
+                        <button type="button" onClick={() => openResume(candidate)} className="mt-1 text-xs font-medium text-sky-700 hover:text-sky-900">
+                          السيرة الذاتية: {candidate.resumeFileName || 'فتح الملف'}
+                        </button>
+                      )}
+                    </span>
+                  </span>
+                ),
+              },
+              { key: 'job', header: 'الوظيفة', render: (candidate: any) => <span className="text-slate-600">{candidate.jobTitle}</span> },
+              { key: 'contact', header: 'التواصل', render: (candidate: any) => <span className="text-xs text-slate-500">{candidate.phone || candidate.email}</span> },
+              { key: 'source', header: 'المصدر', render: (candidate: any) => <span className="text-slate-500">{candidate.source || '—'}</span> },
+              { key: 'date', header: 'تاريخ التقديم', render: (candidate: any) => <span className="whitespace-nowrap text-slate-500">{formatDate(candidate.appliedAt)}</span> },
+              {
+                key: 'stage', header: 'المرحلة',
+                render: (candidate: any) => {
+                  const cls = candidateStatusStyles[candidate.status as keyof typeof candidateStatusStyles];
+                  const lbl = candidateStatusLabels[candidate.status as keyof typeof candidateStatusLabels];
+                  return candidate.status === 'HIRED' ? (
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${cls}`}>{lbl}</span>
+                  ) : canManage && candidate.status !== 'OFFER' ? (
+                    <select
+                      aria-label={`مرحلة المرشح ${candidate.fullName}`}
+                      className={`rounded-full border px-2.5 py-1.5 text-xs font-semibold ${cls}`}
+                      value={candidate.status}
+                      onChange={(event) => changeCandidateStatus(candidate, event.target.value as RecruitmentCandidateStatus)}
+                    >
+                      <option value={candidate.status}>{candidateStatusLabels[candidate.status as keyof typeof candidateStatusLabels]}</option>
+                      {(candidateNextStatuses[candidate.status as keyof typeof candidateNextStatuses] ?? []).map((value: any) => <option key={value} value={value}>{candidateStatusLabels[value as keyof typeof candidateStatusLabels]}</option>)}
+                    </select>
+                  ) : (
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${cls}`}>{lbl}</span>
+                  );
+                },
+              },
+              {
+                key: 'action', header: 'الإجراء',
+                render: (candidate: any) => (
+                  <span className="flex flex-col items-start gap-1.5 whitespace-nowrap">
+                    {candidate.employeeId ? (
+                      <Link
+                        to={`/employees?search=${encodeURIComponent(candidate.fullName)}`}
+                        className="text-xs font-semibold text-sky-700 hover:text-sky-900"
                       >
-                        <option value={candidate.status}>{candidateStatusLabels[candidate.status]}</option>
-                        {candidateNextStatuses[candidate.status].map((value) => <option key={value} value={value}>{candidateStatusLabels[value]}</option>)}
-                      </select>
-                    ) : (
-                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${candidateStatusStyles[candidate.status]}`}>{candidateStatusLabels[candidate.status]}</span>
+                        عرض سجل الموظف
+                      </Link>
+                    ) : canManage && ['SCREENING', 'INTERVIEW'].includes(candidate.status) ? (
+                      <button
+                        type="button"
+                        onClick={() => beginWorkflow(candidate, 'interview')}
+                        className="flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-800"
+                      >
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                        {candidate.status === 'SCREENING' ? 'تحديد مقابلة' : 'المقابلات والتقييم'}
+                      </button>
+                    ) : null}
+                    {candidate.employeeContractId && (
+                      <Link
+                        to={`/employees/contracts?employeeId=${encodeURIComponent(candidate.employeeId || '')}`}
+                        className="text-xs font-semibold text-violet-700 hover:text-violet-900"
+                      >
+                        عرض العقد
+                      </Link>
                     )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex flex-col items-start gap-1.5">
-                      {candidate.employeeId ? (
-                        <Link
-                          to={`/employees?search=${encodeURIComponent(candidate.fullName)}`}
-                          className="text-xs font-semibold text-sky-700 hover:text-sky-900"
-                        >
-                          عرض سجل الموظف
-                        </Link>
-                      ) : canManage && ['SCREENING', 'INTERVIEW'].includes(candidate.status) ? (
-                        <button
-                          type="button"
-                          onClick={() => beginWorkflow(candidate, 'interview')}
-                          className="flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-800"
-                        >
-                          <CalendarPlus className="h-3.5 w-3.5" />
-                          {candidate.status === 'SCREENING' ? 'تحديد مقابلة' : 'المقابلات والتقييم'}
-                        </button>
-                      ) : null}
-                      {candidate.employeeContractId && (
-                          <Link
-                            to={`/employees/contracts?employeeId=${encodeURIComponent(candidate.employeeId || '')}`}
-                            className="text-xs font-semibold text-violet-700 hover:text-violet-900"
-                          >
-                            عرض العقد
-                          </Link>
-                      )}
-                      {canManage && ['INTERVIEW', 'OFFER'].includes(candidate.status) && (
-                        <button
-                          type="button"
-                          onClick={() => beginWorkflow(candidate, 'offer')}
-                          className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700"
-                        >
-                          العرض الوظيفي
-                        </button>
-                      )}
-                      {!candidate.employeeId && candidate.status === 'OFFER' && canHire && (
-                        <button type="button" onClick={() => beginHiring(candidate)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
-                          إتمام التعيين
-                        </button>
-                      )}
-                      {!candidate.employeeId && candidate.status === 'OFFER' && !canHire && (
-                        <span className="text-xs text-slate-400">يلزم صلاحية إدارة الموظفين</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    {canManage && ['INTERVIEW', 'OFFER'].includes(candidate.status) && (
+                      <button
+                        type="button"
+                        onClick={() => beginWorkflow(candidate, 'offer')}
+                        className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700"
+                      >
+                        العرض الوظيفي
+                      </button>
+                    )}
+                    {!candidate.employeeId && candidate.status === 'OFFER' && canHire && (
+                      <button type="button" onClick={() => beginHiring(candidate)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                        إتمام التعيين
+                      </button>
+                    )}
+                    {!candidate.employeeId && candidate.status === 'OFFER' && !canHire && (
+                      <span className="text-xs text-slate-400">يلزم صلاحية إدارة الموظفين</span>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">لا يوجد مرشحون لهذه الوظائف أو المرحلة.</div>

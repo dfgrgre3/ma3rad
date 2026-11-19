@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Search, UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, RefreshCw,
   ChevronDown, ChevronLeft, UserCog, Power, Building2,
@@ -353,105 +354,99 @@ export const AdminUsersTab: React.FC = () => {
           </section>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="p-3.5">المستخدم</th>
-                <th className="p-3.5">الاسم الكامل</th>
-                <th className="p-3.5">الدور</th>
-                <th className="p-3.5">نطاق الفروع</th>
-                <th className="p-3.5">الهاتف</th>
-                {currentUserIsAdmin && <th className="p-3.5">رمز الدخول</th>}
-                <th className="p-3.5">الحالة</th>
-                <th className="p-3.5">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                  <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-slate-100">{user.username}</td>
-                  <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200">{user.fullName}</td>
-                  <td className="p-3.5">
-                    <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-600 dark:text-sky-400">
-                      {roles.find((r) => r.code === user.role)?.name || user.role}
-                    </span>
-                  </td>
-                  <td className="p-3.5">
-                    <div className="flex flex-col items-start">
-                      {user.role === 'ADMIN'
-                        ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
-                        : can('branches.manage_users') && can('branches.view')
-                        ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
-                            <Building2 className="h-3.5 w-3.5" /> نطاق الفروع
-                          </button>
-                        : '—'}
-                      {user.role !== 'ADMIN' && can('branches.manage_users') && (
-                        <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800">
-                          نطاق الأقسام
+          <DataTable
+            ariaLabel="مستخدمو النظام"
+            rows={filtered}
+            rowKey={(user: any) => String(user.id)}
+            dense
+            tableClassName="text-xs"
+            columns={[
+              { key: 'username', header: 'المستخدم', render: (user: any) => <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{user.username}</span> },
+              { key: 'fullname', header: 'الاسم الكامل', render: (user: any) => <span className="font-bold text-slate-800 dark:text-slate-200">{user.fullName}</span> },
+              {
+                key: 'role', header: 'الدور',
+                render: (user: any) => (
+                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-600 dark:text-sky-400">
+                    {roles.find((r) => r.code === user.role)?.name || user.role}
+                  </span>
+                ),
+              },
+              {
+                key: 'scope', header: 'نطاق الفروع',
+                render: (user: any) => (
+                  <span className="flex flex-col items-start">
+                    {user.role === 'ADMIN'
+                      ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
+                      : can('branches.manage_users') && can('branches.view')
+                      ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
+                          <Building2 className="h-3.5 w-3.5" /> نطاق الفروع
                         </button>
-                      )}
-                      {user.role !== 'ADMIN' && can('branches.manage_users') && (
-                        <button onClick={() => openWarehouseScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-slate-800">
-                          نطاق المخازن
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</td>
-                  {currentUserIsAdmin && (
-                    <td className="p-3.5 font-mono font-bold tracking-widest text-slate-700 dark:text-slate-200">
-                      {loginPins === null ? 'جارٍ التحميل...' : loginPins[user.id] || 'غير متاح'}
-                    </td>
-                  )}
-                  <td className="p-3.5">
-                    {user.isActive ? (
-                      <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> نشط
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 font-bold text-slate-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> معطّل
-                      </span>
+                      : '—'}
+                    {user.role !== 'ADMIN' && can('branches.manage_users') && (
+                      <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800">
+                        نطاق الأقسام
+                      </button>
                     )}
-                  </td>
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-1">
-                      {can('users.update') && (
-                        <button onClick={() => openEdit(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-sky-600 dark:hover:bg-slate-700" title="تعديل">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {can('users.permissions') && (
-                        <button onClick={() => { setActive(user); setModal('permissions'); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700" title="صلاحيات مخصصة">
-                          <UserCog className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {can('users.reset_password') && (
-                        <button onClick={() => openPassword(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-amber-600 dark:hover:bg-slate-700" title="تغيير كلمة المرور">
-                          <KeyRound className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {can('users.update') && (
-                        <button onClick={() => toggleActive(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700" title={user.isActive ? 'تعطيل' : 'تنشيط'}>
-                          <Power className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {can('users.delete') && (
-                        <button onClick={() => removeUser(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10" title="حذف">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={currentUserIsAdmin ? 8 : 7} className="p-8 text-center text-slate-400">لا توجد نتائج مطابقة.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    {user.role !== 'ADMIN' && can('branches.manage_users') && (
+                      <button onClick={() => openWarehouseScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-slate-800">
+                        نطاق المخازن
+                      </button>
+                    )}
+                  </span>
+                ),
+              },
+              { key: 'phone', header: 'الهاتف', render: (user: any) => <span className="font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</span> },
+              ...(currentUserIsAdmin ? [{
+                key: 'pin', header: 'رمز الدخول',
+                render: (user: any) => <span className="font-mono font-bold tracking-widest text-slate-700 dark:text-slate-200">{loginPins === null ? 'جارٍ التحميل...' : loginPins[user.id] || 'غير متاح'}</span>,
+              }] : []),
+              {
+                key: 'status', header: 'الحالة',
+                render: (user: any) => user.isActive ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> نشط
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 font-bold text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> معطّل
+                  </span>
+                ),
+              },
+              {
+                key: 'actions', header: 'إجراءات',
+                render: (user: any) => (
+                  <div className="flex items-center gap-1">
+                    {can('users.update') && (
+                      <button onClick={() => openEdit(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-sky-600 dark:hover:bg-slate-700" title="تعديل">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {can('users.permissions') && (
+                      <button onClick={() => { setActive(user); setModal('permissions'); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700" title="صلاحيات مخصصة">
+                        <UserCog className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {can('users.reset_password') && (
+                      <button onClick={() => openPassword(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-amber-600 dark:hover:bg-slate-700" title="تغيير كلمة المرور">
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {can('users.update') && (
+                      <button onClick={() => toggleActive(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700" title={user.isActive ? 'تعطيل' : 'تنشيط'}>
+                        <Power className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {can('users.delete') && (
+                      <button onClick={() => removeUser(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10" title="حذف">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+            emptyTitle="لا توجد نتائج مطابقة."
+          />
         </div>
       </div>
 

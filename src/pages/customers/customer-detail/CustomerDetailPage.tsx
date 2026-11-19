@@ -19,6 +19,7 @@ import { Customer, Product } from '../../../types';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
+import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
 
 type Tab = 'overview' | 'sales' | 'quotations' | 'orders' | 'needs' | 'payments' | 'returns' | 'debts' | 'projects' | 'activities' | 'timeline' | 'prices';
 
@@ -73,22 +74,27 @@ const TAB_PERMISSIONS: Partial<Record<Tab, string>> = {
 const PAY_STATUS: Record<string, string> = { PAID: 'bg-emerald-50 text-emerald-600', PARTIAL: 'bg-amber-50 text-amber-600', UNPAID: 'bg-rose-50 text-rose-600' };
 const PAY_LABEL: Record<string, string> = { PAID: 'مدفوع', PARTIAL: 'جزئي', UNPAID: 'آجل' };
 
-const DataTable: React.FC<{ headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ headers, rows, empty }) => (
-  <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-    <table className="w-full text-sm text-right min-w-[520px]">
-      <thead className="bg-slate-50 border-b border-slate-200">
-        <tr>{[...headers, ...(rows[0]?.length > headers.length ? ['إجراء'] : [])].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
-        {rows.length === 0 ? (
-          <tr><td colSpan={headers.length} className="py-12 text-center text-slate-400">{empty}</td></tr>
-        ) : rows.map((cells, i) => (
-          <tr key={i} className="hover:bg-slate-50/70">{cells.map((c, j) => <td key={j} className="px-4 py-3">{c}</td>)}</tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+const DataTable: React.FC<{ headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ headers, rows, empty }) => {
+  const hasActions = (rows[0]?.length ?? 0) > headers.length;
+  const allHeaders = hasActions ? [...headers, 'إجراء'] : headers;
+  const body = rows.map((cells, i) => ({ __cells: cells, __i: i }));
+  return (
+    <UiDataTable
+      ariaLabel={headers.join(' ')}
+      rows={body}
+      rowKey={(r) => String(r.__i)}
+      minWidth={520}
+      columns={[
+        ...allHeaders.map((h, j) => ({
+          key: `c${j}`,
+          header: h,
+          render: (r: { __cells: React.ReactNode[] }) => r.__cells[j] ?? null,
+        })),
+      ]}
+      emptyTitle={empty}
+    />
+  );
+};
 
 export const CustomerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -339,7 +345,7 @@ export const CustomerDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -632,38 +638,26 @@ export const CustomerDetailPage: React.FC = () => {
               </div>
             </div>}
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-              <table className="w-full text-sm text-right min-w-[520px]">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    {[productSingularLabel, 'السعر / م²', 'ساري من', 'ساري حتى', ...(can('pricing.update') ? [''] : [])].map((h) => (
-                      <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {overrides.length === 0 ? (
-                    <tr><td colSpan={can('pricing.update') ? 5 : 4} className="py-12 text-center text-slate-400">لا توجد أسعار خاصة لهذا السجل</td></tr>
-                  ) : overrides.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-semibold text-slate-900">{row.productName}</td>
-                      <td className="px-4 py-3 font-black text-sky-600">{fmt(row.priceM2)}</td>
-                      <td className="px-4 py-3 text-slate-500">{row.validFrom ? date(row.validFrom) : '—'}</td>
-                      <td className="px-4 py-3 text-slate-500">{row.validTo ? date(row.validTo) : '—'}</td>
-                      {can('pricing.update') && <td className="px-4 py-3">
-                        <button
-                          onClick={() => removeOverride(row.productId)}
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
-                          title="حذف السعر الخاص"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              headers={[productSingularLabel, 'السعر / م²', 'ساري من', 'ساري حتى', ...(can('pricing.update') ? [''] : [])]}
+              rows={overrides.map((row) => [
+                <span key="n" className="font-semibold text-slate-900">{row.productName}</span>,
+                <span key="p" className="font-black text-sky-600">{fmt(row.priceM2)}</span>,
+                <span key="f" className="text-slate-500">{row.validFrom ? date(row.validFrom) : '—'}</span>,
+                <span key="t" className="text-slate-500">{row.validTo ? date(row.validTo) : '—'}</span>,
+                ...(can('pricing.update') ? [(
+                  <button
+                    key="d"
+                    onClick={() => removeOverride(row.productId)}
+                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                    title="حذف السعر الخاص"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )] : []),
+              ])}
+              empty="لا توجد أسعار خاصة لهذا السجل"
+            />
           </div>
         )}
       </div>

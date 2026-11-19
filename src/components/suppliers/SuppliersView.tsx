@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../ui/DataTable';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { 
   Plus, Search, DollarSign, FileText, Download, Printer,
@@ -10,6 +11,12 @@ import { Supplier, PaymentType } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
+import { PageHeader } from '../ui/PageHeader';
+import { Button } from '../ui/Button';
+import { Card, StatCard } from '../ui/Card';
+import { FilterToolbar } from '../ui/FilterToolbar';
+import { Modal } from '../ui/Modal';
+import { useToast } from '../ui/Toast';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { Link } from 'react-router-dom';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
@@ -85,6 +92,7 @@ export const SuppliersView: React.FC = () => {
   const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.view');
   const canApproveFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.approve');
   const canImport = PermissionService.can(currentUser, 'ui.settings.hub.view');
+  const toast = useToast();
 
   const loadSuppliers = useCallback(async () => {
     try {
@@ -157,8 +165,9 @@ export const SuppliersView: React.FC = () => {
       setEditingSupplier(null);
       setOperationalFieldValues({});
       loadSuppliers();
+      toast.success(editingSupplier ? 'تم حفظ تعديلات المورد' : 'تم حفظ المورد بنجاح');
     } catch (err: any) {
-      alert(`خطأ: ${err.message || err}`);
+      toast.error('تعذر حفظ المورد', err?.message || String(err));
     }
   };
 
@@ -183,9 +192,9 @@ export const SuppliersView: React.FC = () => {
       const updatedSupplier = supplierService.getSupplierById(selectedSupplier.id)!;
       if (canViewFinancials) handleOpenStatement(updatedSupplier);
       else setSelectedSupplier(updatedSupplier);
-      alert('تم تسجيل سند الصرف وسداد دفعة المورد بنجاح.');
+      toast.success('تم تسجيل سند الصرف وسداد دفعة المورد بنجاح.');
     } catch (err: any) {
-      alert(`خطأ: ${err.message || err}`);
+      toast.error('تعذر تسجيل الدفعة', err?.message || String(err));
     }
   };
 
@@ -216,8 +225,9 @@ export const SuppliersView: React.FC = () => {
         if (canViewFinancials) setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
       }
       loadSuppliers();
+      toast.success(updated.isActive === 0 ? 'تم تعطيل المورد' : 'تمت إعادة تفعيل المورد');
     } catch (err: any) {
-      alert(`تعذر تحديث حالة المورد: ${err.message || err}`);
+      toast.error('تعذر تحديث حالة المورد', err?.message || String(err));
     }
   };
 
@@ -257,203 +267,193 @@ export const SuppliersView: React.FC = () => {
   };
 
   return (
-    <div className="erp-page" dir="rtl">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900">
-            إدارة {suppliersLabel}
-            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
-          </h2>
-          <p className="text-xs text-slate-500">متابعة حسابات المصانع، سداد الدفعات، وكشوف الحساب التفصيلية</p>
-        </div>
+    <div className="erp-page">
+      <PageHeader
+        title={`إدارة ${suppliersLabel}`}
+        description={`متابعة حسابات المصانع، سداد الدفعات، وكشوف الحساب التفصيلية · ${businessProfileLabel}`}
+        icon={<Building2 className="h-5 w-5" />}
+        actions={
+          <>
+            {canExport && <Button variant="secondary" size="sm" leadingIcon={<Download className="h-4 w-4" />} onClick={exportSuppliers}>تصدير CSV</Button>}
+            {canImport && <Link to="/data-import" className="erp-btn erp-btn--secondary erp-btn--sm"><Upload className="h-4 w-4" /><span>استيراد الموردين</span></Link>}
+            {canCreate && <Button
+              variant="primary"
+              leadingIcon={<Plus className="h-4 w-4" />}
+              onClick={() => {
+                setEditingSupplier(null);
+                setOperationalFieldValues({});
+                setFormData({
+                  name: '',
+                  companyName: '',
+                  phone: '',
+                  email: '',
+                  taxNumber: '',
+                  commercialRecord: '',
+                  address: '',
+                  initialBalance: 0,
+                  paymentTermsDays: 30,
+                  notes: ''
+                });
+                setIsAddModalOpen(true);
+              }}
+            >
+              إضافة {supplierSingularLabel} جديد
+            </Button>}
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {canExport && <button onClick={exportSuppliers} className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
-            <Download className="w-4 h-4" /><span>تصدير CSV</span>
-          </button>}
-          {canImport && <Link to="/data-import" className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
-            <Upload className="w-4 h-4" /><span>استيراد الموردين</span>
-          </Link>}
-          {canCreate && <button
-          onClick={() => {
-            setEditingSupplier(null);
-            setOperationalFieldValues({});
-            setFormData({
-              name: '',
-              companyName: '',
-              phone: '',
-              email: '',
-              taxNumber: '',
-              commercialRecord: '',
-              address: '',
-              initialBalance: 0,
-              paymentTermsDays: 30,
-              notes: ''
-            });
-            setIsAddModalOpen(true);
-          }}
-          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>إضافة {supplierSingularLabel} جديد</span>
-          </button>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="erp-stat-grid">
         {[
-          { label: 'الموردون المعروضون', value: suppliers.length, color: 'text-sky-700' },
-          { label: 'إجمالي المشتريات', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Number(supplier.totalPurchases || 0), 0)), color: 'text-indigo-700' },
-          { label: 'مستحقات الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(Number(supplier.currentBalance || 0), 0), 0)), color: 'text-rose-700' },
-          { label: 'رصيد لنا لدى الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(-Number(supplier.currentBalance || 0), 0), 0)), color: 'text-emerald-700' }
+          { label: 'الموردون المعروضون', value: suppliers.length, icon: Building2, tone: 'default' as const },
+          { label: 'إجمالي المشتريات', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Number(supplier.totalPurchases || 0), 0)), icon: DollarSign, tone: 'default' as const },
+          { label: 'مستحقات الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(Number(supplier.currentBalance || 0), 0), 0)), icon: DollarSign, tone: 'danger' as const },
+          { label: 'رصيد لنا لدى الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(-Number(supplier.currentBalance || 0), 0), 0)), icon: DollarSign, tone: 'success' as const }
         ].filter((card) => card.label === 'الموردون المعروضون' || (card.label === 'إجمالي المشتريات' ? canViewPurchases : canViewFinancials)).map((card) => (
-          <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-bold text-slate-500">{card.label}</div>
-            <div className={`mt-1 text-lg font-black ${card.color}`}>{card.value}</div>
-          </div>
+          <StatCard key={card.label} label={card.label} value={card.value} icon={<card.icon className="h-4 w-4" />} tone={card.tone} />
         ))}
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+      <FilterToolbar ariaLabel="بحث الموردين" className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--cerami-muted)]" />
           <input
             type="text"
+            aria-label="بحث بالاسم، المصنع، الهاتف"
             placeholder="بحث بالاسم، المصنع، الهاتف..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-9 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none"
+            className="ui-input w-full pe-9"
           />
         </div>
-        <label className="flex items-center gap-2 text-xs font-bold text-slate-600 whitespace-nowrap">
+        <label className="flex items-center gap-2 text-xs font-bold whitespace-nowrap">
           <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
           إظهار الموردين غير النشطين
         </label>
-      </div>
-      <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
+        <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
+      </FilterToolbar>
 
-      {/* Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Suppliers List */}
-        <div className={`${canViewFinancials ? 'lg:col-span-2' : 'lg:col-span-3'} bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5">كود المورد</th>
-                  <th className="p-3.5">اسم المورد / الشركة</th>
-                  <th className="p-3.5">الهاتف</th>
-                  {canViewPurchases && <th className="p-3.5">إجمالي المشتريات</th>}
-                  {canViewFinancials && <th className="p-3.5">الرصيد المستحق للمورد</th>}
-                  <th className="p-3.5 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 ">
-                {suppliers.filter((supplier) => matchesOperationalFieldFilters(supplier.id, supplierFieldValuesById, fieldFilters)).map((s) => {
-                  const isSelected = selectedSupplier?.id === s.id;
-                  return (
-                    <tr
-                      key={s.id}
-                      className={`hover:bg-slate-100 transition ${canViewFinancials ? 'cursor-pointer' : ''} ${
- isSelected ? 'bg-sky-50/60 ' : ''
- }`}
-                      onClick={canViewFinancials ? () => handleOpenStatement(s) : undefined}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className={`${canViewFinancials ? 'lg:col-span-2' : 'lg:col-span-3'} ui-table-scroll`}>
+          <DataTable
+            ariaLabel="الموردون"
+            rows={suppliers.filter((supplier) => matchesOperationalFieldFilters(supplier.id, supplierFieldValuesById, fieldFilters))}
+            rowKey={(s: any) => String(s.id)}
+            onRowClick={canViewFinancials ? (s: any) => handleOpenStatement(s) : undefined}
+            rowClassName={(s: any) => (selectedSupplier?.id === s.id ? 'bg-[var(--win-accent-soft)]' : '')}
+            columns={[
+              { key: 'code', header: 'كود المورد', render: (s: any) => <span className="font-mono font-bold text-[var(--cerami-muted)]">{s.code}</span> },
+              {
+                key: 'name', header: 'اسم المورد / الشركة',
+                render: (s: any) => (
+                  <span>
+                    <span className="flex items-center gap-2 font-bold">
+                      <span>{s.name}</span>
+                      {s.isActive === 0 && <span className="erp-badge">غير نشط</span>}
+                    </span>
+                    {s.companyName && <span className="block text-[10px] text-[var(--cerami-muted)] font-normal">{s.companyName}</span>}
+                    {Object.entries(supplierFieldValues[s.id] || {}).map(([label, value]) => (
+                      <span key={label} className="block text-[10px] font-normal text-[var(--cerami-text-secondary)]">{label}: {value}</span>
+                    ))}
+                  </span>
+                ),
+              },
+              { key: 'phone', header: 'الهاتف', render: (s: any) => <span className="font-mono">{s.phone}</span> },
+              ...(canViewPurchases ? [{
+                key: 'purchases', header: 'إجمالي المشتريات',
+                render: (s: any) => <span className="font-bold">{CeramicMath.formatCurrency(s.totalPurchases)}</span>,
+              }] : []),
+              ...(canViewFinancials ? [{
+                key: 'balance', header: 'الرصيد المستحق للمورد',
+                render: (s: any) => <span className="font-black text-sm text-[var(--cerami-danger)]">{CeramicMath.formatCurrency(s.currentBalance)}</span>,
+              }] : []),
+              {
+                key: 'actions', header: 'إجراءات', align: 'center' as const,
+                render: (s: any) => (
+                  <div className="flex justify-center gap-1">
+                    {canUpdate && <Button
+                      variant="secondary"
+                      size="sm"
+                      iconOnly
+                      title="تعديل بيانات المورد"
+                      aria-label="تعديل بيانات المورد"
+                      onClick={(e) => { e.stopPropagation(); openEditSupplier(s); }}
                     >
-                      <td className="p-3.5 font-mono font-bold text-slate-500">{s.code}</td>
-                      <td className="p-3.5 font-bold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <span>{s.name}</span>
-                          {s.isActive === 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] text-slate-500">غير نشط</span>}
-                        </div>
-                        {s.companyName && <div className="text-[10px] text-slate-500 font-normal">{s.companyName}</div>}
-                        {Object.entries(supplierFieldValues[s.id] || {}).map(([label, value]) => (
-                          <div key={label} className="text-[10px] font-normal text-teal-700">{label}: {value}</div>
-                        ))}
-                      </td>
-                      <td className="p-3.5 font-mono text-slate-600 ">{s.phone}</td>
-                      {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
-                        {CeramicMath.formatCurrency(s.totalPurchases)}
-                      </td>}
-                      {canViewFinancials && <td className="p-3.5 font-black text-sm text-red-600">
-                        {CeramicMath.formatCurrency(s.currentBalance)}
-                      </td>}
-                      <td className="p-3.5 text-center">
-                        <div className="flex justify-center gap-1">
-                        {canUpdate && <button
-                          title="تعديل بيانات المورد"
-                          onClick={(e) => { e.stopPropagation(); openEditSupplier(s); }}
-                          className="p-1.5 rounded-lg bg-amber-500/10 text-amber-700 hover:bg-amber-500 hover:text-white transition"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>}
-                        {canDelete && canUpdate && <button
-                          title={s.isActive === 0 ? 'إعادة تفعيل المورد' : 'تعطيل المورد'}
-                          onClick={(e) => { e.stopPropagation(); toggleSupplierStatus(s); }}
-                          className={`p-1.5 rounded-lg transition ${s.isActive === 0 ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500 hover:text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-600 hover:text-white'}`}
-                        >
-                          <Power className="w-4 h-4" />
-                        </button>}
-                        {canViewFinancials && <button
-                          title="عرض كشف الحساب السريع"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenStatement(s);
-                          }}
-                          className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 hover:bg-sky-600 hover:text-white transition"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>}
-                        <Link
-                          to={`/suppliers/${s.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="عرض ملف المورد الكامل"
-                          className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-700 hover:bg-indigo-600 hover:text-white transition"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {suppliers.length === 0 && <tr><td colSpan={4 + Number(canViewPurchases) + Number(canViewFinancials)} className="p-10 text-center text-sm font-bold text-slate-400">لا يوجد موردون مطابقون لبحثك.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+                      <Pencil className="h-4 w-4" />
+                    </Button>}
+                    {canDelete && canUpdate && <Button
+                      variant={s.isActive === 0 ? 'success' : 'secondary'}
+                      size="sm"
+                      iconOnly
+                      title={s.isActive === 0 ? 'إعادة تفعيل المورد' : 'تعطيل المورد'}
+                      aria-label={s.isActive === 0 ? 'إعادة تفعيل المورد' : 'تعطيل المورد'}
+                      onClick={(e) => { e.stopPropagation(); toggleSupplierStatus(s); }}
+                    >
+                      <Power className="h-4 w-4" />
+                    </Button>}
+                    {canViewFinancials && <Button
+                      variant="secondary"
+                      size="sm"
+                      iconOnly
+                      title="عرض كشف الحساب السريع"
+                      aria-label="عرض كشف الحساب"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenStatement(s);
+                      }}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>}
+                    <Link
+                      to={`/suppliers/${s.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      title="عرض ملف المورد الكامل"
+                      aria-label="عرض ملف المورد الكامل"
+                      className="erp-btn erp-btn--secondary erp-btn--sm erp-btn--icon"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
+                  </div>
+                ),
+              },
+            ]}
+            emptyTitle="لا يوجد موردون مطابقون لبحثك."
+          />
         </div>
 
-        {/* Statement Panel */}
-        {canViewFinancials && <div className="supplier-statement-print-area bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        {canViewFinancials && <Card className="supplier-statement-print-area flex flex-col justify-between">
           {selectedSupplier && statement ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--win-border)] pb-3">
                 <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">{selectedSupplier.name}</h3>
-                  <p className="text-[11px] text-slate-500 font-mono">{selectedSupplier.phone}</p>
+                  <h3 className="font-extrabold text-sm">{selectedSupplier.name}</h3>
+                  <p className="text-[11px] font-mono text-[var(--cerami-muted)]">{selectedSupplier.phone}</p>
                 </div>
                 <div className="flex items-center gap-1 no-print">
-                <Link
-                  to={`/suppliers/${selectedSupplier.id}`}
-                  className="px-2.5 py-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 font-bold rounded-xl text-xs flex items-center gap-1 border border-sky-200 transition"
-                  title="فتح ملف المورد الكامل"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>الملف الكامل</span>
-                </Link>
-                {canUpdate && <button
-                  title="تعديل بيانات المورد"
-                  onClick={() => openEditSupplier(selectedSupplier)}
-                  className="p-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100"
-                ><Pencil className="w-4 h-4" /></button>}
-                {canPay && <button
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  <span>سند صرف دفعة</span>
-                </button>}
+                  <Link
+                    to={`/suppliers/${selectedSupplier.id}`}
+                    className="erp-btn erp-btn--secondary erp-btn--sm"
+                    title="فتح ملف المورد الكامل"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>الملف الكامل</span>
+                  </Link>
+                  {canUpdate && <Button
+                    variant="secondary"
+                    size="sm"
+                    iconOnly
+                    title="تعديل بيانات المورد"
+                    aria-label="تعديل بيانات المورد"
+                    onClick={() => openEditSupplier(selectedSupplier)}
+                  ><Pencil className="h-4 w-4" /></Button>}
+                  {canPay && <Button
+                    variant="success"
+                    size="sm"
+                    leadingIcon={<DollarSign className="h-4 w-4" />}
+                    onClick={() => setIsPaymentModalOpen(true)}
+                  >
+                    سند صرف دفعة
+                  </Button>}
                 </div>
               </div>
               <OperationalFieldsForm
@@ -464,61 +464,59 @@ export const SuppliersView: React.FC = () => {
                 readOnly
               />
 
-              {/* Statement Summary Card */}
-              <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 text-xs">
+              <div className="rounded-[var(--ui-radius-sm)] bg-[var(--cerami-surface-muted)] p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">رصيد أول المدة:</span>
-                  <span className="font-bold text-slate-700">{CeramicMath.formatCurrency(statement.openingBalance)}</span>
+                  <span className="text-[var(--cerami-muted)]">رصيد أول المدة:</span>
+                  <span className="font-bold">{CeramicMath.formatCurrency(statement.openingBalance)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">الرصيد المستحق للمورد (دائن):</span>
-                  <span className="font-black text-red-600 text-sm">
+                  <span className="text-[var(--cerami-muted)]">الرصيد المستحق للمورد (دائن):</span>
+                  <span className="font-black text-sm text-[var(--cerami-danger)]">
                     {CeramicMath.formatCurrency(statement.closingBalance)}
                   </span>
                 </div>
               </div>
 
-              {/* Transactions Timeline */}
               <div className="space-y-2">
                 <div className="flex flex-wrap items-end justify-between gap-2">
-                  <div className="text-xs font-bold text-slate-500">سجل حركات كشف الحساب:</div>
+                  <div className="text-xs font-bold text-[var(--cerami-muted)]">سجل حركات كشف الحساب:</div>
                   <div className="flex gap-1 no-print">
-                    {canExport && <button onClick={exportStatement} title="تصدير كشف الحساب" className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100"><Download className="w-4 h-4" /></button>}
-                    {canExport && <button onClick={() => window.print()} title="طباعة كشف الحساب" className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"><Printer className="w-4 h-4" /></button>}
+                    {canExport && <Button variant="secondary" size="sm" iconOnly title="تصدير كشف الحساب" aria-label="تصدير كشف الحساب" onClick={exportStatement}><Download className="h-4 w-4" /></Button>}
+                    {canExport && <Button variant="secondary" size="sm" iconOnly title="طباعة كشف الحساب" aria-label="طباعة كشف الحساب" onClick={() => window.print()}><Printer className="h-4 w-4" /></Button>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 no-print">
-                  <label className="text-[10px] font-bold text-slate-500">
+                  <label className="text-[10px] font-bold text-[var(--cerami-muted)]">
                     من تاريخ
                     <span className="relative mt-1 block">
-                      <CalendarDays className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input type="date" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pr-7 pl-2 text-[10px]" />
+                      <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--cerami-muted)]" />
+                      <input type="date" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} className="ui-input w-full pe-7 text-[10px]" />
                     </span>
                   </label>
-                  <label className="text-[10px] font-bold text-slate-500">
+                  <label className="text-[10px] font-bold text-[var(--cerami-muted)]">
                     إلى تاريخ
                     <span className="relative mt-1 block">
-                      <CalendarDays className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input type="date" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pr-7 pl-2 text-[10px]" />
+                      <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--cerami-muted)]" />
+                      <input type="date" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} className="ui-input w-full pe-7 text-[10px]" />
                     </span>
                   </label>
                 </div>
-                {statementFrom && statementTo && statementFrom > statementTo && <div className="text-[10px] font-bold text-rose-600">تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.</div>}
-                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                {statementFrom && statementTo && statementFrom > statementTo && <div className="text-[10px] font-bold text-[var(--cerami-danger)]">تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.</div>}
+                <div className="max-h-80 overflow-y-auto space-y-2 pe-1">
                   {statement.transactions.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-500">لا توجد حركات مسجلة</div>
+                    <div className="text-center py-6 text-xs text-[var(--cerami-muted)]">لا توجد حركات مسجلة</div>
                   ) : (
                     statement.transactions.map((tx: any) => (
-                      <div key={tx.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-100 text-[11px] space-y-1">
+                      <div key={tx.id} className="p-2.5 rounded-[var(--ui-radius-sm)] border border-[var(--win-border)] bg-[var(--cerami-surface-muted)] text-[11px] space-y-1">
                         <div className="flex justify-between font-bold">
                           <span>{tx.description}</span>
-                          <span className="font-mono text-slate-500">{tx.date}</span>
+                          <span className="font-mono text-[var(--cerami-muted)]">{tx.date}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
-                          <span className={tx.credit > 0 ? 'text-red-500 font-bold' : 'text-emerald-500 font-bold'}>
+                          <span className={tx.credit > 0 ? 'text-[var(--cerami-danger)] font-bold' : 'text-[var(--cerami-success)] font-bold'}>
                             {tx.credit > 0 ? `+${CeramicMath.formatCurrency(tx.credit)} (فاتورة توريد)` : `-${CeramicMath.formatCurrency(tx.debit)} (سداد دفعة)`}
                           </span>
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] text-[var(--cerami-muted)]">
                             الرصيد بعدها: {CeramicMath.formatCurrency(tx.balanceAfter)}
                           </span>
                         </div>
@@ -529,192 +527,166 @@ export const SuppliersView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-12">
-              <Building2 className="w-12 h-12 mb-2 opacity-30" />
+            <div className="h-full flex flex-col items-center justify-center text-center text-[var(--cerami-muted)] py-12">
+              <Building2 className="h-12 w-12 mb-2 opacity-30" />
               <p className="text-xs font-bold">اختر مورداً لعرض كشف حسابه</p>
             </div>
           )}
-        </div>}
+        </Card>}
       </div>
 
-      {/* Add Supplier Modal */}
-      {isAddModalOpen && (editingSupplier ? canUpdate : canCreate) && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-extrabold text-slate-900">{editingSupplier ? `تعديل بيانات ${supplierSingularLabel}` : `إضافة ${supplierSingularLabel} جديد`}</h3>
+      <Modal
+        open={isAddModalOpen && (editingSupplier ? canUpdate : canCreate)}
+        onClose={() => { setIsAddModalOpen(false); setEditingSupplier(null); }}
+        title={editingSupplier ? `تعديل بيانات ${supplierSingularLabel}` : `إضافة ${supplierSingularLabel} جديد`}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setIsAddModalOpen(false); setEditingSupplier(null); }}>إلغاء</Button>
+            <Button variant="primary" type="submit" form="supplier-form">{editingSupplier ? 'حفظ التعديلات' : 'حفظ المورد'}</Button>
+          </>
+        }
+      >
+        <form id="supplier-form" onSubmit={handleSaveSupplier} className="space-y-3 text-xs">
+          <div>
+            <label htmlFor="supplier-name" className="font-bold block mb-1">اسم {supplierSingularLabel} / المسؤول *</label>
+            <input
+              id="supplier-name"
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="ui-input w-full font-bold"
+            />
+          </div>
 
-            <form onSubmit={handleSaveSupplier} className="space-y-3 text-xs">
-              <div>
-                <label htmlFor="supplier-name" className="font-bold text-slate-700 block mb-1">اسم {supplierSingularLabel} / المسؤول *</label>
-                <input
-                  id="supplier-name"
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="supplier-company" className="font-bold text-slate-700 block mb-1">اسم المصنع / الشركة</label>
-                  <input
-                    id="supplier-company"
-                    type="text"
-                    value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
-                  />
-                </div>
-                <div>
-                  <label htmlFor="supplier-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
-                  <input
-                    id="supplier-phone"
-                    type="tel"
-                    required
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="supplier-email" className="font-bold text-slate-700 block mb-1">البريد الإلكتروني</label>
-                  <input id="supplier-email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-                </div>
-                <div>
-                  <label htmlFor="supplier-tax-number" className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
-                  <input id="supplier-tax-number" value={formData.taxNumber} onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-                </div>
-                <div>
-                  <label htmlFor="supplier-commercial-record" className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
-                  <input id="supplier-commercial-record" value={formData.commercialRecord} onChange={(e) => setFormData({ ...formData, commercialRecord: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-                </div>
-                <div>
-                  <label htmlFor="supplier-payment-terms" className="font-bold text-slate-700 block mb-1">مدة السداد بالأيام</label>
-                  <input id="supplier-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="supplier-address" className="font-bold text-slate-700 block mb-1">العنوان</label>
-                  <input id="supplier-address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="supplier-notes" className="font-bold text-slate-700 block mb-1">ملاحظات</label>
-                  <textarea id="supplier-notes" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-                </div>
-              </div>
-
-              {!editingSupplier && canApproveFinancials && <div>
-                <label htmlFor="supplier-initial-balance" className="font-bold text-slate-700 block mb-1">الرصيد الافتتاحي (المستحق للمورد موجب، ورصيدنا لديه سالب)</label>
-                <input
-                  id="supplier-initial-balance"
-                  type="number"
-                  step="0.01"
-                  value={formData.initialBalance}
-                  onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                />
-              </div>
-              }
-              <OperationalFieldsForm
-                fields={operationalFields}
-                values={operationalFieldValues}
-                onChange={setOperationalFieldValues}
-                title="بيانات إضافية"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="supplier-company" className="font-bold block mb-1">اسم المصنع / الشركة</label>
+              <input
+                id="supplier-company"
+                type="text"
+                value={formData.companyName}
+                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                className="ui-input w-full"
               />
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
-                <button
-                  type="button"
-                  onClick={() => { setIsAddModalOpen(false); setEditingSupplier(null); }}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-lg shadow-sky-600/30"
-                >
-                  {editingSupplier ? 'حفظ التعديلات' : 'حفظ المورد'}
-                </button>
-              </div>
-            </form>
+            </div>
+            <div>
+              <label htmlFor="supplier-phone" className="font-bold block mb-1">رقم الهاتف *</label>
+              <input
+                id="supplier-phone"
+                type="tel"
+                required
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="ui-input w-full font-mono font-bold"
+              />
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Record Payment Modal */}
-      {isPaymentModalOpen && selectedSupplier && canPay && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">سند صرف / سداد دفعة للمورد</h3>
-            <p className="text-xs text-slate-500">
-              المورد: <strong className="text-slate-800">{selectedSupplier.name}</strong>
-            </p>
-
-            <form onSubmit={handleRecordPayment} className="space-y-3 text-xs">
-              <div>
-                <label htmlFor="supplier-payment-amount" className="font-bold text-slate-700 block mb-1">المبلغ المسدد (ج.م) *</label>
-                <input
-                  id="supplier-payment-amount"
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm text-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="supplier-payment-type" className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
-                <select
-                  id="supplier-payment-type"
-                  value={paymentData.paymentType}
-                  onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value as PaymentType })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
-                >
-                  <option value="CASH">نقدي كاش (من الخزينة)</option>
-                  <option value="BANK_TRANSFER">تحويل بنكي / شيك</option>
-                  <option value="CHEQUE">شيك</option>
-                  <option value="CARD">بطاقة</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="supplier-payment-notes" className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
-                <input
-                  id="supplier-payment-notes"
-                  type="text"
-                  value={paymentData.notes}
-                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
-                <button
-                  type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30"
-                >
-                  اعتماد سند الصرف
-                </button>
-              </div>
-            </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="supplier-email" className="font-bold block mb-1">البريد الإلكتروني</label>
+              <input id="supplier-email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="ui-input w-full" />
+            </div>
+            <div>
+              <label htmlFor="supplier-tax-number" className="font-bold block mb-1">الرقم الضريبي</label>
+              <input id="supplier-tax-number" value={formData.taxNumber} onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })} className="ui-input w-full" />
+            </div>
+            <div>
+              <label htmlFor="supplier-commercial-record" className="font-bold block mb-1">السجل التجاري</label>
+              <input id="supplier-commercial-record" value={formData.commercialRecord} onChange={(e) => setFormData({ ...formData, commercialRecord: e.target.value })} className="ui-input w-full" />
+            </div>
+            <div>
+              <label htmlFor="supplier-payment-terms" className="font-bold block mb-1">مدة السداد بالأيام</label>
+              <input id="supplier-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number(e.target.value) || 0 })} className="ui-input w-full font-bold" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="supplier-address" className="font-bold block mb-1">العنوان</label>
+              <input id="supplier-address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="ui-input w-full" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="supplier-notes" className="font-bold block mb-1">ملاحظات</label>
+              <textarea id="supplier-notes" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="ui-input w-full" />
+            </div>
           </div>
-        </div>
-      )}
+
+          {!editingSupplier && canApproveFinancials && <div>
+            <label htmlFor="supplier-initial-balance" className="font-bold block mb-1">الرصيد الافتتاحي (المستحق للمورد موجب، ورصيدنا لديه سالب)</label>
+            <input
+              id="supplier-initial-balance"
+              type="number"
+              step="0.01"
+              value={formData.initialBalance}
+              onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
+              className="ui-input w-full font-bold"
+            />
+          </div>
+          }
+          <OperationalFieldsForm
+            fields={operationalFields}
+            values={operationalFieldValues}
+            onChange={setOperationalFieldValues}
+            title="بيانات إضافية"
+          />
+        </form>
+      </Modal>
+
+      <Modal
+        open={isPaymentModalOpen && selectedSupplier !== null && canPay}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="سند صرف / سداد دفعة للمورد"
+        description={selectedSupplier ? `المورد: ${selectedSupplier.name}` : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>إلغاء</Button>
+            <Button variant="primary" type="submit" form="supplier-payment-form">اعتماد سند الصرف</Button>
+          </>
+        }
+      >
+        <form id="supplier-payment-form" onSubmit={handleRecordPayment} className="space-y-3 text-xs">
+          <div>
+            <label htmlFor="supplier-payment-amount" className="font-bold block mb-1">المبلغ المسدد (ج.م) *</label>
+            <input
+              id="supplier-payment-amount"
+              type="number"
+              required
+              min="0.01"
+              step="0.01"
+              value={paymentData.amount}
+              onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
+              className="ui-input w-full font-black text-sm text-[var(--cerami-success)]"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="supplier-payment-type" className="font-bold block mb-1">طريقة السداد</label>
+            <select
+              id="supplier-payment-type"
+              value={paymentData.paymentType}
+              onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value as PaymentType })}
+              className="ui-input w-full font-bold"
+            >
+              <option value="CASH">نقدي كاش (من الخزينة)</option>
+              <option value="BANK_TRANSFER">تحويل بنكي / شيك</option>
+              <option value="CHEQUE">شيك</option>
+              <option value="CARD">بطاقة</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="supplier-payment-notes" className="font-bold block mb-1">البيان / الملاحظات</label>
+            <input
+              id="supplier-payment-notes"
+              type="text"
+              value={paymentData.notes}
+              onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+              className="ui-input w-full"
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

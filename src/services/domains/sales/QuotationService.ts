@@ -516,7 +516,7 @@ export class QuotationService {
       items: (existing.items || []).map((i) => ({
         productId: i.productId,
         quantityM2: i.quantityM2,
-        unitPrice: i.unitPrice,
+        unitPrice: this.conversionUnitPrice(i),
         discountAmount: i.discountAmount,
       })),
       serviceItems: (existing.serviceItems || []).map((item) => ({
@@ -570,7 +570,7 @@ export class QuotationService {
       items: fresh.items!.map((item) => ({
         productId: item.productId,
         quantityM2: item.quantityM2,
-        unitPrice: item.unitPrice,
+        unitPrice: this.conversionUnitPrice(item),
         discountAmount: item.discountAmount,
       })),
     });
@@ -682,7 +682,7 @@ export class QuotationService {
           soldBy: this.baseUnitOf(item.productId),
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
-          unitPrice: item.unitPrice,
+          unitPrice: this.conversionUnitPrice(item),
           discountAmount: item.discountAmount,
           pricingSource: 'QUOTATION',
         })),
@@ -727,6 +727,20 @@ export class QuotationService {
       `SELECT w.id FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause}
        ORDER BY w.is_default DESC, w.created_at ASC LIMIT 1`, scope.params
     )[0]?.id;
+  }
+
+  /**
+   * Stored unit prices are piastre-rounded, so re-pricing a stored line as
+   * qty × unitPrice can drift a piastre from the recorded line total. When
+   * converting or duplicating, derive a price that reproduces the stored
+   * gross exactly so downstream totals never change.
+   */
+  private conversionUnitPrice(item: QuotationItem): number {
+    const qty = Number(item.quantityM2) || 0;
+    if (qty <= 0) return item.unitPrice;
+    const targetGross = round2(Number(item.totalPrice || 0) + Number(item.discountAmount || 0));
+    if (Math.abs(round2(qty * item.unitPrice) - targetGross) <= 0.004) return item.unitPrice;
+    return targetGross / qty;
   }
 
   /** Quotation lines are stored in base units, so invoices must inherit that unit. */

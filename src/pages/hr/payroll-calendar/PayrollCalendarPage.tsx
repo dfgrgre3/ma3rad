@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Calendar, Loader2, AlertTriangle, ChevronRight, Wallet,
   CheckCircle2, Clock, Banknote, RotateCw, Activity, X,
@@ -7,7 +8,17 @@ import { PayrollCalendarService, PayrollCalendarEventView, PayrollCalendarMonthV
 import { EmployeeService, PayrollRun } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+function StatCard({ label, value, icon, color: _color, bg }: {
+  label: string; value: string | number; icon: React.ReactNode; color: string; bg: string;
+}) {
+  return <UiStatCard label={label} value={value} icon={icon} tone={statTone(bg || '')} />;
+}
 const MONTH_NAMES_AR: Record<number, string> = {
   1: 'يناير', 2: 'فبراير', 3: 'مارس', 4: 'أبريل', 5: 'مايو', 6: 'يونيو',
   7: 'يوليو', 8: 'أغسطس', 9: 'سبتمبر', 10: 'أكتوبر', 11: 'نوفمبر', 12: 'ديسمبر',
@@ -134,7 +145,7 @@ export const PayrollCalendarPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600">
@@ -207,63 +218,73 @@ export const PayrollCalendarPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1300px] text-right text-xs">
-                  <thead className="border-b border-slate-200 bg-white sticky top-0">
-                    <tr>
-                      {['الفترة', 'تاريخ الاستحقاق', 'المستحق', 'المصروف', 'المتبقي', 'حالة الصرف', 'الموظفون', 'إجراءات'].map((h) => (
-                        <th key={h} className="px-3 py-3 font-bold text-slate-500">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {view.events.map((event) => {
+                <DataTable
+                ariaLabel="دورات الرواتب"
+                rows={view.events}
+                rowKey={(event) => event.id}
+                minWidth={1300}
+                dense
+                stickyHeader
+                rowClassName={(event) => event.isOverdue ? 'bg-rose-25' : ''}
+                columns={[
+                  {
+                    key: 'period', header: 'الفترة',
+                    render: (event) => (
+                      <span className="font-bold text-slate-800">
+                        {event.period}
+                        <span className="mt-1 block text-[10px] text-slate-500">{event.runStatus === 'DRAFT' ? 'مسودة' : event.runStatus === 'APPROVED' ? 'معتمد' : event.runStatus === 'PAID' ? 'مصرف' : 'مغلق'}</span>
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'due', header: 'تاريخ الاستحقاق',
+                    render: (event) => (
+                      <span className="font-mono text-slate-600">
+                        {event.dueDate}
+                        {event.isOverdue && <span className="mr-1 text-[10px] text-rose-600 font-bold">متأخر</span>}
+                      </span>
+                    ),
+                  },
+                  { key: 'expected', header: 'المستحق', render: (event) => <span className="font-mono">{formatMoney(event.expectedAmount)}</span> },
+                  { key: 'paid', header: 'المصروف', render: (event) => <span className="font-mono text-emerald-700">{formatMoney(event.paidAmount)}</span> },
+                  { key: 'remaining', header: 'المتبقي', render: (event) => <span className="font-mono font-bold text-amber-700">{formatMoney(event.remainingAmount)}</span> },
+                  {
+                    key: 'status', header: 'حالة الصرف',
+                    render: (event) => {
                       const meta = STATUS_LABELS[event.status];
                       return (
-                        <tr key={event.id} className={`hover:bg-slate-50/70 transition-colors ${event.isOverdue ? 'bg-rose-25' : ''}`}>
-                          <td className="px-3 py-3 font-bold text-slate-800">
-                            {event.period}
-                            <div className="mt-1 text-[10px] text-slate-500">{event.runStatus === 'DRAFT' ? 'مسودة' : event.runStatus === 'APPROVED' ? 'معتمد' : event.runStatus === 'PAID' ? 'مصرف' : 'مغلق'}</div>
-                          </td>
-                          <td className="px-3 py-3 font-mono text-slate-600">
-                            {event.dueDate}
-                            {event.isOverdue && <span className="ml-1 text-[10px] text-rose-600 font-bold">متأخر</span>}
-                          </td>
-                          <td className="px-3 py-3 font-mono">{formatMoney(event.expectedAmount)}</td>
-                          <td className="px-3 py-3 font-mono text-emerald-700">{formatMoney(event.paidAmount)}</td>
-                          <td className="px-3 py-3 font-mono font-bold text-amber-700">{formatMoney(event.remainingAmount)}</td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${meta.bg} ${meta.color} border border-slate-200`}>
-                              {meta.label}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 font-mono text-slate-600">
-                            {event.paidEmployeeCount} / {event.employeeCount}
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex gap-1">
-                              {canManage && (
-                                <button
-                                  onClick={() => openRunDetail(event.period)}
-                                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600"
-                                >
-                                  <Banknote className="w-3 h-3" /> تفصيل
-                                </button>
-                              )}
-                              {event.missingPayments.length > 0 && (
-                                <button
-                                  onClick={() => openRunDetail(event.period)}
-                                  className="flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 font-bold text-rose-700"
-                                >
-                                  <AlertTriangle className="w-3 h-3" /> ناقص
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${meta.bg} ${meta.color} border border-slate-200`}>
+                          {meta.label}
+                        </span>
                       );
-                    })}
-                  </tbody>
-                </table>
+                    },
+                  },
+                  { key: 'employees', header: 'الموظفون', render: (event) => <span className="font-mono text-slate-600">{event.paidEmployeeCount} / {event.employeeCount}</span> },
+                  {
+                    key: 'actions', header: 'إجراءات',
+                    render: (event) => (
+                      <div className="flex gap-1">
+                        {canManage && (
+                          <button
+                            onClick={() => openRunDetail(event.period)}
+                            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600"
+                          >
+                            <Banknote className="w-3 h-3" /> تفصيل
+                          </button>
+                        )}
+                        {event.missingPayments.length > 0 && (
+                          <button
+                            onClick={() => openRunDetail(event.period)}
+                            className="flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 font-bold text-rose-700"
+                          >
+                            <AlertTriangle className="w-3 h-3" /> ناقص
+                          </button>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
               </div>
             )}
           </div>
@@ -333,41 +354,36 @@ export const PayrollCalendarPage: React.FC = () => {
                 </button>
               </div>
               <div className="overflow-x-auto p-4">
-                <table className="w-full text-right text-xs">
-                  <thead className="border-b border-slate-200 bg-white sticky top-0">
-                    <tr>
-                      {['الموظف', 'المستحق', 'المدفوع', 'المتبقي', 'حالة الصرف', 'طريقة الصرف', 'المرجع'].map((h) => (
-                        <th key={h} className="px-3 py-3 font-bold text-slate-500">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {runDetail.items.map((item) => {
-                      const paid = Number(item.paidAmount || 0);
-                      const remaining = round2(item.netAmount - paid);
-                      const isPaid = item.payoutStatus === 'PAID';
-                      return (
-                        <tr key={item.id} className={`hover:bg-slate-50/70 ${!isPaid && remaining > 0.009 ? 'bg-rose-25' : ''}`}>
-                          <td className="px-3 py-3 font-bold text-slate-800">{item.employeeName}</td>
-                          <td className="px-3 py-3 font-mono">{formatMoney(item.netAmount)}</td>
-                          <td className={`px-3 py-3 font-mono ${isPaid ? 'text-emerald-700' : 'text-slate-600'}`}>{formatMoney(paid)}</td>
-                          <td className={`px-3 py-3 font-mono font-bold ${remaining > 0.009 ? 'text-rose-700' : 'text-slate-600'}`}>{formatMoney(Math.max(0, remaining))}</td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              isPaid ? 'bg-emerald-100 text-emerald-700' : remaining > 0.009 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
-                            }`}>
-                              {isPaid ? 'مصرف' : remaining > 0.009 ? 'ناقص' : '—'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-slate-600 font-mono">
-                            {item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}
-                          </td>
-                          <td className="px-3 py-3 text-slate-400 text-[10px] truncate max-w-[120px]">{item.paymentReference || '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="تفاصيل دورة الرواتب"
+                  rows={runDetail.items.map((item) => {
+                    const paid = Number(item.paidAmount || 0);
+                    const remaining = round2(item.netAmount - paid);
+                    return { ...item, __paid: paid, __remaining: remaining, __isPaid: item.payoutStatus === 'PAID' };
+                  })}
+                  rowKey={(item) => item.id}
+                  dense
+                  tableClassName="text-xs"
+                  rowClassName={(item) => !item.__isPaid && item.__remaining > 0.009 ? 'bg-rose-25' : ''}
+                  columns={[
+                    { key: 'employee', header: 'الموظف', render: (item) => <span className="font-bold text-slate-800">{item.employeeName}</span> },
+                    { key: 'expected', header: 'المستحق', render: (item) => <span className="font-mono">{formatMoney(item.netAmount)}</span> },
+                    { key: 'paid', header: 'المدفوع', render: (item) => <span className={`font-mono ${item.__isPaid ? 'text-emerald-700' : 'text-slate-600'}`}>{formatMoney(item.__paid)}</span> },
+                    { key: 'remaining', header: 'المتبقي', render: (item) => <span className={`font-mono font-bold ${item.__remaining > 0.009 ? 'text-rose-700' : 'text-slate-600'}`}>{formatMoney(Math.max(0, item.__remaining))}</span> },
+                    {
+                      key: 'status', header: 'حالة الصرف',
+                      render: (item) => (
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.__isPaid ? 'bg-emerald-100 text-emerald-700' : item.__remaining > 0.009 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {item.__isPaid ? 'مصرف' : item.__remaining > 0.009 ? 'ناقص' : '—'}
+                        </span>
+                      ),
+                    },
+                    { key: 'method', header: 'طريقة الصرف', render: (item) => <span className="text-slate-600 font-mono">{item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}</span> },
+                    { key: 'ref', header: 'المرجع', render: (item) => <span className="text-slate-400 text-[10px] truncate max-w-[120px] block">{item.paymentReference || '—'}</span> },
+                  ]}
+                />
               </div>
             </div>
           )}
@@ -376,17 +392,3 @@ export const PayrollCalendarPage: React.FC = () => {
     </div>
   );
 };
-
-function StatCard({ label, value, icon: Icon, color: _color, bg }: {
-  label: string; value: string | number; icon: React.ReactNode; color: string; bg: string;
-}) {
-  return (
-    <div className={`${bg} rounded-xl border border-slate-200 p-3`}>
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] font-bold text-slate-500 uppercase">{label}</p>
-        <div className={`w-6 h-6 rounded flex items-center justify-center ${bg.replace('bg-', 'bg-opacity-50')}`}>{Icon}</div>
-      </div>
-      <p className="text-sm font-black text-slate-900">{value}</p>
-    </div>
-  );
-}

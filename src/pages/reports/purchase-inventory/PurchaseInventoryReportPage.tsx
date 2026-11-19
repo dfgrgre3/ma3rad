@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
   ShoppingBag, TrendingDown, Package, CalendarDays,
@@ -12,31 +13,32 @@ import type { InventoryKpi } from '../../../services/domains/inventory/Inventory
 import { localDateString } from '../../../utils/shared/date';
 import { useNavigate } from 'react-router-dom';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
-const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
-const fmtM = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
-const today = () => localDateString();
-const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 
-type Tab = 'purchases' | 'suppliers' | 'inventory' | 'returns';
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
 
 function StatCard({ label, value, sub, icon: Icon, color, bg }: {
   label: string; value: string; sub?: string;
   icon: React.ElementType; color: string; bg: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${bg}`}>
-        <Icon className={`w-6 h-6 ${color}`} />
-      </div>
-      <div>
-        <p className="text-xs text-slate-500 font-medium">{label}</p>
-        <p className="text-2xl font-black text-slate-900 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
+    <UiStatCard
+      label={label}
+      value={value}
+      hint={sub}
+      icon={Icon ? <Icon className="h-5 w-5" /> : undefined}
+      tone={statTone(color || bg || '')}
+    />
   );
 }
+const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
+const fmtM = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
+const today = () => localDateString();
+const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
+
+type Tab = 'purchases' | 'suppliers' | 'inventory' | 'returns';
 
 function HBar({ rows, color }: { rows: { label: string; value: number; sub?: string }[]; color: string }) {
   const max = Math.max(...rows.map(r => r.value), 1);
@@ -131,7 +133,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -261,24 +263,20 @@ export const PurchaseInventoryReportPage: React.FC = () => {
               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                 <h3 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2"><Handshake className="w-4 h-4 text-orange-500" /> تصنيف الموردين حسب حجم التعامل</h3>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead><tr className="bg-slate-50">
-                      <th className="text-right px-3 py-2 font-black text-slate-700 rounded-r-lg">#</th>
-                      <th className="text-right px-3 py-2 font-black text-slate-700">المورد</th>
-                      <th className="text-right px-3 py-2 font-black text-slate-700">إجمالي المشتريات</th>
-                      <th className="text-right px-3 py-2 font-black text-slate-700 rounded-l-lg">عدد الفواتير</th>
-                    </tr></thead>
-                    <tbody>
-                      {purchaseKpi.topSuppliers.map((s, i) => (
-                        <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 transition">
-                          <td className="px-3 py-2.5 font-bold text-slate-400">{i + 1}</td>
-                          <td className="px-3 py-2.5 font-bold text-slate-900">{s.name}</td>
-                          <td className="px-3 py-2.5 font-black text-orange-600">{fmtM(s.total)} ج</td>
-                          <td className="px-3 py-2.5 text-slate-500">{s.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable
+                    ariaLabel="أعلى الموردين بالمشتريات"
+                    rows={purchaseKpi.topSuppliers.map((s: any, i: number) => ({ ...s, __i: i }))}
+                    rowKey={(s: any) => String(s.__i)}
+                    dense
+                    tableClassName="text-xs"
+                    rowClassName={() => 'transition hover:bg-slate-50'}
+                    columns={[
+                      { key: 'rank', header: '#', render: (s: any) => <span className="font-bold text-slate-400">{s.__i + 1}</span> },
+                      { key: 'name', header: 'المورد', render: (s: any) => <span className="font-bold text-slate-900">{s.name}</span> },
+                      { key: 'total', header: 'إجمالي المشتريات', render: (s: any) => <span className="font-black text-orange-600">{fmtM(s.total)} ج</span> },
+                      { key: 'count', header: 'عدد الفواتير', render: (s: any) => <span className="text-slate-500">{s.count}</span> },
+                    ]}
+                  />
                 </div>
               </div>
             )}

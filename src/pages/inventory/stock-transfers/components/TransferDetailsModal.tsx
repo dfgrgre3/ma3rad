@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../../components/ui/DataTable';
 import { X } from 'lucide-react';
 import { fmt } from './helpers';
 import { TransferStatusBadge } from './TransferStatusBadge';
@@ -28,28 +29,20 @@ export const TransferDetailsModal: React.FC<TransferDetailsModalProps> = ({ tran
         </div>
 
         <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-100 text-slate-500 font-bold">
-              <tr>
-                <th className="p-2">الصنف</th>
-                <th className="p-2 text-center">المطلوب</th>
-                <th className="p-2 text-center">المشحون</th>
-                <th className="p-2 text-center">المستلم</th>
-                <th className="p-2 text-center">الفقد</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {items.map(i => (
-                <tr key={i.id}>
-                  <td className="p-2 font-bold">{i.productName}</td>
-                  <td className="p-2 text-center font-mono">{fmt(i.quantityM2)}</td>
-                  <td className="p-2 text-center font-mono">{fmt(i.shippedM2)}</td>
-                  <td className="p-2 text-center font-mono text-emerald-700 font-bold">{fmt(i.receivedM2)}</td>
-                  <td className="p-2 text-center font-mono text-rose-600">{fmt(i.lostM2 + i.damagedM2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="أصناف أمر التحويل"
+            rows={items}
+            rowKey={(i: any) => String(i.id)}
+            dense
+            tableClassName="text-xs"
+            columns={[
+              { key: 'name', header: 'الصنف', render: (i: any) => <span className="font-bold">{i.productName}</span> },
+              { key: 'req', header: 'المطلوب', align: 'center', render: (i: any) => <span className="font-mono">{fmt(i.quantityM2)}</span> },
+              { key: 'ship', header: 'المشحون', align: 'center', render: (i: any) => <span className="font-mono">{fmt(i.shippedM2)}</span> },
+              { key: 'recv', header: 'المستلم', align: 'center', render: (i: any) => <span className="font-mono font-bold text-emerald-700">{fmt(i.receivedM2)}</span> },
+              { key: 'lost', header: 'الفقد', align: 'center', render: (i: any) => <span className="font-mono text-rose-600">{fmt(i.lostM2 + i.damagedM2)}</span> },
+            ]}
+          />
         </div>
       </div>
 

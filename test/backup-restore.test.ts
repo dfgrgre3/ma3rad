@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { BackupService } from '../src/services/infrastructure/backup/BackupService.ts';
@@ -24,7 +25,13 @@ async function boot(): Promise<DatabaseManager> {
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = manager.query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   return manager;
 }
 

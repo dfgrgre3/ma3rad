@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Boxes,
   Package,
@@ -35,6 +36,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const emptyRelease: PlatformRelease = {
   id: '',
   version: '',
@@ -96,6 +98,7 @@ function mapCentralRelease(r: CentralReleaseRow): PlatformRelease & { _central?:
 }
 
 export const PlatformReleasesPage: React.FC = () => {
+  const toast = useToast();
   const [releases, setReleases] = useState<PlatformRelease[]>([]);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +162,7 @@ export const PlatformReleasesPage: React.FC = () => {
       setTargets(list);
       setSelectedTenantIds(list.map((t) => t.tenantId));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تحميل أهداف الإصدار.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تحميل أهداف الإصدار.');
     } finally {
       setTargetsLoading(false);
     }
@@ -168,7 +171,7 @@ export const PlatformReleasesPage: React.FC = () => {
   const handleSaveTargets = () => {
     if (!activeReleaseForTargets) return;
     if (!canManageReleases) {
-      alert('لا تملك صلاحية إدارة الإصدارات.');
+      toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
     if (centralActive) {
@@ -179,7 +182,7 @@ export const PlatformReleasesPage: React.FC = () => {
         rolloutPercent: central?.rolloutPercent ?? 100,
       })
         .then(() => { setActiveReleaseForTargets(null); loadData(); })
-        .catch((err) => alert(err instanceof Error ? err.message : 'فشل تحديث أهداف العملاء.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'فشل تحديث أهداف العملاء.'));
       return;
     }
     try {
@@ -187,13 +190,13 @@ export const PlatformReleasesPage: React.FC = () => {
       setActiveReleaseForTargets(null);
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل تحديث أهداف العملاء.');
+      toast.error(err instanceof Error ? err.message : 'فشل تحديث أهداف العملاء.');
     }
   };
 
   const handleDisableRelease = (id: string) => {
     if (!canManageReleases) {
-      alert('لا تملك صلاحية إدارة الإصدارات.');
+      toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
     const rel = releases.find((r) => r.id === id);
@@ -203,12 +206,12 @@ export const PlatformReleasesPage: React.FC = () => {
         if (!confirm('إيقاف هذا الإصدار المنشور (rollback)؟ لن يصل للعملاء الجدد.')) return;
         centralPlatformClient.rollbackRelease(id)
           .then(loadData)
-          .catch((err) => alert(err instanceof Error ? err.message : 'تعذر إيقاف الإصدار.'));
+          .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر إيقاف الإصدار.'));
       } else {
         if (!confirm('حذف هذا الإصدار غير المنشور؟')) return;
         centralPlatformClient.deleteRelease(id)
           .then(loadData)
-          .catch((err) => alert(err instanceof Error ? err.message : 'تعذر حذف الإصدار.'));
+          .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر حذف الإصدار.'));
       }
       return;
     }
@@ -217,20 +220,20 @@ export const PlatformReleasesPage: React.FC = () => {
       platformAdminService.disableRelease(id);
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تعطيل الإصدار.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تعطيل الإصدار.');
     }
   };
 
   const handleRollback = (rel: PlatformRelease) => {
     if (!canManageReleases) {
-      alert('لا تملك صلاحية إدارة الإصدارات.');
+      toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
     if (centralActive) {
       if (!confirm(`إيقاف الإصدار ${rel.version} (rollback)؟`)) return;
       centralPlatformClient.rollbackRelease(rel.id)
         .then(loadData)
-        .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع.'));
       return;
     }
     const safeVer = prompt(`أدخل الإصدار الآمن الذي ترغب في التراجع الطارئ إليه (الإصدار الحالي: ${rel.version}):`);
@@ -239,27 +242,27 @@ export const PlatformReleasesPage: React.FC = () => {
       platformAdminService.rollbackRelease(rel.id, safeVer.trim());
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع الطارئ.');
+      toast.error(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع الطارئ.');
     }
   };
 
   const handlePublish = (id: string) => {
     if (!canManageReleases) {
-      alert('لا تملك صلاحية إدارة الإصدارات.');
+      toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
     centralPlatformClient.publishRelease(id)
       .then(loadData)
-      .catch((err) => alert(err instanceof Error ? err.message : 'تعذر نشر الإصدار.'));
+      .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر نشر الإصدار.'));
   };
 
   const handleSaveRelease = () => {
     if (!canManageReleases) {
-      alert('لا تملك صلاحية إدارة الإصدارات.');
+      toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
     if (!releaseForm.version.trim()) {
-      alert('رقم الإصدار مطلوب.');
+      toast.warning('رقم الإصدار مطلوب.');
       return;
     }
     if (centralActive) {
@@ -283,7 +286,7 @@ export const PlatformReleasesPage: React.FC = () => {
             centralPlatformClient.publishRelease(created?.id ?? created?.data?.id ?? releaseForm.id));
       Promise.resolve(request)
         .then(() => { setIsUpsertOpen(false); loadData(); })
-        .catch((err) => alert(err instanceof Error ? err.message : 'فشل حفظ الإصدار.'));
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'فشل حفظ الإصدار.'));
       return;
     }
     try {
@@ -291,7 +294,7 @@ export const PlatformReleasesPage: React.FC = () => {
       setIsUpsertOpen(false);
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل حفظ الإصدار.');
+      toast.error(err instanceof Error ? err.message : 'فشل حفظ الإصدار.');
     }
   };
 
@@ -335,131 +338,97 @@ export const PlatformReleasesPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[950px] text-right text-xs">
-              <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">الإصدار / القناة</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3">إجباري / الحد الأدنى</th>
-                  <th className="px-4 py-3">مجموعة التوزيع</th>
-                  <th className="px-4 py-3">نتائج التطبيق (Targets)</th>
-                  <th className="px-4 py-3">تاريخ النشر</th>
-                  <th className="px-4 py-3 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {releases.map((rel) => {
-                  const summary = rel.targetsSummary || { total: 0, pending: 0, success: 0, failed: 0 };
-                  return (
-                    <tr key={rel.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-slate-100 text-sm">{rel.version}</span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-black ${
-                              rel.channel === 'STABLE'
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : rel.channel === 'HOTFIX'
-                                ? 'bg-rose-500/20 text-rose-300'
-                                : 'bg-amber-500/20 text-amber-300'
-                            }`}
-                          >
-                            {rel.channel}
-                          </span>
-                        </div>
-                        {rel.notes && <p className="text-[11px] text-slate-400 mt-0.5">{rel.notes}</p>}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={`font-bold inline-flex items-center gap-1 ${
-                            rel.status === 'PUBLISHED'
-                              ? 'text-emerald-400'
-                              : rel.status === 'DEPRECATED'
-                              ? 'text-rose-400'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          {rel.status === 'PUBLISHED' ? 'منشور (نشط)' : rel.status === 'DEPRECATED' ? 'معطّل/ملغي' : 'مسودة'}
+            <DataTable
+              ariaLabel="إصدارات التطبيق"
+              rows={releases}
+              rowKey={(rel: any) => String(rel.id)}
+              minWidth={950}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              columns={[
+                {
+                  key: 'ver', header: 'الإصدار / القناة',
+                  render: (rel: any) => (
+                    <span className="block">
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-bold text-slate-100">{rel.version}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black ${rel.channel === 'STABLE' ? 'bg-emerald-500/20 text-emerald-300' : rel.channel === 'HOTFIX' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                          {rel.channel}
                         </span>
-                        {rel.rollbackVersion && (
-                          <div className="text-[10px] text-amber-400 mt-0.5">
-                            تراجع إلى: {rel.rollbackVersion}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div>{rel.isMandatory ? <span className="text-rose-400 font-bold">إجباري</span> : 'اختياري'}</div>
-                        <div className="text-[10px] text-slate-500">أدنى: {rel.minVersion || 'لا يوجد'}</div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-slate-300 bg-slate-800 px-2 py-0.5 rounded text-[10px]">
-                          {rel.rolloutGroup}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-[11px]">
-                          <span className="text-emerald-400 font-bold" title="ناجح">{summary.success}✓</span>
-                          <span className="text-amber-400 font-bold" title="قيد الانتظار">{summary.pending}⌛</span>
-                          {summary.failed > 0 && (
-                            <span className="text-rose-400 font-bold" title="فشل">{summary.failed}✗</span>
-                          )}
-                          <span className="text-slate-500 text-[10px]">({summary.total} عميل)</span>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-400">{formatDateTime(rel.createdAt)}</td>
-
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleOpenTargets(rel)}
-                            className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                            title="تحديد أو فحص العملاء المستهدفين"
-                          >
-                            <Users className="h-3.5 w-3.5" />
-                            العملاء
+                      </span>
+                      {rel.notes && <span className="mt-0.5 block text-[11px] text-slate-400">{rel.notes}</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (rel: any) => (
+                    <span className="block">
+                      <span className={`inline-flex items-center gap-1 font-bold ${rel.status === 'PUBLISHED' ? 'text-emerald-400' : rel.status === 'DEPRECATED' ? 'text-rose-400' : 'text-slate-400'}`}>
+                        {rel.status === 'PUBLISHED' ? 'منشور (نشط)' : rel.status === 'DEPRECATED' ? 'معطّل/ملغي' : 'مسودة'}
+                      </span>
+                      {rel.rollbackVersion && <span className="mt-0.5 block text-[10px] text-amber-400">تراجع إلى: {rel.rollbackVersion}</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'mandatory', header: 'إجباري / الحد الأدنى',
+                  render: (rel: any) => (
+                    <span className="block">
+                      <span className="block">{rel.isMandatory ? <span className="font-bold text-rose-400">إجباري</span> : 'اختياري'}</span>
+                      <span className="block text-[10px] text-slate-500">أدنى: {rel.minVersion || 'لا يوجد'}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'group', header: 'مجموعة التوزيع',
+                  render: (rel: any) => <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-300">{rel.rolloutGroup}</span>,
+                },
+                {
+                  key: 'targets', header: 'نتائج التطبيق (Targets)',
+                  render: (rel: any) => {
+                    const summary = rel.targetsSummary || { total: 0, pending: 0, success: 0, failed: 0 };
+                    return (
+                      <span className="flex items-center gap-2 text-[11px]">
+                        <span className="font-bold text-emerald-400" title="ناجح">{summary.success}✓</span>
+                        <span className="font-bold text-amber-400" title="قيد الانتظار">{summary.pending}⌛</span>
+                        {summary.failed > 0 && <span className="font-bold text-rose-400" title="فشل">{summary.failed}✗</span>}
+                        <span className="text-[10px] text-slate-500">({summary.total} عميل)</span>
+                      </span>
+                    );
+                  },
+                },
+                { key: 'date', header: 'تاريخ النشر', render: (rel: any) => <span className="text-slate-400">{formatDateTime(rel.createdAt)}</span> },
+                {
+                  key: 'actions', header: 'إجراءات', align: 'center',
+                  render: (rel: any) => (
+                    <span className="flex items-center justify-center gap-2">
+                      <button onClick={() => handleOpenTargets(rel)} className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="تحديد أو فحص العملاء المستهدفين">
+                        <Users className="h-3.5 w-3.5" />
+                        العملاء
+                      </button>
+                      {centralActive && rel.status === 'DRAFT' && canManageReleases && (
+                        <button onClick={() => handlePublish(rel.id)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300" title="نشر الإصدار">
+                          نشر
+                        </button>
+                      )}
+                      {rel.status !== 'DEPRECATED' && canManageReleases && (
+                        <>
+                          <button onClick={() => handleDisableRelease(rel.id)} className="text-xs text-rose-400 hover:text-rose-300" title="تعطيل فوري للإصدار">
+                            تعطيل
                           </button>
-
-                          {centralActive && rel.status === 'DRAFT' && canManageReleases && (
-                            <button
-                              onClick={() => handlePublish(rel.id)}
-                              className="text-emerald-400 hover:text-emerald-300 text-xs font-bold"
-                              title="نشر الإصدار"
-                            >
-                              نشر
-                            </button>
-                          )}
-
-                          {rel.status !== 'DEPRECATED' && canManageReleases && (
-                            <>
-                              <button
-                                onClick={() => handleDisableRelease(rel.id)}
-                                className="text-rose-400 hover:text-rose-300 text-xs"
-                                title="تعطيل فوري للإصدار"
-                              >
-                                تعطيل
-                              </button>
-                              <button
-                                onClick={() => handleRollback(rel)}
-                                className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1"
-                                title="تراجع طارئ"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                                تراجع
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          <button onClick={() => handleRollback(rel)} className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300" title="تراجع طارئ">
+                            <RotateCcw className="h-3 w-3" />
+                            تراجع
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </div>

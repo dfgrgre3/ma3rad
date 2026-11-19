@@ -24,6 +24,8 @@ import {
   formatNumber,
 } from './components/PlatformUI';
 
+import { DataTable } from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -68,6 +70,7 @@ interface CentralAppBackupRow {
 }
 
 export const PlatformBackupsPage: React.FC = () => {
+  const toast = useToast();
   const [backups, setBackups] = useState<PlatformCentralBackup[]>([]);
   const [centralBackups, setCentralBackups] = useState<CentralBackupRow[]>([]);
   const [centralAppBackups, setCentralAppBackups] = useState<CentralAppBackupRow[]>([]);
@@ -116,7 +119,7 @@ export const PlatformBackupsPage: React.FC = () => {
 
   const handleTriggerBackup = async () => {
     if (!canManageBackups) {
-      alert('لا تملك صلاحية تنفيذ النسخ الاحتياطي.');
+      toast.warning('لا تملك صلاحية تنفيذ النسخ الاحتياطي.');
       return;
     }
     if (centralActive) {
@@ -128,10 +131,10 @@ export const PlatformBackupsPage: React.FC = () => {
           type: centralType,
           triggerSource: 'MANUAL',
         });
-        alert('تم تسجيل طلب النسخة الاحتياطية — ستظهر حالتها محدثة عند اكتمال المهمة.');
+        toast.success('تم تسجيل طلب النسخة الاحتياطية — ستظهر حالتها محدثة عند اكتمال المهمة.');
         loadData();
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'فشل طلب النسخة الاحتياطية.');
+        toast.error(err instanceof Error ? err.message : 'فشل طلب النسخة الاحتياطية.');
       } finally {
         setRunning(false);
       }
@@ -141,14 +144,14 @@ export const PlatformBackupsPage: React.FC = () => {
     setRunning(true);
     try {
       const created = await platformAdminService.triggerCentralBackup();
-      alert(
+      toast.warning(
         created.integrityCheckPassed
           ? `تم إنشاء النسخة الاحتياطية والتحقق منها: ${created.filename}`
           : `تم إنشاء نسخة احتياطية محلية مشفرة: ${created.filename}\nلم يتم التحقق من نسخة خارج الموقع، لذا لا تصنف كنسخة موثقة (VERIFIED).`
       );
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل أخذ النسخة الاحتياطية.');
+      toast.error(err instanceof Error ? err.message : 'فشل أخذ النسخة الاحتياطية.');
     } finally {
       setRunning(false);
     }
@@ -156,49 +159,49 @@ export const PlatformBackupsPage: React.FC = () => {
 
   const handleRestore = async (backup: CentralBackupRow) => {
     if (!canManageBackups) {
-      alert('لا تملك صلاحية استعادة النسخ.');
+      toast.warning('لا تملك صلاحية استعادة النسخ.');
       return;
     }
     if (!backup.tenantId) {
-      alert('الاستعادة لكل منشأة فقط — اختر نسخة مرتبطة بعميل.');
+      toast.warning('الاستعادة لكل منشأة فقط — اختر نسخة مرتبطة بعميل.');
       return;
     }
     if (!confirm(`استعادة النسخة "${backup.name || backup.id}" للعميل "${backup.tenantName || backup.tenantId}"؟\nلن تتأثر بيانات المنشآت الأخرى.`)) return;
     try {
       await centralPlatformClient.restoreBackup(backup.id);
-      alert('تم تسجيل طلب الاستعادة — ستظهر نتيجتها في سجل عمليات التشغيل.');
+      toast.success('تم تسجيل طلب الاستعادة — ستظهر نتيجتها في سجل عمليات التشغيل.');
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
+      toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
     }
   };
 
   const handleAppBackupRestore = async (backup: CentralAppBackupRow) => {
     if (!canManageBackups) {
-      alert('لا تملك صلاحية استعادة النسخ.');
+      toast.warning('لا تملك صلاحية استعادة النسخ.');
       return;
     }
     if (!backup.tenantId) {
-      alert('استعادة بيانات التطبيق تتطلب نسخة مرتبطة بمنشأة و جهازها.');
+      toast.warning('استعادة بيانات التطبيق تتطلب نسخة مرتبطة بمنشأة و جهازها.');
       return;
     }
     if (['REQUESTED', 'IN_PROGRESS'].includes(backup.restoreStatus)) {
-      alert('توجد استعادة قيد التنفيذ لهذه النسخة بالفعل.');
+      toast.warning('توجد استعادة قيد التنفيذ لهذه النسخة بالفعل.');
       return;
     }
     if (!confirm(`طلب استعادة نسخة بيانات التطبيق "${backup.name || backup.id}" على جهاز المنشأة "${backup.tenantName || backup.tenantId}"؟\nسيقوم الجهاز بتنزيل النسخة المشفرة والتحقق منها وتطبيقها تلقائيًا.`)) return;
     try {
       await centralPlatformClient.requestAppBackupRestore(backup.id);
-      alert('تم تسجيل طلب الاستعادة — سيطبّقها الجهاز عند اتصاله التالي بالمنصة.');
+      toast.success('تم تسجيل طلب الاستعادة — سيطبّقها الجهاز عند اتصاله التالي بالمنصة.');
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
+      toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
     }
   };
 
   const handleAppBackupRestoreCancel = async (backup: CentralAppBackupRow) => {
     if (!canManageBackups) {
-      alert('لا تملك صلاحية استعادة النسخ.');
+      toast.warning('لا تملك صلاحية استعادة النسخ.');
       return;
     }
     if (!confirm(`إلغاء طلب الاستعادة المعلق للنسخة "${backup.name || backup.id}"؟`)) return;
@@ -206,7 +209,7 @@ export const PlatformBackupsPage: React.FC = () => {
       await centralPlatformClient.cancelAppBackupRestore(backup.id);
       loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل إلغاء الاستعادة.');
+      toast.error(err instanceof Error ? err.message : 'فشل إلغاء الاستعادة.');
     }
   };
 
@@ -223,7 +226,7 @@ export const PlatformBackupsPage: React.FC = () => {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشل تنزيل النسخة.');
+      toast.error(err instanceof Error ? err.message : 'فشل تنزيل النسخة.');
     }
   };
 
@@ -273,53 +276,43 @@ export const PlatformBackupsPage: React.FC = () => {
           ) : centralBackups.length === 0 ? (
             <EmptyState icon={<Archive className="h-6 w-6 text-slate-500" />} title="لا توجد نسخ احتياطية" description="اطلب أول نسخة احتياطية لمنشأة أو للمنصة." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-right text-xs">
-                <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">الاسم</th>
-                    <th className="px-4 py-3">المنشأة</th>
-                    <th className="px-4 py-3">النوع</th>
-                    <th className="px-4 py-3">الحالة</th>
-                    <th className="px-4 py-3">الحجم</th>
-                    <th className="px-4 py-3">بواسطة</th>
-                    <th className="px-4 py-3">تاريخ الإنشاء</th>
-                    <th className="px-4 py-3">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80">
-                  {centralBackups.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-100">{b.name || b.id}</td>
-                      <td className="px-4 py-3 text-slate-300">{b.tenantName || 'المنصة (عام)'}</td>
-                      <td className="px-4 py-3 text-slate-400">{TYPE_LABELS[b.type] || b.type}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${b.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : b.status === 'FAILED' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
-                          {STATUS_LABELS[b.status] || b.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">{b.sizeBytes ? formatBytes(b.sizeBytes) : '—'}</td>
-                      <td className="px-4 py-3 text-slate-400">{b.triggeredBy || '—'}</td>
-                      <td className="px-4 py-3 text-slate-400">{formatDateTime(b.createdAt)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {b.status === 'COMPLETED' && (
-                            <Button size="sm" variant="ghost" onClick={() => handleDownload(b)} title="تنزيل ملف النسخة">
-                              تنزيل
-                            </Button>
-                          )}
-                          {b.status === 'COMPLETED' && b.tenantId ? (
-                            <Button size="sm" variant="secondary" onClick={() => handleRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>
-                              استعادة
-                            </Button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                            ariaLabel="نسخ العملاء الاحتياطية"
+                            rows={centralBackups}
+                            rowKey={(b) => b.id}
+                            minWidth={850}
+                            dense
+                            columns={[
+                              { key: 'name', header: 'الاسم', render: (b) => <span className="font-bold text-slate-100">{b.name || b.id}</span> },
+                              { key: 'tenant', header: 'المنشأة', render: (b) => <span className="text-slate-300">{b.tenantName || 'المنصة (عام)'}</span> },
+                              { key: 'type', header: 'النوع', render: (b) => <span className="text-slate-400">{TYPE_LABELS[b.type] || b.type}</span> },
+                              {
+                                key: 'status', header: 'الحالة',
+                                render: (b) => (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${b.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : b.status === 'FAILED' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
+                                    {STATUS_LABELS[b.status] || b.status}
+                                  </span>
+                                ),
+                              },
+                              { key: 'size', header: 'الحجم', render: (b) => <span className="text-slate-300">{b.sizeBytes ? formatBytes(b.sizeBytes) : '—'}</span> },
+                              { key: 'by', header: 'بواسطة', render: (b) => <span className="text-slate-400">{b.triggeredBy || '—'}</span> },
+                              { key: 'created', header: 'تاريخ الإنشاء', render: (b) => <span className="text-slate-400">{formatDateTime(b.createdAt)}</span> },
+                              {
+                                key: 'actions', header: 'إجراءات',
+                                render: (b) => (
+                                  <div className="flex items-center gap-1.5">
+                                    {b.status === 'COMPLETED' && (
+                                      <Button size="sm" variant="ghost" onClick={() => handleDownload(b)} title="تنزيل ملف النسخة">تنزيل</Button>
+                                    )}
+                                    {b.status === 'COMPLETED' && b.tenantId ? (
+                                      <Button size="sm" variant="secondary" onClick={() => handleRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>استعادة</Button>
+                                    ) : null}
+                                  </div>
+                                ),
+                              },
+                            ]}
+                          />
+
           )}
         </div>
 
@@ -334,56 +327,47 @@ export const PlatformBackupsPage: React.FC = () => {
             {centralAppBackups.length === 0 ? (
               <EmptyState icon={<HardDrive className="h-6 w-6 text-slate-500" />} title="لا توجد نسخ تطبيق مرفوعة" description="ترفع الأجهزة نسخ بياناتها للمنصة من صفحة النسخ الاحتياطي في تطبيق سطح المكتب." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-right text-xs">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">الاسم</th>
-                      <th className="px-4 py-3">المنشأة</th>
-                      <th className="px-4 py-3">الجهاز</th>
-                      <th className="px-4 py-3">الحجم</th>
-                      <th className="px-4 py-3">تاريخ الرفع</th>
-                      <th className="px-4 py-3">حالة الاستعادة</th>
-                      <th className="px-4 py-3">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {centralAppBackups.map((b) => (
-                      <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3 font-bold text-slate-100">{b.name || b.id}</td>
-                        <td className="px-4 py-3 text-slate-300">{b.tenantName || b.tenantId || '—'}</td>
-                        <td className="px-4 py-3 text-slate-400">{b.deviceName || b.deviceId || '—'}</td>
-                        <td className="px-4 py-3 text-slate-300">{b.sizeBytes ? formatBytes(b.sizeBytes) : '—'}</td>
-                        <td className="px-4 py-3 text-slate-400">{formatDateTime(b.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            b.restoreStatus === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                            : b.restoreStatus === 'FAILED' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                            : ['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus) ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                            : 'text-slate-400 bg-slate-500/10 border-slate-500/20'
-                          }`} title={b.restoreError || undefined}>
-                            {RESTORE_STATUS_LABELS[b.restoreStatus] || b.restoreStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            {b.status === 'COMPLETED' && !['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus) ? (
-                              <Button size="sm" variant="secondary" onClick={() => handleAppBackupRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>
-                                طلب استعادة على الجهاز
-                              </Button>
-                            ) : null}
-                            {b.restoreStatus === 'REQUESTED' ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleAppBackupRestoreCancel(b)}>
-                                إلغاء
-                              </Button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                                ariaLabel="نسخ تطبيق المنشآت"
+                                rows={centralAppBackups}
+                                rowKey={(b) => b.id}
+                                minWidth={900}
+                                dense
+                                columns={[
+                                  { key: 'name', header: 'الاسم', render: (b) => <span className="font-bold text-slate-100">{b.name || b.id}</span> },
+                                  { key: 'tenant', header: 'المنشأة', render: (b) => <span className="text-slate-300">{b.tenantName || b.tenantId || '—'}</span> },
+                                  { key: 'device', header: 'الجهاز', render: (b) => <span className="text-slate-400">{b.deviceName || b.deviceId || '—'}</span> },
+                                  { key: 'size', header: 'الحجم', render: (b) => <span className="text-slate-300">{b.sizeBytes ? formatBytes(b.sizeBytes) : '—'}</span> },
+                                  { key: 'uploaded', header: 'تاريخ الرفع', render: (b) => <span className="text-slate-400">{formatDateTime(b.createdAt)}</span> },
+                                  {
+                                    key: 'restore', header: 'حالة الاستعادة',
+                                    render: (b) => (
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                        b.restoreStatus === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                        : b.restoreStatus === 'FAILED' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                        : ['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus) ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                                        : 'text-slate-400 bg-slate-500/10 border-slate-500/20'
+                                      }`} title={b.restoreError || undefined}>
+                                        {RESTORE_STATUS_LABELS[b.restoreStatus] || b.restoreStatus}
+                                      </span>
+                                    ),
+                                  },
+                                  {
+                                    key: 'actions', header: 'إجراءات',
+                                    render: (b) => (
+                                      <div className="flex items-center gap-1.5">
+                                        {b.status === 'COMPLETED' && !['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus) ? (
+                                          <Button size="sm" variant="secondary" onClick={() => handleAppBackupRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>طلب استعادة على الجهاز</Button>
+                                        ) : null}
+                                        {b.restoreStatus === 'REQUESTED' ? (
+                                          <Button size="sm" variant="ghost" onClick={() => handleAppBackupRestoreCancel(b)}>إلغاء</Button>
+                                        ) : null}
+                                      </div>
+                                    ),
+                                  },
+                                ]}
+                              />
+
             )}
           </div>
         </div>
@@ -453,57 +437,29 @@ export const PlatformBackupsPage: React.FC = () => {
             description="أنشئ أول نسخة احتياطية لحماية بيانات المنصة والعملاء."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-right text-xs">
-              <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">اسم ملف الأرشيف</th>
-                  <th className="px-4 py-3">الحجم</th>
-                  <th className="px-4 py-3">مسار التخزين</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3">فحص السلامة</th>
-                  <th className="px-4 py-3">تاريخ الإنشاء</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {backups.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-100">
-                      {b.filename}
-                    </td>
+          <DataTable
+                        ariaLabel="نسخ المنصة الاحتياطية"
+                        rows={backups}
+                        rowKey={(b) => b.id}
+                        minWidth={850}
+                        dense
+                        columns={[
+                          { key: 'file', header: 'اسم ملف الأرشيف', render: (b) => <span className="font-mono font-bold text-slate-100">{b.filename}</span> },
+                          { key: 'size', header: 'الحجم', render: (b) => <span className="font-semibold text-slate-300">{formatBytes(b.sizeBytes)}</span> },
+                          { key: 'path', header: 'مسار التخزين', render: (b) => <span className="font-mono text-[11px] text-slate-400">{b.storageLocation}</span> },
+                          { key: 'status', header: 'الحالة', render: (b) => <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">{b.status}</span> },
+                          {
+                            key: 'integrity', header: 'فحص السلامة',
+                            render: (b) => b.integrityCheckPassed ? (
+                              <span className="text-emerald-400 flex items-center gap-1 font-bold text-[11px]"><CheckCircle2 className="h-3.5 w-3.5" /> سليم ومطابق</span>
+                            ) : (
+                              <span className="text-rose-400 flex items-center gap-1 font-bold text-[11px]"><AlertTriangle className="h-3.5 w-3.5" /> تالف</span>
+                            ),
+                          },
+                          { key: 'created', header: 'تاريخ الإنشاء', render: (b) => <span className="text-slate-400">{formatDateTime(b.createdAt)}</span> },
+                        ]}
+                      />
 
-                    <td className="px-4 py-3 font-semibold text-slate-300">
-                      {formatBytes(b.sizeBytes)}
-                    </td>
-
-                    <td className="px-4 py-3 font-mono text-[11px] text-slate-400">
-                      {b.storageLocation}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">
-                        {b.status}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {b.integrityCheckPassed ? (
-                        <span className="text-emerald-400 flex items-center gap-1 font-bold text-[11px]">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> سليم ومطابق
-                        </span>
-                      ) : (
-                        <span className="text-rose-400 flex items-center gap-1 font-bold text-[11px]">
-                          <AlertTriangle className="h-3.5 w-3.5" /> تالف
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3 text-slate-400">{formatDateTime(b.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         )}
       </div>
     </div>

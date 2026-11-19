@@ -13,7 +13,7 @@ export const PaymentMethodsCard: React.FC<PaymentMethodsCardProps> = ({ paymentD
       <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">طرق الدفع</h3>
       <p className="text-[11px] text-slate-400 mb-2">توزيع إيرادات الدفع المستخدمة</p>
       <div className="h-44 w-full" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 176 }}>
           <BarChart data={paymentDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
             <XAxis dataKey="method" stroke="var(--cerami-muted)" fontSize={9} tickLine={false} />

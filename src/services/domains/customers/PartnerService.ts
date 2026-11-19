@@ -854,7 +854,7 @@ export class PartnerService {
     }
 
     const retainedProfits = this.db.query<{ balance: number }>(
-      "SELECT balance FROM chart_of_accounts WHERE code = '3102' AND is_active = 1"
+      "SELECT balance / 100.0 AS balance FROM chart_of_accounts WHERE code = '3102' AND is_active = 1"
     )[0]?.balance;
     if (retainedProfits === undefined || Math.max(0, -Number(retainedProfits)) + MONEY_EPSILON < amount) {
       throw new Error('الأرباح المحتجزة في الحسابات لا تكفي للمبلغ المراد توزيعه.');

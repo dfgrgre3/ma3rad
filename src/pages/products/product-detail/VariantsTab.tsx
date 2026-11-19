@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import { ProductExtraService, ProductVariant } from '../../../services/domains/products/ProductExtraService';
 import { OperationalFieldService, type ProductGradeOption } from '../../../services/domains/products/OperationalFieldService';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { money } from './format';
 
+import { useToast } from '../../../components/ui/Toast';
 interface VariantsTabProps {
   productId: string;
   canEdit: boolean;
@@ -14,6 +16,7 @@ interface VariantsTabProps {
 }
 
 export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, canViewCosts, canViewPricing, canUpdatePricing }) => {
+  const toast = useToast();
   const service = useMemo(() => new ProductExtraService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const [rows, setRows] = useState<ProductVariant[]>([]);
@@ -48,12 +51,12 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
       });
       setForm({ variantName: '', sku: '', barcode: '', color: '', size: '', grade: gradeOptions.find((option) => option.isActive)?.value || '', costPrice: '', sellingPriceM2: '' });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر إضافة المتغير'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر إضافة المتغير'); }
   };
 
   const remove = (id: string) => {
     if (!confirm('حذف هذا المتغير؟')) return;
-    try { service.deleteVariant(id); load(); } catch (err: any) { alert(err?.message); }
+    try { service.deleteVariant(id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   return (
@@ -82,22 +85,25 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
       )}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {rows.length === 0 ? <div className="text-center text-slate-500 py-10 text-sm">لا توجد متغيرات لهذا المنتج</div> : (
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50"><tr>{['المتغير', 'SKU / باركود', 'المقاس واللون', 'الفرز', ...(canViewCosts ? ['التكلفة'] : []), ...(canViewPricing ? ['سعر البيع'] : []), ...(canEdit ? ['حذف'] : [])].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50/70">
-                  <td className="px-4 py-3 font-bold text-slate-900">{v.variantName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{v.sku}<div className="text-slate-400">{v.barcode || '—'}</div></td>
-                  <td className="px-4 py-3 text-slate-600">{v.size || '—'} / {v.color || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{v.grade ? gradeLabel(v.grade) : '—'}</td>
-                  {canViewCosts && <td className="px-4 py-3 font-mono text-rose-600">{money(v.costPrice)}</td>}
-                  {canViewPricing && <td className="px-4 py-3 font-mono text-sky-600 font-bold">{money(v.sellingPriceM2)}</td>}
-                  {canEdit && <td className="px-4 py-3"><button onClick={() => remove(v.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="متغيرات المنتج"
+            rows={rows}
+            rowKey={(v: any) => String(v.id)}
+            tableClassName="text-sm"
+            rowClassName={() => 'transition hover:bg-slate-50/70'}
+            columns={[
+              { key: 'name', header: 'المتغير', render: (v: any) => <span className="font-bold text-slate-900">{v.variantName}</span> },
+              {
+                key: 'sku', header: 'SKU / باركود',
+                render: (v: any) => <span className="font-mono text-xs text-slate-600">{v.sku}<span className="block text-slate-400">{v.barcode || '—'}</span></span>,
+              },
+              { key: 'spec', header: 'المقاس واللون', render: (v: any) => <span className="text-slate-600">{v.size || '—'} / {v.color || '—'}</span> },
+              { key: 'grade', header: 'الفرز', render: (v: any) => <span className="text-slate-600">{v.grade ? gradeLabel(v.grade) : '—'}</span> },
+              ...(canViewCosts ? [{ key: 'cost', header: 'التكلفة', render: (v: any) => <span className="font-mono text-rose-600">{money(v.costPrice)}</span> }] : []),
+              ...(canViewPricing ? [{ key: 'price', header: 'سعر البيع', render: (v: any) => <span className="font-mono font-bold text-sky-600">{money(v.sellingPriceM2)}</span> }] : []),
+              ...(canEdit ? [{ key: 'del', header: 'حذف', render: (v: any) => <button onClick={() => remove(v.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button> }] : []),
+            ]}
+          />
         )}
       </div>
     </div>

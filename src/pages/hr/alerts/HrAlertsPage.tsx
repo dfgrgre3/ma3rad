@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Bell, RefreshCw, Loader2, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { HrAlertsService } from '../../../services/domains/hr/HrAlertsService';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
@@ -94,7 +95,7 @@ export const HrAlertsPage: React.FC = () => {
   const typeMeta = (type: string) => TYPE_LABELS[type] ?? { label: type, color: 'text-slate-600', bg: 'bg-slate-50' };
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600">
@@ -134,51 +135,46 @@ export const HrAlertsPage: React.FC = () => {
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">النوع</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">العنوان</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">التفاصيل</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">التاريخ</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {alerts.map((alert) => {
-                  const meta = typeMeta(alert.type);
-                  const isUrgent = alert.type.startsWith('HR_') && !alert.isRead;
-                  return (
-                    <tr
-                      key={alert.id}
-                      className={`hover:bg-slate-50 transition-colors border-b border-slate-50/50 last:border-0 ${isUrgent ? 'bg-rose-25' : ''}`}
-                      onClick={() => markRead(alert.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${meta.bg} ${meta.color}`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                          {meta.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-800">{alert.title}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{alert.message}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500">
-                        {new Date(alert.createdAt).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${
-                          alert.isRead ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {alert.isRead ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Clock className="w-2.5 h-2.5" />}
-                          {alert.isRead ? 'مقروءة' : 'جديدة'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="تنبيهات الموارد البشرية"
+              rows={alerts}
+              rowKey={(alert: any) => String(alert.id)}
+              onRowClick={(alert: any) => markRead(alert.id)}
+              tableClassName="text-sm"
+              rowClassName={(alert: any) => {
+                const isUrgent = alert.type.startsWith('HR_') && !alert.isRead;
+                return `transition-colors border-b border-slate-50/50 last:border-0 ${isUrgent ? 'bg-rose-25' : ''}`;
+              }}
+              columns={[
+                {
+                  key: 'type', header: 'النوع',
+                  render: (alert: any) => {
+                    const meta = typeMeta(alert.type);
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${meta.bg} ${meta.color}`}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
+                        {meta.label}
+                      </span>
+                    );
+                  },
+                },
+                { key: 'title', header: 'العنوان', render: (alert: any) => <span className="font-medium text-slate-800">{alert.title}</span> },
+                { key: 'details', header: 'التفاصيل', render: (alert: any) => <span className="text-slate-600">{alert.message}</span> },
+                {
+                  key: 'date', header: 'التاريخ',
+                  render: (alert: any) => <span className="text-slate-500">{new Date(alert.createdAt).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>,
+                },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (alert: any) => (
+                    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${alert.isRead ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {alert.isRead ? <CheckCircle2 className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
+                      {alert.isRead ? 'مقروءة' : 'جديدة'}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </div>

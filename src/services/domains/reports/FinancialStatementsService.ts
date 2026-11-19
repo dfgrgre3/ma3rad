@@ -144,7 +144,7 @@ export class FinancialStatementsService {
     const scope = this.ledgerScope();
     const accountBalance = async (code: string, normal: 'DEBIT' | 'CREDIT') => {
       const row = (await this.db.queryAsync<{ balance: number }>(`
-        SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+        SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0) AS balance
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
         WHERE e.is_posted = 1 AND a.code = ? AND ${scope.clause}
@@ -175,7 +175,7 @@ export class FinancialStatementsService {
       if (!canCompareCompanyWide) return null;
       const companyScope = this.branchAccess.companyScope('e.company_id', actor);
       const row = (await this.db.queryAsync<{ balance: number }>(`
-        SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+        SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0) AS balance
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
         WHERE e.is_posted = 1 AND a.code = ? AND ${companyScope.clause}
@@ -201,7 +201,7 @@ export class FinancialStatementsService {
              COALESCE(SUM(CASE WHEN ABS(ROUND(line_debit - line_credit, 2)) > 0 OR
                ABS(ROUND(total_debit - line_debit, 2)) > 0 OR ABS(ROUND(total_credit - line_credit, 2)) > 0
                THEN 1 ELSE 0 END), 0) AS unbalanced,
-             COALESCE(SUM(line_debit), 0) AS debit, COALESCE(SUM(line_credit), 0) AS credit
+             COALESCE(SUM(line_debit), 0) / 100.0 AS debit, COALESCE(SUM(line_credit), 0) / 100.0 AS credit
       FROM entry_totals
     `, scope.params))[0];
     const journalDifference = round2(Number(integrity?.debit || 0) - Number(integrity?.credit || 0));
@@ -218,9 +218,9 @@ export class FinancialStatementsService {
         JOIN journal_entries e ON e.id = l.entry_id
         WHERE e.is_posted = 1 AND ${scope.clause}
       )
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS ledger,
+      SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0) AS ledger,
              COALESCE((
-               SELECT SUM(ca.balance)
+               SELECT SUM(ca.balance) / 100.0
                FROM chart_of_accounts ca
                JOIN scoped_accounts sa ON sa.account_id = ca.id
              ), 0) AS cached
@@ -315,8 +315,8 @@ export class FinancialStatementsService {
       credit: number;
     }>(`
       SELECT a.code, a.name, a.type,
-             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.debit ELSE 0 END), 0) AS debit,
-             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.credit ELSE 0 END), 0) AS credit
+             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.debit ELSE 0 END), 0) / 100.0 AS debit,
+             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.credit ELSE 0 END), 0) / 100.0 AS credit
       FROM chart_of_accounts a
       LEFT JOIN journal_entry_lines l ON l.account_id = a.id
       LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1 AND e.date <= ? AND ${scope.clause}
@@ -411,8 +411,8 @@ export class FinancialStatementsService {
     const scope = this.ledgerScope();
     const balances = (await this.db.queryAsync<{ opening: number; closing: number }>(`
       SELECT
-        COALESCE(SUM(CASE WHEN e.date < ? THEN l.debit - l.credit ELSE 0 END), 0) AS opening,
-        COALESCE(SUM(l.debit - l.credit), 0) AS closing
+        COALESCE(SUM(CASE WHEN e.date < ? THEN l.debit - l.credit ELSE 0 END), 0) / 100.0 AS opening,
+        COALESCE(SUM(l.debit - l.credit), 0) / 100.0 AS closing
       FROM journal_entries e
       JOIN journal_entry_lines l ON l.entry_id = e.id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -426,7 +426,7 @@ export class FinancialStatementsService {
                SUM(CASE
                  WHEN a.code IN ('1101', '1102', '1106')
                       AND COALESCE(e.reference_type, '') NOT IN ('FIXED_ASSET_PURCHASE', 'FIXED_ASSET_SALE', 'LOAN_RECEIVED', 'LOAN_REPAYMENT', 'CAPITAL_INJECTION', 'DIVIDEND_PAYMENT')
-                 THEN l.debit - l.credit
+                 THEN (l.debit - l.credit) / 100.0
                  ELSE 0
                END) AS net_cash
         FROM journal_entries e
@@ -446,7 +446,7 @@ export class FinancialStatementsService {
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
-                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('FIXED_ASSET_PURCHASE', 'FIXED_ASSET_SALE') THEN l.debit - l.credit
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('FIXED_ASSET_PURCHASE', 'FIXED_ASSET_SALE') THEN (l.debit - l.credit) / 100.0
                  ELSE 0
                END) AS net_cash
         FROM journal_entries e
@@ -466,7 +466,7 @@ export class FinancialStatementsService {
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
-                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('LOAN_RECEIVED', 'LOAN_REPAYMENT', 'CAPITAL_INJECTION', 'DIVIDEND_PAYMENT') THEN l.debit - l.credit
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('LOAN_RECEIVED', 'LOAN_REPAYMENT', 'CAPITAL_INJECTION', 'DIVIDEND_PAYMENT') THEN (l.debit - l.credit) / 100.0
                  ELSE 0
                END) AS net_cash
         FROM journal_entries e
@@ -760,7 +760,7 @@ export class FinancialStatementsService {
     const controlAccountCode: '1103' | '2101' = partyType === 'CUSTOMER' ? '1103' : '2101';
     const controlScope = this.branchAccess.companyScope('e.company_id', actor);
     const signed = Number((await this.db.queryAsync<{ balance: number }>(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+      SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0) AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
@@ -806,14 +806,14 @@ export class FinancialStatementsService {
     }
     const scope = this.ledgerScope();
     const opening = await this.scalar(`
-      SELECT COALESCE(SUM(l.debit - l.credit), 0)
+      SELECT COALESCE(SUM(l.debit - l.credit) / 100.0, 0)
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date < ? AND ${scope.clause}
     `, [accountId, from, ...scope.params]);
 
     const rows = await this.db.queryAsync<any>(`
       SELECT e.date, e.entry_number AS entryNumber, e.description,
-             l.debit, l.credit, l.description AS lineDescription,
+             l.debit / 100.0 AS debit, l.credit / 100.0 AS credit, l.description AS lineDescription,
              e.reference_type AS referenceType, e.reference_id AS referenceId
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}

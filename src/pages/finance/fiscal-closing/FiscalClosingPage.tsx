@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertCircle,
   AlertTriangle,
@@ -331,7 +332,7 @@ export const FiscalClosingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-full space-y-5 bg-slate-50 p-4 text-slate-900 sm:p-6" dir="rtl">
+    <div className="min-h-full space-y-5 bg-slate-50 p-4 text-slate-900 sm:p-6">
       <header className="flex flex-col gap-4 border-b border-slate-200 px-1 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-cyan-700 shadow-sm">
@@ -507,75 +508,76 @@ export const FiscalClosingPage: React.FC = () => {
               <div className="p-10 text-center text-sm text-slate-500">لا توجد فترات مسجلة لهذه السنة المالية.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm">
-                  <thead className="bg-slate-50 text-xs text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">الشهر / الفترة</th>
-                      <th className="px-4 py-3 font-semibold">بداية الفترة</th>
-                      <th className="px-4 py-3 font-semibold">نهاية الفترة</th>
-                      <th className="px-4 py-3 font-semibold">الحالة</th>
-                      <th className="px-4 py-3 font-semibold">الإجراء</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {periods.map((period) => {
-                      const status = periodStatus(period);
-                      const isSelected = selectedPeriodId === period.id;
-                      const state = period.workflowState || period.status;
-                      return (
-                        <tr
-                          key={period.id}
-                          onClick={() => { setSelectedPeriodId(period.id); loadPeriodDetails(period.id); }}
-                          className={`cursor-pointer transition ${isSelected ? 'bg-cyan-50/70' : 'hover:bg-slate-50'}`}
-                        >
-                          <td className="px-4 py-3 font-bold text-slate-800">
-                            {period.name}
-                            <span className="mr-2 text-xs font-medium text-slate-400">#{period.periodNumber}</span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{formatDate(period.startDate)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatDate(period.endDate)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>
-                              {state === 'OPEN' ? <Circle className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1.5">
-                              {(state === 'OPEN' || state === 'IN_REVIEW') && canClose && (
-                                <button
-                                  type="button"
-                                  onClick={(event) => { event.stopPropagation(); openCloseChecklist(period); }}
-                                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
-                                >
-                                  فحص وإقفال
-                                </button>
-                              )}
-                              {state === 'CLOSED' && canReopen && (
-                                <button
-                                  type="button"
-                                  onClick={(event) => { event.stopPropagation(); setReopenReason(''); setReopenPeriodTarget(period); }}
-                                  className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
-                                >
-                                  إعادة فتح
-                                </button>
-                              )}
-                              {state === 'CLOSED' && canClose && (
-                                <button
-                                  type="button"
-                                  onClick={(event) => { event.stopPropagation(); runAction(() => service.lockPeriod(period.id), 'تم تأمين الفترة نهائيًا.'); }}
-                                  className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
-                                >
-                                  تأمين
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="الفترات المالية"
+                  rows={periods}
+                  rowKey={(period) => period.id}
+                  onRowClick={(period) => { setSelectedPeriodId(period.id); loadPeriodDetails(period.id); }}
+                  rowClassName={(period) => selectedPeriodId === period.id ? 'bg-cyan-50/70' : 'hover:bg-slate-50'}
+                  columns={[
+                    {
+                      key: 'period', header: 'الشهر / الفترة',
+                      render: (period) => (
+                        <span className="font-bold text-slate-800">
+                          {period.name}
+                          <span className="mr-2 text-xs font-medium text-slate-400">#{period.periodNumber}</span>
+                        </span>
+                      ),
+                    },
+                    { key: 'start', header: 'بداية الفترة', render: (period) => <span className="text-slate-600">{formatDate(period.startDate)}</span> },
+                    { key: 'end', header: 'نهاية الفترة', render: (period) => <span className="text-slate-600">{formatDate(period.endDate)}</span> },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (period) => {
+                        const status = periodStatus(period);
+                        const state = period.workflowState || period.status;
+                        return (
+                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                            {state === 'OPEN' ? <Circle className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                            {status.label}
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: 'actions', header: 'الإجراء',
+                      render: (period) => {
+                        const state = period.workflowState || period.status;
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(state === 'OPEN' || state === 'IN_REVIEW') && canClose && (
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); openCloseChecklist(period); }}
+                                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
+                              >
+                                فحص وإقفال
+                              </button>
+                            )}
+                            {state === 'CLOSED' && canReopen && (
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); setReopenReason(''); setReopenPeriodTarget(period); }}
+                                className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                              >
+                                إعادة فتح
+                              </button>
+                            )}
+                            {state === 'CLOSED' && canClose && (
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); runAction(() => service.lockPeriod(period.id), 'تم تأمين الفترة نهائيًا.'); }}
+                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                              >
+                                تأمين
+                              </button>
+                            )}
+                          </div>
+                        );
+                      },
+                    },
+                  ]}
+                />
               </div>
             )}
           </section>
@@ -813,21 +815,19 @@ export const FiscalClosingPage: React.FC = () => {
                             <h3 className="font-bold text-slate-800">لقطة أرصدة العملاء والموردين</h3>
                             <p className="mt-1 text-xs text-slate-500">تغطية السجل تبدأ من {report.payload.subledgerCoverageStartDate ? formatDate(report.payload.subledgerCoverageStartDate) : 'غير محدد'}.</p>
                             <div className="mt-3 max-h-72 overflow-y-auto">
-                              <table className="w-full text-right text-xs">
-                                <thead className="bg-slate-50 text-slate-500">
-                                  <tr><th className="px-2 py-1">النوع</th><th className="px-2 py-1">معرّف الطرف</th><th className="px-2 py-1">حساب الرقابة</th><th className="px-2 py-1">الرصيد</th></tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {report.payload.partySubledgerBalances.map((row) => (
-                                    <tr key={`${row.partyType}-${row.partyId}`}>
-                                      <td className="px-2 py-1">{row.partyType === 'CUSTOMER' ? 'عميل' : 'مورد'}</td>
-                                      <td className="px-2 py-1">{row.partyId}</td>
-                                      <td className="px-2 py-1">{row.controlAccountCode}</td>
-                                      <td className="px-2 py-1">{formatMoney(row.balance)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              <DataTable
+                                ariaLabel="أرصدة الأطراف"
+                                rows={report.payload.partySubledgerBalances}
+                                rowKey={(row) => `${row.partyType}-${row.partyId}`}
+                                dense
+                                tableClassName="text-xs"
+                                columns={[
+                                  { key: 'type', header: 'النوع', render: (row) => row.partyType === 'CUSTOMER' ? 'عميل' : 'مورد' },
+                                  { key: 'party', header: 'معرّف الطرف', render: (row) => row.partyId },
+                                  { key: 'account', header: 'حساب الرقابة', render: (row) => row.controlAccountCode },
+                                  { key: 'balance', header: 'الرصيد', render: (row) => formatMoney(row.balance) },
+                                ]}
+                              />
                             </div>
                           </div>
                         )}
@@ -849,14 +849,19 @@ export const FiscalClosingPage: React.FC = () => {
                           <div className="rounded-xl border border-slate-200 p-4">
                             <h3 className="font-bold text-slate-800">ميزان المراجعة</h3>
                             <div className="mt-2 max-h-72 overflow-y-auto">
-                              <table className="w-full text-right text-xs">
-                                <thead className="bg-slate-50 text-slate-500"><tr><th className="px-2 py-1">الحساب</th><th className="px-2 py-1">مدين</th><th className="px-2 py-1">دائن</th><th className="px-2 py-1">الرصيد</th></tr></thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {report.payload.trialBalance.map((row) => (
-                                    <tr key={row.code}><td className="px-2 py-1">{row.code} - {row.name}</td><td className="px-2 py-1">{formatMoney(row.debit)}</td><td className="px-2 py-1">{formatMoney(row.credit)}</td><td className="px-2 py-1">{formatMoney(row.balance)}</td></tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              <DataTable
+                                ariaLabel="ميزان المراجعة"
+                                rows={report.payload.trialBalance}
+                                rowKey={(row) => row.code}
+                                dense
+                                tableClassName="text-xs"
+                                columns={[
+                                  { key: 'account', header: 'الحساب', render: (row) => `${row.code} - ${row.name}` },
+                                  { key: 'debit', header: 'مدين', render: (row) => formatMoney(row.debit) },
+                                  { key: 'credit', header: 'دائن', render: (row) => formatMoney(row.credit) },
+                                  { key: 'balance', header: 'الرصيد', render: (row) => formatMoney(row.balance) },
+                                ]}
+                              />
                             </div>
                           </div>
                           <div className="space-y-3">

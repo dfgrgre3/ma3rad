@@ -107,7 +107,13 @@ export class PermissionChecker {
   public static can(user: User | null, required: string, scope?: string, ctx?: AuthContext): boolean {
     // scope التاريخي هو مسار الصفحة — يُمرَّر كـ ctx.path إلى محرك الصلاحيات
     // الموحد الذي يقيّم الأبعاد: central → grant → scope → amount → sensitivity.
-    return AuthorizationService.evaluate(user, required, { path: scope, ...ctx }).allowed;
+    // بلا مسار صريح نستخدم المسار الحالي للواجهة حتى تحترم can() قيود المنصة المركزية.
+    const merged: AuthContext = { path: scope, ...ctx };
+    if (!merged.path) {
+      const current = CentralFeaturePermissionService.getCurrentPath();
+      if (current) merged.path = current;
+    }
+    return AuthorizationService.evaluate(user, required, merged).allowed;
   }
 
   /** تقييم موسّع بالسياق الكامل (فرع/مخزن/مبلغ/عملية) — للمرحلة 1+. */

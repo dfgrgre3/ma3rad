@@ -193,7 +193,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
 
   if (!canViewDocuments && !canViewContracts) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950" dir="rtl">
+      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center">
           <LockKeyhole className="w-10 h-10 text-slate-400 mx-auto mb-2" />
           <p className="text-sm font-bold text-slate-600 dark:text-slate-300">ليس لديك صلاحية الوصول إلى المستندات أو العقود.</p>
@@ -442,7 +442,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
     : Object.entries(CONTRACT_STATUS_LABEL);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center">

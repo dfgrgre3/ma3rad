@@ -55,7 +55,7 @@ export const CashierPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full relative" dir="rtl">
+    <div className="p-6 space-y-6 overflow-y-auto h-full relative">
       {notification && (
         <div className={`fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-2 fade-in duration-300 ${
           notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'

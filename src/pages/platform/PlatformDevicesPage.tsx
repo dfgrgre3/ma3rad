@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { Cpu, Search, ShieldAlert, ShieldX, Link } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -8,9 +9,9 @@ import type { PlatformDevice, PlatformTenant } from '../../services/domains/plat
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformDevicesPage: React.FC = () => {
   const toast = useToast();
   const canManageDevices = canPlatform('devices');
@@ -188,102 +189,69 @@ export const PlatformDevicesPage: React.FC = () => {
           <EmptyState icon={<Cpu className="h-5 w-5" />} title="لا توجد أجهزة مسجلة" description="ستُسجّل الأجهزة عند ربط التراخيص." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-right">
-              <thead className="bg-slate-50 text-[10.5px] text-slate-500">
-                <tr>
-                  <th className="px-3 py-2.5 font-semibold">العميل</th>
-                  <th className="px-3 py-2.5 font-semibold">Hardware ID</th>
-                  <th className="px-3 py-2.5 font-semibold">الاسم</th>
-                  <th className="px-3 py-2.5 font-semibold">نظام التشغيل</th>
-                  <th className="px-3 py-2.5 font-semibold">الإصدار</th>
-                  <th className="px-3 py-2.5 font-semibold">IP</th>
-                  <th className="px-3 py-2.5 font-semibold">أول تفعيل</th>
-                  <th className="px-3 py-2.5 font-semibold">آخر اتصال</th>
-                  <th className="px-3 py-2.5 font-semibold">الحالة</th>
-                  <th className="px-3 py-2.5 font-semibold">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((device) => {
-                  const tenant = tenants.find((item) => item.id === device.tenantId);
-                  return (
-                    <tr key={device.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                      <td className="px-3 py-2.5 text-[11.5px] font-semibold text-slate-700">{tenant?.name || device.tenantId}</td>
-                      <td className="px-3 py-2.5 font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-600">{device.name || '—'}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-600">{device.os || '—'}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-600">{device.appVersion || '—'}</td>
-                      <td className="px-3 py-2.5 font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</td>
-                      <td className="px-3 py-2.5 text-[10.5px] text-slate-600">{formatDateTime(device.firstActivatedAt)}</td>
-                      <td className="px-3 py-2.5 text-[10.5px] text-slate-600">{formatDateTime(device.lastSeenAt)}</td>
-                      <td className="px-3 py-2.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${device.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : device.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {device.status}{device.cloneSuspected ? ' · استنساخ' : ''}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1">
-                          {canManageDevices && (
-                            <>
-                              {!centralMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); void load(); }}
-                                  className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                                  title="إيقاف/تفعيل"
-                                >
-                                  <Cpu className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {device.status === 'ACTIVE' && (
-                                <button
-                                  type="button"
-                                  onClick={() => openDeviceAction('suspend', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
-                                  className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
-                                  title="إيقاف عن بُعد"
-                                >
-                                  <ShieldAlert className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {device.licenseId && (
-                                <button
-                                  type="button"
-                                  onClick={() => openDeviceAction('release', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
-                                  className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-                                  title="تحرير الربط"
-                                >
-                                  <Link className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {device.status !== 'REVOKED' && (
-                                <button
-                                  type="button"
-                                  onClick={() => openDeviceAction('revoke', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })}
-                                  className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                                  title="إلغاء الجهاز"
-                                >
-                                  <ShieldX className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {!centralMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); void load(); } }}
-                                  className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                                  title="حذف التفعيل"
-                                >
-                                  <Cpu className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </>
+            <DataTable
+              ariaLabel="أجهزة العملاء"
+              rows={filtered}
+              rowKey={(device: any) => String(device.id)}
+              minWidth={1000}
+              dense
+              tableClassName="text-[11px]"
+              rowClassName={() => 'transition hover:bg-slate-50/60'}
+              columns={[
+                { key: 'tenant', header: 'العميل', render: (device: any) => { const tenant = tenants.find((item: any) => item.id === device.tenantId); return <span className="text-[11.5px] font-semibold text-slate-700">{tenant?.name || device.tenantId}</span>; } },
+                { key: 'hw', header: 'Hardware ID', render: (device: any) => <span className="font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</span> },
+                { key: 'name', header: 'الاسم', render: (device: any) => <span className="text-[11px] text-slate-600">{device.name || '—'}</span> },
+                { key: 'os', header: 'نظام التشغيل', render: (device: any) => <span className="text-[11px] text-slate-600">{device.os || '—'}</span> },
+                { key: 'ver', header: 'الإصدار', render: (device: any) => <span className="text-[11px] text-slate-600">{device.appVersion || '—'}</span> },
+                { key: 'ip', header: 'IP', render: (device: any) => <span className="font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</span> },
+                { key: 'first', header: 'أول تفعيل', render: (device: any) => <span className="text-[10.5px] text-slate-600">{formatDateTime(device.firstActivatedAt)}</span> },
+                { key: 'seen', header: 'آخر اتصال', render: (device: any) => <span className="text-[10.5px] text-slate-600">{formatDateTime(device.lastSeenAt)}</span> },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (device: any) => (
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${device.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : device.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {device.status}{device.cloneSuspected ? ' · استنساخ' : ''}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (device: any) => (
+                    <span className="flex items-center gap-1">
+                      {canManageDevices && (
+                        <>
+                          {!centralMode && (
+                            <button type="button" onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); void load(); }} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title="إيقاف/تفعيل">
+                              <Cpu className="h-3.5 w-3.5" />
+                            </button>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          {device.status === 'ACTIVE' && (
+                            <button type="button" onClick={() => openDeviceAction('suspend', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })} className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700" title="إيقاف عن بُعد">
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {device.licenseId && (
+                            <button type="button" onClick={() => openDeviceAction('release', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })} className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700" title="تحرير الربط">
+                              <Link className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {device.status !== 'REVOKED' && (
+                            <button type="button" onClick={() => openDeviceAction('revoke', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الجهاز">
+                              <ShieldX className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {!centralMode && (
+                            <button type="button" onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); void load(); } }} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف التفعيل">
+                              <Cpu className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </section>

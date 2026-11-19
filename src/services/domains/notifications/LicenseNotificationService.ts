@@ -33,35 +33,23 @@ export class LicenseNotificationService {
     // 1. Check expiring licenses and subscriptions
     const expiryResult = platformAdminService.checkExpiringLicensesAndSubscriptions();
 
-    // 2. Run clone detection. Requires a valid platform session; skip gracefully if unavailable
-    //    (e.g. when running in the renderer without backend access).
-    //    detectCloneDevices() throws if requirePlatformAccess fails.
-    //    We catch any failure and skip the clone detection.
+    // 2. Run clone detection. Cross-tenant detection requires a platform
+    //    session: try the local platform service first (platform-owner
+    //    installs), then the central admin API when a platform token exists
+    //    on this device. Tenant installs have neither — the central server
+    //    runs its own scheduled detection for them, so skipping here is
+    //    expected rather than an error.
     let cloneResult: ReturnType<typeof platformAdminService.detectCloneDevices> | null = null;
     try {
-      // In renderer contexts the platform service may be unavailable. Attempt direct
-      // central API as a fallback instead of throwing, so the app does not crash.
+      cloneResult = platformAdminService.detectCloneDevices();
+    } catch {
       try {
-        cloneResult = platformAdminService.detectCloneDevices();
-      } catch (error) {
-        console.warn('Clone detection skipped (no valid platform session):', error);
-        cloneResult = null;
-      }
-    } catch (error) {
-      // Fallback: try central API directly if platform service is not reachable.
-      try {
-        const centralResult = await platformAdminService.detectCloneDevicesCentral?.();
-        cloneResult = {
-          suspected: [],
-          groups: [],
-          alerts: [],
-          duplicateHwids: (centralResult?.duplicateHwids ?? []),
-          overLimitLicenses: (centralResult?.overLimitLicenses ?? []),
-          suspiciousTransfers: (centralResult?.suspiciousTransfers ?? []),
-        };
+        cloneResult = await platformAdminService.detectCloneDevicesCentral();
       } catch (centralError) {
         console.warn('Clone detection via central API failed:', centralError);
-        cloneResult = null;
+      }
+      if (!cloneResult) {
+        console.info('[LicenseNotificationService] Clone detection skipped: no valid platform session on this device.');
       }
     }
     const cloneDetections = cloneResult

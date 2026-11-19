@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Calendar, Printer, FileDown, Loader2, AlertTriangle, Wallet, Clock } from 'lucide-react';
 import { EmployeeService, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -194,7 +195,7 @@ export const PayslipsPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600">
@@ -281,58 +282,57 @@ export const PayslipsPage: React.FC = () => {
 
               {run ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1200px] text-right text-xs">
-                    <thead className="border-b border-slate-200 bg-white sticky top-0">
-                      <tr>
-                        {[
-                          'الموظف', 'الأساسي', 'إضافي', 'مكافآت وعمولات', 'بدلات', 'الخصومات', 'ضريبة', 'تأمينات',
-                          'السلف والقروض', 'الإجمالي', 'الصافي', 'حالة الصرف', 'إجراءات',
-                        ].map((heading) => (
-                          <th key={heading} className="px-3 py-3 font-bold text-slate-500">{heading}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {run.items.map((item) => (
-                        <tr key={item.id} className="align-top hover:bg-slate-50/70">
-                          <td className="px-3 py-3 font-bold text-slate-800">
-                            {item.employeeName}
-                            <div className="mt-1 text-[10px] font-normal text-slate-400">{item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}</div>
-                          </td>
-                          <td className="px-3 py-3 font-mono">{money(item.baseAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.overtimeAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.bonusAmount + item.commissionAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.allowanceAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.attendanceDeductionAmount + item.manualDeductionAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.taxAmount)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.socialInsuranceEmployeeShare)}</td>
-                          <td className="px-3 py-3 font-mono">{money(item.advanceAmount + item.loanDeductionAmount)}</td>
-                          <td className="px-3 py-3 font-mono font-bold">{money(item.grossAmount)}</td>
-                          <td className={`px-3 py-3 font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{money(item.netAmount)}</td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              item.payoutStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                            }`}>
-                              {item.payoutStatus === 'PAID' ? 'مصروف' : 'معلق'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => printPayslip(item)}
-                              disabled={printing === item.id}
-                              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600 disabled:opacity-50"
-                            >
-                              {printing === item.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Printer className="w-2.5 h-2.5" />}
-                              قسيمة
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {!run.items.length && (
-                        <tr><td colSpan={13} className="py-12 text-center text-slate-400">لا يوجد موظفون مستحقون في هذه الفترة.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+                  <DataTable
+                  ariaLabel="قسائم رواتب الفترة"
+                  rows={run.items}
+                  rowKey={(item) => item.id}
+                  minWidth={1200}
+                  stickyHeader
+                  tableClassName="text-xs"
+                  columns={[
+                    {
+                      key: 'employee', header: 'الموظف',
+                      render: (item) => (
+                        <span className="font-bold text-slate-800">
+                          {item.employeeName}
+                          <span className="mt-1 block text-[10px] font-normal text-slate-400">{item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}</span>
+                        </span>
+                      ),
+                    },
+                    { key: 'base', header: 'الأساسي', render: (item) => <span className="font-mono">{money(item.baseAmount)}</span> },
+                    { key: 'overtime', header: 'إضافي', render: (item) => <span className="font-mono">{money(item.overtimeAmount)}</span> },
+                    { key: 'bonus', header: 'مكافآت وعمولات', render: (item) => <span className="font-mono">{money(item.bonusAmount + item.commissionAmount)}</span> },
+                    { key: 'allowance', header: 'بدلات', render: (item) => <span className="font-mono">{money(item.allowanceAmount)}</span> },
+                    { key: 'deduction', header: 'الخصومات', render: (item) => <span className="font-mono">{money(item.attendanceDeductionAmount + item.manualDeductionAmount)}</span> },
+                    { key: 'tax', header: 'ضريبة', render: (item) => <span className="font-mono">{money(item.taxAmount)}</span> },
+                    { key: 'insurance', header: 'تأمينات', render: (item) => <span className="font-mono">{money(item.socialInsuranceEmployeeShare)}</span> },
+                    { key: 'advances', header: 'السلف والقروض', render: (item) => <span className="font-mono">{money(item.advanceAmount + item.loanDeductionAmount)}</span> },
+                    { key: 'gross', header: 'الإجمالي', render: (item) => <span className="font-mono font-bold">{money(item.grossAmount)}</span> },
+                    { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{money(item.netAmount)}</span> },
+                    {
+                      key: 'payout', header: 'حالة الصرف',
+                      render: (item) => (
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${item.payoutStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {item.payoutStatus === 'PAID' ? 'مصروف' : 'معلق'}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'actions', header: 'إجراءات',
+                      render: (item) => (
+                        <button
+                          onClick={() => printPayslip(item)}
+                          disabled={printing === item.id}
+                          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600 disabled:opacity-50"
+                        >
+                          {printing === item.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Printer className="w-2.5 h-2.5" />}
+                          قسيمة
+                        </button>
+                      ),
+                    },
+                  ]}
+                  emptyTitle="لا يوجد موظفون مستحقون في هذه الفترة."
+                />
                 </div>
               ) : (
                 <div className="p-10 text-center text-slate-500">اختر فترة من القائمة أعلاه لعرض كشوف الرواتب.</div>

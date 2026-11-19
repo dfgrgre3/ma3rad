@@ -27,7 +27,7 @@ export const OperationalFieldsRecordEditor: React.FC<{
   return (
     <>
       {canEdit && <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-800 hover:bg-teal-100"><SlidersHorizontal className="h-3 w-3" /> حقول إضافية</button>}
-      {open && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4" dir="rtl">
+      {open && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
         <section role="dialog" aria-modal="true" className="w-full max-w-3xl space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
           <header className="flex items-center justify-between">
             <h2 className="text-sm font-black text-slate-900">حقول إضافية · {recordLabel}</h2>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser, ChevronDown, ChevronLeft, Layers } from 'lucide-react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -515,39 +516,35 @@ export const AdminRolesTab: React.FC = () => {
           {limitScopeId && (
             <>
               <div className="mb-3 overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-right text-[10px] font-bold text-slate-400 dark:border-slate-700">
-                      <th className="p-2">الصلاحية</th>
-                      <th className="p-2">الحد الأقصى</th>
-                      <th className="p-2">العملة</th>
-                      <th className="p-2">عند التجاوز</th>
-                      <th className="p-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {limits.length === 0 && (
-                      <tr><td colSpan={5} className="p-3 text-center text-slate-400">لا حدود معرفة — المبالغ غير مقيّدة.</td></tr>
-                    )}
-                    {limits.map((limit) => (
-                      <tr key={limit.id} className="text-slate-700 dark:text-slate-200">
-                        <td className="p-2 font-mono font-bold">{limit.permissionCode}</td>
-                        <td className="p-2 font-bold">{limit.maxAmount.toLocaleString()}</td>
-                        <td className="p-2">{limit.currency}</td>
-                        <td className="p-2">
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${limit.onExceed === 'DENY' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'}`}>
-                            {limit.onExceed === 'DENY' ? 'رفض' : 'يتطلب اعتمادًا'}
-                          </span>
-                        </td>
-                        <td className="p-2">
-                          <button onClick={() => removeLimit(limit)} className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="حذف">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="حدود الصلاحيات"
+                  rows={limits}
+                  rowKey={(limit: any) => String(limit.id)}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'perm', header: 'الصلاحية', render: (limit: any) => <span className="font-mono font-bold">{limit.permissionCode}</span> },
+                    { key: 'max', header: 'الحد الأقصى', render: (limit: any) => <span className="font-bold">{limit.maxAmount.toLocaleString()}</span> },
+                    { key: 'currency', header: 'العملة', render: (limit: any) => limit.currency },
+                    {
+                      key: 'exceed', header: 'عند التجاوز',
+                      render: (limit: any) => (
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${limit.onExceed === 'DENY' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'}`}>
+                          {limit.onExceed === 'DENY' ? 'رفض' : 'يتطلب اعتمادًا'}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'actions', header: '',
+                      render: (limit: any) => (
+                        <button onClick={() => removeLimit(limit)} className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="حذف">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ),
+                    },
+                  ]}
+                  emptyTitle="لا حدود معرفة — المبالغ غير مقيّدة."
+                />
               </div>
 
               <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-200 p-3 dark:border-slate-700">

@@ -163,7 +163,7 @@ export const ReportsHubPage: React.FC = () => {
   const visibleCount = REPORT_DEFINITIONS.filter(canSeeReport).length;
 
   return (
-    <div className="erp-page" dir="rtl">
+    <div className="erp-page">
       <PageHeader
         icon={<BarChart3 className="h-5 w-5" />}
         title="مركز التقارير والتحليلات"

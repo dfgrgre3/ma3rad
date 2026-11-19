@@ -97,18 +97,18 @@ export const FinancialStatementsPage: React.FC = () => {
   const accounting = useMemo(() => new AccountingService(), []);
   const toast = useToast();
   const can = usePermission();
-  const canViewFinancial = can('finance.view') || can('finance.reports.view');
+  const canViewFinancial = can('finance.view') || can('reports.financial.view');
   const canViewInventory = can('inventory.view');
   const canViewAging = can('finance.view') || can('finance.receivables.view') || can('finance.payables.view');
   const [tab, setTab] = useState<FinancialStatementsTab>('balance');
   const TAB_PERMISSIONS: Record<FinancialStatementsTab, string> = {
-    income: 'finance.reports.view',
-    balance: 'finance.reports.view',
-    cash: 'finance.reports.view',
+    income: 'reports.profit_loss.view',
+    balance: 'reports.financial.view',
+    cash: 'reports.financial.view',
     aging: 'finance.receivables.view',
     subledger: 'finance.receivables.view',
-    ledger: 'finance.reports.view',
-    reconciliation: 'finance.reports.view',
+    ledger: 'reports.financial.view',
+    reconciliation: 'reports.financial.view',
   };
   const canTab = (t: FinancialStatementsTab) => can(TAB_PERMISSIONS[t] || 'finance.view');
   const visibleTabs = (Object.keys(TAB_PERMISSIONS) as FinancialStatementsTab[]).filter(canTab);
@@ -403,7 +403,7 @@ export const FinancialStatementsPage: React.FC = () => {
               : Boolean(reconciliation);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <FinancialStatementsHeader
         tab={activeTab}
         visibleTabs={visibleTabs}

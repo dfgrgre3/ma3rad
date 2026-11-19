@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { CheckCircle2, Loader2, MessageCircle, Search, Truck } from 'lucide-react';
 import { CustomerSupplyService, CustomerSupplyRequest } from '../../../services/domains/customers/CustomerSupplyService';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -53,9 +54,9 @@ export const ReadyDeliveriesPage: React.FC = () => {
     load();
   }, [canView, search, service]);
 
-  if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700" dir="rtl">ليس لديك صلاحية عرض هذه الصفحة.</div>;
+  if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700">ليس لديك صلاحية عرض هذه الصفحة.</div>;
 
-  return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+  return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
     <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center"><Truck className="w-5 h-5 text-emerald-700" /></div>
@@ -77,7 +78,19 @@ export const ReadyDeliveriesPage: React.FC = () => {
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold"><CheckCircle2 className="w-4 h-4" />جاهزة</div>
         </div>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">الوارد</th><th className="text-right p-3">السعر / الوحدة</th></tr></thead><tbody>{request.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName}</td><td className="p-3">{formatProductQuantity(item.quantityRequested, item)}</td><td className="p-3 text-emerald-700 font-bold">{formatProductQuantity(item.quantityReceived, item)}</td><td className="p-3">{fmt(item.unitPrice)} ج / {getProductUnitLabel(item)}</td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto"><DataTable
+          ariaLabel="أصناف طلب التسليم"
+          rows={request.items}
+          rowKey={(item: any) => String(item.id)}
+          dense
+          tableClassName="text-sm"
+          columns={[
+            { key: 'product', header: 'المنتج', render: (item: any) => <span className="font-semibold">{item.productName}</span> },
+            { key: 'req', header: 'المطلوب', render: (item: any) => formatProductQuantity(item.quantityRequested, item) },
+            { key: 'recv', header: 'الوارد', render: (item: any) => <span className="font-bold text-emerald-700">{formatProductQuantity(item.quantityReceived, item)}</span> },
+            { key: 'price', header: 'السعر / الوحدة', render: (item: any) => `${fmt(item.unitPrice)} ج / ${getProductUnitLabel(item)}` },
+          ]}
+        /></div>
         <div className="px-5 py-3 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-slate-600">المخزن: <b>{request.warehouseName || '—'}</b></div><button onClick={() => shareReadyDelivery(request)} disabled={!normalizeWhatsAppPhone(request.phone || '')} title={!normalizeWhatsAppPhone(request.phone || '') ? 'لا يوجد رقم هاتف صحيح للعميل' : 'فتح محادثة العميل على واتساب'} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>إرسال واتساب</button></div>
       </article>)}
       {!loading && rows.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500">لا توجد طلبات جاهزة للتسليم حاليًا</div>}

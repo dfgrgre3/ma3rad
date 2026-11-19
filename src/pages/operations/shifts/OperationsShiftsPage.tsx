@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertTriangle, ArrowRightLeft, CalendarClock, CheckCircle2, Clock3, Factory,
   Loader2, PauseCircle, PlayCircle, Plus, RefreshCw, Settings2, Users, Wallet,
@@ -368,7 +369,7 @@ export const OperationsShiftsPage: React.FC = () => {
   );
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full relative" dir="rtl">
+    <div className="p-6 space-y-6 overflow-y-auto h-full relative">
       {notice && (
         <div className="fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl bg-emerald-600 text-white flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5" /> <span className="text-sm font-bold">{notice}</span>
@@ -1151,39 +1152,34 @@ export const OperationsShiftsPage: React.FC = () => {
               className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-bold">تشغيل التقرير</button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-xs text-right">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  {['الوردية', 'التاريخ', 'الحالة', 'المشرف', 'الموظفون', 'المتوقع', 'الفعلي', 'الفرق', 'المسلّم', 'إنتاج جيد', 'هالك', 'توقف', 'ملاحظات', 'تكلفة العمالة', 'إضافي معتمد (د)', 'إنتاج/ساعة عمل', 'تكلفة/وحدة'].map((head) => (
-                    <th key={head} className="p-2 font-bold whitespace-nowrap">{head}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {report.length === 0 && <tr><td colSpan={17} className="p-6 text-center text-slate-400">لا توجد بيانات.</td></tr>}
-                {report.map((row) => (
-                  <tr key={row.shiftId} className="border-t border-slate-100">
-                    <td className="p-2 font-bold text-slate-700 whitespace-nowrap">{row.definitionName}</td>
-                    <td className="p-2 whitespace-nowrap">{row.businessDate}</td>
-                    <td className="p-2 whitespace-nowrap">{STATUS_LABELS[row.status] || row.status}</td>
-                    <td className="p-2 whitespace-nowrap">{row.supervisorName || '—'}</td>
-                    <td className="p-2">{row.staffCount}</td>
-                    <td className="p-2">{money(row.expectedCash)}</td>
-                    <td className="p-2">{money(row.actualCash)}</td>
-                    <td className="p-2">{money(row.cashDifference)}</td>
-                    <td className="p-2">{money(row.cashDelivered)}</td>
-                    <td className="p-2">{row.producedQty}</td>
-                    <td className="p-2">{row.scrapQty}</td>
-                    <td className="p-2">{row.downtimeMinutes}</td>
-                    <td className="p-2">{row.incidents}</td>
-                    <td className="p-2">{money(row.laborCost)}</td>
-                    <td className="p-2">{row.approvedOvertimeMinutes}</td>
-                    <td className="p-2">{row.productivityPerLaborHour.toFixed(2)}</td>
-                    <td className="p-2">{money(row.costPerGoodUnit)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="تقرير الورديات"
+              rows={report}
+              rowKey={(row: any) => String(row.shiftId)}
+              dense
+              tableClassName="whitespace-nowrap text-xs"
+              rowClassName={() => 'border-t border-slate-100'}
+              columns={[
+                { key: 'shift', header: 'الوردية', render: (row: any) => <span className="font-bold text-slate-700">{row.definitionName}</span> },
+                { key: 'date', header: 'التاريخ', render: (row: any) => <span>{row.businessDate}</span> },
+                { key: 'status', header: 'الحالة', render: (row: any) => <span>{STATUS_LABELS[row.status as keyof typeof STATUS_LABELS] || row.status}</span> },
+                { key: 'supervisor', header: 'المشرف', render: (row: any) => <span>{row.supervisorName || '—'}</span> },
+                { key: 'staff', header: 'الموظفون', render: (row: any) => <span>{row.staffCount}</span> },
+                { key: 'expected', header: 'المتوقع', render: (row: any) => <span>{money(row.expectedCash)}</span> },
+                { key: 'actual', header: 'الفعلي', render: (row: any) => <span>{money(row.actualCash)}</span> },
+                { key: 'diff', header: 'الفرق', render: (row: any) => <span>{money(row.cashDifference)}</span> },
+                { key: 'delivered', header: 'المسلّم', render: (row: any) => <span>{money(row.cashDelivered)}</span> },
+                { key: 'produced', header: 'إنتاج جيد', render: (row: any) => <span>{row.producedQty}</span> },
+                { key: 'scrap', header: 'هالك', render: (row: any) => <span>{row.scrapQty}</span> },
+                { key: 'downtime', header: 'توقف', render: (row: any) => <span>{row.downtimeMinutes}</span> },
+                { key: 'incidents', header: 'ملاحظات', render: (row: any) => <span>{row.incidents}</span> },
+                { key: 'labor', header: 'تكلفة العمالة', render: (row: any) => <span>{money(row.laborCost)}</span> },
+                { key: 'overtime', header: 'إضافي معتمد (د)', render: (row: any) => <span>{row.approvedOvertimeMinutes}</span> },
+                { key: 'prodHour', header: 'إنتاج/ساعة عمل', render: (row: any) => <span>{row.productivityPerLaborHour.toFixed(2)}</span> },
+                { key: 'costUnit', header: 'تكلفة/وحدة', render: (row: any) => <span>{money(row.costPerGoodUnit)}</span> },
+              ]}
+              emptyTitle="لا توجد بيانات."
+            />
           </div>
         </div>
       )}

@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Truck, Plus, Search, Loader2, MapPin, User, Phone, Calendar } from 'lucide-react';
 import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { STATUS_LABEL, STATUS_STYLE } from './deliveryStatus';
 import { DeliveryCreateModal } from './DeliveryCreateModal';
+import { useToast } from '../../../components/ui/Toast';
 type Customer = { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null };
 export const DeliveriesPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new OperationsService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.deliveries.deliveries.create');
@@ -67,7 +70,7 @@ export const DeliveriesPage: React.FC = () => {
       setModalOpen(false);
       setForm({ customerId: '', address: '', city: '', driverId: '', vehicleId: '', scheduledAt: '', deliveryFee: '', notes: '' });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر إنشاء أمر التسليم.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر إنشاء أمر التسليم.'); }
     finally { setSaving(false); }
   };
 
@@ -77,16 +80,16 @@ export const DeliveriesPage: React.FC = () => {
     };
     const next = map[d.status];
     if (!next) return;
-    try { service.updateDeliveryStatus(d.id, next); load(); } catch (e: any) { alert(e?.message); }
+    try { service.updateDeliveryStatus(d.id, next); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const cancel = (d: Delivery) => {
     if (!confirm(`إلغاء أمر التسليم ${d.deliveryNumber}؟`)) return;
-    try { service.updateDeliveryStatus(d.id, 'CANCELLED'); load(); } catch (e: any) { alert(e?.message); }
+    try { service.updateDeliveryStatus(d.id, 'CANCELLED'); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center"><Truck className="w-5 h-5 text-sky-600" /></div>
@@ -117,58 +120,72 @@ export const DeliveriesPage: React.FC = () => {
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div> : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
-            <table className="w-full text-right text-xs min-w-[800px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-4 py-3">رقم الأمر</th>
-                  <th className="px-4 py-3">العميل</th>
-                  <th className="px-4 py-3">العنوان</th>
-                  <th className="px-4 py-3">السائق / المركبة</th>
-                  <th className="px-4 py-3">التاريخ</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  {(canStart || canComplete || canCancel) && <th className="px-4 py-3"></th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deliveries.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-900">{d.deliveryNumber}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 font-bold text-slate-800"><User className="w-3 h-3" />{d.customerName}</div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono"><Phone className="w-3 h-3" />{d.customerPhone || '—'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div className="flex items-start gap-1"><MapPin className="w-3 h-3 mt-0.5 shrink-0" /><span className="line-clamp-2">{d.address}{d.city ? `, ${d.city}` : ''}</span></div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div>{d.driverName || 'غير مسند'}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{d.plateNumber || '—'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div className="flex items-center gap-1"><Calendar className="w-3 h-3" />{d.date ? new Date(d.date).toLocaleDateString('ar-EG') : '—'}</div>
-                    </td>
-                    <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${STATUS_STYLE[d.status]}`}>{STATUS_LABEL[d.status]}</span></td>
-                    {(canStart || canComplete || canCancel) && (
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
-                        {(d.status === 'PENDING' || d.status === 'SCHEDULED' || d.status === 'IN_TRANSIT')
-                          && (d.status === 'IN_TRANSIT' ? canComplete : canStart) && (
-                          <button
-                            onClick={() => advance(d)}
-                            className="px-2.5 py-1 mr-1 rounded-lg text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100"
-                          >
-                            {d.status === 'IN_TRANSIT' ? 'تأكيد التسليم' : 'بدء التوصيل'}
-                          </button>
-                        )}
-                        {canCancel && d.status !== 'DELIVERED' && d.status !== 'CANCELLED' && (
-                          <button onClick={() => cancel(d)} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100">إلغاء</button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {deliveries.length === 0 && <tr><td colSpan={7} className="py-16 text-center text-slate-400">لا توجد أوامر تسليم</td></tr>}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="أوامر التسليم"
+              rows={deliveries}
+              rowKey={(d: any) => String(d.id)}
+              minWidth={800}
+              tableClassName="text-xs"
+              columns={[
+                { key: 'num', header: 'رقم الأمر', render: (d: any) => <span className="font-mono font-bold text-slate-900">{d.deliveryNumber}</span> },
+                {
+                  key: 'customer', header: 'العميل',
+                  render: (d: any) => (
+                    <span className="block">
+                      <span className="flex items-center gap-1 font-bold text-slate-800"><User className="h-3 w-3" />{d.customerName}</span>
+                      <span className="flex items-center gap-1 font-mono text-[10px] text-slate-400"><Phone className="h-3 w-3" />{d.customerPhone || '—'}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'address', header: 'العنوان',
+                  render: (d: any) => (
+                    <span className="flex items-start gap-1 text-slate-600">
+                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="line-clamp-2">{d.address}{d.city ? `, ${d.city}` : ''}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'driver', header: 'السائق / المركبة',
+                  render: (d: any) => (
+                    <span className="block text-slate-600">
+                      <span className="block">{d.driverName || 'غير مسند'}</span>
+                      <span className="block font-mono text-[10px] text-slate-400">{d.plateNumber || '—'}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'date', header: 'التاريخ',
+                  render: (d: any) => (
+                    <span className="flex items-center gap-1 text-slate-600">
+                      <Calendar className="h-3 w-3" />{d.date ? new Date(d.date).toLocaleDateString('ar-EG') : '—'}
+                    </span>
+                  ),
+                },
+                { key: 'status', header: 'الحالة', render: (d: any) => <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[d.status as keyof typeof STATUS_STYLE]}`}>{STATUS_LABEL[d.status as keyof typeof STATUS_LABEL]}</span> },
+                ...(canStart || canComplete || canCancel ? [{
+                  key: 'actions', header: '',
+                  render: (d: any) => (
+                    <span className="block whitespace-nowrap text-left">
+                      {(d.status === 'PENDING' || d.status === 'SCHEDULED' || d.status === 'IN_TRANSIT')
+                        && (d.status === 'IN_TRANSIT' ? canComplete : canStart) && (
+                        <button
+                          onClick={() => advance(d)}
+                          className="ml-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-100"
+                        >
+                          {d.status === 'IN_TRANSIT' ? 'تأكيد التسليم' : 'بدء التوصيل'}
+                        </button>
+                      )}
+                      {canCancel && d.status !== 'DELIVERED' && d.status !== 'CANCELLED' && (
+                        <button onClick={() => cancel(d)} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-100">إلغاء</button>
+                      )}
+                    </span>
+                  ),
+                }] : []),
+              ]}
+              emptyTitle="لا توجد أوامر تسليم"
+            />
           </div>
         )}
       </div>

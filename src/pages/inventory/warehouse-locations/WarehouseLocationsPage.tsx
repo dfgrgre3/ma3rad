@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { 
   Barcode, Plus, Search, RefreshCw, Printer, 
   Eye, Edit3, Trash2, X
@@ -172,7 +173,7 @@ export const WarehouseLocationsPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 1 }).format(Number(n) || 0);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -511,50 +512,37 @@ export const WarehouseLocationsPage: React.FC = () => {
             </div>
 
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
-              <table className="w-full text-sm text-right">
-                <thead className="bg-slate-50 text-[11px] font-black text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-2.5">الصنف</th>
-                    <th className="px-3 py-2.5">الكود</th>
-                    <th className="px-3 py-2.5 text-center">الكمية المسكنة</th>
-                    <th className="px-3 py-2.5 text-center">آخر تحديث</th>
-                    <th className="px-3 py-2.5 text-center">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {locationProducts.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/70">
-                      <td className="px-3 py-2 font-bold text-slate-900">{p.productName}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-slate-500">{p.sku}</td>
-                      <td className="px-3 py-2 text-center font-mono font-black text-violet-700">{formatProductQuantity(p.quantityM2, p)}</td>
-                      <td className="px-3 py-2 text-center text-[10px] text-slate-400">{p.lastMovedAt?.slice(0, 10)}</td>
-                      <td className="px-3 py-2 text-center">
-                        {canManage && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`هل تريد إزالة الصنف ${p.productName} من هذا الرف؟`)) {
-                                inventoryService.assignProductLocation(viewingLocation.id, p.productId, 0);
-                                handleViewProducts(viewingLocation);
-                                loadData();
-                              }
-                            }}
-                            className="text-xs text-rose-600 hover:underline font-bold"
-                          >
-                            تفريغ
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {locationProducts.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                        الرف فارغ حالياً، لم يتم تسكين أي بضائع به
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+                  ariaLabel="أصناف موقع التخزين"
+                  rows={locationProducts}
+                  rowKey={(p: any) => String(p.id)}
+                  dense
+                  tableClassName="text-sm"
+                  columns={[
+                    { key: 'name', header: 'الصنف', render: (p: any) => <span className="font-bold text-slate-900">{p.productName}</span> },
+                    { key: 'sku', header: 'الكود', render: (p: any) => <span className="font-mono text-xs text-slate-500">{p.sku}</span> },
+                    { key: 'qty', header: 'الكمية المسكنة', align: 'center', render: (p: any) => <span className="font-mono font-black text-violet-700">{formatProductQuantity(p.quantityM2, p)}</span> },
+                    { key: 'updated', header: 'آخر تحديث', align: 'center', render: (p: any) => <span className="text-[10px] text-slate-400">{p.lastMovedAt?.slice(0, 10)}</span> },
+                    {
+                      key: 'actions', header: 'إجراءات', align: 'center',
+                      render: (p: any) => canManage ? (
+                        <button
+                          onClick={() => {
+                            if (confirm(`هل تريد إزالة الصنف ${p.productName} من هذا الرف؟`)) {
+                              inventoryService.assignProductLocation(viewingLocation.id, p.productId, 0);
+                              handleViewProducts(viewingLocation);
+                              loadData();
+                            }
+                          }}
+                          className="text-xs font-bold text-rose-600 hover:underline"
+                        >
+                          تفريغ
+                        </button>
+                      ) : null,
+                    },
+                  ]}
+                  emptyTitle="الرف فارغ حالياً، لم يتم تسكين أي بضائع به"
+                />
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">

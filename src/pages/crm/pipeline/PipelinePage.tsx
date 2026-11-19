@@ -5,6 +5,7 @@ import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmSe
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
+import { useToast } from '../../../components/ui/Toast';
 const STAGES: { id: LeadStage; label: string; color: string; bg: string; border: string }[] = [
   { id: 'NEW',         label: 'عميل محتمل',  color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
   { id: 'CONTACTED',   label: 'تم التواصل',  color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200' },
@@ -18,6 +19,7 @@ const STAGES: { id: LeadStage; label: string; color: string; bg: string; border:
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const PipelinePage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new CrmService(), []);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -48,14 +50,14 @@ export const PipelinePage: React.FC = () => {
       service.updateLead(lead.id, { stage: next.id });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحديث المرحلة.');
+      toast.error(err?.message || 'تعذر تحديث المرحلة.');
     }
   };
 
   const total = leads.reduce((s, l) => s + (l.estimatedValue || 0), 0);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Workflow className="w-5 h-5 text-violet-600" />

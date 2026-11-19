@@ -55,7 +55,7 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
+import { DataTable, type DataTableColumn } from '../../components/ui/DataTable';
 import {
   EmptyState,
   Field,
@@ -68,6 +68,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const STATUSES: PlatformTenantStatus[] = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'EXPIRED', 'CANCELLED'];
 
 const CYCLE_LABELS: Record<string, string> = {
@@ -1611,83 +1612,56 @@ export const PlatformTenantsPage: React.FC = () => {
             description="أضف عميلاً جديداً أو غيّر عوامل التصفية."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-right">
-              <thead className="bg-slate-50">
-                <tr className="text-[10.5px] text-slate-500">
-                  <th className="px-3 py-2.5 font-semibold w-10">
-                    <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={(e) => handleSelectAll(e.target.checked)} />
-                  </th>
-                  <th className="px-3 py-2.5 font-semibold">العميل / Tenant ID</th>
-                  <th className="px-3 py-2.5 font-semibold">النشاط</th>
-                  <th className="px-3 py-2.5 font-semibold">الباقة</th>
-                  <th className="px-3 py-2.5 font-semibold">الحالة</th>
-                  <th className="px-3 py-2.5 font-semibold">نهاية الاشتراك</th>
-                  <th className="px-3 py-2.5 font-semibold">الأجهزة</th>
-                  <th className="px-3 py-2.5 font-semibold">الفروع</th>
-                  <th className="px-3 py-2.5 font-semibold">مستحقات</th>
-                  <th className="px-3 py-2.5 font-semibold">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenants.slice((page - 1) * 20, page * 20).map((item) => (
-                  <tr key={item.id} className={`border-t border-slate-100 hover:bg-slate-50/60 ${selectedIds.has(item.id) ? 'bg-emerald-50/30' : ''}`}>
-                    <td className="px-3 py-2.5">
-                      <input type="checkbox" checked={selectedIds.has(item.id)} onChange={(e) => handleSelectOne(item.id, e.target.checked)} />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <p className="text-[12.5px] font-bold text-slate-800">{item.name}</p>
-                      <p className="text-[10px] text-slate-500">
-                        <span dir="ltr" className="font-mono">{item.code}</span>
-                        {' · '}
-                        <span dir="ltr" className="font-mono text-slate-400">{item.id}</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500">{item.phone || item.email || '—'}</p>
-                    </td>
-                    <td className="px-3 py-2.5 text-[11px] text-slate-600">{item.businessType || '—'}</td>
-                    <td className="px-3 py-2.5 text-[11.5px] font-semibold text-slate-600">{item.planName || '—'}</td>
-                    <td className="px-3 py-2.5"><StatusBadge value={item.status} label={PLATFORM_TENANT_STATUS_LABELS[item.status]} /></td>
-                    <td className="px-3 py-2.5 text-[11px] text-slate-600">{formatDate(item.subscriptionExpiresAt)}</td>
-                    <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-700">
-                      {formatNumber(item.devicesUsed ?? 0)} / {formatNumber(item.devicesLimit)}
-                    </td>
-                    <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-700">{formatNumber(item.branchesLimit)}</td>
-                    <td className={`px-3 py-2.5 text-[11px] font-bold ${(item.outstanding ?? 0) > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                      {formatMoney(item.outstanding ?? 0)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openProfile(item)}
-                          className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
-                          title="فتح الملف المركزي"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </button>
-                        {canManageTenants && (<button
-                          type="button"
-                          onClick={() => openEdit(item)}
-                          className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
-                          title="تعديل البيانات"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>)}
-                        <button
-                          type="button"
-                          onClick={() => openProfile(item)}
-                          className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                          title="الحساب والترخيص"
-                        >
-                          <KeyRound className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<PlatformTenant>
+            ariaLabel="قائمة العملاء"
+            rows={tenants.slice((page - 1) * 20, page * 20)}
+            rowKey={(item) => item.id}
+            minWidth={1080}
+            rowClassName={(item) => (selectedIds.has(item.id) ? 'bg-emerald-50/30' : '')}
+            columns={[
+              {
+                key: 'select', header: (
+                  <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={(e) => handleSelectAll(e.target.checked)} />
+                ),
+                render: (item) => <input type="checkbox" checked={selectedIds.has(item.id)} onChange={(e) => handleSelectOne(item.id, e.target.checked)} />,
+                width: 40,
+              },
+              {
+                key: 'tenant', header: 'العميل / Tenant ID',
+                render: (item) => (
+                  <>
+                    <p className="text-[12.5px] font-bold text-slate-800">{item.name}</p>
+                    <p className="text-[10px] text-slate-500">
+                      <span dir="ltr" className="font-mono">{item.code}</span>
+                      {' · '}
+                      <span dir="ltr" className="font-mono text-slate-400">{item.id}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500">{item.phone || item.email || '—'}</p>
+                  </>
+                ),
+              },
+              { key: 'business', header: 'النشاط', render: (item) => <span className="text-[11px] text-slate-600">{item.businessType || '—'}</span> },
+              { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11.5px] font-semibold text-slate-600">{item.planName || '—'}</span> },
+              { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.status} label={PLATFORM_TENANT_STATUS_LABELS[item.status]} /> },
+              { key: 'expires', header: 'نهاية الاشتراك', render: (item) => <span className="text-[11px] text-slate-600">{formatDate(item.subscriptionExpiresAt)}</span> },
+              { key: 'devices', header: 'الأجهزة', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{formatNumber(item.devicesUsed ?? 0)} / {formatNumber(item.devicesLimit)}</span> },
+              { key: 'branches', header: 'الفروع', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{formatNumber(item.branchesLimit)}</span> },
+              {
+                key: 'outstanding', header: 'مستحقات',
+                render: (item) => <span className={`text-[11px] font-bold ${(item.outstanding ?? 0) > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{formatMoney(item.outstanding ?? 0)}</span>,
+              },
+              {
+                key: 'actions', header: 'إجراءات',
+                render: (item) => (
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="فتح الملف المركزي"><Eye className="h-3.5 w-3.5" /></button>
+                    {canManageTenants && (<button type="button" onClick={() => openEdit(item)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تعديل البيانات"><Pencil className="h-3.5 w-3.5" /></button>)}
+                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title="الحساب والترخيص"><KeyRound className="h-3.5 w-3.5" /></button>
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
       </section>
 
@@ -2059,40 +2033,27 @@ export const PlatformTenantsPage: React.FC = () => {
                     {overrides.length === 0 ? (
                       <p className="text-[11px] text-slate-500">لا توجد مزايا أو حدود خاصة لهذا العميل.</p>
                     ) : (
-                      <div className="overflow-x-auto rounded-lg border border-slate-200">
-                        <table className="w-full min-w-[520px] text-right">
-                          <thead className="bg-slate-50 text-[10px] text-slate-500">
-                            <tr>
-                              <th className="px-3 py-2">النوع</th>
-                              <th className="px-3 py-2">الرمز</th>
-                              <th className="px-3 py-2">القيمة</th>
-                              <th className="px-3 py-2">الحالة</th>
-                              <th className="px-3 py-2">إجراء</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {overrides.map((item) => (
-                              <tr key={item.id} className="border-t border-slate-100">
-                                <td className="px-3 py-1.5 text-[10.5px] font-semibold text-slate-700">{item.kind}</td>
-                                <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{item.code}</td>
-                                <td className="px-3 py-1.5 text-[10.5px]">{item.value || (item.isEnabled ? 'مفعّل' : 'معطّل')}</td>
-                                <td className="px-3 py-1.5"><StatusBadge value={item.isEnabled ? 'ACTIVE' : 'CANCELLED'} label={item.isEnabled ? 'مفعّل' : 'معطّل'} /></td>
-                                <td className="px-3 py-1.5">
-                                  <button
-                                    type="button"
-                                    disabled={!canManageTenants}
-              onClick={() => removeOverride(item.id)}
-                                    className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                                    title="حذف"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                            <DataTable
+                        ariaLabel="المزايا والحدود الخاصة"
+                        rows={overrides}
+                        rowKey={(item) => item.id}
+                        minWidth={520}
+                        dense
+                        columns={[
+                          { key: 'kind', header: 'النوع', render: (item) => <span className="text-[10.5px] font-semibold text-slate-700">{item.kind}</span> },
+                          { key: 'code', header: 'الرمز', render: (item) => <span className="font-mono text-[10.5px]" dir="ltr">{item.code}</span> },
+                          { key: 'value', header: 'القيمة', render: (item) => <span className="text-[10.5px]">{item.value || (item.isEnabled ? 'مفعّل' : 'معطّل')}</span> },
+                          { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.isEnabled ? 'ACTIVE' : 'CANCELLED'} label={item.isEnabled ? 'مفعّل' : 'معطّل'} /> },
+                          {
+                            key: 'action', header: 'إجراء',
+                            render: (item) => (
+                              <button type="button" disabled={!canManageTenants} onClick={() => removeOverride(item.id)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ),
+                          },
+                        ]}
+                      />
                     )}
                   </div>
                 </SectionCard>
@@ -2150,34 +2111,22 @@ export const PlatformTenantsPage: React.FC = () => {
                   {profile.subscriptions.length === 0 ? (
                     <EmptyState icon={<CalendarClock className="h-5 w-5" />} title="لا توجد اشتراكات مسجلة" />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[720px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">الباقة</th>
-                            <th className="px-3 py-2">الحالة</th>
-                            <th className="px-3 py-2">البداية</th>
-                            <th className="px-3 py-2">النهاية</th>
-                            <th className="px-3 py-2">المستخدمون</th>
-                            <th className="px-3 py-2">السعر</th>
-                            <th className="px-3 py-2">الدورة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.subscriptions.map((item) => (
-                            <tr key={item.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5 text-[11px] font-semibold text-slate-700">{item.planName || '—'}</td>
-                              <td className="px-3 py-1.5"><StatusBadge value={item.status} label={item.status} /></td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDate(item.startDate)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDate(item.endDate)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatNumber(item.seats)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px] font-bold">{formatMoney(item.price)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{CYCLE_LABELS[item.billingCycle] || item.billingCycle}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="سجل الاشتراكات"
+                      rows={profile.subscriptions}
+                      rowKey={(item) => item.id}
+                      minWidth={720}
+                      dense
+                      columns={[
+                        { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{item.planName || '—'}</span> },
+                        { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.status} label={item.status} /> },
+                        { key: 'start', header: 'البداية', render: (item) => <span className="text-[10.5px]">{formatDate(item.startDate)}</span> },
+                        { key: 'end', header: 'النهاية', render: (item) => <span className="text-[10.5px]">{formatDate(item.endDate)}</span> },
+                        { key: 'seats', header: 'المستخدمون', render: (item) => <span className="text-[10.5px]">{formatNumber(item.seats)}</span> },
+                        { key: 'price', header: 'السعر', render: (item) => <span className="text-[10.5px] font-bold">{formatMoney(item.price)}</span> },
+                        { key: 'cycle', header: 'الدورة', render: (item) => <span className="text-[10.5px]">{CYCLE_LABELS[item.billingCycle] || item.billingCycle}</span> },
+                      ]}
+                    />
                   )}
                 </SectionCard>
               </div>
@@ -2198,43 +2147,29 @@ export const PlatformTenantsPage: React.FC = () => {
                   {profile.licenses.length === 0 ? (
                     <EmptyState icon={<KeyRound className="h-5 w-5" />} title="لا توجد تراخيص" description="استخدم تبويب الاشتراك لإصدار ترخيص أو نقل الباقة." />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[760px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">مفتاح الترخيص</th>
-                            <th className="px-3 py-2">الحالة</th>
-                            <th className="px-3 py-2">الجهاز</th>
-                            <th className="px-3 py-2">ينتهي</th>
-                            <th className="px-3 py-2">المستخدمون</th>
-                            <th className="px-3 py-2">حد الأجهزة</th>
-                            <th className="px-3 py-2">الوحدات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.licenses.map((license) => (
-                            <tr key={license.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(license.licenseKey, 'مفتاح الترخيص')}
-                                  className="inline-flex items-center gap-1 font-mono text-[10.5px] text-slate-700 hover:text-emerald-700"
-                                  dir="ltr"
-                                >
-                                  {license.licenseKey} <Copy className="h-3 w-3" />
-                                </button>
-                              </td>
-                              <td className="px-3 py-1.5"><StatusBadge value={license.status} label={license.status} /></td>
-                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{license.hardwareId || '—'}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDate(license.expiresAt)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatNumber(license.seats)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatNumber(license.deviceLimit)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatNumber(license.modules.length)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="التراخيص والأجهزة"
+                      rows={profile.licenses}
+                      rowKey={(item) => item.id}
+                      minWidth={760}
+                      dense
+                      columns={[
+                        {
+                          key: 'key', header: 'مفتاح الترخيص',
+                          render: (license) => (
+                            <button type="button" onClick={() => copyToClipboard(license.licenseKey, 'مفتاح الترخيص')} className="inline-flex items-center gap-1 font-mono text-[10.5px] text-slate-700 hover:text-emerald-700" dir="ltr">
+                              {license.licenseKey} <Copy className="h-3 w-3" />
+                            </button>
+                          ),
+                        },
+                        { key: 'status', header: 'الحالة', render: (license) => <StatusBadge value={license.status} label={license.status} /> },
+                        { key: 'device', header: 'الجهاز', render: (license) => <span className="text-[10.5px]" dir="ltr">{license.hardwareId || '—'}</span> },
+                        { key: 'expires', header: 'ينتهي', render: (license) => <span className="text-[10.5px]">{formatDate(license.expiresAt)}</span> },
+                        { key: 'seats', header: 'المستخدمون', render: (license) => <span className="text-[10.5px]">{formatNumber(license.seats)}</span> },
+                        { key: 'deviceLimit', header: 'حد الأجهزة', render: (license) => <span className="text-[10.5px]">{formatNumber(license.deviceLimit)}</span> },
+                        { key: 'modules', header: 'الوحدات', render: (license) => <span className="text-[10.5px]">{formatNumber(license.modules.length)}</span> },
+                      ]}
+                    />
                   )}
                 </SectionCard>
 
@@ -2267,30 +2202,20 @@ export const PlatformTenantsPage: React.FC = () => {
                   {profile.payments.length === 0 ? (
                     <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد مدفوعات مسجلة" />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[600px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">التاريخ</th>
-                            <th className="px-3 py-2">الفاتورة</th>
-                            <th className="px-3 py-2">المبلغ</th>
-                            <th className="px-3 py-2">الطريقة</th>
-                            <th className="px-3 py-2">المرجع</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.payments.map((payment) => (
-                            <tr key={payment.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDateTime(payment.paidAt)}</td>
-                              <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{payment.invoiceNumber || '—'}</td>
-                              <td className="px-3 py-1.5 text-[11px] font-bold text-emerald-700">{formatMoney(payment.amount)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{payment.method}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{payment.reference || '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="سجل المدفوعات"
+                      rows={profile.payments}
+                      rowKey={(item) => item.id}
+                      minWidth={600}
+                      dense
+                      columns={[
+                        { key: 'date', header: 'التاريخ', render: (payment) => <span className="text-[10.5px]">{formatDateTime(payment.paidAt)}</span> },
+                        { key: 'invoice', header: 'الفاتورة', render: (payment) => <span className="font-mono text-[10.5px]" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[11px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
+                        { key: 'method', header: 'الطريقة', render: (payment) => <span className="text-[10.5px]">{payment.method}</span> },
+                        { key: 'ref', header: 'المرجع', render: (payment) => <span className="text-[10.5px]" dir="ltr">{payment.reference || '—'}</span> },
+                      ]}
+                    />
                   )}
                 </SectionCard>
 
@@ -2298,32 +2223,21 @@ export const PlatformTenantsPage: React.FC = () => {
                   {profile.invoices.length === 0 ? (
                     <EmptyState icon={<CreditCard className="h-5 w-5" />} title="لا توجد فواتير بعد" />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[640px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">الرقم</th>
-                            <th className="px-3 py-2">الإصدار</th>
-                            <th className="px-3 py-2">الاستحقاق</th>
-                            <th className="px-3 py-2">الإجمالي</th>
-                            <th className="px-3 py-2">المدفوع</th>
-                            <th className="px-3 py-2">الحالة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.invoices.map((invoice) => (
-                            <tr key={invoice.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{invoice.number}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDate(invoice.issueDate)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatDate(invoice.dueDate)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px] font-bold">{formatMoney(invoice.total)}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]">{formatMoney(invoice.paidAmount)}</td>
-                              <td className="px-3 py-1.5"><StatusBadge value={invoice.status} label={invoice.status} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="فواتير العميل"
+                      rows={profile.invoices}
+                      rowKey={(item) => item.id}
+                      minWidth={640}
+                      dense
+                      columns={[
+                        { key: 'number', header: 'الرقم', render: (invoice) => <span className="font-mono text-[10.5px]" dir="ltr">{invoice.number}</span> },
+                        { key: 'issue', header: 'الإصدار', render: (invoice) => <span className="text-[10.5px]">{formatDate(invoice.issueDate)}</span> },
+                        { key: 'due', header: 'الاستحقاق', render: (invoice) => <span className="text-[10.5px]">{formatDate(invoice.dueDate)}</span> },
+                        { key: 'total', header: 'الإجمالي', render: (invoice) => <span className="text-[10.5px] font-bold">{formatMoney(invoice.total)}</span> },
+                        { key: 'paid', header: 'المدفوع', render: (invoice) => <span className="text-[10.5px]">{formatMoney(invoice.paidAmount)}</span> },
+                        { key: 'status', header: 'الحالة', render: (invoice) => <StatusBadge value={invoice.status} label={invoice.status} /> },
+                      ]}
+                    />
                   )}
                 </SectionCard>
               </div>
@@ -2344,55 +2258,39 @@ export const PlatformTenantsPage: React.FC = () => {
                   {users.length === 0 ? (
                     <EmptyState icon={<Users className="h-5 w-5" />} title="لا يوجد مستخدمون مسجلون" description="أضف مستخدمين (مسؤولون، كاشير، ...) لإدارة هذا العميل." />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[720px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">الاسم</th>
-                            <th className="px-3 py-2">اسم المستخدم</th>
-                            <th className="px-3 py-2">البريد</th>
-                            <th className="px-3 py-2">الهاتف</th>
-                            <th className="px-3 py-2">الدور</th>
-                            <th className="px-3 py-2">الحالة</th>
-                            <th className="px-3 py-2">ملاحظات</th>
-                            <th className="px-3 py-2">إجراء</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users.map((user) => (
-                            <tr key={user.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5 text-[11.5px] font-bold text-slate-800">{user.fullName}</td>
-                              <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{user.username || '—'}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{user.email || '—'}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{user.phone || '—'}</td>
-                              <td className="px-3 py-1.5 text-[10.5px] font-semibold text-slate-700">{user.role}</td>
-                              <td className="px-3 py-1.5"><StatusBadge value={user.status === 'ACTIVE' ? 'ACTIVE' : user.status === 'SUSPENDED' ? 'SUSPENDED' : 'TRIAL'} label={user.status === 'ACTIVE' ? 'نشط' : user.status === 'SUSPENDED' ? 'موقوف' : 'مدعو'} /></td>
-                              <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{user.notes || '—'}</td>
-                              <td className="px-3 py-1.5">
-                                <div className="flex items-center gap-1">
-                                  {canManageTenants && (<>
-                                    <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل">
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleUser(user, user.status !== 'ACTIVE')}
-                                    className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                                    title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}
-                                  >
-                                    {user.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                                  </button>
-                                  <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف">
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                  </>)}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="مستخدمو العميل"
+                      rows={users}
+                      rowKey={(item) => item.id}
+                      minWidth={720}
+                      dense
+                      columns={[
+                        { key: 'name', header: 'الاسم', render: (user) => <span className="text-[11.5px] font-bold text-slate-800">{user.fullName}</span> },
+                        { key: 'username', header: 'اسم المستخدم', render: (user) => <span className="font-mono text-[10.5px]" dir="ltr">{user.username || '—'}</span> },
+                        { key: 'email', header: 'البريد', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.email || '—'}</span> },
+                        { key: 'phone', header: 'الهاتف', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.phone || '—'}</span> },
+                        { key: 'role', header: 'الدور', render: (user) => <span className="text-[10.5px] font-semibold text-slate-700">{user.role}</span> },
+                        {
+                          key: 'status', header: 'الحالة',
+                          render: (user) => <StatusBadge value={user.status === 'ACTIVE' ? 'ACTIVE' : user.status === 'SUSPENDED' ? 'SUSPENDED' : 'TRIAL'} label={user.status === 'ACTIVE' ? 'نشط' : user.status === 'SUSPENDED' ? 'موقوف' : 'مدعو'} />,
+                        },
+                        { key: 'notes', header: 'ملاحظات', render: (user) => <span className="text-[10.5px] text-slate-500">{user.notes || '—'}</span> },
+                        {
+                          key: 'action', header: 'إجراء',
+                          render: (user) => (
+                            <div className="flex items-center gap-1">
+                              {canManageTenants && (<>
+                                <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل"><Pencil className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => toggleUser(user, user.status !== 'ACTIVE')} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}>
+                                  {user.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                </button>
+                                <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </>)}
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
                   )}
                 </SectionCard>
               </div>
@@ -2453,56 +2351,51 @@ export const PlatformTenantsPage: React.FC = () => {
                   {remoteDevices.length === 0 ? (
                     <EmptyState icon={<Cpu className="h-5 w-5" />} title="لا توجد أجهزة متصلة" description="ستظهر الأجهزة عند تفعيل التراخيص وربطها." />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[900px] text-right">
-                        <thead className="bg-slate-50 text-[10.5px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2 w-10"><input type="checkbox" onChange={(e) => e.target.checked ? setSelectedDeviceIds(remoteDevices.map(d => d.id)) : setSelectedDeviceIds([])} /></th>
-                            <th className="px-3 py-2 font-semibold">Hardware ID</th>
-                            <th className="px-3 py-2 font-semibold">الاسم</th>
-                            <th className="px-3 py-2 font-semibold">نظام التشغيل</th>
-                            <th className="px-3 py-2 font-semibold">إصدار التطبيق</th>
-                            <th className="px-3 py-2 font-semibold">IP</th>
-                            <th className="px-3 py-2 font-semibold">أول اتصال</th>
-                            <th className="px-3 py-2 font-semibold">آخر اتصال</th>
-                            <th className="px-3 py-2 font-semibold">الحالة</th>
-                            <th className="px-3 py-2 font-semibold">إجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {remoteDevices.map((device) => (
-                            <tr key={device.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                              <td className="px-3 py-2"><input type="checkbox" checked={selectedDeviceIds.includes(device.id)} onChange={(e) => setSelectedDeviceIds(e.target.checked ? [...selectedDeviceIds, device.id] : selectedDeviceIds.filter(id => id !== device.id))} /></td>
-                              <td className="px-3 py-2 font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</td>
-                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.name || '—'}</td>
-                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.os || '—'}</td>
-                              <td className="px-3 py-2 text-[11px] text-slate-600">{device.appVersion || '—'}</td>
-                              <td className="px-3 py-2 font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</td>
-                              <td className="px-3 py-2 text-[10.5px] text-slate-600">{formatDateTime(device.firstActivatedAt)}</td>
-                              <td className="px-3 py-2 text-[10.5px] text-slate-600">{formatDateTime(device.lastSeenAt)}</td>
-                              <td className="px-3 py-2">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                  device.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' :
-                                  device.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-700' :
-                                  device.status === 'OFFLINE' ? 'bg-slate-100 text-slate-600' :
-                                  'bg-rose-50 text-rose-700'
-                                }`}>
-                                  {device.status === 'ACTIVE' ? 'نشط' : device.status === 'SUSPENDED' ? 'موقوف' : device.status === 'OFFLINE' ? 'غير متصل' : 'ملغي'}
-                                  {device.cloneSuspected ? ' · ⚠️' : ''}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-1">
-                                  {canManageTenants && (<button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
-                                    {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                                  </button>)}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="الأجهزة المتصلة"
+                      rows={remoteDevices}
+                      rowKey={(item) => item.id}
+                      minWidth={900}
+                      dense
+                      columns={[
+                        {
+                          key: 'select', header: <input type="checkbox" onChange={(e) => e.target.checked ? setSelectedDeviceIds(remoteDevices.map(d => d.id)) : setSelectedDeviceIds([])} />,
+                          render: (device) => <input type="checkbox" checked={selectedDeviceIds.includes(device.id)} onChange={(e) => setSelectedDeviceIds(e.target.checked ? [...selectedDeviceIds, device.id] : selectedDeviceIds.filter(id => id !== device.id))} />,
+                          width: 40,
+                        },
+                        { key: 'hw', header: 'Hardware ID', render: (device) => <span className="font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</span> },
+                        { key: 'name', header: 'الاسم', render: (device) => <span className="text-[11px] text-slate-600">{device.name || '—'}</span> },
+                        { key: 'os', header: 'نظام التشغيل', render: (device) => <span className="text-[11px] text-slate-600">{device.os || '—'}</span> },
+                        { key: 'version', header: 'إصدار التطبيق', render: (device) => <span className="text-[11px] text-slate-600">{device.appVersion || '—'}</span> },
+                        { key: 'ip', header: 'IP', render: (device) => <span className="font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</span> },
+                        { key: 'first', header: 'أول اتصال', render: (device) => <span className="text-[10.5px] text-slate-600">{formatDateTime(device.firstActivatedAt)}</span> },
+                        { key: 'last', header: 'آخر اتصال', render: (device) => <span className="text-[10.5px] text-slate-600">{formatDateTime(device.lastSeenAt)}</span> },
+                        {
+                          key: 'status', header: 'الحالة',
+                          render: (device) => (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              device.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' :
+                              device.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-700' :
+                              device.status === 'OFFLINE' ? 'bg-slate-100 text-slate-600' :
+                              'bg-rose-50 text-rose-700'
+                            }`}>
+                              {device.status === 'ACTIVE' ? 'نشط' : device.status === 'SUSPENDED' ? 'موقوف' : device.status === 'OFFLINE' ? 'غير متصل' : 'ملغي'}
+                              {device.cloneSuspected ? ' · ⚠️' : ''}
+                            </span>
+                          ),
+                        },
+                        {
+                          key: 'actions', header: 'إجراءات',
+                          render: (device) => (
+                            <div className="flex items-center gap-1">
+                              {canManageTenants && (<button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
+                                {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                              </button>)}
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
                   )}
                 </SectionCard>
 
@@ -2537,30 +2430,20 @@ export const PlatformTenantsPage: React.FC = () => {
                   {remoteConfig.length > 0 && (
                     <div className="border-t border-slate-100 mt-3 pt-3">
                       <p className="mb-2 text-[11px] font-semibold text-slate-700">إعدادات مطبقة حالياً</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[600px] text-right">
-                          <thead className="bg-slate-50 text-[10px] text-slate-500">
-                            <tr>
-                              <th className="px-3 py-2">المفتاح</th>
-                              <th className="px-3 py-2">القيمة</th>
-                              <th className="px-3 py-2">النطاق</th>
-                              <th className="px-3 py-2">الحالة</th>
-                              <th className="px-3 py-2">تاريخ التطبيق</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {remoteConfig.map((cfg) => (
-                              <tr key={cfg.id || cfg.key} className="border-t border-slate-100">
-                                <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{cfg.key}</td>
-                                <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{cfg.value}</td>
-                                <td className="px-3 py-1.5 text-[10.5px]">{cfg.scope}</td>
-                                <td className="px-3 py-1.5"><StatusBadge value={cfg.status || 'APPLIED'} label={cfg.status === 'APPLIED' ? 'مطبق' : cfg.status === 'PENDING' ? 'بانتظار' : 'فشل'} /></td>
-                                <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{formatDateTime(cfg.appliedAt || cfg.createdAt)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                            <DataTable
+                        ariaLabel="الإعدادات المطبقة حالياً"
+                        rows={remoteConfig}
+                        rowKey={(cfg) => cfg.id || cfg.key}
+                        minWidth={600}
+                        dense
+                        columns={[
+                          { key: 'key', header: 'المفتاح', render: (cfg) => <span className="font-mono text-[10.5px]" dir="ltr">{cfg.key}</span> },
+                          { key: 'value', header: 'القيمة', render: (cfg) => <span className="text-[10.5px]" dir="ltr">{cfg.value}</span> },
+                          { key: 'scope', header: 'النطاق', render: (cfg) => <span className="text-[10.5px]">{cfg.scope}</span> },
+                          { key: 'status', header: 'الحالة', render: (cfg) => <StatusBadge value={cfg.status || 'APPLIED'} label={cfg.status === 'APPLIED' ? 'مطبق' : cfg.status === 'PENDING' ? 'بانتظار' : 'فشل'} /> },
+                          { key: 'date', header: 'تاريخ التطبيق', render: (cfg) => <span className="text-[10.5px] text-slate-500">{formatDateTime(cfg.appliedAt || cfg.createdAt)}</span> },
+                        ]}
+                      />
                     </div>
                   )}
                 </SectionCard>
@@ -2578,34 +2461,22 @@ export const PlatformTenantsPage: React.FC = () => {
                   {remoteHistory.length === 0 ? (
                     <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا يوجد سجل عمليات" description="ستظهر هنا عمليات دفع التكوين عبر outbox/sync relay." />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[800px] text-right">
-                        <thead className="bg-slate-50 text-[10px] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2">النوع</th>
-                            <th className="px-3 py-2">المفتاح</th>
-                            <th className="px-3 py-2">القيمة</th>
-                            <th className="px-3 py-2">الأجهزة المستهدفة</th>
-                            <th className="px-3 py-2">الحالة</th>
-                            <th className="px-3 py-2">النتيجة / الخطأ</th>
-                            <th className="px-3 py-2">التاريخ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {remoteHistory.map((entry) => (
-                            <tr key={entry.id} className="border-t border-slate-100">
-                              <td className="px-3 py-1.5 text-[10.5px] font-semibold text-slate-700">{entry.type || 'CONFIG_PUSH'}</td>
-                              <td className="px-3 py-1.5 font-mono text-[10.5px]" dir="ltr">{entry.key}</td>
-                              <td className="px-3 py-1.5 text-[10.5px]" dir="ltr">{entry.value}</td>
-                              <td className="px-3 py-1.5 text-[10.5px] text-slate-600">{entry.targetCount || 0} جهاز</td>
-                              <td className="px-3 py-1.5"><StatusBadge value={entry.status || 'PENDING'} label={entry.status === 'ACKNOWLEDGED' ? 'وصل' : entry.status === 'SENT' ? 'مرسل' : entry.status === 'FAILED' ? 'فشل' : 'بانتظار'} /></td>
-                              <td className="px-3 py-1.5 text-[10.5px] text-slate-500" dir="ltr">{entry.error || entry.result || '—'}</td>
-                              <td className="px-3 py-1.5 text-[10.5px] text-slate-500">{formatDateTime(entry.createdAt)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                        <DataTable
+                      ariaLabel="سجل دفع التكوين"
+                      rows={remoteHistory}
+                      rowKey={(item) => item.id}
+                      minWidth={800}
+                      dense
+                      columns={[
+                        { key: 'type', header: 'النوع', render: (entry) => <span className="text-[10.5px] font-semibold text-slate-700">{entry.type || 'CONFIG_PUSH'}</span> },
+                        { key: 'key', header: 'المفتاح', render: (entry) => <span className="font-mono text-[10.5px]" dir="ltr">{entry.key}</span> },
+                        { key: 'value', header: 'القيمة', render: (entry) => <span className="text-[10.5px]" dir="ltr">{entry.value}</span> },
+                        { key: 'targets', header: 'الأجهزة المستهدفة', render: (entry) => <span className="text-[10.5px] text-slate-600">{entry.targetCount || 0} جهاز</span> },
+                        { key: 'status', header: 'الحالة', render: (entry) => <StatusBadge value={entry.status || 'PENDING'} label={entry.status === 'ACKNOWLEDGED' ? 'وصل' : entry.status === 'SENT' ? 'مرسل' : entry.status === 'FAILED' ? 'فشل' : 'بانتظار'} /> },
+                        { key: 'result', header: 'النتيجة / الخطأ', render: (entry) => <span className="text-[10.5px] text-slate-500" dir="ltr">{entry.error || entry.result || '—'}</span> },
+                        { key: 'date', header: 'التاريخ', render: (entry) => <span className="text-[10.5px] text-slate-500">{formatDateTime(entry.createdAt)}</span> },
+                      ]}
+                    />
                   )}
                 </SectionCard>
               </div>
@@ -2872,20 +2743,18 @@ export const PlatformTenantsPage: React.FC = () => {
           {csvPreview.length > 0 && (
             <div className="rounded-lg border border-slate-200 overflow-hidden">
               <p className="px-3 py-2 text-[10.5px] font-semibold text-slate-700 bg-slate-50 border-b">معاينة أول 5 أسطر:</p>
-              <div className="overflow-x-auto max-h-48">
-                <table className="w-full min-w-[600px] text-right text-sm">
-                  <thead className="bg-slate-50 text-[10px] text-slate-500">
-                    <tr>{csvPreview[0].map((h, i) => <th key={i} className="px-3 py-2">{h || `عمود ${i+1}`}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {csvPreview.slice(1).map((row, ri) => (
-                      <tr key={ri} className="border-t border-slate-100">
-                        {row.map((cell, ci) => <td key={ci} className="px-3 py-1.5 text-[10.5px]">{cell}</td>)}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <DataTable
+                ariaLabel="معاينة استيراد CSV"
+                rows={csvPreview.slice(1)}
+                rowKey={(row) => row.join('¦')}
+                minWidth={600}
+                dense
+                columns={csvPreview[0].map((h, i) => ({
+                  key: `col-${i}`,
+                  header: h || `عمود ${i + 1}`,
+                  render: (row: string[]) => <span className="text-[10.5px]">{row[i] ?? ''}</span>,
+                }))}
+              />
             </div>
           )}
         </div>

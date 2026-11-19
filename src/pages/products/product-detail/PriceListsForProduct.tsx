@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 
 interface PriceListsForProductProps {
@@ -14,13 +15,17 @@ export const PriceListsForProduct: React.FC<PriceListsForProductProps> = ({ prod
   );
   if (rows.length === 0) return <div className="text-center text-slate-500 py-8 text-sm">لا توجد قوائم أسعار مرتبطة</div>;
   return (
-    <table className="w-full text-sm text-right">
-      <thead className="bg-slate-50"><tr>{['قائمة الأسعار', `السعر (${unitLabel})`, 'العملة'].map((h) => <th key={h} className="px-4 py-2 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
-      <tbody className="divide-y divide-slate-100">
-        {rows.map((r) => (
-          <tr key={r.id}><td className="px-4 py-2 font-medium">{r.name}</td><td className="px-4 py-2 font-mono text-sky-600 font-bold">{r.priceM2}</td><td className="px-4 py-2 text-slate-500">{r.currency}</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      ariaLabel="قوائم أسعار المنتج"
+      rows={rows}
+      rowKey={(r: any) => String(r.id)}
+      dense
+      tableClassName="text-sm"
+      columns={[
+        { key: 'name', header: 'قائمة الأسعار', render: (r: any) => <span className="font-medium">{r.name}</span> },
+        { key: 'price', header: `السعر (${unitLabel})`, render: (r: any) => <span className="font-mono font-bold text-sky-600">{r.priceM2}</span> },
+        { key: 'cur', header: 'العملة', render: (r: any) => <span className="text-slate-500">{r.currency}</span> },
+      ]}
+    />
   );
 };

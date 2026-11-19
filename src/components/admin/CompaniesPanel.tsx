@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { DataTable } from '../ui/DataTable';
 import { Building2, Plus, Save, Ban, RefreshCw } from 'lucide-react';
 import { CompanyService } from '../../services/domains/organization/CompanyService';
 import { usePermission } from '../../hooks/domains/auth/usePermission';
@@ -132,71 +133,76 @@ export const CompaniesPanel: React.FC = () => {
       )}
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-        <table className="w-full text-right text-xs">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2">الكود</th>
-              <th className="px-3 py-2">الاسم</th>
-              <th className="px-3 py-2">القانوني</th>
-              <th className="px-3 py-2">الرقم الضريبي</th>
-              <th className="px-3 py-2">العملة</th>
-              <th className="px-3 py-2">الفروع</th>
-              <th className="px-3 py-2">الحالة</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.map((company) => {
+        <DataTable
+        ariaLabel="الشركات"
+        rows={companies}
+        rowKey={(company: any) => String(company.id)}
+        dense
+        tableClassName="text-xs"
+        columns={[
+          { key: 'code', header: 'الكود', render: (company: any) => <span className="font-mono">{company.code}</span> },
+          {
+            key: 'name', header: 'الاسم',
+            render: (company: any) => editing === company.id
+              ? <input className={inputCls} value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+              : company.name,
+          },
+          {
+            key: 'legal', header: 'القانوني',
+            render: (company: any) => editing === company.id
+              ? <input className={inputCls} value={editDraft.legalName} onChange={(e) => setEditDraft({ ...editDraft, legalName: e.target.value })} />
+              : company.legalName || '—',
+          },
+          {
+            key: 'tax', header: 'الرقم الضريبي',
+            render: (company: any) => editing === company.id
+              ? <input className={inputCls} value={editDraft.taxNumber} onChange={(e) => setEditDraft({ ...editDraft, taxNumber: e.target.value })} />
+              : company.taxNumber || '—',
+          },
+          {
+            key: 'currency', header: 'العملة',
+            render: (company: any) => editing === company.id
+              ? <input className={inputCls} value={editDraft.currency} onChange={(e) => setEditDraft({ ...editDraft, currency: e.target.value })} />
+              : company.currency || '—',
+          },
+          { key: 'branches', header: 'الفروع', render: (company: any) => company.branchCount ?? 0 },
+          {
+            key: 'status', header: 'الحالة',
+            render: (company: any) => (
+              <span className={company.isActive ? 'text-emerald-600' : 'text-slate-400'}>
+                {company.isActive ? 'نشطة' : 'معطلة'}
+              </span>
+            ),
+          },
+          {
+            key: 'actions', header: '', align: 'end' as const,
+            render: (company: any) => {
               const isEditing = editing === company.id;
               return (
-                <tr key={company.id} className="border-t border-slate-100 dark:border-slate-800">
-                  <td className="px-3 py-2 font-mono">{company.code}</td>
-                  <td className="px-3 py-2">
-                    {isEditing ? <input className={inputCls} value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} /> : company.name}
-                  </td>
-                  <td className="px-3 py-2">
-                    {isEditing ? <input className={inputCls} value={editDraft.legalName} onChange={(e) => setEditDraft({ ...editDraft, legalName: e.target.value })} /> : company.legalName || '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    {isEditing ? <input className={inputCls} value={editDraft.taxNumber} onChange={(e) => setEditDraft({ ...editDraft, taxNumber: e.target.value })} /> : company.taxNumber || '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    {isEditing ? <input className={inputCls} value={editDraft.currency} onChange={(e) => setEditDraft({ ...editDraft, currency: e.target.value })} /> : company.currency || '—'}
-                  </td>
-                  <td className="px-3 py-2">{company.branchCount ?? 0}</td>
-                  <td className="px-3 py-2">
-                    <span className={company.isActive ? 'text-emerald-600' : 'text-slate-400'}>
-                      {company.isActive ? 'نشطة' : 'معطلة'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-1">
-                      {isEditing ? (
-                        <button type="button" onClick={() => saveEdit(company)} className="rounded-md bg-emerald-600 p-1.5 text-white" title="حفظ">
-                          <Save className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        can('companies.update') && (
-                          <button type="button" onClick={() => startEdit(company)} className="rounded-md border border-slate-200 px-2 py-1 text-slate-600 dark:border-slate-700 dark:text-slate-300">
-                            تعديل
-                          </button>
-                        )
-                      )}
-                      {company.isActive && can('companies.delete') && !isEditing && (
-                        <button type="button" onClick={() => deactivate(company)} className="rounded-md border border-rose-200 p-1.5 text-rose-600 dark:border-rose-500/30" title="تعطيل">
-                          <Ban className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                <div className="flex justify-end gap-1">
+                  {isEditing ? (
+                    <button type="button" onClick={() => saveEdit(company)} className="rounded-md bg-emerald-600 p-1.5 text-white" title="حفظ">
+                      <Save className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    can('companies.update') && (
+                      <button type="button" onClick={() => startEdit(company)} className="rounded-md border border-slate-200 px-2 py-1 text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                        تعديل
+                      </button>
+                    )
+                  )}
+                  {company.isActive && can('companies.delete') && !isEditing && (
+                    <button type="button" onClick={() => deactivate(company)} className="rounded-md border border-rose-200 p-1.5 text-rose-600 dark:border-rose-500/30" title="تعطيل">
+                      <Ban className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               );
-            })}
-            {!loading && companies.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">لا توجد شركات ضمن نطاق صلاحيتك.</td></tr>
-            )}
-          </tbody>
-        </table>
+            },
+          },
+        ]}
+        emptyTitle="لا توجد شركات ضمن نطاق صلاحيتك."
+      />
       </div>
       <p className="mt-2 text-[11px] text-slate-500">
         تعطيل الشركة لا يحذف أي سجل تاريخي. يجب نقل أو تعطيل فروعها أولًا.

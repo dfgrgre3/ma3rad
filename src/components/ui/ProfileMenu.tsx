@@ -307,7 +307,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       {passwordOpen && <ChangePasswordModal current={current} next={next} confirm={confirm} busy={busy} setCurrent={setCurrent} setNext={setNext} setConfirm={setConfirm} onClose={() => { setPasswordOpen(false); resetForm(); }} onSubmit={submitPassword} />}
 
       {pinSettingsOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4" dir="rtl">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4">
           <div className="w-full max-w-md rounded-[2px] border border-[#b3b3b3] bg-white p-5 dark:border-[#565656] dark:bg-[#2b2b2b]" role="dialog" aria-modal="true" aria-labelledby="login-pin-settings-title">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -366,7 +366,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       )}
 
       {restartOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4" dir="rtl">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4">
           <div className="w-full max-w-md rounded-[2px] border border-[#b3b3b3] bg-white p-5 dark:border-[#565656] dark:bg-[#2b2b2b]" role="dialog" aria-modal="true">
             <div className="mb-4 flex items-start justify-between">
               <div>

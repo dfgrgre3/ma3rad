@@ -31,7 +31,9 @@ import {
   type TransactionFormState,
 } from '../../../types/hr/employeesPage';
 
+import { useToast } from '../../../components/ui/Toast';
 export const EmployeesPage: React.FC = () => {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.manage');
   const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.export');
@@ -459,7 +461,7 @@ export const EmployeesPage: React.FC = () => {
       });
       loadAll();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تسجيل الحركة المالية.');
+      toast.error(err?.message || 'تعذر تسجيل الحركة المالية.');
     }
   };
 
@@ -471,10 +473,10 @@ export const EmployeesPage: React.FC = () => {
         status,
         recordedBy: AuthService.getCurrentUser()?.id || 'usr_admin',
       });
-      if (result.pendingApproval) alert('أُرسل تعديل الحضور للموافقة، ولن يتغير السجل قبل اعتماده.');
+      if (result.pendingApproval) toast.warning('أُرسل تعديل الحضور للموافقة، ولن يتغير السجل قبل اعتماده.');
       loadAll();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تسجيل الحضور.');
+      toast.error(err?.message || 'تعذر تسجيل الحضور.');
     }
   };
 
@@ -518,7 +520,7 @@ export const EmployeesPage: React.FC = () => {
     : 0;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
 
       <EmployeesHeader
         loading={loading}

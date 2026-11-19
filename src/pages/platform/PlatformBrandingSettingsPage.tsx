@@ -32,10 +32,12 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 type BrandingTab = 'theme' | 'logos' | 'login' | 'templates' | 'permissions' | 'history';
 type PreviewMode = 'login' | 'invoice' | 'app';
 
 export const PlatformBrandingSettingsPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<BrandingTab>('theme');
   const canManageBranding = canPlatform('branding');
   const [previewMode, setPreviewMode] = useState<PreviewMode>('login');
@@ -144,7 +146,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   // Handle Save
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
+    if (!canManageBranding) { toast.warning('لا تملك صلاحية إدارة الهوية'); return; }
     setSaving(true);
     setSavedSuccess(false);
     const centralState = getCentralDataSourceState();
@@ -197,7 +199,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
       setTimeout(() => setSavedSuccess(false), 3000);
       loadBranding(selectedTenantId);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -205,7 +207,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
 
   // Handle Rollback
   const handleRollback = async (ver: number) => {
-    if (!canManageBranding) { alert('لا تملك صلاحية إدارة الهوية'); return; }
+    if (!canManageBranding) { toast.warning('لا تملك صلاحية إدارة الهوية'); return; }
     if (!confirm(`هل أنت متأكد من استرجاع إعدادات الهوية للإصدار #${ver}؟`)) return;
     const centralState = getCentralDataSourceState();
     try {
@@ -215,14 +217,14 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
         platformAdminService.rollbackTenantBranding(selectedTenantId || null, ver);
       }
       loadBranding(selectedTenantId);
-      alert(`تم استرجاع الإصدار #${ver} بنجاح.`);
+      toast.success(`تم استرجاع الإصدار #${ver} بنجاح.`);
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         title="الهوية والمظهر وواجهات العملاء (Branding)"

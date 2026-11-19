@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { FileText, DollarSign } from 'lucide-react';
 import { Supplier } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
@@ -164,52 +165,29 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-right">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="p-2.5">رقم الفاتورة</th>
-                      <th className="p-2.5">التاريخ</th>
-                      <th className="p-2.5">الإجمالي</th>
-                      <th className="p-2.5">المسدد</th>
-                      <th className="p-2.5">المتبقي</th>
-                      <th className="p-2.5">الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {invoices.slice(0, 5).map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50">
-                        <td className="p-2.5 font-mono font-bold text-slate-900">{inv.invoice_number}</td>
-                        <td className="p-2.5 text-slate-600">{inv.date}</td>
-                        <td className="p-2.5 font-bold text-slate-900">
-                          {CeramicMath.formatCurrency(inv.total_amount)}
-                        </td>
-                        <td className="p-2.5 text-emerald-700 font-bold">
-                          {CeramicMath.formatCurrency(inv.paid_amount)}
-                        </td>
-                        <td className="p-2.5 text-rose-700 font-bold">
-                          {CeramicMath.formatCurrency(inv.remaining_amount)}
-                        </td>
-                        <td className="p-2.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              PAY_STATUS_BADGES[inv.payment_status]?.className ||
-                              'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {invoices.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-slate-400">
-                          لا توجد فواتير توريد مسجلة لهذا المورد حتى الآن.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="آخر فواتير التوريد"
+                  rows={invoices.slice(0, 5)}
+                  rowKey={(inv) => String(inv.id)}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'num', header: 'رقم الفاتورة', render: (inv) => <span className="font-mono font-bold text-slate-900">{inv.invoice_number}</span> },
+                    { key: 'date', header: 'التاريخ', render: (inv) => <span className="text-slate-600">{inv.date}</span> },
+                    { key: 'total', header: 'الإجمالي', render: (inv) => <span className="font-bold text-slate-900">{CeramicMath.formatCurrency(inv.total_amount)}</span> },
+                    { key: 'paid', header: 'المسدد', render: (inv) => <span className="text-emerald-700 font-bold">{CeramicMath.formatCurrency(inv.paid_amount)}</span> },
+                    { key: 'remaining', header: 'المتبقي', render: (inv) => <span className="text-rose-700 font-bold">{CeramicMath.formatCurrency(inv.remaining_amount)}</span> },
+                    {
+                      key: 'status', header: 'الحالة',
+                      render: (inv) => (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${PAY_STATUS_BADGES[inv.payment_status]?.className || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                          {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  emptyTitle="لا توجد فواتير توريد مسجلة لهذا المورد حتى الآن."
+                />
               </div>
             </div>
           )}
@@ -229,45 +207,24 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-right">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="p-2.5">رقم السند</th>
-                      <th className="p-2.5">التاريخ</th>
-                      <th className="p-2.5">المبلغ</th>
-                      <th className="p-2.5">طريقة الدفع</th>
-                      <th className="p-2.5">البيان / ملاحظات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {payments.slice(0, 5).map((pay) => (
-                      <tr key={pay.id} className="hover:bg-slate-50">
-                        <td className="p-2.5 font-mono font-bold text-slate-900">{pay.receipt_number}</td>
-                        <td className="p-2.5 text-slate-600">{pay.date}</td>
-                        <td className="p-2.5 font-black text-emerald-700">
-                          {CeramicMath.formatCurrency(pay.amount)}
-                        </td>
-                        <td className="p-2.5 font-bold text-slate-700">
-                          {pay.payment_type === 'CASH'
-                            ? 'نقدي'
-                            : pay.payment_type === 'BANK'
-                            ? 'تحويل بنكي'
-                            : pay.payment_type === 'CHEQUE'
-                            ? 'شيك'
-                            : pay.payment_type}
-                        </td>
-                        <td className="p-2.5 text-slate-500 truncate max-w-xs">{pay.notes || '—'}</td>
-                      </tr>
-                    ))}
-                    {payments.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-6 text-center text-slate-400">
-                          لا توجد سندات صرف مسجلة لهذا المورد.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="آخر سندات الصرف"
+                  rows={payments.slice(0, 5)}
+                  rowKey={(pay) => String(pay.id)}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'num', header: 'رقم السند', render: (pay) => <span className="font-mono font-bold text-slate-900">{pay.receipt_number}</span> },
+                    { key: 'date', header: 'التاريخ', render: (pay) => <span className="text-slate-600">{pay.date}</span> },
+                    { key: 'amount', header: 'المبلغ', render: (pay) => <span className="font-black text-emerald-700">{CeramicMath.formatCurrency(pay.amount)}</span> },
+                    {
+                      key: 'method', header: 'طريقة الدفع',
+                      render: (pay) => <span className="font-bold text-slate-700">{pay.payment_type === 'CASH' ? 'نقدي' : pay.payment_type === 'BANK' ? 'تحويل بنكي' : pay.payment_type === 'CHEQUE' ? 'شيك' : pay.payment_type}</span>,
+                    },
+                    { key: 'notes', header: 'البيان / ملاحظات', render: (pay) => <span className="text-slate-500 truncate max-w-xs block">{pay.notes || '—'}</span> },
+                  ]}
+                  emptyTitle="لا توجد سندات صرف مسجلة لهذا المورد."
+                />
               </div>
             </div>
           )}

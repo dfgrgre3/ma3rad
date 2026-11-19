@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ShieldCheck, Plus, Search, RefreshCw, Loader2, X, CheckCircle2, XCircle,
   Clock, FileText, Wrench, Eye, AlertTriangle, Ban, ThumbsUp, PackageCheck,
@@ -337,120 +338,111 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="p-3.5">رقم المطالبة</th>
-                  <th className="p-3.5">العميل</th>
-                  <th className="p-3.5">الفاتورة</th>
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5">النوع</th>
-                  <th className="p-3.5">الكمية</th>
-                  <th className="p-3.5">حالة الضمان</th>
-                  <th className="p-3.5">الحالة</th>
-                  <th className="p-3.5">التاريخ</th>
-                  <th className="p-3.5 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                {claims.map((claim) => (
-                  <tr key={claim.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/30 transition">
-                    <td className="p-3.5 font-bold font-mono text-sky-600 dark:text-sky-400">{claim.claimNumber}</td>
-                    <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
+            <DataTable
+              ariaLabel="مطالبات الضمان"
+              rows={claims}
+              rowKey={(claim) => claim.id}
+              tableClassName="text-sm"
+              columns={[
+                { key: 'num', header: 'رقم المطالبة', render: (claim) => <span className="font-bold font-mono text-sky-600 dark:text-sky-400">{claim.claimNumber}</span> },
+                {
+                  key: 'customer', header: 'العميل',
+                  render: (claim) => (
+                    <span className="font-semibold text-slate-900 dark:text-white">
                       {claim.customerName}
                       <span className="block text-[11px] text-slate-400 font-normal">{claim.customerPhone || '—'}</span>
-                    </td>
-                    <td className="p-3.5 font-mono text-xs text-slate-600 dark:text-slate-300">{claim.invoiceNumber}</td>
-                    <td className="p-3.5 text-slate-700 dark:text-slate-200 max-w-[200px] truncate">
+                    </span>
+                  ),
+                },
+                { key: 'invoice', header: 'الفاتورة', render: (claim) => <span className="font-mono text-xs text-slate-600 dark:text-slate-300">{claim.invoiceNumber}</span> },
+                {
+                  key: 'product', header: 'الصنف',
+                  render: (claim) => (
+                    <span className="text-slate-700 dark:text-slate-200 max-w-[200px] truncate block">
                       {claim.productName}
                       <span className="block text-[11px] text-slate-400">{claim.grade || ''} {claim.size || ''}</span>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                        {TYPE_LABELS[claim.claimType]}
-                      </span>
-                    </td>
-                    <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                      {formatProductQuantity(claim.quantityM2, unitInfo(claim))}
-                    </td>
-                    <td className="p-3.5 text-xs">
-                      {(() => {
-                        const days = Math.ceil(
-                          (new Date(`${claim.warrantyExpiresAt || ''}T00:00:00`).getTime() - Date.now()) / 86_400_000
-                        );
-                        if (!claim.warrantyExpiresAt) return <span className="text-slate-400">—</span>;
-                        return days >= 0 ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">ساري ({days} يوم)</span>
-                        ) : (
-                          <span className="text-rose-600 dark:text-rose-400 font-semibold">منتهي</span>
-                        );
-                      })()}
-                    </td>
-                    <td className="p-3.5">
-                      <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${STATUS_BADGES[claim.status]}`}>
-                        {STATUS_LABELS[claim.status]}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-xs text-slate-500 font-mono">{claim.createdAt?.substring(0, 10)}</td>
-                    <td className="p-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => openDetail(claim)}
-                          className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
-                          title="عرض التفاصيل"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {claim.status === 'OPEN' && (
-                          <PermissionGate permission="ui.sales.after_sales.update">
+                    </span>
+                  ),
+                },
+                { key: 'type', header: 'النوع', render: (claim) => <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{TYPE_LABELS[claim.claimType]}</span> },
+                { key: 'qty', header: 'الكمية', render: (claim) => <span className="font-bold text-slate-900 dark:text-white">{formatProductQuantity(claim.quantityM2, unitInfo(claim))}</span> },
+                {
+                  key: 'warranty', header: 'حالة الضمان',
+                  render: (claim) => {
+                    const days = Math.ceil(
+                      (new Date(`${claim.warrantyExpiresAt || ''}T00:00:00`).getTime() - Date.now()) / 86_400_000
+                    );
+                    if (!claim.warrantyExpiresAt) return <span className="text-xs text-slate-400">—</span>;
+                    return days >= 0 ? (
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">ساري ({days} يوم)</span>
+                    ) : (
+                      <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">منتهي</span>
+                    );
+                  },
+                },
+                { key: 'status', header: 'الحالة', render: (claim) => <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${STATUS_BADGES[claim.status]}`}>{STATUS_LABELS[claim.status]}</span> },
+                { key: 'date', header: 'التاريخ', render: (claim) => <span className="text-xs text-slate-500 font-mono">{claim.createdAt?.substring(0, 10)}</span> },
+                {
+                  key: 'actions', header: 'إجراءات', align: 'center',
+                  render: (claim) => (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => openDetail(claim)}
+                        className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        title="عرض التفاصيل"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {claim.status === 'OPEN' && (
+                        <PermissionGate permission="ui.sales.after_sales.update">
+                          <button
+                            onClick={() => openDecision(claim, 'review')}
+                            className="p-1.5 text-sky-600 hover:text-white hover:bg-sky-600 bg-sky-50 dark:bg-sky-950/50 rounded-lg transition"
+                            title="بدء المراجعة"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                        </PermissionGate>
+                      )}
+                      {(claim.status === 'OPEN' || claim.status === 'UNDER_REVIEW') && (
+                        <>
+                          <PermissionGate permission="ui.sales.after_sales.approve">
                             <button
-                              onClick={() => openDecision(claim, 'review')}
-                              className="p-1.5 text-sky-600 hover:text-white hover:bg-sky-600 bg-sky-50 dark:bg-sky-950/50 rounded-lg transition"
-                              title="بدء المراجعة"
+                              onClick={() => openDecision(claim, 'approve')}
+                              className="p-1.5 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg transition"
+                              title="اعتماد"
                             >
-                              <Clock className="w-4 h-4" />
+                              <ThumbsUp className="w-4 h-4" />
                             </button>
                           </PermissionGate>
-                        )}
-                        {(claim.status === 'OPEN' || claim.status === 'UNDER_REVIEW') && (
-                          <>
-                            <PermissionGate permission="ui.sales.after_sales.approve">
-                              <button
-                                onClick={() => openDecision(claim, 'approve')}
-                                className="p-1.5 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg transition"
-                                title="اعتماد"
-                              >
-                                <ThumbsUp className="w-4 h-4" />
-                              </button>
-                            </PermissionGate>
-                            <PermissionGate permission="ui.sales.after_sales.reject">
-                              <button
-                                onClick={() => openDecision(claim, 'reject')}
-                                className="p-1.5 text-rose-600 hover:text-white hover:bg-rose-600 bg-rose-50 dark:bg-rose-950/50 rounded-lg transition"
-                                title="رفض"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </PermissionGate>
-                          </>
-                        )}
-                        {claim.status === 'APPROVED' && (
-                          <PermissionGate permission="ui.sales.after_sales.update">
+                          <PermissionGate permission="ui.sales.after_sales.reject">
                             <button
-                              onClick={() => openDecision(claim, 'resolve')}
-                              className="p-1.5 text-indigo-600 hover:text-white hover:bg-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg transition"
-                              title="تسجيل الحل"
+                              onClick={() => openDecision(claim, 'reject')}
+                              className="p-1.5 text-rose-600 hover:text-white hover:bg-rose-600 bg-rose-50 dark:bg-rose-950/50 rounded-lg transition"
+                              title="رفض"
                             >
-                              <PackageCheck className="w-4 h-4" />
+                              <XCircle className="w-4 h-4" />
                             </button>
                           </PermissionGate>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </>
+                      )}
+                      {claim.status === 'APPROVED' && (
+                        <PermissionGate permission="ui.sales.after_sales.update">
+                          <button
+                            onClick={() => openDecision(claim, 'resolve')}
+                            className="p-1.5 text-indigo-600 hover:text-white hover:bg-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg transition"
+                            title="تسجيل الحل"
+                          >
+                            <PackageCheck className="w-4 h-4" />
+                          </button>
+                        </PermissionGate>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+              emptyTitle="لا توجد مطالبات ضمان مطابقة لمعايير البحث."
+            />
           </div>
         )}
       </div>
@@ -532,54 +524,51 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                     </div>
                   ) : (
                     <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                      <table className="w-full text-right text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold">
-                          <tr>
-                            <th className="p-2.5">الصنف</th>
-                            <th className="p-2.5">المباع</th>
-                            <th className="p-2.5">المرتجع</th>
-                            <th className="p-2.5">مطالبات سابقة</th>
-                            <th className="p-2.5">المتاح</th>
-                            <th className="p-2.5">سعر الوحدة</th>
-                            <th className="p-2.5">الضمان</th>
-                            <th className="p-2.5"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                          {claimableItems.map((item) => (
-                            <tr
-                              key={item.invoiceItemId || item.productId}
-                              onClick={() => selectItem(item)}
-                              className={`cursor-pointer transition ${selectedInvoiceItemId === item.invoiceItemId
-                                ? 'bg-sky-50 dark:bg-sky-950/40'
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
-                            >
-                              <td className="p-2.5 font-bold text-slate-900 dark:text-white">
+                      <DataTable
+                        ariaLabel="أصناف الفاتورة المؤهلة للمطالبة"
+                        rows={claimableItems}
+                        rowKey={(item) => item.invoiceItemId || item.productId}
+                        dense
+                        onRowClick={(item) => selectItem(item)}
+                        rowClassName={(item) => selectedInvoiceItemId === item.invoiceItemId
+                          ? 'bg-sky-50 dark:bg-sky-950/40 cursor-pointer'
+                          : 'cursor-pointer'}
+                        columns={[
+                          {
+                            key: 'product', header: 'الصنف',
+                            render: (item) => (
+                              <span className="font-bold text-slate-900 dark:text-white">
                                 {item.productName}
                                 <span className="block text-[10px] text-slate-400">{item.productSku || ''} {item.size || ''}</span>
-                              </td>
-                              <td className="p-2.5">{formatProductQuantity(item.soldQuantity, unitInfo(item))}</td>
-                              <td className="p-2.5">{formatProductQuantity(item.returnedQuantity, unitInfo(item))}</td>
-                              <td className="p-2.5">{formatProductQuantity(item.claimedQuantity, unitInfo(item))}</td>
-                              <td className="p-2.5 font-bold text-sky-700 dark:text-sky-300">{formatProductQuantity(item.availableQuantity, unitInfo(item))}</td>
-                              <td className="p-2.5 font-mono">{fmtCurrency(item.unitPrice)}</td>
-                              <td className="p-2.5">
+                              </span>
+                            ),
+                          },
+                          { key: 'sold', header: 'المباع', render: (item) => formatProductQuantity(item.soldQuantity, unitInfo(item)) },
+                          { key: 'returned', header: 'المرتجع', render: (item) => formatProductQuantity(item.returnedQuantity, unitInfo(item)) },
+                          { key: 'claimed', header: 'مطالبات سابقة', render: (item) => formatProductQuantity(item.claimedQuantity, unitInfo(item)) },
+                          { key: 'available', header: 'المتاح', render: (item) => <span className="font-bold text-sky-700 dark:text-sky-300">{formatProductQuantity(item.availableQuantity, unitInfo(item))}</span> },
+                          { key: 'price', header: 'سعر الوحدة', render: (item) => <span className="font-mono">{fmtCurrency(item.unitPrice)}</span> },
+                          {
+                            key: 'warranty', header: 'الضمان',
+                            render: (item) => (
+                              <span>
                                 {item.warrantyActive ? (
                                   <span className="text-emerald-600 dark:text-emerald-400 font-semibold">ساري</span>
                                 ) : (
                                   <span className="text-rose-600 dark:text-rose-400 font-semibold">منتهي</span>
                                 )}
                                 <span className="block text-[10px] text-slate-400 font-mono">{item.warrantyExpiresAt}</span>
-                              </td>
-                              <td className="p-2.5 text-center">
-                                {selectedInvoiceItemId === item.invoiceItemId
-                                  ? <CheckCircle2 className="w-4 h-4 text-sky-600 mx-auto" />
-                                  : <span className="block w-4 h-4 rounded-full border border-slate-300 mx-auto" />}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </span>
+                            ),
+                          },
+                          {
+                            key: 'selected', header: '', align: 'center',
+                            render: (item) => selectedInvoiceItemId === item.invoiceItemId
+                              ? <CheckCircle2 className="w-4 h-4 text-sky-600 mx-auto" />
+                              : <span className="block w-4 h-4 rounded-full border border-slate-300 mx-auto" />,
+                          },
+                        ]}
+                      />
                     </div>
                   )}
                 </div>

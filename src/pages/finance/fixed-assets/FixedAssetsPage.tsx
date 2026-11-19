@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   ArrowDownUp, Building2, CalendarDays, Check, ClipboardList, Download, Loader2,
   MapPin, Pencil, Plus, Search, SlidersHorizontal, Trash2, TrendingDown, Wallet,
@@ -246,7 +247,7 @@ export const FixedAssetsPage: React.FC = () => {
   const hasFilters = Boolean(search || categoryFilter !== 'ALL' || statusFilter !== 'ALL');
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-[var(--cerami-canvas)] dark:text-[var(--cerami-text)]" dir="rtl">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-[var(--cerami-canvas)] dark:text-[var(--cerami-text)]">
       <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-700 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -502,88 +503,68 @@ export const FixedAssetsPage: React.FC = () => {
           ) : (
             <>
               <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[1120px] text-right text-xs">
-                  <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/70">
-                    <tr className="text-[10px] font-bold text-slate-500 dark:text-slate-300">
-                      <th scope="col" className="px-4 py-3">كود الأصل</th>
-                      <th scope="col" className="px-4 py-3">الأصل والفئة</th>
-                      {view === 'register' ? (
-                        <>
-                          <th scope="col" className="px-4 py-3">تاريخ الشراء</th>
-                          <th scope="col" className="px-4 py-3">العمر الإنتاجي</th>
-                          <th scope="col" className="px-4 py-3">تكلفة الشراء</th>
-                          <th scope="col" className="px-4 py-3">مجمع الإهلاك</th>
-                          <th scope="col" className="px-4 py-3">القيمة الدفترية</th>
-                          <th scope="col" className="px-4 py-3">الموقع</th>
-                        </>
-                      ) : (
-                        <>
-                          <th scope="col" className="px-4 py-3">الإهلاك الشهري</th>
-                          <th scope="col" className="px-4 py-3">العمر الإنتاجي</th>
-                          <th scope="col" className="px-4 py-3">تكلفة الاقتناء</th>
-                          <th scope="col" className="px-4 py-3">مجمع الإهلاك</th>
-                          <th scope="col" className="px-4 py-3">القيمة الدفترية</th>
-                        </>
-                      )}
-                      <th scope="col" className="px-4 py-3">الحالة</th>
-                      <th scope="col" className="px-4 py-3">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {visibleRows.map((row) => {
-                      const progress = depreciationProgressOf(row);
-                      return (
-                        <tr key={row.id} className="group transition hover:bg-violet-50/30 dark:hover:bg-violet-950/25">
-                          <td className="whitespace-nowrap px-4 py-3 font-mono font-bold text-slate-600 dark:text-slate-300" dir="ltr">{row.code}</td>
-                          <td className="min-w-48 px-4 py-3">
-                            <div className="font-bold text-slate-900">{row.name}</div>
-                            <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABELS[row.category] || row.category}</div>
-                          </td>
-                          {view === 'register' ? (
-                            <>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" dir="ltr">{row.purchaseDate}</td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</td>
-                              <td className="whitespace-nowrap px-4 py-3 text-left font-mono font-semibold tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</td>
-                              <td className="whitespace-nowrap px-4 py-3 text-left font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</td>
-                              <td className="min-w-40 px-4 py-3 text-left" dir="ltr">
-                                <div className="font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</div>
-                                <DepreciationBar progress={progress} />
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-                                <span className="inline-flex items-center gap-1"><MapPin aria-hidden="true" className="h-3 w-3 text-slate-400 dark:text-slate-500" />{row.location || '—'}</span>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="whitespace-nowrap px-4 py-3 text-left font-mono font-bold tabular-nums text-violet-800 dark:text-violet-300" dir={row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'rtl' : 'ltr'}>
-                                {row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'حسب الاستخدام' : fmt(monthlyDepreciationOf(row))}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</td>
-                              <td className="whitespace-nowrap px-4 py-3 text-left font-mono tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</td>
-                              <td className="whitespace-nowrap px-4 py-3 text-left font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</td>
-                              <td className="min-w-40 px-4 py-3 text-left" dir="ltr">
-                                <div className="font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</div>
-                                <DepreciationBar progress={progress} />
-                              </td>
-                            </>
-                          )}
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <StatusBadge status={row.status} />
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <AssetActions
-                              row={row}
-                              canManage={canManage}
-                              onDepreciate={depreciate}
-                              onEdit={openEdit}
-                              onRemove={remove}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="سجل الأصول الثابتة"
+                  rows={visibleRows}
+                  rowKey={(row: any) => String(row.id)}
+                  minWidth={1120}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'code', header: 'كود الأصل', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-600 dark:text-slate-300" dir="ltr">{row.code}</span> },
+                    {
+                      key: 'asset', header: 'الأصل والفئة',
+                      render: (row: any) => (
+                        <span className="block min-w-48">
+                          <span className="block font-bold text-slate-900">{row.name}</span>
+                          <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABELS[row.category] || row.category}</span>
+                        </span>
+                      ),
+                    },
+                    ...(view === 'register' ? [
+                      { key: 'purchaseDate', header: 'تاريخ الشراء', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300" dir="ltr">{row.purchaseDate}</span> },
+                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</span> },
+                      { key: 'cost', header: 'تكلفة الشراء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono font-semibold tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
+                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
+                      {
+                        key: 'book', header: 'القيمة الدفترية', align: 'end' as const,
+                        render: (row: any) => (
+                          <span className="block min-w-40 text-left" dir="ltr">
+                            <span className="block font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</span>
+                            <DepreciationBar progress={depreciationProgressOf(row)} />
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'location', header: 'الموقع',
+                        render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300"><MapPin aria-hidden="true" className="ml-1 inline h-3 w-3 text-slate-400 dark:text-slate-500" />{row.location || '—'}</span>,
+                      },
+                    ] : [
+                      {
+                        key: 'monthly', header: 'الإهلاك الشهري', align: 'end' as const,
+                        render: (row: any) => <span className="whitespace-nowrap font-mono font-bold tabular-nums text-violet-800 dark:text-violet-300" dir={row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'rtl' : 'ltr'}>{row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'حسب الاستخدام' : fmt(monthlyDepreciationOf(row))}</span>,
+                      },
+                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</span> },
+                      { key: 'cost', header: 'تكلفة الاقتناء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
+                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
+                      {
+                        key: 'book', header: 'القيمة الدفترية', align: 'end' as const,
+                        render: (row: any) => (
+                          <span className="block min-w-40 text-left" dir="ltr">
+                            <span className="block font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</span>
+                            <DepreciationBar progress={depreciationProgressOf(row)} />
+                          </span>
+                        ),
+                      },
+                    ]),
+                    { key: 'status', header: 'الحالة', render: (row: any) => <StatusBadge status={row.status} /> },
+                    {
+                      key: 'actions', header: 'الإجراءات',
+                      render: (row: any) => <AssetActions row={row} canManage={canManage} onDepreciate={depreciate} onEdit={openEdit} onRemove={remove} />,
+                    },
+                  ]}
+                  rowClassName={() => 'group transition hover:bg-violet-50/30 dark:hover:bg-violet-950/25'}
+                />
               </div>
 
               <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">

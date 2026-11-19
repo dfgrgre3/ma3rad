@@ -20,7 +20,7 @@ export const NotFoundPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100/60 text-slate-900" dir="rtl">
+    <div className="min-h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100/60 text-slate-900">
       <div className="w-full max-w-xl mx-auto text-center space-y-6">
         {/* Animated Badge & Visual Icon */}
         <div className="relative inline-flex items-center justify-center">

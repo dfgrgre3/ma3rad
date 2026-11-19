@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   RotateCcw, ShieldCheck, Search, Eye,
   Printer, Loader2, X, RefreshCw,
@@ -269,78 +270,47 @@ export const AfterSalesPage: React.FC = () => {
         /* Returns Table */
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="p-3.5">رقم الإشعار</th>
-                  <th className="p-3.5">الفاتورة الأصلية</th>
-                  <th className="p-3.5">العميل</th>
-                  <th className="p-3.5">التاريخ</th>
-                  <th className="p-3.5">سبب الإرجاع</th>
-                  <th className="p-3.5">إجمالي المرتجع</th>
-                  <th className="p-3.5">المسترد نقداً</th>
-                  <th className="p-3.5">المضاف للرصيد</th>
-                  <th className="p-3.5 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                {returnsList.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="p-12 text-center text-slate-400">
-                      لا توجد عمليات إرجاع مطابقة لمعايير البحث.
-                    </td>
-                  </tr>
-                ) : (
-                  returnsList.map((ret) => (
-                    <tr key={ret.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/30 transition">
-                      <td className="p-3.5 font-bold font-mono text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        {ret.returnNumber}
-                      </td>
-                      <td className="p-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        {ret.invoiceNumber || '—'}
-                      </td>
-                      <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                        {ret.customerName || 'عميل نقدي'}
-                      </td>
-                      <td className="p-3.5 text-xs text-slate-500 font-mono">
-                        {ret.date ? ret.date.substring(0, 10) : '—'}
-                      </td>
-                      <td className="p-3.5 text-slate-700 dark:text-slate-300 max-w-xs truncate">
-                        {ret.reason || 'إرجاع بضاعة'}
-                      </td>
-                      <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                        {fmtCurrency(ret.totalAmount)}
-                      </td>
-                      <td className="p-3.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                        {fmtCurrency(ret.refundedAmount || 0)}
-                      </td>
-                      <td className="p-3.5 font-semibold text-purple-600 dark:text-purple-400">
-                        {fmtCurrency(ret.remainingToBalance || 0)}
-                      </td>
-                      <td className="p-3.5">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleViewReturn(ret)}
-                            className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
-                            title="عرض تفاصيل المرتجع"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handlePrintReturn(ret)}
-                            className="p-1.5 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
-                            title="طباعة إشعار دائن"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="عمليات الإرجاع"
+              rows={returnsList}
+              rowKey={(ret) => ret.id}
+              tableClassName="text-sm"
+              columns={[
+                {
+                  key: 'num', header: 'رقم الإشعار',
+                  render: (ret) => <span className="font-bold font-mono text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" />{ret.returnNumber}</span>,
+                },
+                { key: 'invoice', header: 'الفاتورة الأصلية', render: (ret) => <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{ret.invoiceNumber || '—'}</span> },
+                { key: 'customer', header: 'العميل', render: (ret) => <span className="font-semibold text-slate-900 dark:text-white">{ret.customerName || 'عميل نقدي'}</span> },
+                { key: 'date', header: 'التاريخ', render: (ret) => <span className="text-xs text-slate-500 font-mono">{ret.date ? ret.date.substring(0, 10) : '—'}</span> },
+                { key: 'reason', header: 'سبب الإرجاع', render: (ret) => <span className="text-slate-700 dark:text-slate-300 max-w-xs truncate block">{ret.reason || 'إرجاع بضاعة'}</span> },
+                { key: 'total', header: 'إجمالي المرتجع', render: (ret) => <span className="font-bold text-slate-900 dark:text-white">{fmtCurrency(ret.totalAmount)}</span> },
+                { key: 'cash', header: 'المسترد نقداً', render: (ret) => <span className="font-semibold text-emerald-600 dark:text-emerald-400">{fmtCurrency(ret.refundedAmount || 0)}</span> },
+                { key: 'balance', header: 'المضاف للرصيد', render: (ret) => <span className="font-semibold text-purple-600 dark:text-purple-400">{fmtCurrency(ret.remainingToBalance || 0)}</span> },
+                {
+                  key: 'actions', header: 'إجراءات', align: 'center',
+                  render: (ret) => (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => handleViewReturn(ret)}
+                        className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        title="عرض تفاصيل المرتجع"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handlePrintReturn(ret)}
+                        className="p-1.5 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        title="طباعة إشعار دائن"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </span>
+                  ),
+                },
+              ]}
+              emptyTitle="لا توجد عمليات إرجاع مطابقة لمعايير البحث."
+            />
           </div>
         </div>
       ) : viewTab === 'warranty' ? (
@@ -466,28 +436,19 @@ export const AfterSalesPage: React.FC = () => {
                   <div className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>
                 ) : (
                   <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                    <table className="w-full text-right">
-                      <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 font-bold border-b border-slate-200 dark:border-slate-700">
-                        <tr>
-                          <th className="p-2.5">الصنف</th>
-                          <th className="p-2.5">الكمية المرتجعة</th>
-                          <th className="p-2.5">سعر الوحدة</th>
-                          <th className="p-2.5">الإجمالي</th>
-                          <th className="p-2.5">السبب</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                        {returnItems.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2.5 font-bold text-slate-900 dark:text-white">{item.productName}</td>
-                            <td className="p-2.5 font-semibold text-rose-600">{formatProductQuantity(item.quantityM2, item)}</td>
-                            <td className="p-2.5 font-mono">{fmtCurrency(item.unitPrice)}</td>
-                            <td className="p-2.5 font-bold font-mono">{fmtCurrency(item.totalRefund)}</td>
-                            <td className="p-2.5 text-slate-500">{selectedReturn.reason || 'إرجاع'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      ariaLabel="الأصناف المرتجعة"
+                      rows={returnItems.map((item, idx) => ({ ...item, __idx: idx }))}
+                      rowKey={(item) => `${item.productName}-${item.__idx}`}
+                      dense
+                      columns={[
+                        { key: 'product', header: 'الصنف', render: (item) => <span className="font-bold text-slate-900 dark:text-white">{item.productName}</span> },
+                        { key: 'qty', header: 'الكمية المرتجعة', render: (item) => <span className="font-semibold text-rose-600">{formatProductQuantity(item.quantityM2, item)}</span> },
+                        { key: 'price', header: 'سعر الوحدة', render: (item) => <span className="font-mono">{fmtCurrency(item.unitPrice)}</span> },
+                        { key: 'total', header: 'الإجمالي', render: (item) => <span className="font-bold font-mono">{fmtCurrency(item.totalRefund)}</span> },
+                        { key: 'reason', header: 'السبب', render: () => <span className="text-slate-500">{selectedReturn.reason || 'إرجاع'}</span> },
+                      ]}
+                    />
                   </div>
                 )}
               </div>

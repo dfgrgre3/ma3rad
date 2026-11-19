@@ -293,7 +293,7 @@ export const App: React.FC = () => {
 
   if (licenseBlocked) {
     return (
-      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
         <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-white p-8 text-center shadow-2xl">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl font-black text-rose-700">!</div>
           <h1 className="text-xl font-black text-slate-900">تعذر التحقق من الترخيص</h1>
@@ -317,7 +317,7 @@ export const App: React.FC = () => {
 
   if (!dbReady) {
     return (
-      <main dir="rtl" className="min-h-screen bg-slate-100 text-slate-800">
+      <main className="min-h-screen bg-slate-100 text-slate-800">
         <header aria-hidden="true" className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 animate-pulse rounded-lg bg-slate-200" />

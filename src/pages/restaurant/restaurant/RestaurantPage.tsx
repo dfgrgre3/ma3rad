@@ -285,7 +285,7 @@ export const RestaurantPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-5 p-4 md:p-6" dir="rtl">
+    <div className="space-y-5 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">

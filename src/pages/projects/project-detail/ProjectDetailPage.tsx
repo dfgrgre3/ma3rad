@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowRight, Boxes, Building2, Calendar, CheckCircle2, DollarSign, Loader2,
@@ -16,6 +17,7 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
+import { useToast } from '../../../components/ui/Toast';
 const STATUS: Record<ProjectStatus, { label: string; color: string }> = {
   PLANNED: { label: 'قيد التخطيط', color: 'text-amber-700 bg-amber-50 border-amber-200' },
   ACTIVE: { label: 'جاري التنفيذ', color: 'text-sky-700 bg-sky-50 border-sky-200' },
@@ -31,6 +33,7 @@ const UNIT_TYPES: Record<string, string> = {
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
 export const ProjectDetailPage: React.FC = () => {
+  const toast = useToast();
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const projectsLabel = useBusinessTerm('entities.projects.plural');
@@ -78,7 +81,7 @@ export const ProjectDetailPage: React.FC = () => {
   useEffect(() => { load(); }, [id]);
 
   const changeStatus = (status: ProjectStatus) => {
-    try { service.updateProject(id, { status }); load(); } catch (e: any) { alert(e?.message); }
+    try { service.updateProject(id, { status }); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const addUnit = (e: React.FormEvent) => {
@@ -95,24 +98,24 @@ export const ProjectDetailPage: React.FC = () => {
       setUnitForm({ name: '', unitType: 'APARTMENT', areaM2: '', parentId: '' });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إضافة الوحدة.');
+      toast.error(err?.message || 'تعذر إضافة الوحدة.');
     } finally {
       setSaving(false);
     }
   };
 
   const setUnitStatus = (unit: ProjectUnit, status: ProjectUnit['status']) => {
-    try { service.updateUnit(unit.id, { status }); load(); } catch (e: any) { alert(e?.message); }
+    try { service.updateUnit(unit.id, { status }); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const removeUnit = (unit: ProjectUnit) => {
     if (!confirm(`حذف الوحدة "${unit.name}"؟`)) return;
-    try { service.deleteUnit(unit.id); load(); } catch (e: any) { alert(e?.message); }
+    try { service.deleteUnit(unit.id); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const addProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productForm.productId) { alert('اختر المنتج.'); return; }
+    if (!productForm.productId) { toast.warning('اختر المنتج.'); return; }
     setSaving(true);
     try {
       service.addProjectProduct({
@@ -125,7 +128,7 @@ export const ProjectDetailPage: React.FC = () => {
       setProductForm({ productId: '', unitId: '', plannedQuantityM2: '', agreedPriceM2: '' });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إضافة البند.');
+      toast.error(err?.message || 'تعذر إضافة البند.');
     } finally {
       setSaving(false);
     }
@@ -133,7 +136,7 @@ export const ProjectDetailPage: React.FC = () => {
 
   const removeProduct = (item: ProjectProduct) => {
     if (!confirm(`حذف البند "${item.productName}"؟`)) return;
-    try { service.deleteProjectProduct(item.id); load(); } catch (e: any) { alert(e?.message); }
+    try { service.deleteProjectProduct(item.id); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   if (loading) {
@@ -142,7 +145,7 @@ export const ProjectDetailPage: React.FC = () => {
 
   if (error || !project) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 bg-slate-50" dir="rtl">
+      <div className="h-full flex flex-col items-center justify-center gap-3 bg-slate-50">
         <Boxes className="w-12 h-12 text-slate-300" />
         <p className="text-sm text-slate-600">{error || 'المشروع غير موجود.'}</p>
         <button onClick={() => navigate('/projects')} className="px-4 py-2 bg-sky-600 text-white rounded-xl text-sm font-bold">العودة للمشاريع</button>
@@ -155,7 +158,7 @@ export const ProjectDetailPage: React.FC = () => {
   const deliveredTotal = products.reduce((s, p) => s + p.deliveredQuantityM2 * p.agreedPriceM2, 0);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -236,50 +239,47 @@ export const ProjectDetailPage: React.FC = () => {
         {tab === 'units' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 font-bold">الوحدة</th>
-                    <th className="p-3 font-bold">النوع</th>
-                    <th className="p-3 font-bold">المساحة</th>
-                    <th className="p-3 font-bold">الحالة</th>
-                    <th className="p-3 font-bold"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {units.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-800">
-                        {u.name}
-                        {u.parentId && <span className="text-[10px] text-slate-400"> (تابعة)</span>}
-                      </td>
-                      <td className="p-3 text-slate-500">{UNIT_TYPES[u.unitType]}</td>
-                      <td className="p-3 font-mono text-slate-600">{u.areaM2} م²</td>
-                      <td className="p-3">
-                        {canUpdate ? (
-                          <select value={u.status} onChange={(e) => setUnitStatus(u, e.target.value as any)} className={`text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${u.status === 'DELIVERED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : u.status === 'IN_PROGRESS' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                            <option value="PENDING">بالانتظار</option>
-                            <option value="IN_PROGRESS">جاري</option>
-                            <option value="DELIVERED">تم التسليم</option>
-                          </select>
-                        ) : (
-                          <span className="text-[10px] font-bold">{u.status}</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {canUpdate && (
-                          <button onClick={() => removeUnit(u)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {units.length === 0 && (
-                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">لا توجد وحدات مسجلة بعد</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <DataTable
+              ariaLabel="وحدات المشروع"
+              rows={units}
+              rowKey={(u) => u.id}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                {
+                  key: 'name', header: 'الوحدة',
+                  render: (u) => (
+                    <span className="font-bold text-slate-800">
+                      {u.name}
+                      {u.parentId && <span className="text-[10px] text-slate-400"> (تابعة)</span>}
+                    </span>
+                  ),
+                },
+                { key: 'type', header: 'النوع', render: (u) => <span className="text-slate-500">{UNIT_TYPES[u.unitType]}</span> },
+                { key: 'area', header: 'المساحة', render: (u) => <span className="font-mono text-slate-600">{u.areaM2} م²</span> },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (u) => canUpdate ? (
+                    <select value={u.status} onChange={(e) => setUnitStatus(u, e.target.value as any)} className={`text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${u.status === 'DELIVERED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : u.status === 'IN_PROGRESS' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      <option value="PENDING">بالانتظار</option>
+                      <option value="IN_PROGRESS">جاري</option>
+                      <option value="DELIVERED">تم التسليم</option>
+                    </select>
+                  ) : (
+                    <span className="text-[10px] font-bold">{u.status}</span>
+                  ),
+                },
+                {
+                  key: 'actions', header: '',
+                  render: (u) => canUpdate ? (
+                    <button onClick={() => removeUnit(u)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  ) : null,
+                },
+              ]}
+              emptyTitle="لا توجد وحدات مسجلة بعد"
+            />
             </div>
 
             {canUpdate && (
@@ -319,63 +319,53 @@ export const ProjectDetailPage: React.FC = () => {
         {tab === 'products' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 font-bold">المنتج</th>
-                    <th className="p-3 font-bold">الوحدة</th>
-                    <th className="p-3 font-bold">المخطط (م²)</th>
-                    <th className="p-3 font-bold">المسلّم (م²)</th>
-                    <th className="p-3 font-bold">السعر/م²</th>
-                    <th className="p-3 font-bold">الإجمالي</th>
-                    <th className="p-3 font-bold"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {products.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-800">{p.productName}</td>
-                      <td className="p-3 text-slate-500">{p.unitName || '—'}</td>
-                      <td className="p-3 font-mono">{p.plannedQuantityM2}</td>
-                      <td className="p-3 font-mono">
-                        {canUpdate ? (
-                          <input
-                            type="number" min="0" step="0.01" defaultValue={p.deliveredQuantityM2}
-                            onBlur={(e) => {
-                              const v = Number(e.target.value);
-                              if (v !== p.deliveredQuantityM2) {
-                                try { service.updateProjectProduct(p.id, { deliveredQuantityM2: v }); load(); } catch (err: any) { alert(err?.message); }
-                              }
-                            }}
-                            className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg font-mono"
-                          />
-                        ) : p.deliveredQuantityM2}
-                      </td>
-                      <td className="p-3 font-mono">{fmt(p.agreedPriceM2)}</td>
-                      <td className="p-3 font-bold text-sky-600">{fmt(p.plannedQuantityM2 * p.agreedPriceM2)}</td>
-                      <td className="p-3">
-                        {canUpdate && (
-                          <button onClick={() => removeProduct(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {products.length === 0 && (
-                    <tr><td colSpan={7} className="p-8 text-center text-slate-400">لا توجد بنود منتجات</td></tr>
-                  )}
-                </tbody>
-                {products.length > 0 && (
-                  <tfoot className="bg-slate-50 border-t border-slate-200 text-xs">
-                    <tr>
-                      <td colSpan={5} className="p-3 font-bold text-slate-600">الإجمالي المخطط / المسلّم</td>
-                      <td className="p-3 font-black text-slate-900">{fmt(plannedTotal)}</td>
-                      <td className="p-3 font-bold text-emerald-600">{fmt(deliveredTotal)}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+              <DataTable
+              ariaLabel="منتجات المشروع"
+              rows={products}
+              rowKey={(p) => p.id}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                { key: 'product', header: 'المنتج', render: (p) => <span className="font-bold text-slate-800">{p.productName}</span> },
+                { key: 'unit', header: 'الوحدة', render: (p) => <span className="text-slate-500">{p.unitName || '—'}</span> },
+                { key: 'planned', header: 'المخطط (م²)', render: (p) => <span className="font-mono">{p.plannedQuantityM2}</span> },
+                {
+                  key: 'delivered', header: 'المسلّم (م²)',
+                  render: (p) => canUpdate ? (
+                    <input
+                      type="number" min="0" step="0.01" defaultValue={p.deliveredQuantityM2}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== p.deliveredQuantityM2) {
+                          try { service.updateProjectProduct(p.id, { deliveredQuantityM2: v }); load(); } catch (err: any) { toast.error(err?.message); }
+                        }
+                      }}
+                      className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg font-mono"
+                    />
+                  ) : p.deliveredQuantityM2,
+                },
+                { key: 'price', header: 'السعر/م²', render: (p) => <span className="font-mono">{fmt(p.agreedPriceM2)}</span> },
+                { key: 'total', header: 'الإجمالي', render: (p) => <span className="font-bold text-sky-600">{fmt(p.plannedQuantityM2 * p.agreedPriceM2)}</span> },
+                {
+                  key: 'actions', header: '',
+                  render: (p) => canUpdate ? (
+                    <button onClick={() => removeProduct(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  ) : null,
+                },
+              ]}
+              emptyTitle="لا توجد بنود منتجات"
+            />
+            {products.length > 0 && (
+              <div className="bg-slate-50 border-t border-slate-200 px-3 py-2 text-xs flex items-center justify-between">
+                <span className="font-bold text-slate-600">الإجمالي المخطط / المسلّم</span>
+                <span className="flex gap-6">
+                  <span className="font-black text-slate-900">{fmt(plannedTotal)}</span>
+                  <span className="font-bold text-emerald-600">{fmt(deliveredTotal)}</span>
+                </span>
+              </div>
+            )}
             </div>
 
             {canUpdate && (

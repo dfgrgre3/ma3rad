@@ -30,7 +30,7 @@ export const WorkspaceHub: React.FC<WorkspaceHubProps> = ({
   showTabs = true,
   children,
 }) => (
-  <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--win-canvas)]" dir="rtl">
+  <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--win-canvas)]">
     {(showHeading || showTabs) && (
       <header className="shrink-0 border-b border-[var(--win-border)] bg-[var(--win-surface)]">
         <div className="mx-auto flex w-full max-w-none flex-col gap-2 px-3 py-2 sm:px-4 sm:py-3 lg:px-5">

@@ -10,6 +10,7 @@ import { CustomerService } from '../../../services/domains/customers/CustomerSer
 import { Customer } from '../../../types';
 import { localDateString } from '../../../utils/shared/date';
 
+import { useToast } from '../../../components/ui/Toast';
 interface InstallmentRow {
   id: string;
   planId: string;
@@ -50,6 +51,7 @@ interface InstallmentInvoiceOption {
 }
 
 export const InstallmentsPage: React.FC = () => {
+  const toast = useToast();
   const [installments, setInstallments] = useState<InstallmentRow[]>([]);
   const [plans, setPlans] = useState<InstallmentPlanRecord[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -174,26 +176,26 @@ export const InstallmentsPage: React.FC = () => {
     e.preventDefault();
     try {
       const { planNumber, downPaymentReceipt } = installmentService.createPlan({ customerId: selectedCustomerId, invoiceId: selectedInvoiceId, totalAmount: totalFinanced, downPayment, installmentsCount: monthsCount, startDate });
-      alert(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية).${downPaymentReceipt ? ` إيصال المقدم: ${downPaymentReceipt}` : ''}`);
+      toast.success(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية).${downPaymentReceipt ? ` إيصال المقدم: ${downPaymentReceipt}` : ''}`);
       setShowCreateModal(false);
       load();
     } catch (err: any) {
-      alert(`خطأ أثناء إنشاء خطة التقسيط: ${err?.message}`);
+      toast.error(`خطأ أثناء إنشاء خطة التقسيط: ${err?.message}`);
     }
   };
 
   const customerInvoices = openInvoices.filter((invoice) => invoice.customerId === selectedCustomerId);
 
   const handlePayInstallment = (inst: InstallmentRow) => {
-    if (inst.status === 'PAID') { alert('هذا القسط مسدد بالفعل.'); return; }
+    if (inst.status === 'PAID') { toast.warning('هذا القسط مسدد بالفعل.'); return; }
     const confirmPay = window.confirm(`تأكيد استلام وسداد القسط رقم (${inst.sequenceNumber} من ${inst.totalInstallments}) بقيمة ${inst.amount} ج من العميل: ${inst.customerName}؟`);
     if (!confirmPay) return;
     try {
       const result = installmentService.payInstallment(inst.id);
-      alert(`تم تسجيل سداد القسط بنجاح!\nرقم الإيصال: ${result.receiptNumber}\nتم إضافة ${result.amount} ج إلى الخزينة.`);
+      toast.success(`تم تسجيل سداد القسط بنجاح!\nرقم الإيصال: ${result.receiptNumber}\nتم إضافة ${result.amount} ج إلى الخزينة.`);
       load();
     } catch (err: any) {
-      alert(`خطأ أثناء سداد القسط: ${err?.message}`);
+      toast.error(`خطأ أثناء سداد القسط: ${err?.message}`);
     }
   };
 
@@ -202,10 +204,10 @@ export const InstallmentsPage: React.FC = () => {
     if (!window.confirm(`عكس سند سداد القسط ${inst.sequenceNumber} من خطة ${inst.planNumber}؟ سيتم إعادة الدين إلى رصيد العميل.`)) return;
     try {
       const result = installmentService.reverseInstallmentPayment(inst.id);
-      alert(`تم عكس الإيصال ${result.receiptNumber} وإعادة ${fmt(result.amount)} إلى رصيد العميل.`);
+      toast.success(`تم عكس الإيصال ${result.receiptNumber} وإعادة ${fmt(result.amount)} إلى رصيد العميل.`);
       load();
     } catch (err: any) {
-      alert(`تعذر عكس سداد القسط: ${err?.message}`);
+      toast.error(`تعذر عكس سداد القسط: ${err?.message}`);
     }
   };
 
@@ -214,10 +216,10 @@ export const InstallmentsPage: React.FC = () => {
     if (!window.confirm(`إلغاء خطة ${inst.planNumber}؟ يجب عكس الأقساط المحصلة أولًا.`)) return;
     try {
       const result = installmentService.cancelPlan(inst.planId);
-      alert(`تم إلغاء خطة ${result.planNumber} وعكس المقدم إن وجد.`);
+      toast.success(`تم إلغاء خطة ${result.planNumber} وعكس المقدم إن وجد.`);
       load();
     } catch (err: any) {
-      alert(`تعذر إلغاء الخطة: ${err?.message}`);
+      toast.error(`تعذر إلغاء الخطة: ${err?.message}`);
     }
   };
 
@@ -237,7 +239,7 @@ export const InstallmentsPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">

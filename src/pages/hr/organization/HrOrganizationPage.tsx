@@ -4,6 +4,7 @@ import { EmployeeOrganizationService, EmployeeDepartment, EmployeeJobTitle, Empl
 import { fmt } from '../../operations/payroll/payrollDisplay';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
+import { useToast } from '../../../components/ui/Toast';
 type Tab = 'structure' | 'departments' | 'titles' | 'costCenters' | 'transfers' | 'lifecycle' | 'onboarding' | 'custody' | 'probation';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -21,6 +22,7 @@ const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
 const service = new EmployeeOrganizationService();
 
 export const HrOrganizationPage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('structure');
   const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
   const anyTabAllowed = (['structure', 'departments', 'titles', 'costCenters', 'transfers', 'lifecycle', 'onboarding', 'custody', 'probation'] as Tab[]).some(canTab);
@@ -198,7 +200,7 @@ export const HrOrganizationPage: React.FC = () => {
     try {
       service.requestOffboardingApproval({ employeeId: procedureEmployeeId.trim(), reason: 'طلب إخلاء طرف' });
       setError(null);
-      alert('تم إنشاء طلب اعتماد إخلاء الطرف.');
+      toast.success('تم إنشاء طلب اعتماد إخلاء الطرف.');
     } catch (e: any) { setError(e?.message || 'تعذر إنشاء طلب الاعتماد.'); }
   };
 
@@ -241,7 +243,7 @@ export const HrOrganizationPage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center">
           <Building2 className="w-5 h-5 text-teal-600" />

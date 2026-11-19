@@ -29,7 +29,9 @@ import { ConvertInvoiceModal } from './ConvertInvoiceModal';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
+import { useToast } from '../../../components/ui/Toast';
 export const OrdersPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new OrderService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
   const productService = useMemo(() => new ProductService(), []);
@@ -123,7 +125,7 @@ export const OrdersPage: React.FC = () => {
       setForm({ ...emptyForm(), warehouseId: whs.find((w) => w.isDefault)?.id || whs[0]?.id || '' });
       setOperationalFieldValues({});
       setFormOpen(true);
-    } catch (e: any) { alert(e?.message || 'تعذر تحميل بيانات الطلب.'); }
+    } catch (e: any) { toast.error(e?.message || 'تعذر تحميل بيانات الطلب.'); }
   };
 
   const openEdit = (order: Order) => {
@@ -150,7 +152,7 @@ export const OrdersPage: React.FC = () => {
       });
       setOperationalFieldValues(operationalFieldService.getRecordValues('orders', order.id));
       setFormOpen(true);
-    } catch (e: any) { alert(e?.message || 'تعذر تحميل بيانات الطلب.'); }
+    } catch (e: any) { toast.error(e?.message || 'تعذر تحميل بيانات الطلب.'); }
   };
 
   const setLine = (idx: number, patch: Partial<Line>) =>
@@ -199,9 +201,9 @@ export const OrdersPage: React.FC = () => {
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
     const items = form.lines.filter((l) => l.productId && l.quantity > 0);
-    if (!form.customerId) return alert('اختر العميل.');
-    if (!form.warehouseId) return alert('اختر المخزن.');
-    if (items.length === 0) return alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
+    if (!form.customerId) return toast.warning('اختر العميل.');
+    if (!form.warehouseId) return toast.warning('اختر المخزن.');
+    if (items.length === 0) return toast.warning('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
     try {
       operationalFieldService.validateRecordValues(
@@ -235,7 +237,7 @@ export const OrdersPage: React.FC = () => {
       setFormOpen(false);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حفظ الطلب.');
+      toast.error(err?.message || 'تعذر حفظ الطلب.');
     } finally {
       setSaving(false);
     }
@@ -248,13 +250,13 @@ export const OrdersPage: React.FC = () => {
     const target = next[order.status];
     if (!target) return;
     try { service.updateStatus(order.id, target); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const cancel = (order: Order) => {
     if (!window.confirm(`إلغاء الطلب ${order.orderNumber}؟ سيتم تحرير الكميات المحجوزة من المخزن.`)) return;
     try { service.cancelOrder(order.id); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const openTimeline = (order: Order) => {
@@ -280,16 +282,16 @@ export const OrdersPage: React.FC = () => {
     const lines = Object.entries(deliveryLines)
       .map(([itemId, quantityM2]) => ({ itemId, quantityM2: Number(quantityM2) || 0 }))
       .filter((line) => line.quantityM2 > 0);
-    if (lines.length === 0) return alert('أدخل كمية تسليم أكبر من صفر لبند واحد على الأقل.');
+    if (lines.length === 0) return toast.warning('أدخل كمية تسليم أكبر من صفر لبند واحد على الأقل.');
     setSaving(true);
     try {
       service.recordDelivery(deliveryTarget.id, lines, deliveryNote || undefined);
       setDeliveryTarget(null);
       setDetail(null);
       load();
-      alert('تم تسجيل التسليم وتحديث حالة الطلب بنجاح.');
+      toast.success('تم تسجيل التسليم وتحديث حالة الطلب بنجاح.');
     } catch (err: any) {
-      alert(err?.message || 'تعذر تسجيل التسليم.');
+      toast.error(err?.message || 'تعذر تسجيل التسليم.');
     } finally {
       setSaving(false);
     }
@@ -298,7 +300,7 @@ export const OrdersPage: React.FC = () => {
   const removeOrder = (order: Order) => {
     if (!window.confirm(`حذف الطلب الملغي ${order.orderNumber} نهائياً؟`)) return;
     try { service.deleteCancelledOrder(order.id); load(); setDetail(null); }
-    catch (e: any) { alert(e?.message); }
+    catch (e: any) { toast.warning(e?.message); }
   };
 
   const shareOnWhatsApp = (order: Order) => {
@@ -331,9 +333,9 @@ export const OrdersPage: React.FC = () => {
       setConvertTarget(null);
       setDetail(null);
       load();
-      alert(`تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح وإتمام الطلب.`);
+      toast.success(`تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح وإتمام الطلب.`);
     } catch (err: any) {
-      alert(err?.message || 'تعذر إصدار الفاتورة.');
+      toast.error(err?.message || 'تعذر إصدار الفاتورة.');
     } finally {
       setSaving(false);
     }
@@ -382,7 +384,7 @@ export const OrdersPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <OrdersHeader canCreate={canCreate} onExport={doExport} onCreate={openCreate} />
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">

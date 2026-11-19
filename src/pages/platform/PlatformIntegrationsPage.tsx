@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Webhook,
   CreditCard,
@@ -29,8 +30,8 @@ import {
   formatDateTime,
   inputClass,
 } from './components/PlatformUI';
-import { useToast } from '../../components/ui/Toast';
 
+import { useToast } from '../../components/ui/Toast';
 interface WebhookEndpoint {
   id: string;
   name: string;
@@ -397,103 +398,100 @@ export const PlatformIntegrationsPage: React.FC = () => {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-right text-xs">
-                  <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">اسم نقطة الربط</th>
-                      <th className="px-4 py-3">الرابط الهدف (Target URL)</th>
-                      <th className="px-4 py-3">الأحداث المشترك بها</th>
-                      <th className="px-4 py-3">المفتاح السري (Signing Secret)</th>
-                      <th className="px-4 py-3">آخر تسليم</th>
-                      <th className="px-4 py-3 text-center">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {webhooks.map((wh) => (
-                      <tr key={wh.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 py-3 font-bold text-slate-100">{wh.name}</td>
-                        <td className="px-4 py-3 font-mono text-slate-300 text-[11px]">{wh.url}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {wh.events.map((ev) => (
-                              <span
-                                key={ev}
-                                className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-sky-400"
-                              >
-                                {ev}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">
-                          {maskSecret(wh.secret)}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(wh.secret);
-                              toast.success('تم نسخ المفتاح السري');
-                            }}
-                            className="ml-2 text-sky-400 hover:text-sky-300 text-xs"
-                            title="نسخ المفتاح السري"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400">
-                          {wh.lastTriggeredAt ? formatDateTime(wh.lastTriggeredAt) : 'لم يتم الإرسال بعد'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            {canManageIntegrations && (
-                              <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingWebhookId(wh.id);
-                                    setWhForm({
-                                      name: wh.name,
-                                      url: wh.url,
-                                      events: wh.events,
-                                      secret: '',
-                                      isActive: wh.isActive,
-                                    });
-                                    setIsWhModalOpen(true);
-                                  }}
-                                  className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                                  title="تعديل"
-                                >
-                                  <Settings className="h-3 w-3" />
-                                  تعديل
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleTestWebhook(wh);
-                                  }}
-                                  className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1"
-                                  title="اختبار إرسال حمولة تجريبية"
-                                >
-                                  <Play className="h-3 w-3" />
-                                  اختبار
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleDeleteWebhook(wh.id);
-                                  }}
-                                  className="text-rose-400 hover:text-rose-300 text-xs"
-                                  title="حذف"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                ariaLabel="نقاط الربط Webhooks"
+                rows={webhooks}
+                rowKey={(wh: any) => String(wh.id)}
+                minWidth={850}
+                dense
+                tableClassName="text-xs"
+                rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+                columns={[
+                  { key: 'name', header: 'اسم نقطة الربط', render: (wh: any) => <span className="font-bold text-slate-100">{wh.name}</span> },
+                  { key: 'url', header: 'الرابط الهدف (Target URL)', render: (wh: any) => <span className="font-mono text-[11px] text-slate-300">{wh.url}</span> },
+                  {
+                    key: 'events', header: 'الأحداث المشترك بها',
+                    render: (wh: any) => (
+                      <span className="flex flex-wrap gap-1">
+                        {(wh.events as string[]).map((ev: string) => (
+                          <span key={ev} className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-sky-400">{ev}</span>
+                        ))}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'secret', header: 'المفتاح السري (Signing Secret)',
+                    render: (wh: any) => (
+                      <span className="font-mono text-[11px] text-slate-400">
+                        {maskSecret(wh.secret)}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(wh.secret);
+                            toast.success('تم نسخ المفتاح السري');
+                          }}
+                          className="ml-2 text-xs text-sky-400 hover:text-sky-300"
+                          title="نسخ المفتاح السري"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ),
+                  },
+                  { key: 'last', header: 'آخر تسليم', render: (wh: any) => <span className="text-slate-400">{wh.lastTriggeredAt ? formatDateTime(wh.lastTriggeredAt) : 'لم يتم الإرسال بعد'}</span> },
+                  {
+                    key: 'actions', header: 'إجراءات', align: 'center',
+                    render: (wh: any) => (
+                      <span className="flex items-center justify-center gap-2">
+                        {canManageIntegrations && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingWebhookId(wh.id);
+                                setWhForm({
+                                  name: wh.name,
+                                  url: wh.url,
+                                  events: wh.events,
+                                  secret: '',
+                                  isActive: wh.isActive,
+                                });
+                                setIsWhModalOpen(true);
+                              }}
+                              className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300"
+                              title="تعديل"
+                            >
+                              <Settings className="h-3 w-3" />
+                              تعديل
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleTestWebhook(wh);
+                              }}
+                              className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300"
+                              title="اختبار إرسال حمولة تجريبية"
+                            >
+                              <Play className="h-3 w-3" />
+                              اختبار
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteWebhook(wh.id);
+                              }}
+                              className="text-xs text-rose-400 hover:text-rose-300"
+                              title="حذف"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
               </div>
             )}
           </div>

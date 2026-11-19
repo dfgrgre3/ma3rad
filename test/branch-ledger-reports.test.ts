@@ -85,7 +85,7 @@ test('financial statements only include assigned-branch ledger entries', async (
   AuthService.setCurrentUser(user);
   try {
     const service = new FinancialStatementsService();
-    const cashFlow = service.getCashFlow('2037-05-14', '2037-05-14');
+    const cashFlow = await service.getCashFlow('2037-05-14', '2037-05-14');
     assert.equal(cashFlow.totals.inflows, 100);
     assert.equal(cashFlow.totals.net, 100);
     assert.equal(cashFlow.balances.closing, cashFlow.balances.opening + cashFlow.totals.net);
@@ -95,14 +95,14 @@ test('financial statements only include assigned-branch ledger entries', async (
       "SELECT id FROM chart_of_accounts WHERE code = '1101'"
     )[0];
     assert.ok(cashAccount);
-    const ledger = service.getGeneralLedger(cashAccount.id, '2037-05-14', '2037-05-14');
+    const ledger = await service.getGeneralLedger(cashAccount.id, '2037-05-14', '2037-05-14');
     assert.equal(ledger.lines.length, 1);
     assert.equal(ledger.lines[0].debit, 100);
     assert.match(service.getBranchScopeWarning() || '', /الفرع النشط فقط/);
 
     const reconciliation = new SalesFinancialReconciliationService();
     const checks = reconciliation.getReconciliation('2037-05-14', '2037-05-14');
-    assert.equal(checks.length, 6);
+    assert.equal(checks.length, 7);
     assert.equal(checks.find(check => check.key === 'cash')?.ledger, 100);
     assert.equal(reconciliation.getLatestClosure('2037-05-14', '2037-05-14'), null);
     assert.throws(

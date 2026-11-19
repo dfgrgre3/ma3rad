@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertCircle,
   ArrowDownToLine,
@@ -117,7 +118,7 @@ export const AuditLogPage: React.FC = () => {
   const activeFilters = Boolean(search || dateFrom || dateTo || selectedModule || selectedSource);
 
   return (
-    <main className="erp-page" dir="rtl">
+    <main className="erp-page">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-3">
@@ -350,63 +351,18 @@ export const AuditLogPage: React.FC = () => {
                   <span className="shrink-0 text-base" aria-hidden="true">â†”</span>
                 </p>
                 <div className="overflow-x-auto overscroll-x-contain">
-                <table className="w-full min-w-[920px] text-right text-sm">
-                  <thead className="bg-slate-50 text-[11px] font-bold text-slate-600">
-                    <tr>
-                      <th scope="col" className="px-4 py-3">التاريخ والوقت</th>
-                      <th scope="col" className="px-4 py-3">المصدر</th>
-                      <th scope="col" className="px-4 py-3">المستخدم</th>
-                      <th scope="col" className="px-4 py-3">الحدث</th>
-                      <th scope="col" className="px-4 py-3">النوع / الوحدة</th>
-                      <th scope="col" className="px-4 py-3 text-center">التفاصيل</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {logs.map((log) => {
-                      const rowKey = `${log.source}:${log.id}`;
-                      const isExpanded = expandedLog === rowKey;
-                      return (
-                        <React.Fragment key={rowKey}>
-                          <tr className={`transition-colors ${isExpanded ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-slate-700">{formatTimestamp(log.createdAt)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-bold ${log.source === 'business' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${log.source === 'business' ? 'bg-emerald-600' : 'bg-amber-600'}`} />
-                                {log.source === 'business' ? 'عملية أعمال' : 'محاولة دخول'}
-                              </span>
-                            </td>
-                            <td className="max-w-[200px] truncate px-4 py-3 font-semibold text-slate-800" title={log.userName}>
-                              {log.userName || 'غير مسجل'}
-                              {log.source === 'login' && (
-                                <span className={`me-2 inline-flex items-center gap-1 text-[10px] font-bold ${log.succeeded ? 'text-emerald-700' : 'text-red-700'}`}>
-                                  {log.succeeded
-                                    ? <><CheckCircle2 className="h-3 w-3" aria-hidden="true" /> ناجح</>
-                                    : <><XCircle className="h-3 w-3" aria-hidden="true" /> فاشل</>}
-                                </span>
-                              )}
-                            </td>
-                            <td className="max-w-[320px] truncate px-4 py-3 font-semibold text-slate-800" title={log.action}>{log.action}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold ${log.module === 'LOGIN' ? 'border-amber-200 bg-amber-50 text-amber-900' : getModuleColor(log.module)}`}>
-                                {moduleLabel(log.module)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => toggleExpand(rowKey)}
-                                aria-expanded={isExpanded}
-                                aria-label={`${isExpanded ? 'إخفاء' : 'عرض'} تفاصيل ${log.action}`}
-                                className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-200 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              >
-                                {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
-                              </button>
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr className="bg-slate-50">
-                              <td colSpan={6} className="px-4 py-4">
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <DataTable
+                  ariaLabel="سجل المراجعة والأحداث"
+                  rows={logs}
+                  rowKey={(log) => `${log.source}:${log.id}`}
+                  minWidth={920}
+                  stickyHeader
+                  tableClassName="text-sm"
+                  isRowExpanded={(log) => expandedLog === `${log.source}:${log.id}`}
+                  rowClassName={(log) => (expandedLog === `${log.source}:${log.id}` ? 'bg-indigo-50/50' : '')}
+                  renderExpandedRow={(log) => (
+                    <div className="grid gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                   <Detail label="معرف الحدث" value={log.id} mono />
                                   {log.userId && <Detail label="معرف المستخدم" value={log.userId} mono />}
                                   {log.recordId && <Detail label="معرف السجل المتأثر" value={log.recordId} mono />}
@@ -430,14 +386,59 @@ export const AuditLogPage: React.FC = () => {
                                   {log.oldValues && <JsonDetail label="القيم السابقة" value={log.oldValues} tone="red" />}
                                   {log.newValues && <JsonDetail label="القيم الجديدة" value={log.newValues} tone="green" />}
                                 </div>
-                              </td>
-                            </tr>
+                    </div>
+                  )}
+                  columns={[
+                    { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="whitespace-nowrap text-xs tabular-nums text-slate-700">{formatTimestamp(log.createdAt)}</span> },
+                    {
+                      key: 'source', header: 'المصدر',
+                      render: (log) => (
+                        <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-bold ${log.source === 'business' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${log.source === 'business' ? 'bg-emerald-600' : 'bg-amber-600'}`} />
+                          {log.source === 'business' ? 'عملية أعمال' : 'محاولة دخول'}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'user', header: 'المستخدم',
+                      render: (log) => (
+                        <span className="block max-w-[200px] truncate font-semibold text-slate-800" title={log.userName}>
+                          {log.userName || 'غير مسجل'}
+                          {log.source === 'login' && (
+                            <span className={`ms-2 inline-flex items-center gap-1 text-[10px] font-bold ${log.succeeded ? 'text-emerald-700' : 'text-red-700'}`}>
+                              {log.succeeded
+                                ? <><CheckCircle2 className="h-3 w-3" aria-hidden="true" /> ناجح</>
+                                : <><XCircle className="h-3 w-3" aria-hidden="true" /> فاشل</>}
+                            </span>
                           )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        </span>
+                      ),
+                    },
+                    { key: 'action', header: 'الحدث', render: (log) => <span className="block max-w-[320px] truncate font-semibold text-slate-800" title={log.action}>{log.action}</span> },
+                    {
+                      key: 'module', header: 'النوع / الوحدة',
+                      render: (log) => <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold ${log.module === 'LOGIN' ? 'border-amber-200 bg-amber-50 text-amber-900' : getModuleColor(log.module)}`}>{moduleLabel(log.module)}</span>,
+                    },
+                    {
+                      key: 'details', header: 'التفاصيل', align: 'center',
+                      render: (log) => {
+                        const rowKey = `${log.source}:${log.id}`;
+                        const isExpanded = expandedLog === rowKey;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(rowKey)}
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? 'إخفاء' : 'عرض'} تفاصيل ${log.action}`}
+                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-200 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                          </button>
+                        );
+                      },
+                    },
+                  ]}
+                />
                 </div>
               </div>
             )}

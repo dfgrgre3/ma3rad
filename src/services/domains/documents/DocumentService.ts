@@ -748,7 +748,8 @@ export class DocumentService {
 
     if (!dto.companyId) throw new Error('الشركة مطلوبة.');
     this.assertCompany(dto.companyId, actor);
-    const branchId = this.assertBranch(dto.branchId, dto.companyId, actor);
+    const branchId = this.assertBranch(dto.branchId, dto.companyId, actor)
+      ?? this.access.getCurrentBranchId(actor);
     const title = requireText(dto.title, 'عنوان العقد', 2, 200);
     const partyName = requireText(dto.partyName, 'اسم الطرف', 2, 200);
     const partyType = dto.partyType || 'OTHER';
@@ -786,7 +787,7 @@ export class DocumentService {
            (id, company_id, branch_id, contract_number, title, party_type, party_id, party_name,
             start_date, end_date, value, currency, status, auto_renew, renewal_notice_days,
             owner_user_id, document_id, notes, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           dto.companyId,

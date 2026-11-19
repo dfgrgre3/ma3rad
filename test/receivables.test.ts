@@ -8,6 +8,7 @@ import { PurchaseOrderService } from '../src/services/domains/purchases/Purchase
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { SupplierService } from '../src/services/domains/suppliers/SupplierService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { DATA_INTEGRITY_BASELINE } from './fixtures/data-integrity-baseline.ts';
 
 test('purchase order partial and full receipts post only received stock and preserve history', async () => {
@@ -15,7 +16,7 @@ test('purchase order partial and full receipts post only received stock and pres
   { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const pid = 'prod_receivable_test'; const sid = 'sup_receivable_test';
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
-    [pid,'SKU-RCV','BAR-RCV','وحدة اختبار','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,20,30,25,0,0]);
+    [pid,'SKU-RCV','BAR-RCV','وحدة اختبار','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,2000,3000,2500,0,0]);
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases) VALUES (?,?,?,?,0,0)`, [sid,'SUP-RCV','مورد اختبار','01000000000']);
   const before = Number(db.query<any>(`SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id='wh_main'`,[pid])[0]?.quantityM2 || 0);
   const service = new PurchaseOrderService();
@@ -40,14 +41,18 @@ test('purchase order partial and full receipts post only received stock and pres
 
 test('one customer receipt allocates across several invoices atomically', async () => {
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = db.query<{ id: string }>(`SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id])[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
   const bankAccountId = 'bank_receivable_test';
   const bankGlId = db.query<any>(`SELECT id FROM chart_of_accounts WHERE code='1102'`)[0].id;
   db.run(`INSERT INTO bank_accounts (id,account_name,bank_name,account_number,opening_balance,current_balance,gl_account_id,branch_id,is_active)
-    VALUES (?,?,?,?,0,0,?,NULL,1)`, [bankAccountId,'Test receipt account','Test Bank','BANK-RCV-001',bankGlId]);
+    VALUES (?,?,?,?,0,0,?,'br_main',1)`, [bankAccountId,'Test receipt account','Test Bank','BANK-RCV-001',bankGlId]);
   const pid = 'prod_alloc_test'; const customer = new CustomerService().createCustomer({ name:'عميل توزيع', phone:'01000000002', customerType:'RETAIL', creditLimit:0, paymentTermsDays:15 });
   db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
-    [pid,'SKU-ALLOC','BAR-ALLOC','صنف توزيع','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,5,10,9,0,0]);
+    [pid,'SKU-ALLOC','BAR-ALLOC','صنف توزيع','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,500,1000,900,0,0]);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2) VALUES (?,?,?,?,0)`, ['stk_alloc','wh_main',pid,10]);
   const sales = new SalesService();
   const makeInvoice = () => sales.createSale({ customerId:customer.id, warehouseId:'wh_main', items:[{productId:pid,soldBy:'M2',quantityM2:2,boxesCount:0,piecesCount:0,unitPrice:10}], paidAmount:0, paymentType:'CREDIT' });
@@ -66,14 +71,14 @@ test('one customer receipt allocates across several invoices atomically', async 
   assert.throws(() => sales.recordCustomerPaymentAllocations(customer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'CASH','cr_main','2026-10-24','TR-42','',undefined,receiptKey), /different customer payment request/);
   const otherCustomer = new CustomerService().createCustomer({ name:'Ø¹Ù…ÙŠÙ„ Ø¢Ø®Ø±', phone:'01000000003', customerType:'RETAIL', creditLimit:0, paymentTermsDays:15 });
   assert.throws(() => sales.recordCustomerPaymentAllocations(otherCustomer.id,[{invoiceId:first.id,amount:5},{invoiceId:second.id,amount:10}],'BANK_TRANSFER','cr_main','2026-10-24','TR-42','',undefined,receiptKey), /different customer payment request/);
-  assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[first.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[0]);
-  assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[1]);
+  assert.equal(db.query<any>(`SELECT remaining_amount / 100.0 AS remainingAmount FROM sales_invoices WHERE id=?`,[first.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[0]);
+  assert.equal(db.query<any>(`SELECT remaining_amount / 100.0 AS remainingAmount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,DATA_INTEGRITY_BASELINE.customerAllocation.invoiceRemainingM2[1]);
   assert.equal(db.query<any>(`SELECT COUNT(*) AS n FROM customer_payments WHERE payment_group_id=?`,[result.groupId])[0].n,DATA_INTEGRITY_BASELINE.customerAllocation.paymentRows);
   const firstPayment=db.query<any>(`SELECT id FROM customer_payments WHERE payment_group_id=? LIMIT 1`,[result.groupId])[0];
   assert.ok(firstPayment,'payment group has a linked invoice receipt');
   sales.deleteInvoicePayment(firstPayment.id);
-  assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[first.id])[0].remainingAmount,20);
-  assert.equal(db.query<any>(`SELECT remaining_amount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,20);
+  assert.equal(db.query<any>(`SELECT remaining_amount / 100.0 AS remainingAmount FROM sales_invoices WHERE id=?`,[first.id])[0].remainingAmount,20);
+  assert.equal(db.query<any>(`SELECT remaining_amount / 100.0 AS remainingAmount FROM sales_invoices WHERE id=?`,[second.id])[0].remainingAmount,20);
   assert.equal(db.query<any>(`SELECT COUNT(*) AS n FROM customer_payments WHERE payment_group_id=?`,[result.groupId])[0].n,0);
   const customerService=new CustomerService();
   const generalPayment=customerService.recordPayment(customer.id,5,'BANK_TRANSFER',undefined,undefined,'رصيد مرحل','usr_admin','2026-10-24','generic-payment-key',bankAccountId);
@@ -89,7 +94,7 @@ test('supplier payment retry with the same idempotency key posts once and reject
   { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   const supplierId = 'sup_payment_retry_test';
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases) VALUES (?,?,?,?,?,0)`,
-    [supplierId,'SUP-RETRY','مورد إعادة المحاولة','01000000009',DATA_INTEGRITY_BASELINE.supplierPaymentRetry.initialBalance]);
+    [supplierId,'SUP-RETRY','مورد إعادة المحاولة','01000000009',DATA_INTEGRITY_BASELINE.supplierPaymentRetry.initialBalance*100]);
   const service = new SupplierService();
   const first = service.recordPayment(supplierId, DATA_INTEGRITY_BASELINE.supplierPaymentRetry.paymentAmount, 'BANK_TRANSFER', 'cr_main', 'retry test', 'supplier-payment-retry-key');
   const replay = service.recordPayment(supplierId, DATA_INTEGRITY_BASELINE.supplierPaymentRetry.paymentAmount, 'BANK_TRANSFER', 'cr_main', 'retry test', 'supplier-payment-retry-key');
@@ -106,17 +111,17 @@ test('supplier payment reallocation preserves prior paid amounts and enforces in
   const supplierId = 'sup_reallocate_caps_test';
   const branchId = db.query<any>(`SELECT branch_id FROM warehouses WHERE id='wh_main'`)[0].branchId;
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases,company_id)
-    VALUES (?,?,?,?,?,?,?)`, [supplierId,'SUP-REALLOC','مورد إعادة التوزيع','01000000008',1000,200,'cmp_main']);
+    VALUES (?,?,?,?,100000,200000,'cmp_main')`, [supplierId,'SUP-REALLOC','مورد إعادة التوزيع','01000000008']);
   db.run(`INSERT INTO purchase_invoices
     (id,invoice_number,date,supplier_id,warehouse_id,branch_id,subtotal,total_amount,paid_amount,remaining_amount,payment_status,created_by)
     VALUES
-    ('pi_realloc_a','REALLOC-A','2026-10-24',?,'wh_main',?,50,50,35,15,'PARTIAL','usr_admin'),
-    ('pi_realloc_b','REALLOC-B','2026-10-24',?,'wh_main',?,100,100,0,100,'UNPAID','usr_admin')`,
+    ('pi_realloc_a','REALLOC-A','2026-10-24',?,'wh_main',?,5000,5000,3500,1500,'PARTIAL','usr_admin'),
+    ('pi_realloc_b','REALLOC-B','2026-10-24',?,'wh_main',?,10000,10000,0,10000,'UNPAID','usr_admin')`,
   [supplierId,branchId,supplierId,branchId]);
 
   const service = new SupplierService();
   const payment = service.recordPayment(supplierId,40,'BANK_TRANSFER','cr_main','allocation test');
-  assert.equal(Number(db.query<any>(`SELECT paid_amount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50);
+  assert.equal(Number(db.query<any>(`SELECT paid_amount / 100.0 AS paidAmount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50);
 
   assert.throws(
     () => service.reallocateSupplierPayment(payment.id,[{purchaseInvoiceId:'pi_realloc_a',amount:16}]),
@@ -129,7 +134,7 @@ test('supplier payment reallocation preserves prior paid amounts and enforces in
     ]),
     /يتجاوز قيمة السند/
   );
-  assert.equal(Number(db.query<any>(`SELECT paid_amount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50,
+  assert.equal(Number(db.query<any>(`SELECT paid_amount / 100.0 AS paidAmount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50,
     'failed reallocations do not remove the payment’s existing allocation');
 
   service.reallocateSupplierPayment(payment.id,[
@@ -137,11 +142,11 @@ test('supplier payment reallocation preserves prior paid amounts and enforces in
     {purchaseInvoiceId:'pi_realloc_b',amount:25}
   ]);
   assert.deepEqual(
-    db.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE id IN ('pi_realloc_a','pi_realloc_b') ORDER BY id`),
+    db.query<any>(`SELECT id,paid_amount / 100.0 AS paidAmount,remaining_amount / 100.0 AS remainingAmount FROM purchase_invoices WHERE id IN ('pi_realloc_a','pi_realloc_b') ORDER BY id`),
     [
       { id:'pi_realloc_a', paidAmount:50, remainingAmount:0 },
       { id:'pi_realloc_b', paidAmount:25, remainingAmount:75 }
     ]
   );
-  assert.equal(Number(db.query<any>(`SELECT SUM(amount) AS total FROM supplier_payment_allocations WHERE payment_id=?`,[payment.id])[0].total),40);
+  assert.equal(Number(db.query<any>(`SELECT SUM(amount) / 100.0 AS total FROM supplier_payment_allocations WHERE payment_id=?`,[payment.id])[0].total),40);
 });

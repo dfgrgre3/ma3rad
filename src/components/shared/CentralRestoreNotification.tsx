@@ -23,7 +23,7 @@ export function CentralRestoreNotification() {
   if (!pending || pending.id === dismissedId) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[110] w-[min(92vw,420px)]" dir="rtl">
+    <div className="fixed bottom-4 right-4 z-[110] w-[min(92vw,420px)]">
       <section
         role="alert"
         aria-live="assertive"

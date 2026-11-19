@@ -3,15 +3,6 @@ import { CeramicMath } from '../../utils/products/ceramicMath';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 
-export const StatCard: React.FC<{ label: string; value: string; icon: React.ElementType; tone: string }> = ({ label, value, icon: Icon, tone }) => (
-  <div className={`rounded-xl border px-3 py-2.5 ${tone}`}>
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] font-bold opacity-80">{label}</span>
-      <Icon className="w-4 h-4 opacity-70" />
-    </div>
-    <div className="text-sm font-black mt-1 truncate">{value}</div>
-  </div>
-);
 
 export const IconButton: React.FC<{ title: string; onClick: () => void; children: React.ReactNode; tone?: string }> = ({ title, onClick, children, tone }) => (
   <button title={title} onClick={onClick} className={`p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition ${tone || ''}`}>

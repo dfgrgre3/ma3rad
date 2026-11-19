@@ -7,7 +7,15 @@ import {
   SocialInsuranceSystemType, SocialInsuranceCalculation, EndOfServiceCalculation,
 } from '../../../services/domains/hr/PayrollSocialInsuranceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
+import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; icon?: React.ReactNode; tone?: string }> = ({ label, value, hint, icon, tone }: any) => (
+  <UiStatCard label={label} value={value} hint={hint} icon={icon} tone={statTone(tone || '')} />
+);
 type Tab = 'insurance' | 'eos' | 'calculator';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -66,16 +74,6 @@ const emptyEndOfServiceForm = (): EndOfServiceForm => ({
   benefitMonthsPerYearSecondPeriod: '1', secondPeriodThresholdYears: '5',
 });
 
-const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: React.ReactNode; tone: string }> = ({ label, value, hint, icon, tone }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-bold text-slate-500">{label}</span>
-      <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${tone}`}>{icon}</span>
-    </div>
-    <div className="mt-2 text-xl font-black tabular-nums">{value}</div>
-    {hint && <div className="mt-0.5 text-[10px] font-semibold text-slate-400">{hint}</div>}
-  </div>
-);
 
 export const PayrollSocialInsurancePage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('insurance');
@@ -253,7 +251,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50">
           <Landmark className="h-5 w-5 text-indigo-600" />

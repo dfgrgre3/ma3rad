@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../ui/DataTable';
 import {
   Building2, Copy, Check, KeyRound, Link2, Loader2, Plus, RefreshCw,
   ShieldCheck, ShieldOff, Trash2, Power, PowerOff, X, Search, Lock,
@@ -280,42 +281,24 @@ export const AccountLinksPanel: React.FC = () => {
 
       {/* Links table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <table className="w-full text-right text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-            <tr>
-              <th className="px-3 py-2 font-bold">الحساب</th>
-              <th className="px-3 py-2 font-bold">الحالة</th>
-              <th className="px-3 py-2 font-bold">الاعتماد</th>
-              <th className="px-3 py-2 font-bold">الصلاحيات</th>
-              <th className="px-3 py-2 font-bold">آخر تحقق</th>
-              <th className="px-3 py-2 font-bold">معلّق</th>
-              <th className="px-3 py-2 font-bold">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </td>
-              </tr>
-            )}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
-                  لا توجد حسابات مرتبطة بعد. اضغط «ربط حساب جديد» لإصدار كود أو مفتاح API.
-                </td>
-              </tr>
-            )}
-            {!loading && items.map((link) => {
-              const status = STATUS_STYLES[link.status] ?? STATUS_STYLES.PENDING;
-              return (
-                <tr key={link.id} className="hover:bg-slate-50/60">
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900">
+        <DataTable
+          ariaLabel="الحسابات المرتبطة"
+          rows={loading ? [] : items}
+          rowKey={(link: any) => String(link.id)}
+          loading={loading}
+          dense
+          tableClassName="text-xs"
+          columns={[
+            {
+              key: 'account', header: 'الحساب',
+              render: (link: any) => {
+                const status = STATUS_STYLES[link.status] ?? STATUS_STYLES.PENDING;
+                return (
+                  <span>
+                    <span className="flex items-center gap-1.5 font-bold text-slate-900">
                       <Building2 className="h-3.5 w-3.5 text-slate-400" /> {link.companyName}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-slate-400">
                       <span>{link.branchId || 'كل الفروع'}</span>
                       {(link.linkCode || link.apiToken) && (
                         <button
@@ -327,67 +310,80 @@ export const AccountLinksPanel: React.FC = () => {
                           {copied === link.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                         </button>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${status.cls}`}>{status.label}</span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleApproval(link)}
-                      className={`flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${
-                        link.requiresApproval
-                          ? 'border-amber-200 bg-amber-50 text-amber-700'
-                          : 'border-slate-200 bg-white text-slate-500'
-                      }`}
-                    >
-                      {link.requiresApproval ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
-                      {link.requiresApproval ? 'يحتاج اعتماد' : 'مباشر'}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setPermissionsFor(link)}
-                      className="rounded-lg border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
-                    >
-                      {link.permissions.length} صلاحية
-                    </button>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-[10px] text-slate-500">{formatTimestamp(link.lastVerifiedAt)}</td>
-                  <td className="px-3 py-2">
-                    <span className={`text-[11px] font-black ${link.pendingChanges > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                      {link.pendingChanges}
                     </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      {link.status === 'REVOKED' ? (
-                        <span className="text-[10px] text-slate-400">—</span>
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'status', header: 'الحالة',
+              render: (link: any) => {
+                const status = STATUS_STYLES[link.status] ?? STATUS_STYLES.PENDING;
+                return <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${status.cls}`}>{status.label}</span>;
+              },
+            },
+            {
+              key: 'approval', header: 'الاعتماد',
+              render: (link: any) => (
+                <button
+                  type="button"
+                  onClick={() => toggleApproval(link)}
+                  className={`flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${
+                    link.requiresApproval
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-white text-slate-500'
+                  }`}
+                >
+                  {link.requiresApproval ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
+                  {link.requiresApproval ? 'يحتاج اعتماد' : 'مباشر'}
+                </button>
+              ),
+            },
+            {
+              key: 'perms', header: 'الصلاحيات',
+              render: (link: any) => (
+                <button
+                  type="button"
+                  onClick={() => setPermissionsFor(link)}
+                  className="rounded-lg border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  {link.permissions.length} صلاحية
+                </button>
+              ),
+            },
+            { key: 'verified', header: 'آخر تحقق', render: (link: any) => <span className="font-mono text-[10px] text-slate-500">{formatTimestamp(link.lastVerifiedAt)}</span> },
+            {
+              key: 'pending', header: 'معلّق',
+              render: (link: any) => <span className={`text-[11px] font-black ${link.pendingChanges > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{link.pendingChanges}</span>,
+            },
+            {
+              key: 'actions', header: 'إجراءات',
+              render: (link: any) => (
+                <div className="flex items-center gap-1">
+                  {link.status === 'REVOKED' ? (
+                    <span className="text-[10px] text-slate-400">—</span>
+                  ) : (
+                    <>
+                      {link.status === 'ACTIVE' ? (
+                        <button type="button" onClick={() => setEnabled(link, false)} title="تعطيل" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+                          <PowerOff className="h-3.5 w-3.5" />
+                        </button>
                       ) : (
-                        <>
-                          {link.status === 'ACTIVE' ? (
-                            <button type="button" onClick={() => setEnabled(link, false)} title="تعطيل" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
-                              <PowerOff className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <button type="button" onClick={() => setEnabled(link, true)} title="تفعيل" className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
-                              <Power className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          <button type="button" onClick={() => revoke(link)} title="إلغاء" className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50">
-                            {busy === link.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                          </button>
-                        </>
+                        <button type="button" onClick={() => setEnabled(link, true)} title="تفعيل" className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
+                          <Power className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      <button type="button" onClick={() => revoke(link)} title="إلغاء" className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50">
+                        {busy === link.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+          emptyTitle="لا توجد حسابات مرتبطة بعد. اضغط «ربط حساب جديد» لإصدار كود أو مفتاح API."
+        />
       </div>
 
       {issueOpen && (

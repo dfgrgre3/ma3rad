@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Plus,
   RefreshCw,
@@ -165,7 +166,7 @@ export const BankReconciliationPage: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -287,48 +288,51 @@ export const BankReconciliationPage: React.FC = () => {
                 لا توجد حركات غير مطابقة لهذا الحساب حتى تاريخ {statementDate}.
               </div>
             ) : (
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 w-10 text-center">مطابقة</th>
-                    <th className="p-3 font-semibold">التاريخ</th>
-                    <th className="p-3 font-semibold">رقم المرجع / القيد</th>
-                    <th className="p-3 font-semibold">البيان</th>
-                    <th className="p-3 font-semibold text-left">المبلغ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {unreconciledItems.map((item) => {
-                    const isChecked = clearedIds.has(item.id);
-                    const isDeposit = item.type === 'DEPOSIT';
-                    return (
-                      <tr
-                        key={item.id}
-                        onClick={() => toggleCleared(item.id)}
-                        className={`transition ${canManage ? 'cursor-pointer' : ''} ${isChecked ? 'bg-sky-50/60 font-semibold' : canManage ? 'hover:bg-slate-50' : ''}`}
-                      >
-                        <td className="p-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={!canManage}
-                            onChange={() => {}}
-                            className={`w-4 h-4 rounded text-sky-600 focus:ring-sky-500 ${canManage ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          />
-                        </td>
-                        <td className="p-3 text-slate-600 font-mono">{item.date}</td>
-                        <td className="p-3 font-mono font-bold text-slate-700">{item.reference}</td>
-                        <td className="p-3 text-slate-800">{item.description}</td>
-                        <td className="p-3 text-left font-mono font-bold">
-                          <span className={isDeposit ? 'text-emerald-600' : 'text-slate-800'}>
-                            {isDeposit ? '+' : '-'}{item.amount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="حركات الدفاتر غير المطابقة"
+                rows={unreconciledItems}
+                rowKey={(item: any) => String(item.id)}
+                onRowClick={canManage ? (item: any) => toggleCleared(item.id) : undefined}
+                stickyHeader
+                dense
+                tableClassName="text-xs"
+                rowClassName={(item: any) => {
+                  const isChecked = clearedIds.has(item.id);
+                  return `${isChecked ? 'bg-sky-50/60 font-semibold' : ''} ${canManage ? 'hover:bg-slate-50' : ''}`;
+                }}
+                columns={[
+                  {
+                    key: 'check', header: 'مطابقة', align: 'center',
+                    render: (item: any) => {
+                      const isChecked = clearedIds.has(item.id);
+                      return (
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={!canManage}
+                          onChange={() => {}}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`w-4 h-4 rounded text-sky-600 focus:ring-sky-500 ${canManage ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                        />
+                      );
+                    },
+                  },
+                  { key: 'date', header: 'التاريخ', render: (item: any) => <span className="font-mono text-slate-600">{item.date}</span> },
+                  { key: 'ref', header: 'رقم المرجع / القيد', render: (item: any) => <span className="font-mono font-bold text-slate-700">{item.reference}</span> },
+                  { key: 'desc', header: 'البيان', render: (item: any) => <span className="text-slate-800">{item.description}</span> },
+                  {
+                    key: 'amount', header: 'المبلغ', align: 'end',
+                    render: (item: any) => {
+                      const isDeposit = item.type === 'DEPOSIT';
+                      return (
+                        <span className={`font-mono font-bold ${isDeposit ? 'text-emerald-600' : 'text-slate-800'}`}>
+                          {isDeposit ? '+' : '-'}{item.amount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                        </span>
+                      );
+                    },
+                  },
+                ]}
+              />
             )}
           </div>
 

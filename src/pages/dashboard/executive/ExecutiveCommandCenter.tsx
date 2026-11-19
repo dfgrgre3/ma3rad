@@ -350,7 +350,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
         >
           {data.trend.length === 0 ? <EmptyLine text="لا توجد حركة مبيعات في هذه الفترة" /> : (
             <div className="h-56 w-full min-w-0" dir="ltr">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 224 }}>
                 <ComposedChart data={data.trend} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
                   <XAxis dataKey="label" stroke="var(--cerami-muted)" fontSize={10} tickLine={false} minTickGap={12} />

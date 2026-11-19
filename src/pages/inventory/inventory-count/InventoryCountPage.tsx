@@ -12,9 +12,11 @@ import { StartCountSessionModal } from './StartCountSessionModal';
 import { SessionCountModal } from './SessionCountModal';
 import type { CountItem, CountProductOption, CountSession, CountType, WarehouseOption } from '../../../types/inventory/countSessions';
 
+import { useToast } from '../../../components/ui/Toast';
 export { loadBranchCountSessions } from '../../../services/domains/inventory-count/countSessionData';
 
 export const InventoryCountPage: React.FC = () => {
+  const toast = useToast();
   const [sessions, setSessions] = useState<CountSession[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export const InventoryCountPage: React.FC = () => {
       setShowSessionModal(true);
     } catch (e) {
       console.error(e);
-      alert(e instanceof Error ? e.message : 'تعذر فتح جلسة الجرد.');
+      toast.error(e instanceof Error ? e.message : 'تعذر فتح جلسة الجرد.');
     }
   };
 
@@ -165,10 +167,10 @@ export const InventoryCountPage: React.FC = () => {
     if (!activeSession) return;
     try {
       saveCountDraft(activeSession, sessionItems);
-      alert('تم حفظ المسودة بنجاح.');
+      toast.success('تم حفظ المسودة بنجاح.');
     } catch (e) {
       console.error(e);
-      alert(e instanceof Error ? `فشل حفظ المسودة: ${e.message}` : 'فشل حفظ المسودة.');
+      toast.error(e instanceof Error ? `فشل حفظ المسودة: ${e.message}` : 'فشل حفظ المسودة.');
     }
   };
 
@@ -180,7 +182,7 @@ export const InventoryCountPage: React.FC = () => {
       loadSessions();
     } catch (e: any) {
       console.error(e);
-      alert('فشل ترحيل الجرد: ' + e.message);
+      toast.error('فشل ترحيل الجرد: ' + e.message);
     }
   };
 
@@ -190,7 +192,7 @@ export const InventoryCountPage: React.FC = () => {
       approveCountSession(activeSession);
       setShowSessionModal(false);
       loadSessions();
-    } catch (error: any) { alert(error?.message || 'تعذر اعتماد الجرد.'); }
+    } catch (error: any) { toast.error(error?.message || 'تعذر اعتماد الجرد.'); }
   };
 
   const handleRejectSession = () => {
@@ -201,7 +203,7 @@ export const InventoryCountPage: React.FC = () => {
       rejectCountSession(activeSession, reason);
       setShowSessionModal(false);
       loadSessions();
-    } catch (error: any) { alert(error?.message || 'تعذر رفض الجرد.'); }
+    } catch (error: any) { toast.error(error?.message || 'تعذر رفض الجرد.'); }
   };
 
   const handleCancelSession = () => {
@@ -211,7 +213,7 @@ export const InventoryCountPage: React.FC = () => {
       setShowSessionModal(false);
       loadSessions();
     } catch (error: any) {
-      alert(error?.message || 'تعذر إلغاء جلسة الجرد.');
+      toast.error(error?.message || 'تعذر إلغاء جلسة الجرد.');
     }
   };
 
@@ -233,7 +235,7 @@ export const InventoryCountPage: React.FC = () => {
   const varianceItems = countVarianceItems(sessionItems);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <InventoryCountHeader
         onCreateSession={() => { setErrorMsg(''); setSelectedProductIds([]); setProductSearch(''); loadProducts(); setShowCreateModal(true); }}

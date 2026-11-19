@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   ScrollText,
   Search,
@@ -519,92 +520,83 @@ export const PlatformAuditPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50/75 text-slate-600 font-semibold">
-                <tr>
-                  <th className="py-3 px-4">الوقت والتاريخ</th>
-                  {!centralMode && <th className="py-3 px-4">مستوى الخطورة</th>}
-                  {!centralMode && <th className="py-3 px-4">النتيجة</th>}
-                  <th className="py-3 px-4">المنفذ</th>
-                  <th className="py-3 px-4">الإجراء</th>
-                  <th className="py-3 px-4">نوع الكيان</th>
-                  <th className="py-3 px-4">الجهاز / العنوان</th>
-                  <th className="py-3 px-4 text-center">التفاصيل</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {entries.map((entry) => {
-                  const badge = SEVERITY_BADGES[entry.severity] || SEVERITY_BADGES.INFO;
-                  return (
-                    <tr key={entry.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono" dir="ltr">
-                        {formatDateTime(entry.createdAt)}
-                      </td>
-                      {!centralMode && (
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}
-                          >
-                            {badge.icon}
-                            {badge.label}
-                          </span>
-                        </td>
-                      )}
-                      {!centralMode && (
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          {entry.status === 'SUCCESS' ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> ناجح
-                            </span>
-                          ) : entry.status === 'BLOCKED' ? (
-                            <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
-                              <Lock className="h-3.5 w-3.5" /> محظور
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-rose-700 font-medium">
-                              <XCircle className="h-3.5 w-3.5" /> فاشل
-                            </span>
-                          )}
-                        </td>
-                      )}
-                      <td className="py-3 px-4">
-                        <p className="font-semibold text-slate-800">{entry.actorName || 'النظام'}</p>
-                        <p className="text-[10px] text-slate-400">
-                          {ACTOR_LABELS[entry.actorType || 'SUPER_ADMIN']}
-                        </p>
-                      </td>
-                      <td className="py-3 px-4">
-                        <p className="font-semibold text-slate-900">{entry.action}</p>
-                        {entry.entityId && (
-                          <p className="font-mono text-[10px] text-slate-400 truncate max-w-[200px]" dir="ltr">
-                            {entry.entityId}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700">
-                          {ENTITY_LABELS[entry.entityType] || entry.entityType}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-500 text-[11px]">
-                        <div>{entry.deviceName || entry.deviceId || '—'}</div>
-                        {entry.ipAddress && <div className="font-mono text-[10px] text-slate-400">{entry.ipAddress}</div>}
-                      </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leadingIcon={<Eye className="h-3.5 w-3.5 text-indigo-600" />}
-                          onClick={() => setSelectedEntry(entry)}
-                        >
-                          معاينة
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="سجل التدقيق"
+              rows={entries}
+              rowKey={(entry: any) => String(entry.id)}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition-colors hover:bg-slate-50/70'}
+              columns={[
+                { key: 'time', header: 'الوقت والتاريخ', render: (entry: any) => <span className="whitespace-nowrap font-mono text-slate-500" dir="ltr">{formatDateTime(entry.createdAt)}</span> },
+                ...(!centralMode ? [{
+                  key: 'severity', header: 'مستوى الخطورة',
+                  render: (entry: any) => {
+                    const badge = SEVERITY_BADGES[entry.severity as keyof typeof SEVERITY_BADGES] || SEVERITY_BADGES.INFO;
+                    return (
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}>
+                        {badge.icon}
+                        {badge.label}
+                      </span>
+                    );
+                  },
+                }] : []),
+                ...(!centralMode ? [{
+                  key: 'result', header: 'النتيجة',
+                  render: (entry: any) => entry.status === 'SUCCESS' ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> ناجح</span>
+                  ) : entry.status === 'BLOCKED' ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-purple-700"><Lock className="h-3.5 w-3.5" /> محظور</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 font-medium text-rose-700"><XCircle className="h-3.5 w-3.5" /> فاشل</span>
+                  ),
+                }] : []),
+                {
+                  key: 'actor', header: 'المنفذ',
+                  render: (entry: any) => (
+                    <span className="block">
+                      <span className="block font-semibold text-slate-800">{entry.actorName || 'النظام'}</span>
+                      <span className="block text-[10px] text-slate-400">{ACTOR_LABELS[(entry.actorType || 'SUPER_ADMIN') as keyof typeof ACTOR_LABELS]}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'action', header: 'الإجراء',
+                  render: (entry: any) => (
+                    <span className="block">
+                      <span className="block font-semibold text-slate-900">{entry.action}</span>
+                      {entry.entityId && <span className="block max-w-[200px] truncate font-mono text-[10px] text-slate-400" dir="ltr">{entry.entityId}</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'entity', header: 'نوع الكيان',
+                  render: (entry: any) => <span className="rounded bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700">{ENTITY_LABELS[entry.entityType as keyof typeof ENTITY_LABELS] || entry.entityType}</span>,
+                },
+                {
+                  key: 'device', header: 'الجهاز / العنوان',
+                  render: (entry: any) => (
+                    <span className="block whitespace-nowrap text-[11px] text-slate-500">
+                      <span className="block">{entry.deviceName || entry.deviceId || '—'}</span>
+                      {entry.ipAddress && <span className="block font-mono text-[10px] text-slate-400">{entry.ipAddress}</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'details', header: 'التفاصيل', align: 'center',
+                  render: (entry: any) => (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Eye className="h-3.5 w-3.5 text-indigo-600" />}
+                      onClick={() => setSelectedEntry(entry)}
+                    >
+                      معاينة
+                    </Button>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
 

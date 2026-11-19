@@ -34,7 +34,9 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge, formatDate, formatMoney, formatNumber } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformHealthPage: React.FC = () => {
+  const toast = useToast();
   const centralActive = getCentralDataSourceState().active;
   const canUpdateHealth = canPlatform('platform-health', 'platform.platform-health.update')
     || canPlatform('operations', 'platform.operations.update')
@@ -73,7 +75,7 @@ export const PlatformHealthPage: React.FC = () => {
   const handleErrorAction = useCallback((id: string, action: 'acknowledge' | 'resolve' | 'ignore' | 'reopen') => {
     centralPlatformClient.setErrorReportStatus(id, action)
       .then(loadCentral)
-      .catch((err) => alert(err instanceof Error ? err.message : 'تعذر تحديث حالة البلاغ.'));
+      .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تحديث حالة البلاغ.'));
   }, [loadCentral]);
 
   const load = useCallback(() => {

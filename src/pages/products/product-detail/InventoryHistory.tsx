@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
@@ -17,13 +18,19 @@ export const InventoryHistory: React.FC<InventoryHistoryProps> = ({ productId, u
   );
   if (rows.length === 0) return <div className="text-center text-slate-500 py-8 text-sm">لا توجد حركات مخزون</div>;
   return (
-    <table className="w-full text-sm text-right">
-      <thead className="bg-slate-50"><tr>{['التاريخ', 'النوع', 'المخزن', `الكمية (${unitLabel})`, 'ملاحظات'].map((h) => <th key={h} className="px-4 py-2 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
-      <tbody className="divide-y divide-slate-100">
-        {rows.map((r, i) => (
-          <tr key={i}><td className="px-4 py-2 text-slate-500">{r.date ? new Date(r.date).toLocaleString('ar-EG') : '—'}</td><td className="px-4 py-2 font-bold text-slate-700">{r.type}</td><td className="px-4 py-2 text-slate-600">{r.warehouseName || '—'}</td><td className="px-4 py-2 font-mono">{r.qty} {unitLabel}</td><td className="px-4 py-2 text-slate-500 max-w-[240px] truncate">{r.notes}</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      ariaLabel="سجل حركة المخزون"
+      rows={rows.map((r: any, i: number) => ({ ...r, __i: i }))}
+      rowKey={(r: any) => String(r.__i)}
+      dense
+      tableClassName="text-sm"
+      columns={[
+        { key: 'date', header: 'التاريخ', render: (r: any) => <span className="text-slate-500">{r.date ? new Date(r.date).toLocaleString('ar-EG') : '—'}</span> },
+        { key: 'type', header: 'النوع', render: (r: any) => <span className="font-bold text-slate-700">{r.type}</span> },
+        { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-slate-600">{r.warehouseName || '—'}</span> },
+        { key: 'qty', header: `الكمية (${unitLabel})`, render: (r: any) => <span className="font-mono">{r.qty} {unitLabel}</span> },
+        { key: 'notes', header: 'ملاحظات', render: (r: any) => <span className="block max-w-[240px] truncate text-slate-500">{r.notes}</span> },
+      ]}
+    />
   );
 };

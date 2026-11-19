@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
@@ -136,14 +137,14 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
 
   if (!canView) {
     return (
-      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">
+      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">
         لا تملك صلاحية عرض أرصدة المخازن.
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-4 sm:p-6" dir="rtl">
+    <div className="h-full overflow-y-auto bg-slate-50 p-4 sm:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${isComparison ? 'border-sky-200 bg-sky-50' : 'border-violet-200 bg-violet-50'}`}>
@@ -253,66 +254,58 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
           <div className="py-16 text-center text-sm font-semibold text-slate-500">جاري تحميل بيانات المخزون...</div>
         ) : isComparison ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5 text-center">المعرض — {warehouses.find((item) => item.id === showroomWarehouseId)?.name || 'غير محدد'}</th>
-                  <th className="p-3.5 text-center">المخزن — {warehouses.find((item) => item.id === storeWarehouseId)?.name || 'غير محدد'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {comparisonItems.map(({ product, showroom, warehouse }) => (
-                  <tr key={product.id} className="hover:bg-slate-50">
-                    <td className="p-3.5">
-                      <div className="flex items-start gap-2">
-                        <Package className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                        <div>
-                          <div className="font-bold text-slate-900">{product.name}</div>
-                          <div className="mt-1 text-[10px] text-slate-500">كود: {product.sku} · المقاس: {product.size}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="border-r border-slate-100 p-3.5 text-center">{renderQuantity(showroom, Boolean(showroomWarehouseId))}</td>
-                    <td className="border-r border-slate-100 p-3.5 text-center">{renderQuantity(warehouse, Boolean(storeWarehouseId))}</td>
-                  </tr>
-                ))}
-                {comparisonItems.length === 0 && (
-                  <tr><td colSpan={3} className="py-12 text-center text-slate-500">لا توجد أصناف تطابق الفلتر المحدد.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="مقارنة المخزون"
+              rows={comparisonItems}
+              rowKey={(row) => row.product.id}
+              minWidth={760}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                {
+                  key: 'product', header: 'الصنف',
+                  render: ({ product }) => (
+                    <span className="flex items-start gap-2">
+                      <Package className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                      <span>
+                        <span className="block font-bold text-slate-900">{product.name}</span>
+                        <span className="mt-1 block text-[10px] text-slate-500">كود: {product.sku} · المقاس: {product.size}</span>
+                      </span>
+                    </span>
+                  ),
+                },
+                { key: 'showroom', header: `المعرض — ${warehouses.find((item) => item.id === showroomWarehouseId)?.name || 'غير محدد'}`, align: 'center', render: ({ showroom }) => renderQuantity(showroom, Boolean(showroomWarehouseId)) },
+                { key: 'store', header: `المخزن — ${warehouses.find((item) => item.id === storeWarehouseId)?.name || 'غير محدد'}`, align: 'center', render: ({ warehouse }) => renderQuantity(warehouse, Boolean(storeWarehouseId)) },
+              ]}
+              emptyTitle="لا توجد أصناف تطابق الفلتر المحدد."
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-right text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3.5">المخزن</th>
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5">المقاس</th>
-                  <th className="p-3.5">الرصيد بوحدة الصنف</th>
-                  <th className="p-3.5">الرصيد بالكرتونة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {warehouseItems.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
-                    <td className="p-3.5 font-bold text-violet-700">{row.warehouseName}</td>
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900">{row.productName}</div>
-                      <div className="mt-1 text-[10px] text-slate-500">كود: {row.sku}</div>
-                    </td>
-                    <td className="p-3.5 font-semibold text-slate-700">{row.size}</td>
-                    <td className="p-3.5 font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</td>
-                    <td className="p-3.5 font-semibold text-slate-700">{row.productType === 'GENERAL' ? '—' : `${formatBoxes(row.quantityBoxes)} كرتونة`}</td>
-                  </tr>
-                ))}
-                {warehouseItems.length === 0 && (
-                  <tr><td colSpan={5} className="py-12 text-center text-slate-500">لا يوجد رصيد متوفر في المخزن المحدد.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="رصيد المخازن"
+              rows={warehouseItems}
+              rowKey={(row) => row.id}
+              minWidth={640}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                { key: 'warehouse', header: 'المخزن', render: (row) => <span className="font-bold text-violet-700">{row.warehouseName}</span> },
+                {
+                  key: 'product', header: 'الصنف',
+                  render: (row) => (
+                    <span>
+                      <span className="block font-bold text-slate-900">{row.productName}</span>
+                      <span className="mt-1 block text-[10px] text-slate-500">كود: {row.sku}</span>
+                    </span>
+                  ),
+                },
+                { key: 'size', header: 'المقاس', render: (row) => <span className="font-semibold text-slate-700">{row.size}</span> },
+                { key: 'qty', header: 'الرصيد بوحدة الصنف', render: (row) => <span className="font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</span> },
+                { key: 'boxes', header: 'الرصيد بالكرتونة', render: (row) => <span className="font-semibold text-slate-700">{row.productType === 'GENERAL' ? '—' : `${formatBoxes(row.quantityBoxes)} كرتونة`}</span> },
+              ]}
+              emptyTitle="لا يوجد رصيد متوفر في المخزن المحدد."
+            />
           </div>
         )}
       </div>

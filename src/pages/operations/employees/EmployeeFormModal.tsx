@@ -76,7 +76,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
       <section
         role="dialog"
         aria-modal="true"

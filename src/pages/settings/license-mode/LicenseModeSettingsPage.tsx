@@ -53,7 +53,7 @@ export const LicenseModeSettingsPage: React.FC = () => {
 
   if (!canManage) {
     return (
-      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">
+      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">
         لا تملك صلاحية إدارة وضع الترخيص.
       </div>
     );
@@ -179,7 +179,6 @@ export const LicenseModeSettingsPage: React.FC = () => {
       {pendingMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="presentation">
           <form
-            dir="rtl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="license-mode-auth-title"

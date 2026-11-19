@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AlertCircle, CheckCircle2, Download, Eye, EyeOff, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
@@ -414,8 +415,8 @@ export const DataImportPage: React.FC = () => {
     ? 0
     : item.data.rows.length - service.validate(item.data).length), 0);
 
-  if (!canOpen) return <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">لا تملك صلاحية استيراد البيانات. يرجى التواصل مع مسؤول النظام لمنحك الصلاحية اللازمة.</div>;
-  return <div className="w-full p-4 md:p-8 space-y-6" dir="rtl">
+  if (!canOpen) return <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">لا تملك صلاحية استيراد البيانات. يرجى التواصل مع مسؤول النظام لمنحك الصلاحية اللازمة.</div>;
+  return <div className="w-full p-4 md:p-8 space-y-6">
     {/* Sub Navigation Bar */}
     <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
       <Link
@@ -500,67 +501,94 @@ export const DataImportPage: React.FC = () => {
             <span className="rounded-lg bg-white px-4 py-2.5">متخطى: {backupImport.preview.skippedRows}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-amber-200 bg-white">
-            <table className="min-w-full text-right text-sm">
-              <thead className="sticky top-0 z-10 bg-amber-100 text-amber-950">
-                <tr>
-                  <th className="whitespace-nowrap p-3 sm:p-4">الجدول</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">في الملف</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">الحالي</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">جديد</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">متعارض</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">متخطى</th>
-                  <th className="whitespace-nowrap p-3 sm:p-4">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backupImport.preview.tables.map(table=>(
-                  <React.Fragment key={table.table}>
-                    <tr className="border-t border-amber-100">
-                      <td className="whitespace-nowrap p-3 font-mono font-bold sm:p-4">{table.table}</td>
-                      <td className="p-3 sm:p-4">{table.incomingRows}</td>
-                      <td className="p-3 sm:p-4">{table.existingRows}</td>
-                      <td className="p-3 sm:p-4">{table.newRows}</td>
-                      <td className="p-3 sm:p-4">{table.conflictRows}</td>
-                      <td className="p-3 sm:p-4">{table.skippedRows}</td>
-                      <td className={`whitespace-nowrap p-3 font-bold sm:p-4 ${table.protected ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        {table.protected ? 'محمي — لن يُستورد' : 'جاهز للدمج'}
-                      </td>
-                    </tr>
-                    {table.sampleConflicts.length > 0 && (
-                      <tr className="border-t border-amber-100 bg-amber-50">
-                        <td colSpan={7} className="space-y-2 p-3 sm:p-4">
-                          {table.sampleConflicts.map((conflict,index)=>(
-                            <div key={`${conflict.key}-${index}`} className="rounded-lg bg-white p-3">
-                              <div className="font-bold">مفتاح السجل: {conflict.key}</div>
-                              {conflict.changes.length
-                                ? conflict.changes.map(change=>(
-                                  <div key={change.column} className="mt-1 break-words text-slate-700">
-                                    {change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}
-                                  </div>
-                                ))
-                                : <div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}
-                            </div>
-                          ))}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="معاينة استيراد النسخة الاحتياطية"
+              rows={backupImport.preview.tables}
+              rowKey={(table) => table.table}
+              stickyHeader
+              tableClassName="text-sm"
+              isRowExpanded={(table) => table.sampleConflicts.length > 0}
+              renderExpandedRow={(table) => (
+                <div className="space-y-2">
+                  {table.sampleConflicts.map((conflict, index) => (
+                    <div key={`${conflict.key}-${index}`} className="rounded-lg bg-white p-3">
+                      <div className="font-bold">مفتاح السجل: {conflict.key}</div>
+                      {conflict.changes.length
+                        ? conflict.changes.map((change) => (
+                          <div key={change.column} className="mt-1 break-words text-slate-700">
+                            {change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}
+                          </div>
+                        ))
+                        : <div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              expandedRowClassName="bg-amber-50"
+              columns={[
+                { key: 'table', header: 'الجدول', render: (table) => <span className="whitespace-nowrap font-mono font-bold">{table.table}</span> },
+                { key: 'incoming', header: 'في الملف', render: (table) => table.incomingRows },
+                { key: 'existing', header: 'الحالي', render: (table) => table.existingRows },
+                { key: 'new', header: 'جديد', render: (table) => table.newRows },
+                { key: 'conflict', header: 'متعارض', render: (table) => table.conflictRows },
+                { key: 'skipped', header: 'متخطى', render: (table) => table.skippedRows },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (table) => <span className={`whitespace-nowrap font-bold ${table.protected ? 'text-amber-700' : 'text-emerald-700'}`}>{table.protected ? 'محمي — لن يُستورد' : 'جاهز للدمج'}</span>,
+                },
+              ]}
+            />
           </div>
           <div className="flex shrink-0 flex-wrap gap-3 border-t border-amber-200 pt-3">
             <button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-amber-700 px-5 py-3 text-sm font-black text-white disabled:opacity-40">{busy ? 'جارٍ الدمج...' : 'دمج السجلات المعروضة'}</button>
             <button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-amber-300 bg-white px-5 py-3 text-sm font-bold text-amber-900 disabled:opacity-40">إلغاء</button>
           </div>
         </div>}
-        {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><table className="min-w-full text-right text-xs"><thead className="bg-slate-100"><tr>{dynamicPreview.headers.map(h=><th key={h} className="p-2.5">{h}</th>)}</tr></thead><tbody>{dynamicPreview.rows.slice(0,8).map((row,i)=><tr key={i} className="border-t border-slate-100">{dynamicPreview.headers.map(h=><td key={h} className="max-w-48 truncate p-2.5">{String(row[h]??'')}</td>)}</tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
+        {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><DataTable
+              ariaLabel="معاينة البيانات الديناميكية"
+              rows={dynamicPreview.rows.slice(0, 8).map((row, i) => ({ __row: row, __i: i }))}
+              rowKey={(r) => String(r.__i)}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                ...dynamicPreview.headers.map((h) => ({
+                  key: h, header: h,
+                  render: (r: { __row: Record<string, unknown> }) => <span className="block max-w-48 truncate">{String(r.__row[h] ?? '')}</span>,
+                })),
+              ]}
+            /></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
         {data && data.entity !== 'dynamic' && <>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-violet-600"/><span className="text-sm font-black">نوع البيانات: {ENTITY_META[data.entity].label}</span><span className="text-xs text-slate-500">({data.rows.length} صف)</span></div><span className="text-xs font-bold text-slate-500">تم ربط {Object.keys(data.mapping).length} من {fields.length} عمود</span></div>
           <div><h2 className="mb-3 text-sm font-black text-slate-800">مطابقة الأعمدة</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{fields.map(field=><label key={field.key} className="text-xs font-bold text-slate-600">{field.label}{field.required&&<span className="text-rose-600"> *</span>}<select value={data.mapping[field.key]||''} onChange={e=>changeMapping(field.key,e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"><option value="">— غير مرتبط —</option>{data.headers.map(h=><option key={h} value={h}>{h}</option>)}</select></label>)}</div></div>
           {(data.entity==='customers'||data.entity==='suppliers')&&<label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowBalances} onChange={e=>setAllowBalances(e.target.checked)} className="mt-0.5"/>تطبيق عمود الرصيد الافتتاحي على حسابات {ENTITY_META[data.entity].label}. يؤثر هذا على الأرصدة المالية.</label>}
           {data.entity==='products'&&<div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3"><label className="flex items-start gap-2 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowStock} onChange={e=>toggleProductStock(e.target.checked)} className="mt-0.5"/>إضافة الكميات من عمود الرصيد الافتتاحي إلى مخزن تختاره يدويًا، مع تسجيل حركة مخزنية.</label>{allowStock&&<label className="block text-xs font-black text-amber-950">مخزن الرصيد الافتتاحي<select value={openingStockWarehouseId} onChange={e=>setOpeningStockWarehouseId(e.target.value)} className="mt-1.5 w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm"><option value="">اختر مخزنًا نشطًا</option>{openingStockWarehouses.map(warehouse=><option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>{!openingStockWarehouses.length&&<span className="mt-1 block font-normal text-rose-700">لا توجد مخازن متاحة أو لا تملك صلاحية عرضها.</span>}</label>}</div>}
-          <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[700px] text-right text-xs"><thead className="bg-slate-50 text-slate-600"><tr><th className="p-3">صف الملف</th>{fields.filter(f=>data.mapping[f.key]).slice(0,7).map(f=><th key={f.key} className="p-3">{f.label}</th>)}<th className="p-3">التحقق</th></tr></thead><tbody>{data.rows.slice(0,100).map((row,i)=>{const rowNo=i+2;const rowIssues=issues.find(x=>x.row===rowNo);return <tr key={rowNo} className="border-t border-slate-100"><td className="p-3 font-bold">{rowNo}</td>{fields.filter(f=>data.mapping[f.key]).slice(0,7).map(f=><td key={f.key} className="max-w-48 truncate p-3">{String(row[data.mapping[f.key]]??'')}</td>)}<td className="p-3">{rowIssues?<span className="text-rose-700">{rowIssues.messages.join('، ')}</span>:<span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/>صالح</span>}</td></tr>})}</tbody></table>{data.rows.length>100&&<p className="bg-slate-50 p-2 text-center text-xs text-slate-500">معاينة أول 100 صف؛ سيتم فحص كل الصفوف عند الاستيراد.</p>}</div>
+          <div className="overflow-x-auto rounded-xl border border-slate-200"><DataTable
+            ariaLabel="معاينة بيانات الاستيراد"
+            rows={data.rows.slice(0, 100).map((row, i) => ({ __row: row, __rowNo: i + 2 }))}
+            rowKey={(r) => String(r.__rowNo)}
+            minWidth={700}
+            dense
+            tableClassName="text-xs"
+            columns={[
+              { key: 'rowNo', header: 'صف الملف', render: (r) => <span className="font-bold">{r.__rowNo}</span> },
+              ...fields.filter((f) => data.mapping[f.key]).slice(0, 7).map((f) => ({
+                key: f.key, header: f.label,
+                render: (r: any) => {
+                  const mapped = data.mapping[f.key];
+                  return <span className="block max-w-48 truncate">{mapped ? String(r.__row[mapped] ?? '') : ''}</span>;
+                },
+              })),
+              {
+                key: 'validation', header: 'التحقق',
+                render: (r) => {
+                  const rowIssues = issues.find((x) => x.row === r.__rowNo);
+                  return rowIssues
+                    ? <span className="text-rose-700">{rowIssues.messages.join('، ')}</span>
+                    : <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />صالح</span>;
+                },
+              },
+            ]}
+          />{data.rows.length>100&&<p className="bg-slate-50 p-2 text-center text-xs text-slate-500">معاينة أول 100 صف؛ سيتم فحص كل الصفوف عند الاستيراد.</p>}</div>
           {result?.errors?.length ? <div className="max-h-36 overflow-auto rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{result.errors.map(e=><p key={e.row}>صف {e.row}: {e.messages.join('، ')}</p>)}</div>:null}
         </>}
       </section>

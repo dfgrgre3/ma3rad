@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { 
   TrendingDown, AlertTriangle, Package, RefreshCw, 
   Search, SlidersHorizontal, ShoppingCart, ShieldAlert, Clock, BarChart3, X
@@ -179,7 +180,7 @@ export const ReorderPlanningPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -329,130 +330,118 @@ export const ReorderPlanningPage: React.FC = () => {
       {/* Main Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-100/70 text-[11px] font-black text-slate-500 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
-              <tr>
-                <th className="px-3 py-3 w-10 text-center">
-                  {canCreatePurchaseRequest && (
+          <DataTable
+            ariaLabel="تخطيط إعادة الطلب"
+            rows={filteredItems}
+            rowKey={(item: any) => `${item.productId}-${item.warehouseId}`}
+            tableClassName="text-sm"
+            stickyHeader
+            columns={[
+              {
+                key: 'select',
+                header: canCreatePurchaseRequest ? (
+                  <input
+                    type="checkbox"
+                    checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredItems.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedProductIds(new Set(filteredItems.map(i => i.productId)));
+                      else setSelectedProductIds(new Set());
+                    }}
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    aria-label="تحديد الكل"
+                  />
+                ) : '',
+                align: 'center', width: 40,
+                headerClassName: 'text-center',
+                render: (item: any) => {
+                  const isSelected = selectedProductIds.has(item.productId);
+                  return canCreatePurchaseRequest ? (
                     <input
                       type="checkbox"
-                      checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredItems.length}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedProductIds(new Set(filteredItems.map(i => i.productId)));
-                        else setSelectedProductIds(new Set());
-                      }}
-                      className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(item.productId)}
+                      disabled={!selectedWarehouseId}
+                      className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed"
                     />
-                  )}
-                </th>
-                <th className="px-3 py-3">الصنف / الكود</th>
-                <th className="px-3 py-3">المخزن</th>
-                <th className="px-3 py-3 text-center">المتاح / المحجوز</th>
-                <th className="px-3 py-3 text-center">قيد التوريد</th>
-                <th className="px-3 py-3 text-center">سحب اليوم</th>
-                <th className="px-3 py-3 text-center">أيام النفاذ</th>
-                <th className="px-3 py-3 text-center">حد الأمان / نقطة الطلب</th>
-                <th className="px-3 py-3 text-center">اقتراح الشراء</th>
-                <th className="px-3 py-3 text-center">الحالة</th>
-                <th className="px-3 py-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredItems.map((item) => {
-                const isSelected = selectedProductIds.has(item.productId);
-                return (
-                  <tr key={`${item.productId}-${item.warehouseId}`} className={`hover:bg-slate-50/80 transition ${isSelected ? 'bg-sky-50/40' : ''}`}>
-                    <td className="px-3 py-2.5 text-center">
-                      {canCreatePurchaseRequest && (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelect(item.productId)}
-                          disabled={!selectedWarehouseId}
-                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed"
-                        />
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-black text-slate-900">{item.productName}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{item.productSku} {item.categoryName ? `• ${item.categoryName}` : ''}</div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600 font-bold">{item.warehouseName}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <div className="font-mono font-black text-slate-900">{quantity(item.availableStockM2, item)}</div>
-                      {item.reservedStockM2 > 0 && (
-                        <div className="text-[10px] text-amber-600 font-bold">محجوز: {quantity(item.reservedStockM2, item)}</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {item.onOrderStockM2 > 0 ? (
-                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
-                          {quantity(item.onOrderStockM2, item)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-center font-mono text-xs font-bold text-slate-600">
-                      {quantity(item.dailySalesRate, item)} / يوم
-                    </td>
-                    <td className="px-3 py-2.5 text-center font-mono">
-                      {item.stockDepletionDays <= 5 ? (
-                        <span className="text-rose-600 font-black flex items-center justify-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> {item.stockDepletionDays} يوم
-                        </span>
-                      ) : item.stockDepletionDays <= 15 ? (
-                        <span className="text-amber-600 font-bold">{item.stockDepletionDays} يوم</span>
-                      ) : (
-                        <span className="text-slate-500">{item.stockDepletionDays === 999 ? 'مستقر' : `${item.stockDepletionDays} يوم`}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-center text-xs">
-                      <span className="text-slate-500 font-bold">أمان: {quantity(item.safetyStock, item)}</span>
-                      <span className="text-slate-300 mx-1">|</span>
-                      <span className="text-sky-600 font-black">طلب: {quantity(item.reorderPoint, item)}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {item.suggestedOrderM2 > 0 ? (
-                        <div>
-                          <span className="font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                            +{quantity(item.suggestedOrderM2, item)}
-                          </span>
-                          <div className="text-[10px] text-slate-400 mt-0.5 font-bold">
-                            ~ {fmtCur(item.suggestedOrderValue)}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-slate-300 text-xs font-bold">مكتمل</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {getStatusBadge(item.stockStatus)}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {canManage && (
-                        <button
-                          onClick={() => handleEditThresholds(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition"
-                          title="تعديل الحدود ونقاط الطلب"
-                        >
-                          <SlidersHorizontal className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredItems.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
-                    <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                    لا توجد أصناف تطابق الفلاتر الحالية
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  ) : null;
+                },
+              },
+              {
+                key: 'product', header: 'الصنف / الكود',
+                render: (item: any) => (
+                  <span className="block">
+                    <span className="block font-black text-slate-900">{item.productName}</span>
+                    <span className="block font-mono text-[10px] text-slate-400">{item.productSku} {item.categoryName ? `• ${item.categoryName}` : ''}</span>
+                  </span>
+                ),
+              },
+              { key: 'wh', header: 'المخزن', render: (item: any) => <span className="text-xs font-bold text-slate-600">{item.warehouseName}</span> },
+              {
+                key: 'stock', header: 'المتاح / المحجوز', align: 'center',
+                render: (item: any) => (
+                  <span className="block">
+                    <span className="block font-mono font-black text-slate-900">{quantity(item.availableStockM2, item)}</span>
+                    {item.reservedStockM2 > 0 && <span className="block text-[10px] font-bold text-amber-600">محجوز: {quantity(item.reservedStockM2, item)}</span>}
+                  </span>
+                ),
+              },
+              {
+                key: 'onorder', header: 'قيد التوريد', align: 'center',
+                render: (item: any) => item.onOrderStockM2 > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-600">
+                    {quantity(item.onOrderStockM2, item)}
+                  </span>
+                ) : <span className="text-slate-300">—</span>,
+              },
+              { key: 'sales', header: 'سحب اليوم', align: 'center', render: (item: any) => <span className="font-mono text-xs font-bold text-slate-600">{quantity(item.dailySalesRate, item)} / يوم</span> },
+              {
+                key: 'days', header: 'أيام النفاذ', align: 'center',
+                render: (item: any) => item.stockDepletionDays <= 5 ? (
+                  <span className="flex items-center justify-center gap-1 font-black text-rose-600">
+                    <Clock className="h-3.5 w-3.5" /> {item.stockDepletionDays} يوم
+                  </span>
+                ) : item.stockDepletionDays <= 15 ? (
+                  <span className="font-bold text-amber-600">{item.stockDepletionDays} يوم</span>
+                ) : (
+                  <span className="font-mono text-slate-500">{item.stockDepletionDays === 999 ? 'مستقر' : `${item.stockDepletionDays} يوم`}</span>
+                ),
+              },
+              {
+                key: 'thresholds', header: 'حد الأمان / نقطة الطلب', align: 'center',
+                render: (item: any) => (
+                  <span className="text-xs">
+                    <span className="font-bold text-slate-500">أمان: {quantity(item.safetyStock, item)}</span>
+                    <span className="mx-1 text-slate-300">|</span>
+                    <span className="font-black text-sky-600">طلب: {quantity(item.reorderPoint, item)}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'suggest', header: 'اقتراح الشراء', align: 'center',
+                render: (item: any) => item.suggestedOrderM2 > 0 ? (
+                  <span className="block">
+                    <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono font-black text-emerald-700">
+                      +{quantity(item.suggestedOrderM2, item)}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-slate-400">
+                      ~ {fmtCur(item.suggestedOrderValue)}
+                    </span>
+                  </span>
+                ) : <span className="text-xs font-bold text-slate-300">مكتمل</span>,
+              },
+              { key: 'status', header: 'الحالة', align: 'center', render: (item: any) => getStatusBadge(item.stockStatus) },
+              {
+                key: 'actions', header: 'إجراءات', align: 'center',
+                render: (item: any) => canManage ? (
+                  <button onClick={() => handleEditThresholds(item)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-sky-50 hover:text-sky-600" title="تعديل الحدود ونقاط الطلب">
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </button>
+                ) : null,
+              },
+            ]}
+            rowClassName={(item: any) => `transition hover:bg-slate-50/80 ${selectedProductIds.has(item.productId) ? 'bg-sky-50/40' : ''}`}
+            emptyTitle="لا توجد أصناف تطابق الفلاتر الحالية"
+          />
         </div>
       </div>
 

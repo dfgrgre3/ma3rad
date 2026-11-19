@@ -7,7 +7,7 @@ export const ToneWarningModal: React.FC<{
   onCancel: () => void;
   onContinue: () => void;
 }> = ({ conflicts, onCancel, onContinue }) => (
-  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-amber-200">
       <div className="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">

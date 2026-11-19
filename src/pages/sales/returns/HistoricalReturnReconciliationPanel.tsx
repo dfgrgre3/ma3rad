@@ -101,7 +101,7 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
   };
 
   return (
-    <section className="mb-5 rounded-2xl border border-amber-300 bg-white p-4 shadow-sm" dir="rtl">
+    <section className="mb-5 rounded-2xl border border-amber-300 bg-white p-4 shadow-sm">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-black text-slate-900">مراجعة المرتجعات التاريخية قبل التسوية</h2>

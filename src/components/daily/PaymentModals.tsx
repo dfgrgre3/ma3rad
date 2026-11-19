@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../ui/DataTable';
 import { Trash2, Loader2, Save, AlertTriangle } from 'lucide-react';
 import { CustomerService } from '../../services/domains/customers/CustomerService';
 import { SalesService } from '../../services/domains/sales/SalesService';
@@ -204,21 +205,20 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
           </div>
 
           <div className="rounded-xl border border-slate-200 overflow-x-auto">
-            <table className="w-full text-xs text-right min-w-[520px]">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>{['الصنف', 'الكمية', 'السعر/التكلفة', 'الإجمالي'].map((h) => <th key={h} className="px-3 py-2 font-bold text-slate-500">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(invoice.items || []).map((item: any) => (
-                  <tr key={item.id}>
-                    <td className="px-3 py-2 font-semibold">{item.productName}</td>
-                    <td className="px-3 py-2">{formatProductQuantity(item.quantityM2, item)}</td>
-                    <td className="px-3 py-2">{fmt(item.unitPrice ?? item.unitCost)}</td>
-                    <td className="px-3 py-2 font-bold">{fmt(item.totalPrice ?? item.totalCost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="أصناف الفاتورة"
+              rows={invoice.items || []}
+              rowKey={(item: any) => String(item.id)}
+              minWidth={520}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                { key: 'product', header: 'الصنف', render: (item: any) => <span className="font-semibold">{item.productName}</span> },
+                { key: 'qty', header: 'الكمية', render: (item: any) => formatProductQuantity(item.quantityM2, item) },
+                { key: 'price', header: 'السعر/التكلفة', render: (item: any) => fmt(item.unitPrice ?? item.unitCost) },
+                { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-bold">{fmt(item.totalPrice ?? item.totalCost)}</span> },
+              ]}
+            />
           </div>
 
           {kind === 'sale' && (

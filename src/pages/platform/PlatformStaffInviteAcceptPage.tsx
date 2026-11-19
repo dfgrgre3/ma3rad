@@ -65,7 +65,7 @@ export const PlatformStaffInviteAcceptPage: React.FC<Props> = ({ token, onSucces
     : invite?.role ?? '';
 
   return (
-    <div className="win-auth flex min-h-screen w-screen items-center justify-center" dir="rtl">
+    <div className="win-auth flex min-h-screen w-screen items-center justify-center">
       <div className="w-full max-w-[420px] px-4 py-10">
         {loadError ? (
           <div className="win-auth-card">

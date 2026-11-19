@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -6,6 +7,7 @@ import { ProductPicker } from '../../../components/products/ProductPicker';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import type { Product } from '../../../types';
 
+import { useToast } from '../../../components/ui/Toast';
 const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color: string }> = {
   RETAIL: { label: 'بيع قطاعي', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
   WHOLESALE: { label: 'جملة الموزعين', color: 'bg-violet-50 text-violet-600 border-violet-200' },
@@ -17,6 +19,7 @@ const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color:
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
 export const PricingPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new PricingService(), []);
   const canManage = usePermission()('pricing.update');
   const [lists, setLists] = useState<PriceList[]>([]);
@@ -49,7 +52,7 @@ export const PricingPage: React.FC = () => {
 
   const loadItems = (list: PriceList) => {
     setActiveList(list);
-    try { setItems(service.getPriceListItems(list.id)); } catch (e: any) { alert(e?.message); }
+    try { setItems(service.getPriceListItems(list.id)); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -68,7 +71,7 @@ export const PricingPage: React.FC = () => {
       setForm({ name: '', customerType: 'RETAIL', validFrom: '', validTo: '', isDefault: false });
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إنشاء القائمة.');
+      toast.error(err?.message || 'تعذر إنشاء القائمة.');
     } finally {
       setSaving(false);
     }
@@ -76,7 +79,7 @@ export const PricingPage: React.FC = () => {
 
   const toggle = (list: PriceList) => {
     if (!canManage) return;
-    try { service.togglePriceList(list.id, !list.isActive); load(); } catch (e: any) { alert(e?.message); }
+    try { service.togglePriceList(list.id, !list.isActive); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const addItem = (e: React.FormEvent) => {
@@ -95,19 +98,19 @@ export const PricingPage: React.FC = () => {
       loadItems(activeList);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إضافة الصنف.');
+      toast.error(err?.message || 'تعذر إضافة الصنف.');
     }
   };
 
   const removeItem = (id: string) => {
     if (!canManage || !activeList) return;
-    try { service.deletePriceListItem(id); loadItems(activeList); load(); } catch (e: any) { alert(e?.message); }
+    try { service.deletePriceListItem(id); loadItems(activeList); load(); } catch (e: any) { toast.warning(e?.message); }
   };
 
   const filtered = lists.filter((p) => p.name.includes(search) || p.code.includes(search));
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
@@ -257,35 +260,28 @@ export const PricingPage: React.FC = () => {
             )}
 
             <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="p-2.5 font-bold">الصنف</th>
-                    <th className="p-2.5 font-bold">الكود</th>
-                    <th className="p-2.5 font-bold">سعر المتر</th>
-                    <th className="p-2.5 font-bold">سعر الكرتونة</th>
-                    <th className="p-2.5 font-bold">الحد الأدنى</th>
-                    <th className="p-2.5 font-bold"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-bold text-slate-800">{item.productName}</td>
-                      <td className="p-2.5 font-mono text-slate-500">{item.productSku}</td>
-                      <td className="p-2.5 font-bold text-emerald-600">{fmt(item.priceM2)}</td>
-                      <td className="p-2.5 font-mono text-slate-600">{item.priceBox ? fmt(item.priceBox) : '—'}</td>
-                      <td className="p-2.5 font-mono text-slate-600">{item.minQuantityM2 || 0}</td>
-                      <td className="p-2.5">
-                        {canManage && (
-                          <button onClick={() => removeItem(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"><Trash2 className="w-3.5 h-3.5" /></button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {items.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400">لا توجد أسعار مخصصة — القائمة تستخدم السعر الأساسي للأصناف</td></tr>}
-                </tbody>
-              </table>
+              <DataTable
+              ariaLabel="أسعار مخصصة"
+              rows={items}
+              rowKey={(item: any) => String(item.id)}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition hover:bg-slate-50'}
+              columns={[
+                { key: 'product', header: 'الصنف', render: (item: any) => <span className="font-bold text-slate-800">{item.productName}</span> },
+                { key: 'sku', header: 'الكود', render: (item: any) => <span className="font-mono text-slate-500">{item.productSku}</span> },
+                { key: 'm2', header: 'سعر المتر', render: (item: any) => <span className="font-bold text-emerald-600">{fmt(item.priceM2)}</span> },
+                { key: 'box', header: 'سعر الكرتونة', render: (item: any) => <span className="font-mono text-slate-600">{item.priceBox ? fmt(item.priceBox) : '—'}</span> },
+                { key: 'min', header: 'الحد الأدنى', render: (item: any) => <span className="font-mono text-slate-600">{item.minQuantityM2 || 0}</span> },
+                {
+                  key: 'del', header: '',
+                  render: (item: any) => canManage ? (
+                    <button onClick={() => removeItem(item.id)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                  ) : null,
+                },
+              ]}
+              emptyTitle="لا توجد أسعار مخصصة — القائمة تستخدم السعر الأساسي للأصناف"
+            />
             </div>
           </div>
         </div>

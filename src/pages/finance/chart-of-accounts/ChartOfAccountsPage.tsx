@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   BookOpen, ChevronDown, ChevronLeft, ChevronsDownUp, ChevronsUpDown,
   Loader2, Pencil, Plus, Power, RotateCcw, Search, Trash2, X,
@@ -7,6 +8,7 @@ import { FinanceExtrasService, Account, AccountType } from '../../../services/do
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
+import { useToast } from '../../../components/ui/Toast';
 const TYPE_LABELS: Record<AccountType, string> = {
   ASSET: 'أصول',
   LIABILITY: 'التزامات',
@@ -78,6 +80,7 @@ const buildAccountTree = (accounts: Account[]): AccountTree => {
 };
 
 export const ChartOfAccountsPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new FinanceExtrasService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.accounts.approve');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -177,7 +180,7 @@ export const ChartOfAccountsPage: React.FC = () => {
       setEditing(null);
       setForm({ code: '', name: '', type: 'ASSET', parentCode: '', notes: '' });
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر حفظ الحساب.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر حفظ الحساب.'); }
   };
 
   const openNew = (parent?: Account) => {
@@ -200,13 +203,13 @@ export const ChartOfAccountsPage: React.FC = () => {
 
   const toggle = (account: Account) => {
     try { service.updateAccount(account.id, { isActive: !account.isActive }); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر تحديث الحساب.'); }
+    catch (err: any) { toast.error(err?.message || 'تعذر تحديث الحساب.'); }
   };
 
   const remove = (account: Account) => {
     if (!confirm(`حذف الحساب ${account.code} — ${account.name}؟`)) return;
     try { service.deleteAccount(account.id); load(); }
-    catch (err: any) { alert(err?.message || 'تعذر حذف الحساب.'); }
+    catch (err: any) { toast.error(err?.message || 'تعذر حذف الحساب.'); }
   };
 
   const resetFilters = () => {
@@ -226,7 +229,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const hasChildren = expandableIds.length > 0;
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-slate-50 text-slate-900">
       <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -408,97 +411,119 @@ export const ChartOfAccountsPage: React.FC = () => {
           </div>
           <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-right text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    {['الكود', 'اسم الحساب', 'النوع', 'الحساب الأب', 'الرصيد الصافي', 'الحالة', ''].map((heading) => (
-                      <th key={heading} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-500">{heading}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map(({ node, depth, isExpanded, continuing, isLastSibling }) => {
-                    const account = node.account;
-                    const parent = tree.parentOf.get(account.id);
-                    const isRoot = !account.parentCode;
-                    const isOrphan = !!account.parentCode && !parent;
-                    const isMatch = matches.has(account.id);
-                    return (
-                      <tr
-                        key={account.id}
-                        aria-level={depth + 1}
-                        aria-expanded={node.children.length ? isExpanded : undefined}
-                        className={`group transition-colors hover:bg-slate-50/80 ${isRoot ? 'bg-sky-50/50' : isOrphan ? 'bg-amber-50/50' : 'bg-white'} ${!isMatch ? 'bg-slate-50/50' : ''}`}
-                      >
-                        <td className="whitespace-nowrap px-4 py-3 font-mono font-bold text-slate-700" dir="ltr">{account.code}</td>
-                        <td className="px-4 py-3">
-                          <div className={`relative flex min-w-0 items-center gap-2 ${isRoot ? 'border-r-4 border-sky-600 pr-2' : isOrphan ? 'border-r-4 border-amber-500 pr-2' : 'pr-1'}`} style={{ paddingRight: depth ? `${depth * 22}px` : undefined }}>
-                            {continuing.map((hasFollowingSibling, index) => hasFollowingSibling && (
-                              <span key={index} aria-hidden="true" className="absolute inset-y-[-12px] border-r-2 border-sky-200" style={{ right: `${7 + index * 22}px` }} />
-                            ))}
-                            {depth > 0 && (
-                              <>
-                                <span aria-hidden="true" className={`absolute top-[-12px] border-r-2 border-sky-300 ${isLastSibling ? 'h-[calc(50%+12px)]' : 'bottom-[-12px]'}`} style={{ right: `${7 + (depth - 1) * 22}px` }} />
-                                <span aria-hidden="true" className="absolute h-0.5 w-4 bg-sky-300" style={{ right: `${7 + (depth - 1) * 22}px`, top: '50%' }} />
-                              </>
-                            )}
-                            {node.children.length ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleExpanded(account.id)}
-                                aria-label={`${isExpanded ? 'طي' : 'توسيع'} الحساب ${account.name}`}
-                                aria-expanded={isExpanded}
-                                disabled={isFiltering}
-                                title={isFiltering ? 'تظهر مسارات الحسابات تلقائيًا أثناء التصفية' : undefined}
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 disabled:cursor-default focus:outline-none focus:ring-2 focus:ring-sky-400"
-                              >
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                              </button>
-                            ) : <span aria-hidden="true" className="h-6 w-6 shrink-0 border-r border-slate-200" />}
-                            <span className={`min-w-0 truncate ${depth === 0 ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>{account.name}</span>
-                            {isRoot && <span className="hidden shrink-0 rounded border border-sky-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-sky-800 sm:inline">رئيسي</span>}
-                            {isOrphan && <span className="shrink-0 rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-amber-800">أب غير مرتبط</span>}
-                            {!isMatch && <span className="shrink-0 text-[9px] font-medium text-slate-400">مسار</span>}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3"><span className={`rounded border px-2 py-1 text-[10px] font-bold ${TYPE_COLORS[account.type]}`}>{TYPE_LABELS[account.type]}</span></td>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500" dir="ltr">
-                          {parent?.code || (account.parentCode ? `${account.parentCode} · غير مرتبط` : '—')}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-left font-mono font-black tabular-nums text-slate-800" dir="ltr">{fmt(Number(account.computedBalance ?? account.balance ?? 0))}</td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${account.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {account.isActive ? 'نشط' : 'موقوف'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          {canManage && (
-                            <div className="flex items-center justify-end gap-1 opacity-100 transition sm:opacity-70 sm:group-hover:opacity-100">
-                              {account.isActive ? (
-                                <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                                  <Plus className="h-3.5 w-3.5" />
-                                </button>
-                              ) : null}
-                              <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                                <Power className="h-3.5 w-3.5" />
-                              </button>
-                              <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-400">
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+              <DataTable
+                ariaLabel="شجرة الحسابات"
+                rows={rows}
+                rowKey={(row: any) => row.node.account.id}
+                minWidth={980}
+                tableClassName="text-sm"
+                rowClassName={(row: any) => {
+                  const account = row.node.account;
+                  const isRoot = !account.parentCode;
+                  const isOrphan = !!account.parentCode;
+                  const isMatch = matches.has(account.id);
+                  return `group transition-colors hover:bg-slate-50/80 ${isRoot ? 'bg-sky-50/50' : isOrphan ? 'bg-amber-50/50' : 'bg-white'} ${!isMatch ? 'bg-slate-50/50' : ''}`;
+                }}
+                columns={[
+                  { key: 'code', header: 'الكود', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-700" dir="ltr">{row.node.account.code}</span> },
+                  {
+                    key: 'name', header: 'اسم الحساب',
+                    render: (row: any) => {
+                      const { node, depth, isExpanded, continuing, isLastSibling } = row;
+                      const account = node.account;
+                      const parent = tree.parentOf.get(account.id);
+                      const isRoot = !account.parentCode;
+                      const isOrphan = !!account.parentCode && !parent;
+                      const isMatch = matches.has(account.id);
+                      return (
+                        <div className={`relative flex min-w-0 items-center gap-2 ${isRoot ? 'border-r-4 border-sky-600 pr-2' : isOrphan ? 'border-r-4 border-amber-500 pr-2' : 'pr-1'}`} style={{ paddingRight: depth ? `${depth * 22}px` : undefined }}>
+                          {continuing.map((hasFollowingSibling: boolean, index: number) => hasFollowingSibling && (
+                            <span key={index} aria-hidden="true" className="absolute inset-y-[-12px] border-r-2 border-sky-200" style={{ right: `${7 + index * 22}px` }} />
+                          ))}
+                          {depth > 0 && (
+                            <>
+                              <span aria-hidden="true" className={`absolute top-[-12px] border-r-2 border-sky-300 ${isLastSibling ? 'h-[calc(50%+12px)]' : 'bottom-[-12px]'}`} style={{ right: `${7 + (depth - 1) * 22}px` }} />
+                              <span aria-hidden="true" className="absolute h-0.5 w-4 bg-sky-300" style={{ right: `${7 + (depth - 1) * 22}px`, top: '50%' }} />
+                            </>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {rows.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-slate-500">لا توجد حسابات مطابقة للفلاتر المحددة.</td></tr>
-                  )}
-                </tbody>
-              </table>
+                          {node.children.length ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(account.id)}
+                              aria-label={`${isExpanded ? 'طي' : 'توسيع'} الحساب ${account.name}`}
+                              aria-expanded={isExpanded}
+                              disabled={isFiltering}
+                              title={isFiltering ? 'تظهر مسارات الحسابات تلقائيًا أثناء التصفية' : undefined}
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 disabled:cursor-default focus:outline-none focus:ring-2 focus:ring-sky-400"
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                            </button>
+                          ) : <span aria-hidden="true" className="h-6 w-6 shrink-0 border-r border-slate-200" />}
+                          <span className={`min-w-0 truncate ${depth === 0 ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>{account.name}</span>
+                          {isRoot && <span className="hidden shrink-0 rounded border border-sky-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-sky-800 sm:inline">رئيسي</span>}
+                          {isOrphan && <span className="shrink-0 rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-amber-800">أب غير مرتبط</span>}
+                          {!isMatch && <span className="shrink-0 text-[9px] font-medium text-slate-400">مسار</span>}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    key: 'type', header: 'النوع',
+                    render: (row: any) => <span className={`whitespace-nowrap rounded border px-2 py-1 text-[10px] font-bold ${TYPE_COLORS[row.node.account.type as keyof typeof TYPE_COLORS]}`}>{TYPE_LABELS[row.node.account.type as keyof typeof TYPE_LABELS]}</span>,
+                  },
+                  {
+                    key: 'parent', header: 'الحساب الأب',
+                    render: (row: any) => {
+                      const account = row.node.account;
+                      const parent = tree.parentOf.get(account.id);
+                      return <span className="whitespace-nowrap font-mono text-xs text-slate-500" dir="ltr">{parent?.code || (account.parentCode ? `${account.parentCode} · غير مرتبط` : '—')}</span>;
+                    },
+                  },
+                  {
+                    key: 'balance', header: 'الرصيد الصافي', align: 'end',
+                    render: (row: any) => {
+                      const account = row.node.account;
+                      return <span className="whitespace-nowrap font-mono font-black tabular-nums text-slate-800" dir="ltr">{fmt(Number(account.computedBalance ?? account.balance ?? 0))}</span>;
+                    },
+                  },
+                  {
+                    key: 'status', header: 'الحالة',
+                    render: (row: any) => {
+                      const account = row.node.account;
+                      return (
+                        <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${account.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {account.isActive ? 'نشط' : 'موقوف'}
+                        </span>
+                      );
+                    },
+                  },
+                  {
+                    key: 'actions', header: '',
+                    render: (row: any) => {
+                      const account = row.node.account;
+                      return canManage ? (
+                        <div className="flex items-center justify-end gap-1 opacity-100 transition sm:opacity-70 sm:group-hover:opacity-100">
+                          {account.isActive ? (
+                            <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                          <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                            <Power className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-400">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : null;
+                    },
+                  },
+                ]}
+                emptyTitle="لا توجد حسابات مطابقة للفلاتر المحددة."
+              />
             </div>
           </div>
           </>

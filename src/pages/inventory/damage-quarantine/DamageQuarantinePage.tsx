@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { 
   ShieldAlert, AlertTriangle, Eye, 
   RefreshCw, Plus, Search, 
@@ -204,7 +205,7 @@ export const DamageQuarantinePage: React.FC = () => {
   const pendingInspectionCount = items.filter(i => i.status === 'RECORDED').length;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -333,131 +334,131 @@ export const DamageQuarantinePage: React.FC = () => {
       {/* Main Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-100/70 text-[11px] font-black text-slate-500 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
-              <tr>
-                <th className="px-3 py-3">رقم السجل / التاريخ</th>
-                <th className="px-3 py-3">الصنف / الكود</th>
-                <th className="px-3 py-3">المخزن</th>
-                <th className="px-3 py-3 text-center">التصنيف</th>
-                <th className="px-3 py-3 text-center">الكمية</th>
-                <th className="px-3 py-3 text-center">التكلفة الإجمالية</th>
-                <th className="px-3 py-3 text-center">الحالة</th>
-                <th className="px-3 py-3">تقرير الفحص / المعالجة</th>
-                <th className="px-3 py-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {items.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/70 transition">
-                  <td className="px-3 py-2.5">
-                    <span className="font-mono font-black text-slate-900">{row.specialNumber}</span>
-                    <span className="block text-[10px] text-slate-400 font-bold">{row.createdAt?.slice(0, 10)}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="font-black text-slate-900">{row.productName}</div>
-                    <div className="text-[10px] font-mono text-slate-400">{row.sku} {row.grade ? `• ${row.grade}` : ''}</div>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 font-bold">{row.warehouseName}</td>
-                  <td className="px-3 py-2.5 text-center">
-                    {getCategoryBadge(row.category)}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <div className="font-mono font-black text-rose-700">{formatProductQuantity(Number(row.quantityM2), row)}</div>
-                    {row.productType !== 'GENERAL' && <div className="text-[10px] text-slate-400 font-bold">{row.boxesCount} كرتونة</div>}
-                  </td>
-                  <td className="px-3 py-2.5 text-center font-mono font-black text-slate-900">
-                    {fmtCur(row.totalCost)}
+          <DataTable
+            ariaLabel="سجلات التالف والحجر الصحي"
+            rows={items}
+            rowKey={(row: any) => String(row.id)}
+            tableClassName="text-sm"
+            stickyHeader
+            columns={[
+              {
+                key: 'num', header: 'رقم السجل / التاريخ',
+                render: (row: any) => (
+                  <span className="block">
+                    <span className="block font-mono font-black text-slate-900">{row.specialNumber}</span>
+                    <span className="block text-[10px] font-bold text-slate-400">{row.createdAt?.slice(0, 10)}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'product', header: 'الصنف / الكود',
+                render: (row: any) => (
+                  <span className="block">
+                    <span className="block font-black text-slate-900">{row.productName}</span>
+                    <span className="block font-mono text-[10px] text-slate-400">{row.sku} {row.grade ? `• ${row.grade}` : ''}</span>
+                  </span>
+                ),
+              },
+              { key: 'wh', header: 'المخزن', render: (row: any) => <span className="text-xs font-bold text-slate-600">{row.warehouseName}</span> },
+              { key: 'cat', header: 'التصنيف', align: 'center', render: (row: any) => getCategoryBadge(row.category) },
+              {
+                key: 'qty', header: 'الكمية', align: 'center',
+                render: (row: any) => (
+                  <span className="block">
+                    <span className="block font-mono font-black text-rose-700">{formatProductQuantity(Number(row.quantityM2), row)}</span>
+                    {row.productType !== 'GENERAL' && <span className="block text-[10px] font-bold text-slate-400">{row.boxesCount} كرتونة</span>}
+                  </span>
+                ),
+              },
+              {
+                key: 'cost', header: 'التكلفة الإجمالية', align: 'center',
+                render: (row: any) => (
+                  <span className="block font-mono font-black text-slate-900">
+                    <span className="block">{fmtCur(row.totalCost)}</span>
                     {row.status === 'DOWNGRADED_SALE' && (
-                      <div className="text-[10px] font-bold text-purple-700">
+                      <span className="block text-[10px] font-bold text-purple-700">
                         {row.discountedUnitPrice == null
                           ? 'بانتظار تحديد سعر البيع'
                           : `سعر مخفض ${fmtCur(row.discountedUnitPrice)} / ${getProductUnitLabel(row)}`}
                         {' • متبقٍ '}
                         {formatProductQuantity(Number(row.remainingQuantityM2) || 0, row)}
-                      </div>
+                      </span>
                     )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {getStatusBadge(row.status, row.remainingQuantityM2)}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs">
-                    {row.resolutionNotes ? (
-                      <span className="text-slate-700 font-bold">{row.resolutionNotes}</span>
-                    ) : row.inspectionNotes ? (
-                      <span className="text-blue-700 font-medium">فحص: {row.inspectionNotes}</span>
-                    ) : (
-                      <span className="text-slate-300 italic">بانتظار المعاينة الفنية</span>
+                  </span>
+                ),
+              },
+              { key: 'status', header: 'الحالة', align: 'center', render: (row: any) => getStatusBadge(row.status, row.remainingQuantityM2) },
+              {
+                key: 'report', header: 'تقرير الفحص / المعالجة',
+                render: (row: any) => row.resolutionNotes ? (
+                  <span className="block text-xs font-bold text-slate-700">{row.resolutionNotes}</span>
+                ) : row.inspectionNotes ? (
+                  <span className="block text-xs font-medium text-blue-700">فحص: {row.inspectionNotes}</span>
+                ) : (
+                  <span className="block text-xs italic text-slate-300">بانتظار المعاينة الفنية</span>
+                ),
+              },
+              {
+                key: 'actions', header: 'إجراءات', align: 'center',
+                render: (row: any) => (
+                  <span className="flex items-center justify-center gap-1.5">
+                    {canManage && row.status === 'RECORDED' && (
+                      <button
+                        onClick={() => {
+                          setInspectingItem(row);
+                          setInspectionNotes(row.inspectionNotes || '');
+                        }}
+                        className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                        title="توثيق تقرير الفحص"
+                      >
+                        فحص
+                      </button>
                     )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      {canManage && row.status === 'RECORDED' && (
-                        <button
-                          onClick={() => {
-                            setInspectingItem(row);
-                            setInspectionNotes(row.inspectionNotes || '');
-                          }}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
-                          title="توثيق تقرير الفحص"
-                        >
-                          فحص
-                        </button>
-                      )}
-
-                      {canManage && row.status === 'RECORDED' && (
-                        <button
-                          onClick={() => {
-                            setInspectingItem(row);
-                            setInspectionNotes('');
-                          }}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
-                          title="فحص السجل"
-                        >
-                          فحص
-                        </button>
-                      )}
-                      {canManage && row.status === 'INSPECTED' && (
-                        <button
-                          onClick={() => {
-                            setResolvingItem(row);
-                            setResolutionNotes('');
-                            setResolutionAction('WRITE_OFF');
-                            setDiscountedUnitPrice(0);
-                          }}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
-                          title="اعتماد قرار الفحص"
-                        >
-                          اعتماد القرار
-                        </button>
-                      )}
-                      {canManage && row.status === 'DOWNGRADED_SALE' && row.discountedUnitPrice == null && (
-                        <button
-                          onClick={() => {
-                            setResolvingItem(row);
-                            setResolutionNotes('');
-                            setDiscountedUnitPrice(Math.max(0, Number(allProducts.find((product) => product.id === row.productId)?.sellingPriceM2 || 0) * 0.8));
-                          }}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 transition"
-                          title="تحديد سعر البيع لسجل قديم"
-                        >
-                          تحديد السعر
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
-                    <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-30 text-rose-500" />
-                    لا توجد سجلات تالف أو حجر تطابق البحث
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    {canManage && row.status === 'RECORDED' && (
+                      <button
+                        onClick={() => {
+                          setInspectingItem(row);
+                          setInspectionNotes('');
+                        }}
+                        className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                        title="فحص السجل"
+                      >
+                        فحص
+                      </button>
+                    )}
+                    {canManage && row.status === 'INSPECTED' && (
+                      <button
+                        onClick={() => {
+                          setResolvingItem(row);
+                          setResolutionNotes('');
+                          setResolutionAction('WRITE_OFF');
+                          setDiscountedUnitPrice(0);
+                        }}
+                        className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                        title="اعتماد قرار الفحص"
+                      >
+                        اعتماد القرار
+                      </button>
+                    )}
+                    {canManage && row.status === 'DOWNGRADED_SALE' && row.discountedUnitPrice == null && (
+                      <button
+                        onClick={() => {
+                          setResolvingItem(row);
+                          setResolutionNotes('');
+                          setDiscountedUnitPrice(Math.max(0, Number(allProducts.find((product) => product.id === row.productId)?.sellingPriceM2 || 0) * 0.8));
+                        }}
+                        className="rounded-lg bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 transition hover:bg-purple-100"
+                        title="تحديد سعر البيع لسجل قديم"
+                      >
+                        تحديد السعر
+                      </button>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+            emptyTitle="لا توجد سجلات تالف أو حجر تطابق البحث"
+          />
         </div>
       </div>
 

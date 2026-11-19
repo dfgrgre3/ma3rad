@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   CreditCard,
   Plus,
@@ -149,7 +150,7 @@ export const EPaymentSettlementPage: React.FC = () => {
   const totalFees = settlements.reduce((s, st) => s + st.commissionAmount, 0);
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -266,38 +267,23 @@ export const EPaymentSettlementPage: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5 font-semibold">رقم التسوية</th>
-                    <th className="p-3.5 font-semibold">تاريخ التسوية</th>
-                    <th className="p-3.5 font-semibold">بوابة / مزود الدفع</th>
-                    <th className="p-3.5 font-semibold">المبلغ الإجمالي (Gross)</th>
-                    <th className="p-3.5 font-semibold">العمولة المخصومة</th>
-                    <th className="p-3.5 font-semibold">الصافي المودع بالبنك</th>
-                    <th className="p-3.5 font-semibold">الحساب البنكي المودع به</th>
-                    <th className="p-3.5 font-semibold text-center">الحالة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {settlements.map((st) => (
-                    <tr key={st.id} className="hover:bg-slate-50/70 transition">
-                      <td className="p-3.5 font-mono font-bold text-slate-800">{st.settlementNumber}</td>
-                      <td className="p-3.5 font-mono text-slate-600">{st.settlementDate}</td>
-                      <td className="p-3.5 font-bold text-indigo-700">{st.gatewayName}</td>
-                      <td className="p-3.5 font-mono font-bold">{st.grossAmount.toLocaleString()} ج.م</td>
-                      <td className="p-3.5 font-mono font-bold text-rose-600">-{st.commissionAmount.toLocaleString()} ج.م</td>
-                      <td className="p-3.5 font-mono font-bold text-emerald-600">+{st.netAmount.toLocaleString()} ج.م</td>
-                      <td className="p-3.5 text-slate-700">{st.bankAccountName}</td>
-                      <td className="p-3.5 text-center">
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">
-                          تمت التسوية وقيد البنك
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="سجل التسويات"
+                rows={settlements}
+                rowKey={(st) => st.id}
+                dense
+                tableClassName="text-xs"
+                columns={[
+                  { key: 'number', header: 'رقم التسوية', render: (st) => <span className="font-mono font-bold text-slate-800">{st.settlementNumber}</span> },
+                  { key: 'date', header: 'تاريخ التسوية', render: (st) => <span className="font-mono text-slate-600">{st.settlementDate}</span> },
+                  { key: 'gateway', header: 'بوابة / مزود الدفع', render: (st) => <span className="font-bold text-indigo-700">{st.gatewayName}</span> },
+                  { key: 'gross', header: 'المبلغ الإجمالي (Gross)', render: (st) => <span className="font-mono font-bold">{st.grossAmount.toLocaleString()} ج.م</span> },
+                  { key: 'commission', header: 'العمولة المخصومة', render: (st) => <span className="font-mono font-bold text-rose-600">-{st.commissionAmount.toLocaleString()} ج.م</span> },
+                  { key: 'net', header: 'الصافي المودع بالبنك', render: (st) => <span className="font-mono font-bold text-emerald-600">+{st.netAmount.toLocaleString()} ج.م</span> },
+                  { key: 'bank', header: 'الحساب البنكي المودع به', render: (st) => <span className="text-slate-700">{st.bankAccountName}</span> },
+                  { key: 'status', header: 'الحالة', align: 'center', render: (st) => <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">تمت التسوية وقيد البنك</span> },
+                ]}
+              />
             </div>
           )}
         </div>
@@ -311,36 +297,23 @@ export const EPaymentSettlementPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5 font-semibold">اسم البوابة / الماكينة</th>
-                  <th className="p-3.5 font-semibold">كود المزود</th>
-                  <th className="p-3.5 font-semibold">حساب التسوية المحاسبي</th>
-                  <th className="p-3.5 font-semibold">نسبة العمولة (%)</th>
-                  <th className="p-3.5 font-semibold">رسم ثابت لكل حركة</th>
-                  <th className="p-3.5 font-semibold">دورة التسوية التقديرية</th>
-                  <th className="p-3.5 font-semibold text-center">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {gateways.map((gw) => (
-                  <tr key={gw.id} className="hover:bg-slate-50/70 transition">
-                    <td className="p-3.5 font-bold text-slate-800">{gw.name}</td>
-                    <td className="p-3.5 font-mono font-bold text-indigo-600">{gw.providerCode}</td>
-                    <td className="p-3.5 font-mono text-slate-600">{gw.glAccountCode || '1106'}</td>
-                    <td className="p-3.5 font-mono font-bold">{gw.commissionRate}%</td>
-                    <td className="p-3.5 font-mono font-bold">{gw.fixedFee} ج.م</td>
-                    <td className="p-3.5 text-slate-600">{gw.settlementPeriodDays} يوم عمل</td>
-                    <td className="p-3.5 text-center">
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">
-                        نشطة
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="بوابات الدفع"
+              rows={gateways}
+              rowKey={(gw) => gw.id}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                { key: 'name', header: 'اسم البوابة / الماكينة', render: (gw) => <span className="font-bold text-slate-800">{gw.name}</span> },
+                { key: 'code', header: 'كود المزود', render: (gw) => <span className="font-mono font-bold text-indigo-600">{gw.providerCode}</span> },
+                { key: 'gl', header: 'حساب التسوية المحاسبي', render: (gw) => <span className="font-mono text-slate-600">{gw.glAccountCode || '1106'}</span> },
+                { key: 'rate', header: 'نسبة العمولة (%)', render: (gw) => <span className="font-mono font-bold">{gw.commissionRate}%</span> },
+                { key: 'fee', header: 'رسم ثابت لكل حركة', render: (gw) => <span className="font-mono font-bold">{gw.fixedFee} ج.م</span> },
+                { key: 'period', header: 'دورة التسوية التقديرية', render: (gw) => <span className="text-slate-600">{gw.settlementPeriodDays} يوم عمل</span> },
+                { key: 'status', header: 'الحالة', align: 'center', render: (gw) => <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">نشطة</span> },
+              ]}
+              emptyTitle="لا توجد بوابات دفع"
+            />
           </div>
         </div>
       )}

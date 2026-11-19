@@ -289,7 +289,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   return (
     <div
       className="win-auth flex min-h-screen w-screen"
-      dir="rtl"
     >
       <LoginBrandPanel />
 

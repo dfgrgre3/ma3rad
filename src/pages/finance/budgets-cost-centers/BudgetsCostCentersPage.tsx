@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   PieChart,
   Plus,
@@ -152,7 +153,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
   const percentUsed = totalAllocated > 0 ? Math.round((totalActual / totalAllocated) * 100) : 0;
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -308,64 +309,66 @@ export const BudgetsCostCentersPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5 font-semibold">كود الحساب</th>
-                      <th className="p-3.5 font-semibold">اسم البند / الحساب</th>
-                      <th className="p-3.5 font-semibold">المبلغ المخصص</th>
-                      <th className="p-3.5 font-semibold">المنصرف الفعلي</th>
-                      <th className="p-3.5 font-semibold">الانحراف (وفر / عجز)</th>
-                      <th className="p-3.5 font-semibold">نسبة الاستهلاك</th>
-                      <th className="p-3.5 font-semibold text-center">الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedBudgetDetail.items.map((item) => {
-                      const itemAllocated = item.allocatedAmount || 0;
-                      const itemActual = item.actualSpent || 0;
-                      const itemVariance = item.variance || 0;
-                      const itemPercent = itemAllocated > 0 ? Math.round((itemActual / itemAllocated) * 100) : 0;
-                      const isOver = itemVariance < 0;
-
-                      return (
-                        <tr key={item.id} className="hover:bg-slate-50/70 transition">
-                          <td className="p-3.5 font-mono font-bold text-slate-700">{item.accountCode}</td>
-                          <td className="p-3.5 font-semibold text-slate-800">{item.accountName}</td>
-                          <td className="p-3.5 font-mono font-bold">{itemAllocated.toLocaleString()} ج.م</td>
-                          <td className="p-3.5 font-mono font-bold text-rose-600">{itemActual.toLocaleString()} ج.م</td>
-                          <td className={`p-3.5 font-mono font-bold ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {itemVariance.toLocaleString()} ج.م
-                          </td>
-                          <td className="p-3.5 font-mono font-bold">
-                            <div className="flex items-center gap-2">
-                              <span>{itemPercent}%</span>
-                              <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full ${isOver ? 'bg-rose-500' : itemPercent > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                  style={{ width: `${Math.min(itemPercent, 100)}%` }}
+                <DataTable
+                  ariaLabel="بنود الموازنة"
+                  rows={selectedBudgetDetail.items}
+                  rowKey={(item) => item.id}
+                  dense
+                  tableClassName="text-xs"
+                  columns={[
+                    { key: 'code', header: 'كود الحساب', render: (item) => <span className="font-mono font-bold text-slate-700">{item.accountCode}</span> },
+                    { key: 'name', header: 'اسم البند / الحساب', render: (item) => <span className="font-semibold text-slate-800">{item.accountName}</span> },
+                    { key: 'allocated', header: 'المبلغ المخصص', render: (item) => <span className="font-mono font-bold">{(item.allocatedAmount || 0).toLocaleString()} ج.م</span> },
+                    { key: 'actual', header: 'المنصرف الفعلي', render: (item) => <span className="font-mono font-bold text-rose-600">{(item.actualSpent || 0).toLocaleString()} ج.م</span> },
+                    {
+                      key: 'variance', header: 'الانحراف (وفر / عجز)',
+                      render: (item) => {
+                        const v = item.variance || 0;
+                        return <span className={`font-mono font-bold ${v < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{v.toLocaleString()} ج.م</span>;
+                      },
+                    },
+                    {
+                      key: 'percent', header: 'نسبة الاستهلاك',
+                      render: (item) => {
+                        const allocated = item.allocatedAmount || 0;
+                        const actual = item.actualSpent || 0;
+                        const variance = item.variance || 0;
+                        const percent = allocated > 0 ? Math.round((actual / allocated) * 100) : 0;
+                        const isOver = variance < 0;
+                        return (
+                          <span className="font-mono font-bold">
+                            <span className="flex items-center gap-2">
+                              <span>{percent}%</span>
+                              <span className="block w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <span
+                                  className={`block h-full ${isOver ? 'bg-rose-500' : percent > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                  style={{ width: `${Math.min(percent, 100)}%` }}
                                 />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-3.5 text-center">
-                            {isOver ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-md font-bold text-[10px]">
-                                <AlertTriangle className="w-3 h-3 text-rose-500" />
-                                تجاوز الموازنة
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold text-[10px]">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                                ضمن الحدود
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </span>
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: 'status', header: 'الحالة', align: 'center',
+                      render: (item) => {
+                        const isOver = (item.variance || 0) < 0;
+                        return isOver ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-md font-bold text-[10px]">
+                            <AlertTriangle className="w-3 h-3 text-rose-500" />
+                            تجاوز الموازنة
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold text-[10px]">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            ضمن الحدود
+                          </span>
+                        );
+                      },
+                    },
+                  ]}
+                />
               </div>
             )}
           </div>
@@ -380,32 +383,21 @@ export const BudgetsCostCentersPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5 font-semibold">كود المركز</th>
-                  <th className="p-3.5 font-semibold">اسم مركز التكلفة</th>
-                  <th className="p-3.5 font-semibold">الفرع المرتبط</th>
-                  <th className="p-3.5 font-semibold">الوصف / الاستخدام</th>
-                  <th className="p-3.5 font-semibold text-center">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {costCenters.map((cc) => (
-                  <tr key={cc.id} className="hover:bg-slate-50/70 transition">
-                    <td className="p-3.5 font-mono font-bold text-violet-700">{cc.code}</td>
-                    <td className="p-3.5 font-bold text-slate-800">{cc.name}</td>
-                    <td className="p-3.5 text-slate-600">{cc.branchName || 'الإدارة العامة'}</td>
-                    <td className="p-3.5 text-slate-500">{cc.description || '-'}</td>
-                    <td className="p-3.5 text-center">
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">
-                        نشط
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="مراكز التكلفة"
+              rows={costCenters}
+              rowKey={(cc) => cc.id}
+              dense
+              tableClassName="text-xs"
+              columns={[
+                { key: 'code', header: 'كود المركز', render: (cc) => <span className="font-mono font-bold text-violet-700">{cc.code}</span> },
+                { key: 'name', header: 'اسم مركز التكلفة', render: (cc) => <span className="font-bold text-slate-800">{cc.name}</span> },
+                { key: 'branch', header: 'الفرع المرتبط', render: (cc) => <span className="text-slate-600">{cc.branchName || 'الإدارة العامة'}</span> },
+                { key: 'desc', header: 'الوصف / الاستخدام', render: (cc) => <span className="text-slate-500">{cc.description || '-'}</span> },
+                { key: 'status', header: 'الحالة', align: 'center', render: (cc) => <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[11px]">نشط</span> },
+              ]}
+              emptyTitle="لا توجد مراكز تكلفة"
+            />
           </div>
         </div>
       )}

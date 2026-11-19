@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   Trash2, AlertTriangle, Database, CalendarRange, Rows3, ShieldAlert,
   RefreshCw, CheckCircle2, Table2, Search,
@@ -390,47 +391,42 @@ export const DataDeletionPage: React.FC = () => {
             {rows.length > 0 && (
               <>
                 <div className="max-h-[42vh] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                  <table className="w-full text-right text-[11px]">
-                    <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
-                      <tr>
-                        <th className="border-b border-slate-200 px-2 py-1.5 dark:border-slate-700">
+                  <DataTable
+                    ariaLabel="سجلات الجدول للحذف"
+                    rows={rows.map((row, index) => ({ __row: row, __index: index }))}
+                    rowKey={(r) => String(r.__index)}
+                    dense
+                    stickyHeader
+                    tableClassName="text-[11px]"
+                    columns={[
+                      {
+                        key: '__select__', header: '', align: 'center' as const, width: 40,
+                        render: (r: any) => (
                           <input
                             type="checkbox"
                             className="h-3.5 w-3.5 accent-rose-600"
-                            checked={selectedRows.size === rows.length}
-                            onChange={(e) => setSelectedRows(e.target.checked ? new Set(rows.map((_, i) => i)) : new Set())}
+                            checked={selectedRows.has(r.__index)}
+                            onChange={() => setSelectedRows((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(r.__index)) next.delete(r.__index);
+                              else next.add(r.__index);
+                              return next;
+                            })}
                           />
-                        </th>
-                        {rowColumns.map((column) => (
-                          <th key={column} className="whitespace-nowrap border-b border-slate-200 px-2 py-1.5 font-mono font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300">{column}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, index) => (
-                        <tr key={index} className="odd:bg-white even:bg-slate-50 dark:odd:bg-slate-900 dark:even:bg-slate-800/40">
-                          <td className="border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 accent-rose-600"
-                              checked={selectedRows.has(index)}
-                              onChange={() => setSelectedRows((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(index)) next.delete(index);
-                                else next.add(index);
-                                return next;
-                              })}
-                            />
-                          </td>
-                          {rowColumns.map((column) => (
-                            <td key={column} className="max-w-[200px] truncate whitespace-nowrap border-b border-slate-100 px-2 py-1.5 font-mono text-slate-600 dark:border-slate-800 dark:text-slate-400" title={String(row[column] ?? '')}>
-                              {row[column] == null ? <span className="text-slate-300">فارغ</span> : String(row[column])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                        ),
+                      },
+                      ...rowColumns.map((column) => ({
+                        key: column,
+                        header: <span className="font-mono font-bold text-slate-600 dark:text-slate-300">{column}</span>,
+                        headerClassName: 'whitespace-nowrap',
+                        render: (r: any) => (
+                          <span className="block max-w-[200px] truncate whitespace-nowrap font-mono text-slate-600 dark:text-slate-400" title={String(r.__row[column] ?? '')}>
+                            {r.__row[column] == null ? <span className="text-slate-300">فارغ</span> : String(r.__row[column])}
+                          </span>
+                        ),
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between">

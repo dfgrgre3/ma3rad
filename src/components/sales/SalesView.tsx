@@ -16,7 +16,12 @@ import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import { exportToExcel, buildExportHtml } from '../../utils/export/export';
 import { SalesModals } from './SalesModals';
-import { StatCard, IconButton } from './SalesUi';
+import { PageHeader } from '../ui/PageHeader';
+import { Button } from '../ui/Button';
+import { StatCard } from '../ui/Card';
+import { FilterToolbar } from '../ui/FilterToolbar';
+import { DataTable } from '../ui/DataTable';
+import { useToast } from '../ui/Toast';
 import { localDateString } from '../../utils/shared/date';
 import { openWhatsAppChat } from '../../utils/shared/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
@@ -66,6 +71,7 @@ export const SalesView: React.FC = () => {
   const canCreate = PermissionService.can(user, 'ui.sales.invoices.create');
   const canUpdateInvoice = PermissionService.can(user, 'ui.sales.invoices.update');
   const canExportCustomers = PermissionService.can(user, 'ui.customers.list.export');
+  const toast = useToast();
 
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
@@ -151,7 +157,7 @@ export const SalesView: React.FC = () => {
     try {
       setStatement(customerService.getCustomerStatement(customerId));
     } catch (e: any) {
-      alert(e?.message || 'تعذر فتح كشف الحساب.');
+      toast.error('تعذر فتح كشف الحساب', e?.message);
     }
   };
 
@@ -241,7 +247,7 @@ export const SalesView: React.FC = () => {
   const submitVoid = (e: React.FormEvent) => {
     e.preventDefault();
     if (!voidTarget) return;
-    if (!voidReason.trim()) return alert('يرجى إدخال سبب الإلغاء.');
+    if (!voidReason.trim()) { toast.warning('سبب الإلغاء مطلوب', 'يرجى إدخال سبب الإلغاء.'); return; }
     setSaving(true);
     try {
       salesService.voidInvoice(voidTarget.id, voidReason.trim());
@@ -249,7 +255,7 @@ export const SalesView: React.FC = () => {
       setSelected(null);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إلغاء الفاتورة.');
+      toast.error('تعذر إلغاء الفاتورة', err?.message);
     } finally {
       setSaving(false);
     }
@@ -267,8 +273,8 @@ export const SalesView: React.FC = () => {
     e.preventDefault();
     if (!payTarget) return;
     const amount = Number(payAmount);
-    if (!amount || amount <= 0) return alert('يرجى إدخال مبلغ صحيح أكبر من الصفر.');
-    if (amount > payTarget.remainingAmount) return alert('المبلغ أكبر من المتبقي على الفاتورة.');
+    if (!amount || amount <= 0) { toast.warning('مبلغ غير صحيح', 'يرجى إدخال مبلغ صحيح أكبر من الصفر.'); return; }
+    if (amount > payTarget.remainingAmount) { toast.warning('مبلغ أكبر من المتبقي', 'المبلغ أكبر من المتبقي على الفاتورة.'); return; }
     setSaving(true);
     try {
       salesService.recordInvoicePayment(payTarget.id, amount, payType, undefined, undefined, payNotes, undefined, undefined, payBankAccountId || undefined);
@@ -276,7 +282,7 @@ export const SalesView: React.FC = () => {
       refreshSelected(payTarget.id);
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تسجيل التحصيل.');
+      toast.error('تعذر تسجيل التحصيل', err?.message);
     } finally {
       setSaving(false);
     }
@@ -395,223 +401,226 @@ export const SalesView: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <Receipt className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">
-              سجل فواتير {salesLabel}
-              <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              متابعة الفواتير، التحصيلات، المرتجعات، وإعادة الطباعة مع رقابة كاملة على الحسابات
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {canExport && <button
-            onClick={() => doExport('excel')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات
-          </button>}
-          {canExport && <button
-            onClick={() => doExport('pdf')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition"
-          >
-            <FileDown className="w-4 h-4 text-rose-600" /> مستند
-          </button>}
-          {canCreate && <button
-            onClick={() => navigate('/pos')}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shrink-0"
-          >
-            <Plus className="w-4 h-4" /> فاتورة جديدة (POS)
-          </button>}
-        </div>
+    <div className="erp-page">
+      <PageHeader
+        title={`سجل فواتير ${salesLabel}`}
+        description={`متابعة الفواتير، التحصيلات، المرتجعات، وإعادة الطباعة مع رقابة كاملة على الحسابات · ${businessProfileLabel}`}
+        icon={<Receipt className="h-5 w-5" />}
+        actions={
+          <>
+            {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => doExport('excel')}>جدول بيانات</Button>}
+            {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => doExport('pdf')}>مستند</Button>}
+            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>فاتورة جديدة (POS)</Button>}
+          </>
+        }
+      />
+
+      <div className="erp-stat-grid">
+        <StatCard label="عدد الفواتير" value={String(stats?.count ?? 0)} icon={<Receipt className="h-4 w-4" />} />
+        <StatCard label="إجمالي المبيعات" value={fmt(stats?.totalAmount ?? 0)} icon={<TrendingUp className="h-4 w-4" />} />
+        {canViewDebts && <StatCard label="المحصّل" value={fmt(stats?.paidAmount ?? 0)} icon={<Wallet className="h-4 w-4" />} tone="success" />}
+        {canViewDebts && <StatCard label="المتبقي (آجل)" value={fmt(stats?.remainingAmount ?? 0)} icon={<Banknote className="h-4 w-4" />} tone="warning" />}
+        {canViewReturns && <StatCard label="المرتجعات" value={fmt(stats?.returnedAmount ?? 0)} icon={<RotateCcw className="h-4 w-4" />} tone="danger" />}
+        <StatCard label="الربح الإجمالي" value={fmt(stats?.grossProfit ?? 0)} icon={<Percent className="h-4 w-4" />} />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <StatCard label="عدد الفواتير" value={String(stats?.count ?? 0)} icon={Receipt} tone="text-slate-700 bg-slate-50 border-slate-200" />
-          <StatCard label="إجمالي المبيعات" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingUp} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
-          {canViewDebts && <StatCard label="المحصّل" value={fmt(stats?.paidAmount ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />}
-          {canViewDebts && <StatCard label="المتبقي (آجل)" value={fmt(stats?.remainingAmount ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />}
-          {canViewReturns && <StatCard label="المرتجعات" value={fmt(stats?.returnedAmount ?? 0)} icon={RotateCcw} tone="text-rose-700 bg-rose-50 border-rose-200" />}
-          <StatCard label="الربح الإجمالي" value={fmt(stats?.grossProfit ?? 0)} icon={Percent} tone="text-violet-700 bg-violet-50 border-violet-200" />
-        </div>
-
+      <FilterToolbar ariaLabel="بحث وفلاتر فواتير المبيعات" className="space-y-3">
         <div className="flex flex-col xl:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--cerami-muted)]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="بحث برقم الفاتورة أو اسم العميل أو الهاتف..."
-              className="w-full pl-4 pr-9 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:border-emerald-400"
+              aria-label="بحث في الفواتير"
+              className="ui-input w-full pe-9"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
-              <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
-              <span className="text-slate-300">—</span>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-[var(--cerami-muted)]" />
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="ui-input" aria-label="من تاريخ" />
+              <span className="text-[var(--cerami-muted)]">—</span>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="ui-input" aria-label="إلى تاريخ" />
             </div>
-            <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+            <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="ui-input" aria-label="حالة السداد">
               <option value="ALL">كل حالات السداد</option>
               <option value="PAID">مسددة بالكامل</option>
               <option value="PARTIAL">مسدد جزء</option>
               <option value="UNPAID">آجل / غير مسدد</option>
             </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="ui-input" aria-label="حالة الفاتورة">
               <option value="COMPLETED">الفواتير المكتملة</option>
               <option value="VOID">الفواتير الملغاة</option>
               <option value="ALL">كل الفواتير</option>
             </select>
-            <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="max-w-[180px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+            <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="ui-input max-w-[180px]" aria-label="العميل">
               <option value="">كل العملاء</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+            <select value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)} className="ui-input" aria-label="المخزن">
               <option value="">كل المخازن</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
-            <button onClick={load} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100" title="تحديث">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <Button variant="secondary" size="sm" iconOnly onClick={load} title="تحديث" aria-label="تحديث">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold text-slate-400 ml-1">فترات سريعة:</span>
+          <span className="text-[10px] font-bold text-[var(--cerami-muted)] ml-1">فترات سريعة:</span>
           {([
             ['today', 'اليوم'],
             ['yesterday', 'أمس'],
             ['week', 'آخر 7 أيام'],
             ['month', 'هذا الشهر'],
           ] as const).map(([key, label]) => (
-            <button key={key} onClick={() => applyPreset(key)} className="px-2.5 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold transition">{label}</button>
+            <button key={key} type="button" onClick={() => applyPreset(key)} className="erp-btn erp-btn--secondary erp-btn--sm">{label}</button>
           ))}
-          <button onClick={() => applyPreset('clear')} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500">مسح التاريخ</button>
+          <button type="button" onClick={() => applyPreset('clear')} className="erp-btn erp-btn--ghost erp-btn--sm">مسح التاريخ</button>
           {(search || dateFrom || dateTo || customerFilter || warehouseFilter || paymentFilter !== 'ALL' || statusFilter !== 'COMPLETED') && (
-            <button onClick={clearFilters} className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-[10px] font-bold text-rose-600 flex items-center gap-1">
-              <XCircle className="w-3 h-3" /> مسح كل الفلاتر
+            <button type="button" onClick={clearFilters} className="erp-btn erp-btn--danger erp-btn--sm inline-flex items-center gap-1">
+              <XCircle className="h-3 w-3" /> مسح كل الفلاتر
             </button>
           )}
         </div>
-        <div className="mt-3"><OperationalFieldsFilter fields={operationalFields} values={operationalFieldFilters} onChange={setOperationalFieldFilters} /></div>
-      </div>
+        <OperationalFieldsFilter fields={operationalFields} values={operationalFieldFilters} onChange={setOperationalFieldFilters} />
+      </FilterToolbar>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-emerald-500" /></div>
-        ) : (
-          <>
-            <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
-              <table className="w-full text-right text-xs min-w-[980px]">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                  <tr>
-                    <th className="px-4 py-3">رقم الفاتورة</th>
-                    <th className="px-4 py-3">العميل</th>
-                    <th className="px-4 py-3">المخزن</th>
-                    <th className="px-4 py-3">التاريخ</th>
-                    <th className="px-4 py-3">البنود</th>
-                    <th className="px-4 py-3">الإجمالي</th>
-                    {canViewDebts && <th className="px-4 py-3">المدفوع</th>}
-                    {canViewDebts && <th className="px-4 py-3">المتبقي</th>}
-                    <th className="px-4 py-3">حالة الفاتورة</th>
-                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
-                    <th className="px-4 py-3 text-center">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pageItems.map((inv) => (
-                    <tr key={inv.id} className={`hover:bg-slate-50/70 ${inv.invoiceStatus === 'VOID' ? 'opacity-60' : ''}`}>
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{inv.invoiceNumber}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-bold text-slate-800">{inv.customerName}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{inv.customerPhone || '—'}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sky-600 font-semibold">{inv.warehouseName}</td>
-                      <td className="px-4 py-3 font-mono text-slate-500">{inv.date}</td>
-                      <td className="px-4 py-3 text-slate-500">{inv.itemsCount ?? inv.items?.length ?? 0}</td>
-                      <td className="px-4 py-3 font-black text-slate-900">{fmt(inv.totalAmount)}</td>
-                      {canViewDebts && <td className="px-4 py-3 font-bold text-emerald-600">{fmt(inv.paidAmount)}</td>}
-                      {canViewDebts && <td className="px-4 py-3 font-bold text-amber-600">{fmt(inv.remainingAmount)}</td>}
-                      <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                            inv.invoiceStatus === 'VOID'
-                              ? 'bg-rose-500/10 text-rose-600'
-                              : canViewDebts && inv.paymentStatus === 'PAID'
-                                ? 'bg-emerald-500/10 text-emerald-600'
-                                : canViewDebts && inv.paymentStatus === 'PARTIAL'
-                                  ? 'bg-sky-500/10 text-sky-600'
-                                  : canViewDebts
-                                    ? 'bg-amber-500/10 text-amber-600'
-                                    : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {inv.invoiceStatus === 'VOID' ? 'ملغاة' : canViewDebts ? paymentStatusLabel[inv.paymentStatus] : 'مكتملة'}
-                          </span>
-                          {canViewReturns && (inv.returnedAmount || 0) > 0 && (
-                            <div className="text-[9px] text-rose-500 font-bold">مرتجع: {fmt(inv.returnedAmount || 0)}</div>
-                          )}
-                        </div>
-                      </td>
-                      {operationalFields.map((field) => {
-                        const raw = operationalValuesByInvoice[inv.id]?.[field.id] || '';
-                        return <td key={field.id} className="px-4 py-3 text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</td>;
-                      })}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <IconButton title="معاينة الفاتورة" onClick={() => openInvoicePreview(inv)}><Eye className="w-4 h-4" /></IconButton>
-                          <IconButton title="تفاصيل الفاتورة" onClick={() => openDetails(inv)}><Info className="w-4 h-4" /></IconButton>
-                          <IconButton title="طباعة A4" onClick={() => {
-                            const full = salesService.getInvoiceById(inv.id);
-                            if (full) printService.printInvoice(full);
-                          }}><Printer className="w-4 h-4" /></IconButton>
-                          <IconButton title="طباعة إيصال حراري" onClick={() => {
-                            const full = salesService.getInvoiceById(inv.id);
-                            if (full) printService.printThermalReceipt(full);
-                          }}><Receipt className="w-4 h-4" /></IconButton>
-                          {inv.invoiceStatus !== 'VOID' && inv.remainingAmount > 0 && canCollect && (
-                            <IconButton title="تحصيل دفعة" tone="hover:text-sky-600" onClick={() => {
-                              const full = salesService.getInvoiceById(inv.id);
-                              if (full) openPayment(full);
-                            }}><Wallet className="w-4 h-4" /></IconButton>
-                          )}
-                          {inv.invoiceStatus !== 'VOID' && canRefund && (
-                            <IconButton title="مرتجع مبيعات" tone="hover:text-rose-600" onClick={() => goToReturn(inv.id)}>
-                              <RotateCcw className="w-4 h-4" />
-                            </IconButton>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {invoices.length === 0 && (
-                    <tr><td colSpan={canViewDebts ? 10 : 8} className="py-16 text-center text-slate-400">لا توجد فواتير مطابقة للفلتر الحالي.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {invoices.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between mt-3 text-xs text-slate-500">
-                <span>عرض {(page - 1) * PAGE_SIZE + 1} — {Math.min(page * PAGE_SIZE, invoices.length)} من {invoices.length}</span>
-                <div className="flex items-center gap-1">
-                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
-                  <span className="px-3 font-bold">{page} / {totalPages}</span>
-                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-                </div>
+      <DataTable<InvoiceRow>
+        ariaLabel="فواتير المبيعات"
+        columns={[
+          {
+            key: 'invoiceNumber',
+            header: 'رقم الفاتورة',
+            className: 'font-mono font-bold text-[var(--cerami-primary-readable)]',
+            render: (inv) => inv.invoiceNumber,
+          },
+          {
+            key: 'customer',
+            header: 'العميل',
+            render: (inv) => (
+              <div>
+                <div className="font-bold">{inv.customerName}</div>
+                <div className="text-[10px] font-mono text-[var(--cerami-muted)]">{inv.customerPhone || '—'}</div>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            ),
+          },
+          {
+            key: 'warehouse',
+            header: 'المخزن',
+            className: 'text-[var(--cerami-primary-readable)]',
+            render: (inv) => inv.warehouseName,
+          },
+          {
+            key: 'date',
+            header: 'التاريخ',
+            className: 'font-mono text-[var(--cerami-muted)]',
+            render: (inv) => inv.date,
+          },
+          {
+            key: 'itemsCount',
+            header: 'البنود',
+            render: (inv) => inv.itemsCount ?? inv.items?.length ?? 0,
+          },
+          {
+            key: 'total',
+            header: 'الإجمالي',
+            className: 'font-black',
+            render: (inv) => fmt(inv.totalAmount),
+          },
+          ...(canViewDebts ? [
+            {
+              key: 'paid',
+              header: 'المدفوع',
+              className: 'font-bold text-[var(--cerami-success)]',
+              render: (inv: InvoiceRow) => fmt(inv.paidAmount),
+            },
+            {
+              key: 'remaining',
+              header: 'المتبقي',
+              className: 'font-bold text-[var(--cerami-warning)]',
+              render: (inv: InvoiceRow) => fmt(inv.remainingAmount),
+            },
+          ] : []),
+          {
+            key: 'status',
+            header: 'حالة الفاتورة',
+            render: (inv) => (
+              <div className="space-y-1">
+                <span className={`erp-badge ${
+                  inv.invoiceStatus === 'VOID'
+                    ? 'erp-badge--danger'
+                    : canViewDebts && inv.paymentStatus === 'PAID'
+                      ? 'erp-badge--success'
+                      : canViewDebts && inv.paymentStatus === 'PARTIAL'
+                        ? 'erp-badge--primary'
+                        : canViewDebts
+                          ? 'erp-badge--warning'
+                          : ''
+                }`}>
+                  {inv.invoiceStatus === 'VOID' ? 'ملغاة' : canViewDebts ? paymentStatusLabel[inv.paymentStatus] : 'مكتملة'}
+                </span>
+                {canViewReturns && (inv.returnedAmount || 0) > 0 && (
+                  <div className="text-[9px] text-[var(--cerami-danger)] font-bold">مرتجع: {fmt(inv.returnedAmount || 0)}</div>
+                )}
+              </div>
+            ),
+          },
+          ...operationalFields.map((field) => ({
+            key: `op-${field.id}`,
+            header: field.name,
+            render: (inv: InvoiceRow) => {
+              const raw = operationalValuesByInvoice[inv.id]?.[field.id] || '';
+              return field.values.find((option) => option.value === raw)?.label || raw || '—';
+            },
+          })),
+          {
+            key: 'actions',
+            header: 'الإجراءات',
+            align: 'center' as const,
+            render: (inv) => (
+              <div className="flex items-center justify-center gap-1">
+                <Button variant="ghost" size="sm" iconOnly title="معاينة الفاتورة" aria-label="معاينة الفاتورة" onClick={() => openInvoicePreview(inv)}><Eye className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="sm" iconOnly title="تفاصيل الفاتورة" aria-label="تفاصيل الفاتورة" onClick={() => openDetails(inv)}><Info className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="sm" iconOnly title="طباعة A4" aria-label="طباعة A4" onClick={() => {
+                  const full = salesService.getInvoiceById(inv.id);
+                  if (full) printService.printInvoice(full);
+                }}><Printer className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="sm" iconOnly title="طباعة إيصال حراري" aria-label="طباعة إيصال حراري" onClick={() => {
+                  const full = salesService.getInvoiceById(inv.id);
+                  if (full) printService.printThermalReceipt(full);
+                }}><Receipt className="h-4 w-4" /></Button>
+                {inv.invoiceStatus !== 'VOID' && inv.remainingAmount > 0 && canCollect && (
+                  <Button variant="ghost" size="sm" iconOnly title="تحصيل دفعة" aria-label="تحصيل دفعة" onClick={() => {
+                    const full = salesService.getInvoiceById(inv.id);
+                    if (full) openPayment(full);
+                  }}><Wallet className="h-4 w-4" /></Button>
+                )}
+                {inv.invoiceStatus !== 'VOID' && canRefund && (
+                  <Button variant="ghost" size="sm" iconOnly title="مرتجع مبيعات" aria-label="مرتجع مبيعات" onClick={() => goToReturn(inv.id)}>
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ),
+          },
+        ]}
+        rows={pageItems}
+        rowKey={(inv) => inv.id}
+        loading={loading}
+        error={error}
+        onRetry={load}
+        emptyTitle="لا توجد فواتير مطابقة للفلتر الحالي"
+        minWidth={1100}
+        stickyHeader
+        page={page}
+        pageCount={totalPages}
+        total={invoices.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+        rowClassName={(inv) => inv.invoiceStatus === 'VOID' ? 'opacity-60' : ''}
+      />
 
       <SalesModals
         selected={selected}

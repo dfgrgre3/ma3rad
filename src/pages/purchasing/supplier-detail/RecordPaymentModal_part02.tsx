@@ -13,7 +13,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4" dir="rtl">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-emerald-600" />

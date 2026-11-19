@@ -10,7 +10,9 @@ import { NotificationPreferencesService } from '../../../services/domains/notifi
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
+import { useToast } from '../../../components/ui/Toast';
 export const NotificationsPage: React.FC = () => {
+  const toast = useToast();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -63,7 +65,7 @@ export const NotificationsPage: React.FC = () => {
       setPreferencesSaved(true);
       window.setTimeout(() => setPreferencesSaved(false), 2500);
     } catch (error) {
-      alert(error instanceof Error ? error.message : String(error));
+      toast.error(error instanceof Error ? error.message : String(error));
     }
   };
 

@@ -40,7 +40,7 @@ export class HrBenefitsService {
     let where = '1 = 1';
     if (employeeId) { where = 'employee_id = ?'; params.push(employeeId); }
     return this.db.query<any>(`SELECT * FROM hr_allowances WHERE ${where} ORDER BY created_at DESC`, params).map((r) => ({
-      id: r.id, employeeId: r.employeeId, allowanceType: r.allowanceType, amount: Number(r.amount) || 0, frequency: r.frequency,
+      id: r.id, employeeId: r.employeeId, allowanceType: r.allowanceType, amount: Number(r.amount) / 100 || 0, frequency: r.frequency,
       effectiveFrom: r.effectiveFrom, effectiveTo: r.effectiveTo || null, isActive: Boolean(r.isActive), createdAt: r.createdAt,
     }));
   }
@@ -73,7 +73,7 @@ export class HrBenefitsService {
     if (employeeId) { where = 'employee_id = ?'; params.push(employeeId); }
     return this.db.query<any>(`SELECT * FROM hr_benefits WHERE ${where} ORDER BY start_date DESC`, params).map((r) => ({
       id: r.id, employeeId: r.employeeId, benefitType: r.benefitType, provider: r.provider || null, policyNumber: r.policyNumber || null,
-      startDate: r.startDate, endDate: r.endDate || null, amount: Number(r.amount) || 0, status: r.status, createdAt: r.createdAt,
+      startDate: r.startDate, endDate: r.endDate || null, amount: Number(r.amount) / 100 || 0, status: r.status, createdAt: r.createdAt,
     }));
   }
   static updateBenefitStatus(id: string, status: string): void { const actor = this.requireManage(); this.db.run('UPDATE hr_benefits SET status = ? WHERE id = ?', [status, id]); this.audit(actor, 'تحديث حالة ميزة', id, { status }); }
@@ -128,14 +128,14 @@ export class HrBenefitsService {
     let where = '1 = 1';
     if (employeeId) { where = 'employee_id = ?'; params.push(employeeId); }
     return this.db.query<any>(`SELECT * FROM hr_loans WHERE ${where} ORDER BY created_at DESC`, params).map((r) => ({
-      id: r.id, employeeId: r.employeeId, principal: Number(r.principal) || 0, installmentAmount: Number(r.installmentAmount) || 0,
-      startDate: r.startDate, remainingBalance: Number(r.remainingBalance) || 0, status: r.status, notes: r.notes || null, createdAt: r.createdAt,
+      id: r.id, employeeId: r.employeeId, principal: Number(r.principal) / 100 || 0, installmentAmount: Number(r.installmentAmount) / 100 || 0,
+      startDate: r.startDate, remainingBalance: Number(r.remainingBalance) / 100 || 0, status: r.status, notes: r.notes || null, createdAt: r.createdAt,
     }));
   }
   static getInstallments(loanId: string): HrLoanInstallment[] {
     this.requireView();
     return this.db.query<any>(`SELECT * FROM hr_loan_installments WHERE loan_id = ? ORDER BY due_date`, [loanId]).map((r) => ({
-      id: r.id, loanId: r.loanId, dueDate: r.dueDate, amount: Number(r.amount) || 0, status: r.status, payrollTransactionId: r.payrollTransactionId || null, createdAt: r.createdAt,
+      id: r.id, loanId: r.loanId, dueDate: r.dueDate, amount: Number(r.amount) / 100 || 0, status: r.status, payrollTransactionId: r.payrollTransactionId || null, createdAt: r.createdAt,
     }));
   }
   static getDueInstallments(employeeId: string, period: string): number {
@@ -186,7 +186,7 @@ export class HrBenefitsService {
     let where = '1 = 1';
     if (employeeId) { where = 'employee_id = ?'; params.push(employeeId); }
     return this.db.query<any>(`SELECT * FROM hr_leave_settlements WHERE ${where} ORDER BY settlement_date DESC`, params).map((r) => ({
-      id: r.id, employeeId: r.employeeId, leaveDays: Number(r.leaveDays) || 0, amount: Number(r.amount) || 0,
+      id: r.id, employeeId: r.employeeId, leaveDays: Number(r.leaveDays) || 0, amount: Number(r.amount) / 100 || 0,
       settlementDate: r.settlementDate, status: r.status, notes: r.notes || null, createdAt: r.createdAt,
     }));
   }

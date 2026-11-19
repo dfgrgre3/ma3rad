@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Wrench, FileText, X, AlertTriangle } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { ProductPicker } from '../../../components/products/ProductPicker';
@@ -142,26 +143,20 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
         </div>
 
         <div className="border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50">
-              <tr>
-                {['الصنف', 'الكمية', 'عدد الصناديق', 'سعر التكلفة', 'القيمة الإجمالية'].map(h => (
-                  <th key={h} className="px-4 py-2 text-right font-bold text-slate-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {selectedItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-4 py-3 text-slate-900 font-medium">{item.productName}</td>
-                  <td className="px-4 py-3 font-mono font-bold text-sky-600">{formatProductQuantity(item.quantityM2, item)}</td>
-                  <td className="px-4 py-3 font-mono text-slate-700">{item.boxesCount} صندوق</td>
-                  <td className="px-4 py-3 font-mono text-slate-500">{fmt(item.unitCost)}</td>
-                  <td className="px-4 py-3 font-mono font-bold text-emerald-600">{fmt(item.totalValue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="أصناف التسوية"
+            rows={selectedItems}
+            rowKey={(item: any) => String(item.id)}
+            dense
+            tableClassName="text-xs"
+            columns={[
+              { key: 'name', header: 'الصنف', render: (item: any) => <span className="font-medium text-slate-900">{item.productName}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="font-mono font-bold text-sky-600">{formatProductQuantity(item.quantityM2, item)}</span> },
+              { key: 'boxes', header: 'عدد الصناديق', render: (item: any) => <span className="font-mono text-slate-700">{item.boxesCount} صندوق</span> },
+              { key: 'cost', header: 'سعر التكلفة', render: (item: any) => <span className="font-mono text-slate-500">{fmt(item.unitCost)}</span> },
+              { key: 'total', header: 'القيمة الإجمالية', render: (item: any) => <span className="font-mono font-bold text-emerald-600">{fmt(item.totalValue)}</span> },
+            ]}
+          />
         </div>
       </div>
       <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-200">

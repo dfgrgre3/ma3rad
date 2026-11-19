@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import {
   AlertTriangle,
   TrendingUp,
@@ -49,7 +50,7 @@ export const CashFlowForecastPage: React.FC = () => {
   }, [forecastData]);
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -168,57 +169,37 @@ export const CashFlowForecastPage: React.FC = () => {
                 لا توجد حركات استحقاق آجلة مسجلة خلال فترة {daysHorizon} يوم القادمة.
               </div>
             ) : (
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 font-semibold">تاريخ الاستحقاق</th>
-                    <th className="p-3 font-semibold text-emerald-700">وارد متوقع (+)</th>
-                    <th className="p-3 font-semibold text-rose-700">صادر متوقع (-)</th>
-                    <th className="p-3 font-semibold">صافي اليوم</th>
-                    <th className="p-3 font-semibold">الرصيد التراكمي المتوقع</th>
-                    <th className="p-3 font-semibold text-center">عدد البنود</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {forecastData.days.map((day) => {
-                    const isSelected = selectedDay?.date === day.date;
-                    const isDeficit = day.projectedClosingBalance < 0;
-
-                    return (
-                      <tr
-                        key={day.date}
-                        onClick={() => setSelectedDay(day)}
-                        className={`cursor-pointer transition ${
-                          isSelected ? 'bg-teal-50/70 font-bold' : isDeficit ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <td className="p-3 font-mono font-bold text-slate-800">{day.date}</td>
-                        <td className="p-3 font-mono text-emerald-600 font-bold">
-                          {day.inflows > 0 ? `+${day.inflows.toLocaleString()}` : '-'}
-                        </td>
-                        <td className="p-3 font-mono text-rose-600 font-bold">
-                          {day.outflows > 0 ? `-${day.outflows.toLocaleString()}` : '-'}
-                        </td>
-                        <td className="p-3 font-mono font-semibold">
-                          <span className={day.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
-                            {day.net.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono font-bold">
-                          <span className={day.projectedClosingBalance >= 0 ? 'text-slate-800' : 'text-rose-600 font-black'}>
-                            {day.projectedClosingBalance.toLocaleString()} ج.م
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className="px-2 py-0.5 bg-slate-100 rounded font-semibold text-[10px]">
-                            {day.items.length} بند
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                ariaLabel="التدفقات المتوقعة يومياً"
+                rows={forecastData.days}
+                rowKey={(day: any) => day.date}
+                onRowClick={(day: any) => setSelectedDay(day)}
+                stickyHeader
+                dense
+                tableClassName="text-xs"
+                rowClassName={(day: any) => {
+                  const isSelected = selectedDay?.date === day.date;
+                  const isDeficit = day.projectedClosingBalance < 0;
+                  return isSelected ? 'bg-teal-50/70 font-bold' : isDeficit ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50';
+                }}
+                columns={[
+                  { key: 'date', header: 'تاريخ الاستحقاق', render: (day: any) => <span className="font-mono font-bold text-slate-800">{day.date}</span> },
+                  { key: 'in', header: 'وارد متوقع (+)', render: (day: any) => <span className="font-mono font-bold text-emerald-600">{day.inflows > 0 ? `+${day.inflows.toLocaleString()}` : '-'}</span> },
+                  { key: 'out', header: 'صادر متوقع (-)', render: (day: any) => <span className="font-mono font-bold text-rose-600">{day.outflows > 0 ? `-${day.outflows.toLocaleString()}` : '-'}</span> },
+                  {
+                    key: 'net', header: 'صافي اليوم',
+                    render: (day: any) => <span className={`font-mono font-semibold ${day.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{day.net.toLocaleString()}</span>,
+                  },
+                  {
+                    key: 'closing', header: 'الرصيد التراكمي المتوقع',
+                    render: (day: any) => <span className={`font-mono font-bold ${day.projectedClosingBalance >= 0 ? 'text-slate-800' : 'text-rose-600 font-black'}`}>{day.projectedClosingBalance.toLocaleString()} ج.م</span>,
+                  },
+                  {
+                    key: 'items', header: 'عدد البنود', align: 'center',
+                    render: (day: any) => <span className="rounded bg-slate-100 px-2 py-0.5 font-semibold text-[10px]">{day.items.length} بند</span>,
+                  },
+                ]}
+              />
             )}
           </div>
         </div>

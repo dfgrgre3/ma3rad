@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   CalendarClock,
   Layers3,
@@ -36,6 +37,7 @@ import {
   downloadCsv,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const CYCLE_LABELS: Record<string, string> = {
   MONTHLY: 'شهري',
   QUARTERLY: 'ربع سنوي',
@@ -44,6 +46,7 @@ const CYCLE_LABELS: Record<string, string> = {
 };
 
 export const PlatformSubscriptionsPage: React.FC = () => {
+  const toast = useToast();
   const [subscriptions, setSubscriptions] = useState<PlatformSubscription[]>([]);
   const canManageSubscriptions = canPlatform('subscriptions');
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
@@ -114,10 +117,10 @@ export const PlatformSubscriptionsPage: React.FC = () => {
 
   const handleExecuteModal = async () => {
     if (!activeSub) return;
-    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
+    if (!canManageSubscriptions) { toast.warning('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      alert('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.warning('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
       return;
     }
     try {
@@ -127,10 +130,10 @@ export const PlatformSubscriptionsPage: React.FC = () => {
         } else {
           platformAdminService.renewTenantSubscription(activeSub.tenantId, renewMonths);
         }
-        alert(`تم تجديد الاشتراك بنجاح لمدة ${renewMonths} شهر.`);
+        toast.success(`تم تجديد الاشتراك بنجاح لمدة ${renewMonths} شهر.`);
       } else {
         if (!newPlanId) {
-          alert('يرجى اختيار الباقة الجديدة.');
+          toast.warning('يرجى اختيار الباقة الجديدة.');
           return;
         }
         if (central.active) {
@@ -145,21 +148,21 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             seats: activeSub.seats,
           });
         }
-        alert('تم نقل العميل إلى الخطة الجديدة بنجاح.');
+        toast.success('تم نقل العميل إلى الخطة الجديدة بنجاح.');
       }
       setActiveSub(null);
       await loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'فشلت العملية.');
+      toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
   const handleCancelSub = async (sub: PlatformSubscription) => {
-    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
+    if (!canManageSubscriptions) { toast.warning('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     if (!confirm(`هل أنت متأكد من إلغاء اشتراك "${sub.tenantName || sub.tenantId}"؟ سيتم إبطال التراخيص والحساب المرتبط.`)) return;
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      alert('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.warning('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
       return;
     }
     try {
@@ -170,12 +173,12 @@ export const PlatformSubscriptionsPage: React.FC = () => {
       }
       await loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'تعذر إلغاء الاشتراك.');
+      toast.error(err instanceof Error ? err.message : 'تعذر إلغاء الاشتراك.');
     }
   };
 
   const exportSubscriptions = () => {
-    if (!canManageSubscriptions) { alert('لا تملك صلاحية إدارة الاشتراكات.'); return; }
+    if (!canManageSubscriptions) { toast.warning('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     downloadCsv('platform-subscriptions.csv', [
       ['رقم الاشتراك', 'العميل', 'الباقة', 'الحالة', 'تاريخ البدء', 'تاريخ الانتهاء', 'القيمة', 'دورة الفوترة', 'التجديد التلقائي'],
       ...subscriptions.map((s) => [
@@ -305,107 +308,78 @@ export const PlatformSubscriptionsPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[950px] text-right text-xs">
-              <thead className="border-b border-slate-800 bg-slate-950/50 text-[11px] font-bold text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">العميل / المستأجر</th>
-                  <th className="px-4 py-3">الباقة</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3">القيمة والفوترة</th>
-                  <th className="px-4 py-3">البداية</th>
-                  <th className="px-4 py-3">نهاية الصلاحية</th>
-                  <th className="px-4 py-3">التجديد التلقائي</th>
-                  <th className="px-4 py-3 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {subscriptions.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-100">{sub.tenantName || 'عميل غير مسمى'}</div>
-                      <div className="text-[10px] font-mono text-slate-500">{sub.tenantId}</div>
-                    </td>
-
-                    <td className="px-4 py-3 font-semibold text-slate-200">
-                      {sub.planName || 'باقة محذوفة'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span
-                        className={`font-bold inline-flex items-center gap-1 ${
-                          sub.status === 'ACTIVE'
-                            ? 'text-emerald-400'
-                            : sub.status === 'TRIAL'
-                            ? 'text-sky-400'
-                            : 'text-rose-400'
-                        }`}
-                      >
-                        {sub.status === 'ACTIVE' ? 'نشط' : sub.status === 'TRIAL' ? 'تجريبي' : sub.status}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-200">{formatMoney(sub.price)}</div>
-                      <div className="text-[10px] text-slate-500">{CYCLE_LABELS[sub.billingCycle] || sub.billingCycle}</div>
-                    </td>
-
-                    <td className="px-4 py-3 text-slate-400">{formatDate(sub.startDate)}</td>
-
-                    <td className="px-4 py-3">
-                      <span
-                        className={`font-semibold ${
-                          sub.endDate && new Date(sub.endDate) < new Date() ? 'text-rose-400 font-bold' : 'text-slate-300'
-                        }`}
-                      >
-                        {sub.endDate ? formatDate(sub.endDate) : 'مفتوح (مدى الحياة)'}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span className={sub.autoRenew ? 'text-emerald-400' : 'text-slate-500'}>
-                        {sub.autoRenew ? 'مفعل' : 'معطل'}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {canManageSubscriptions && (
-                          <>
-                            <button
-                              onClick={() => handleRenew(sub)}
-                              className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1"
-                              title="تجديد مدة الاشتراك"
-                            >
-                              <RotateCw className="h-3 w-3" />
-                              تجديد
+            <DataTable
+              ariaLabel="الاشتراكات"
+              rows={subscriptions}
+              rowKey={(sub: any) => String(sub.id)}
+              minWidth={950}
+              dense
+              tableClassName="text-xs"
+              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              columns={[
+                {
+                  key: 'tenant', header: 'العميل / المستأجر',
+                  render: (sub: any) => (
+                    <span className="block">
+                      <span className="block font-bold text-slate-100">{sub.tenantName || 'عميل غير مسمى'}</span>
+                      <span className="block font-mono text-[10px] text-slate-500">{sub.tenantId}</span>
+                    </span>
+                  ),
+                },
+                { key: 'plan', header: 'الباقة', render: (sub: any) => <span className="font-semibold text-slate-200">{sub.planName || 'باقة محذوفة'}</span> },
+                {
+                  key: 'status', header: 'الحالة',
+                  render: (sub: any) => (
+                    <span className={`inline-flex items-center gap-1 font-bold ${sub.status === 'ACTIVE' ? 'text-emerald-400' : sub.status === 'TRIAL' ? 'text-sky-400' : 'text-rose-400'}`}>
+                      {sub.status === 'ACTIVE' ? 'نشط' : sub.status === 'TRIAL' ? 'تجريبي' : sub.status}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'price', header: 'القيمة والفوترة',
+                  render: (sub: any) => (
+                    <span className="block">
+                      <span className="block font-bold text-slate-200">{formatMoney(sub.price)}</span>
+                      <span className="block text-[10px] text-slate-500">{CYCLE_LABELS[sub.billingCycle as keyof typeof CYCLE_LABELS] || sub.billingCycle}</span>
+                    </span>
+                  ),
+                },
+                { key: 'start', header: 'البداية', render: (sub: any) => <span className="text-slate-400">{formatDate(sub.startDate)}</span> },
+                {
+                  key: 'end', header: 'نهاية الصلاحية',
+                  render: (sub: any) => (
+                    <span className={`font-semibold ${sub.endDate && new Date(sub.endDate) < new Date() ? 'font-bold text-rose-400' : 'text-slate-300'}`}>
+                      {sub.endDate ? formatDate(sub.endDate) : 'مفتوح (مدى الحياة)'}
+                    </span>
+                  ),
+                },
+                { key: 'renew', header: 'التجديد التلقائي', render: (sub: any) => <span className={sub.autoRenew ? 'text-emerald-400' : 'text-slate-500'}>{sub.autoRenew ? 'مفعل' : 'معطل'}</span> },
+                {
+                  key: 'actions', header: 'إجراءات', align: 'center',
+                  render: (sub: any) => (
+                    <span className="flex items-center justify-center gap-2">
+                      {canManageSubscriptions && (
+                        <>
+                          <button onClick={() => handleRenew(sub)} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300" title="تجديد مدة الاشتراك">
+                            <RotateCw className="h-3 w-3" />
+                            تجديد
+                          </button>
+                          <button onClick={() => handleChangePlan(sub)} className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="ترقية أو تخفيض الباقة">
+                            <ArrowUpRight className="h-3 w-3" />
+                            تغيير الباقة
+                          </button>
+                          {sub.status !== 'CANCELLED' && (
+                            <button onClick={() => void handleCancelSub(sub)} className="text-xs text-rose-400 hover:text-rose-300" title="إلغاء الاشتراك فوراً">
+                              إلغاء
                             </button>
-
-                            <button
-                              onClick={() => handleChangePlan(sub)}
-                              className="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1"
-                              title="ترقية أو تخفيض الباقة"
-                            >
-                              <ArrowUpRight className="h-3 w-3" />
-                              تغيير الباقة
-                            </button>
-
-                            {sub.status !== 'CANCELLED' && (
-                              <button
-                                onClick={() => void handleCancelSub(sub)}
-                                className="text-rose-400 hover:text-rose-300 text-xs"
-                                title="إلغاء الاشتراك فوراً"
-                              >
-                                إلغاء
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </div>

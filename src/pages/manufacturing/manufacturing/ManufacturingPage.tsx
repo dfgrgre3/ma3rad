@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Factory, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { ManufacturingService } from '../../../services/domains/manufacturing/ManufacturingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -113,7 +114,7 @@ export const ManufacturingPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
@@ -158,31 +159,19 @@ export const ManufacturingPage: React.FC = () => {
         <>
           {tab === 'workCenters' && (
             <div className="grid gap-3 lg:grid-cols-3">
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-                <table className="w-full text-right text-sm">
-                  <thead className="bg-slate-50 text-xs text-slate-500">
-                    <tr>
-                      <th className="p-3">الرمز</th>
-                      <th className="p-3">الاسم</th>
-                      <th className="p-3">التكلفة/ساعة</th>
-                      <th className="p-3">السعة/يوم</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workCenters.map((row) => (
-                      <tr key={row.id} className="border-t border-slate-100">
-                        <td className="p-3 font-mono text-xs">{row.code}</td>
-                        <td className="p-3">{row.name}</td>
-                        <td className="p-3">{row.costPerHour}</td>
-                        <td className="p-3">{row.capacityPerDay}</td>
-                      </tr>
-                    ))}
-                    {workCenters.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-slate-400">لا توجد مراكز عمل.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                                ariaLabel="مراكز العمل"
+                                rows={workCenters}
+                                rowKey={(row) => row.id}
+                                columns={[
+                                  { key: 'code', header: 'الرمز', render: (row) => <span className="font-mono text-xs">{row.code}</span> },
+                                  { key: 'name', header: 'الاسم', render: (row) => row.name },
+                                  { key: 'cost', header: 'التكلفة/ساعة', render: (row) => row.costPerHour },
+                                  { key: 'capacity', header: 'السعة/يوم', render: (row) => row.capacityPerDay },
+                                ]}
+                                emptyTitle="لا توجد مراكز عمل."
+                              />
+
               {canManage && (
                 <form onSubmit={createWorkCenter} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
                   <h3 className="font-black text-slate-900">إضافة مركز عمل</h3>
@@ -202,33 +191,20 @@ export const ManufacturingPage: React.FC = () => {
 
           {tab === 'boms' && (
             <div className="grid gap-3 lg:grid-cols-3">
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-                <table className="w-full text-right text-sm">
-                  <thead className="bg-slate-50 text-xs text-slate-500">
-                    <tr>
-                      <th className="p-3">المنتج</th>
-                      <th className="p-3">الاسم</th>
-                      <th className="p-3">الإصدار</th>
-                      <th className="p-3">الحالة</th>
-                      <th className="p-3">المكوّنات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {boms.map((bom) => (
-                      <tr key={bom.id} className="border-t border-slate-100">
-                        <td className="p-3">{bom.productName}</td>
-                        <td className="p-3">{bom.name}</td>
-                        <td className="p-3">{bom.version}</td>
-                        <td className="p-3">{bom.status}</td>
-                        <td className="p-3 text-xs text-slate-500">{(bom.items || []).map((item: any) => `${item.componentName || item.componentProductId} × ${item.quantity}`).join('، ')}</td>
-                      </tr>
-                    ))}
-                    {boms.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-slate-400">لا توجد BOM.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                                ariaLabel="قوائم المواد"
+                                rows={boms}
+                                rowKey={(bom) => bom.id}
+                                columns={[
+                                  { key: 'product', header: 'المنتج', render: (bom) => bom.productName },
+                                  { key: 'name', header: 'الاسم', render: (bom) => bom.name },
+                                  { key: 'version', header: 'الإصدار', render: (bom) => bom.version },
+                                  { key: 'status', header: 'الحالة', render: (bom) => bom.status },
+                                  { key: 'items', header: 'المكوّنات', render: (bom) => <span className="text-xs text-slate-500">{(bom.items || []).map((item: any) => `${item.componentName || item.componentProductId} × ${item.quantity}`).join('، ')}</span> },
+                                ]}
+                                emptyTitle="لا توجد BOM."
+                              />
+
               {canManage && (
                 <form onSubmit={createBom} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
                   <h3 className="font-black text-slate-900">إنشاء BOM</h3>
@@ -261,51 +237,41 @@ export const ManufacturingPage: React.FC = () => {
 
           {tab === 'orders' && (
             <div className="grid gap-3 lg:grid-cols-3">
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-                <table className="w-full text-right text-sm">
-                  <thead className="bg-slate-50 text-xs text-slate-500">
-                    <tr>
-                      <th className="p-3">الرقم</th>
-                      <th className="p-3">المنتج</th>
-                      <th className="p-3">الكمية</th>
-                      <th className="p-3">الحالة</th>
-                      <th className="p-3">الإجراء</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => (
-                      <tr key={order.id} className="border-t border-slate-100">
-                        <td className="p-3 font-mono text-xs">{order.orderNumber}</td>
-                        <td className="p-3">{order.productName}</td>
-                        <td className="p-3">{order.quantity}</td>
-                        <td className="p-3">{order.status}</td>
-                        <td className="p-3">
-                          <div className="flex flex-wrap gap-1">
-                            {canManage && order.status === 'PLANNED' && (
-                              <button className="rounded bg-sky-50 px-2 py-1 text-xs text-sky-700" onClick={() => release(order.id)}>إصدار</button>
-                            )}
-                            {canManage && order.status === 'RELEASED' && (
-                              <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => start(order.id)}>بدء</button>
-                            )}
-                            {canManage && order.status === 'IN_PROGRESS' && (
-                              <>
-                                <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => complete(order.id)}>إكمال</button>
-                                <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
-                              </>
-                            )}
-                            {canManage && order.status === 'PLANNED' && (
-                              <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {orders.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-slate-400">لا توجد أوامر إنتاج.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                                ariaLabel="أوامر الإنتاج"
+                                rows={orders}
+                                rowKey={(order) => order.id}
+                                columns={[
+                                  { key: 'number', header: 'الرقم', render: (order) => <span className="font-mono text-xs">{order.orderNumber}</span> },
+                                  { key: 'product', header: 'المنتج', render: (order) => order.productName },
+                                  { key: 'quantity', header: 'الكمية', render: (order) => order.quantity },
+                                  { key: 'status', header: 'الحالة', render: (order) => order.status },
+                                  {
+                                    key: 'action', header: 'الإجراء',
+                                    render: (order) => (
+                                      <div className="flex flex-wrap gap-1">
+                                        {canManage && order.status === 'PLANNED' && (
+                                          <button className="rounded bg-sky-50 px-2 py-1 text-xs text-sky-700" onClick={() => release(order.id)}>إصدار</button>
+                                        )}
+                                        {canManage && order.status === 'RELEASED' && (
+                                          <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => start(order.id)}>بدء</button>
+                                        )}
+                                        {canManage && order.status === 'IN_PROGRESS' && (
+                                          <>
+                                            <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => complete(order.id)}>إكمال</button>
+                                            <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
+                                          </>
+                                        )}
+                                        {canManage && order.status === 'PLANNED' && (
+                                          <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
+                                        )}
+                                      </div>
+                                    ),
+                                  },
+                                ]}
+                                emptyTitle="لا توجد أوامر إنتاج."
+                              />
+
               {canManage && (
                 <form onSubmit={createOrder} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
                   <h3 className="font-black text-slate-900">إنشاء أمر إنتاج</h3>

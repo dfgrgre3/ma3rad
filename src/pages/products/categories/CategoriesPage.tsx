@@ -6,7 +6,9 @@ import {
 import { CategoryService, CategoryWithCount } from '../../../services/domains/products/CategoryService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
+import { useToast } from '../../../components/ui/Toast';
 export const CategoriesPage: React.FC = () => {
+  const toast = useToast();
   const can = usePermission();
   const canCreate = can('categories.create');
   const canUpdate = can('categories.update');
@@ -77,7 +79,7 @@ export const CategoriesPage: React.FC = () => {
       setIsModalOpen(false);
       loadCategories();
     } catch (err: any) {
-      alert(`خطأ: ${err.message || err}`);
+      toast.error(`خطأ: ${err.message || err}`);
     }
   };
 
@@ -87,7 +89,7 @@ export const CategoriesPage: React.FC = () => {
         categoryService.deleteCategory(id);
         loadCategories();
       } catch (err: any) {
-        alert(`خطأ: ${err.message || err}`);
+        toast.error(`خطأ: ${err.message || err}`);
       }
     }
   };
@@ -124,7 +126,7 @@ export const CategoriesPage: React.FC = () => {
   );
 
   return (
-    <div className="erp-page" dir="rtl">
+    <div className="erp-page">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900">أنواع المنتجات</h2>

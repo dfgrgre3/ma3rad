@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   Layers,
   Save,
@@ -39,9 +40,9 @@ import {
 } from '../../config/moduleRegistry';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import { EmptyState, inputClass, formatDateTime } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 export const PlatformActivitySettingsPage: React.FC = () => {
   const toast = useToast();
   const canManageActivity = canPlatform('activity', 'platform.activity.update');
@@ -525,46 +526,35 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4">رقم الإصدار</th>
-                      <th className="py-3 px-4">النشاط التجاري</th>
-                      <th className="py-3 px-4">سبب التحديث</th>
-                      <th className="py-3 px-4">المنفذ</th>
-                      <th className="py-3 px-4">تاريخ الإصدار</th>
-                      <th className="py-3 px-4 text-center">الإجراء</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {versions.map((ver) => (
-                      <tr key={ver.id} className="hover:bg-slate-50/70">
-                        <td className="py-3 px-4 font-bold text-indigo-700">#{ver.version}</td>
-                        <td className="py-3 px-4 font-semibold text-slate-800">
-                          {allActivities.find((a) => a.id === ver.activityId)?.label || ver.activityId}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600">{ver.changeSummary || '—'}</td>
-                        <td className="py-3 px-4 text-slate-600">{ver.createdBy || 'النظام'}</td>
-                        <td className="py-3 px-4 text-slate-400 font-mono" dir="ltr">
-                          {formatDateTime(ver.createdAt)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {canManageActivity && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              leadingIcon={<RotateCcw className="h-3 w-3 text-amber-600" />}
-                              onClick={() => handleRollback(ver.version)}
-                              className="text-xs"
-                            >
-                              استرجاع
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  ariaLabel="سجل إصدارات الأنشطة"
+                  rows={versions}
+                  rowKey={(ver: any) => String(ver.id)}
+                  dense
+                  tableClassName="text-xs"
+                  rowClassName={() => 'transition hover:bg-slate-50/70'}
+                  columns={[
+                    { key: 'ver', header: 'رقم الإصدار', render: (ver: any) => <span className="font-bold text-indigo-700">#{ver.version}</span> },
+                    { key: 'activity', header: 'النشاط التجاري', render: (ver: any) => <span className="font-semibold text-slate-800">{allActivities.find((a: any) => a.id === ver.activityId)?.label || ver.activityId}</span> },
+                    { key: 'reason', header: 'سبب التحديث', render: (ver: any) => <span className="text-slate-600">{ver.changeSummary || '—'}</span> },
+                    { key: 'by', header: 'المنفذ', render: (ver: any) => <span className="text-slate-600">{ver.createdBy || 'النظام'}</span> },
+                    { key: 'date', header: 'تاريخ الإصدار', render: (ver: any) => <span className="font-mono text-slate-400" dir="ltr">{formatDateTime(ver.createdAt)}</span> },
+                    {
+                      key: 'action', header: 'الإجراء', align: 'center',
+                      render: (ver: any) => canManageActivity ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          leadingIcon={<RotateCcw className="h-3 w-3 text-amber-600" />}
+                          onClick={() => handleRollback(ver.version)}
+                          className="text-xs"
+                        >
+                          استرجاع
+                        </Button>
+                      ) : null,
+                    },
+                  ]}
+                />
               </div>
             )}
           </div>

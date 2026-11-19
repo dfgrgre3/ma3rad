@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, Calculator, ClipboardList, Plus, Trash2, Package, ArrowRight,
@@ -1008,7 +1009,7 @@ export const ApartmentEstimatePage: React.FC = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-4 md:p-6" dir="rtl">
+    <div className="h-full overflow-y-auto bg-slate-50 p-4 md:p-6">
       <PageHeader
         title="حاسبة الشقة والمقايسة الهندسية"
         description="احسب مساحات الغرف وكميات التشطيب وتكلفتها، ثم أصدر عرض سعر قابلًا للتعديل والطباعة."
@@ -1073,7 +1074,22 @@ export const ApartmentEstimatePage: React.FC = () => {
       {projectId && selectedEstimateId && <section className="mb-5 rounded-2xl border border-indigo-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">إصدارات المقايسة واعتمادها</h2><p className="text-xs text-slate-500">كل حفظ ينشئ نسخة مستقلة، وتظل عروض الأسعار مرتبطة بالإصدار الذي صدرت منه.</p></div><label className="min-w-64 text-[11px] font-bold text-slate-600">ملخص التعديل لهذه النسخة<input value={versionChangeSummary} onChange={(event) => setVersionChangeSummary(event.target.value)} className={`${fieldClass()} mt-1`} placeholder="مثال: تحديث أسعار السيراميك والكميات" /></label></div>
         <div className="space-y-2">{versions.map((version) => <article key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs"><div><b>الإصدار {version.versionNumber} · {({ DRAFT: 'مسودة', PENDING: 'بانتظار المراجعة', APPROVED: 'معتمد', RETURNED: 'معاد للمراجعة' } as Record<string, string>)[version.status]}</b><div className="mt-1 text-slate-500">أعده {version.createdByName} · {new Date(version.createdAt).toLocaleString('ar-EG')} · {version.changeSummary}</div>{version.reviewedByName && <div className="mt-1 text-slate-500">راجعه {version.reviewedByName} · {version.reviewNotes || (version.status === 'APPROVED' ? 'تم الاعتماد' : '')}</div>}</div><div className="flex flex-wrap gap-1">{(version.status === 'DRAFT' || version.status === 'RETURNED') && version.id === versions[0]?.id && canUpdateProjects && <button type="button" onClick={() => submitVersionForReview(version.id)} className="rounded-lg border border-sky-200 bg-white px-2 py-1 font-bold text-sky-800">إرسال للمراجعة</button>}{version.status === 'PENDING' && canApproveProject && <><button type="button" disabled={version.id !== versions[0]?.id} onClick={() => reviewEstimateVersion(version.id, 'APPROVED')} className="rounded-lg bg-emerald-700 px-2 py-1 font-bold text-white disabled:opacity-50">اعتماد</button><button type="button" onClick={() => reviewEstimateVersion(version.id, 'RETURNED')} className="rounded-lg border border-rose-200 bg-white px-2 py-1 font-bold text-rose-700">إرجاع</button></>}<label className="flex items-center gap-1">مقارنة A<select value={compareVersionIds[0]} onChange={(event) => setCompareVersionIds((current) => [event.target.value, current[1]])} className="rounded border bg-white px-1 py-1"> <option value="">—</option>{versions.map((item) => <option key={item.id} value={item.id}>v{item.versionNumber}</option>)}</select></label><label className="flex items-center gap-1">B<select value={compareVersionIds[1]} onChange={(event) => setCompareVersionIds((current) => [current[0], event.target.value])} className="rounded border bg-white px-1 py-1"><option value="">—</option>{versions.map((item) => <option key={item.id} value={item.id}>v{item.versionNumber}</option>)}</select></label></div></article>)}</div>
-        {compareA && compareB && <div className="mt-3 overflow-x-auto rounded-xl border border-indigo-100"><div className="p-3 text-xs font-bold text-indigo-900">مقارنة الإصدار {compareA.versionNumber} مع الإصدار {compareB.versionNumber} · الإجمالي {fmt(compareA.snapshot.totalAmount)} ← {fmt(compareB.snapshot.totalAmount)} ج · المساحة {fmt(compareA.snapshot.areaM2)} ← {fmt(compareB.snapshot.areaM2)} م² · تغييرات البنود: {compareLines.length}</div><table className="w-full min-w-[850px] text-right text-xs"><thead className="bg-slate-50"><tr><th className="p-2">البند</th><th className="p-2">الكمية قبل ← بعد</th><th className="p-2">المادة</th><th className="p-2">العمالة</th><th className="p-2">المعدات / المصروفات / الهالك / الخصم / الربح</th></tr></thead><tbody>{compareLines.map((row) => <tr key={row.id} className="border-t"><td className="p-2 font-bold">{row.name}</td><td className="p-2">{fmt(row.beforeQuantity)} ← {fmt(row.afterQuantity)}</td><td className="p-2">{fmt(row.beforePrice)} ← {fmt(row.afterPrice)}</td><td className="p-2">{fmt(row.beforeLabor)} ← {fmt(row.afterLabor)}</td><td className="p-2">{row.beforeOtherRates.map(fmt).join(' / ')} ← {row.afterOtherRates.map(fmt).join(' / ')}</td></tr>)}{!compareLines.length && <tr><td colSpan={5} className="p-3 text-center text-slate-500">لا توجد تغييرات في كميات البنود أو أسعارها.</td></tr>}</tbody></table></div>}
+        {compareA && compareB && <div className="mt-3 overflow-x-auto rounded-xl border border-indigo-100"><div className="p-3 text-xs font-bold text-indigo-900">مقارنة الإصدار {compareA.versionNumber} مع الإصدار {compareB.versionNumber} · الإجمالي {fmt(compareA.snapshot.totalAmount)} ← {fmt(compareB.snapshot.totalAmount)} ج · المساحة {fmt(compareA.snapshot.areaM2)} ← {fmt(compareB.snapshot.areaM2)} م² · تغييرات البنود: {compareLines.length}</div><DataTable
+            ariaLabel="مقارنة بنود الإصدارات"
+            rows={compareLines}
+            rowKey={(row) => row.id}
+            dense
+            minWidth={850}
+            tableClassName="text-xs"
+            columns={[
+              { key: 'item', header: 'البند', render: (row) => <span className="font-bold">{row.name}</span> },
+              { key: 'qty', header: 'الكمية قبل ← بعد', render: (row) => <span>{fmt(row.beforeQuantity)} ← {fmt(row.afterQuantity)}</span> },
+              { key: 'material', header: 'المادة', render: (row) => <span>{fmt(row.beforePrice)} ← {fmt(row.afterPrice)}</span> },
+              { key: 'labor', header: 'العمالة', render: (row) => <span>{fmt(row.beforeLabor)} ← {fmt(row.afterLabor)}</span> },
+              { key: 'other', header: 'المعدات / المصروفات / الهالك / الخصم / الربح', render: (row) => <span>{row.beforeOtherRates.map(fmt).join(' / ')} ← {row.afterOtherRates.map(fmt).join(' / ')}</span> },
+            ]}
+            emptyTitle="لا توجد تغييرات في كميات البنود أو أسعارها."
+          /></div>}
         {quotationLinks.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-xs"><b className="self-center text-slate-600">عروض الأسعار المرتبطة:</b>{quotationLinks.map((link) => <button key={link.quotationId} type="button" onClick={() => navigate('/quotations')} className="rounded-lg border border-sky-100 bg-sky-50 px-2 py-1 font-bold text-sky-800">{link.quotationNumber} · الإصدار {link.versionNumber ?? '—'}</button>)}</div>}
       </section>}
 
@@ -1093,7 +1109,21 @@ export const ApartmentEstimatePage: React.FC = () => {
           </div>
           <div className="rounded-xl border border-slate-100 p-3">
             <h3 className="mb-2 text-sm font-black text-slate-800">المراحل ومقارنة المخطط بالفعلي</h3>
-            <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-right text-xs"><thead className="bg-slate-50"><tr><th className="p-2">المرحلة</th><th className="p-2">مخطط</th><th className="p-2">فعلي مسجل</th><th className="p-2">الفرق</th></tr></thead><tbody>{(executionSummary?.schedule || []).map((phase) => <tr key={phase.title} className="border-t"><td className="p-2 font-bold">{phase.title}</td><td className="p-2">{fmt(phase.plannedAmount)} ج</td><td className="p-2">{fmt(phase.actualAmount)} ج</td><td className="p-2">{fmt(phase.plannedAmount - phase.actualAmount)} ج</td></tr>)}{!executionSummary?.schedule.length && <tr><td colSpan={4} className="p-2 text-center text-slate-400">أنشئ المراحل من الإصدار المعتمد لبدء المقارنة.</td></tr>}</tbody></table></div>
+            <div className="overflow-x-auto"><DataTable
+              ariaLabel="مقارنة المخطط بالفعلي"
+              rows={executionSummary?.schedule || []}
+              rowKey={(phase) => phase.title}
+              dense
+              minWidth={420}
+              tableClassName="text-xs"
+              columns={[
+                { key: 'phase', header: 'المرحلة', render: (phase) => <span className="font-bold">{phase.title}</span> },
+                { key: 'planned', header: 'مخطط', render: (phase) => <span>{fmt(phase.plannedAmount)} ج</span> },
+                { key: 'actual', header: 'فعلي مسجل', render: (phase) => <span>{fmt(phase.actualAmount)} ج</span> },
+                { key: 'diff', header: 'الفرق', render: (phase) => <span>{fmt(phase.plannedAmount - phase.actualAmount)} ج</span> },
+              ]}
+              emptyTitle="أنشئ المراحل من الإصدار المعتمد لبدء المقارنة."
+            /></div>
           </div>
           <div className="rounded-xl border border-slate-100 p-3">
             <h3 className="mb-2 text-sm font-black text-slate-800">المستخلصات والدفعات</h3>
@@ -1266,11 +1296,23 @@ export const ApartmentEstimatePage: React.FC = () => {
       <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2"><Calculator className="h-5 w-5 text-emerald-700" /><h2 className="font-black text-slate-900">المقايسة النهائية حسب الغرفة</h2></div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-right text-sm">
-            <thead className="bg-slate-50 text-xs font-bold text-slate-500"><tr><th className="px-3 py-2">الغرفة</th><th className="px-3 py-2">المساحة</th><th className="px-3 py-2">مساحة الحوائط</th><th className="px-3 py-2">إجمالي الغرفة</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{roomTotals.map(({ room, measures, total }) => <tr key={room.id}><td className="px-3 py-3 font-bold">{room.name}</td><td className="px-3 py-3">{fmt(measures.floor)} م²</td><td className="px-3 py-3">{fmt(measures.walls)} م²</td><td className="px-3 py-3 font-black text-emerald-700">{fmt(total)} ج</td></tr>)}</tbody>
-            <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-black"><tr><td className="px-3 py-3">إجمالي الشقة</td><td className="px-3 py-3">{fmt(totalArea)} م²</td><td className="px-3 py-3">{fmt(rooms.reduce((sum, room) => sum + getRoomMeasures(room).walls, 0))} م²</td><td className="px-3 py-3 text-lg text-emerald-700">{fmt(estimateTotal)} ج</td></tr></tfoot>
-          </table>
+          <DataTable
+            ariaLabel="إجماليات الغرف"
+            rows={roomTotals}
+            rowKey={(row) => row.room.id}
+            columns={[
+              { key: 'room', header: 'الغرفة', render: (row) => <span className="font-bold">{row.room.name}</span> },
+              { key: 'area', header: 'المساحة', render: (row) => <span>{fmt(row.measures.floor)} م²</span> },
+              { key: 'walls', header: 'مساحة الحوائط', render: (row) => <span>{fmt(row.measures.walls)} م²</span> },
+              { key: 'total', header: 'إجمالي الغرفة', render: (row) => <span className="font-black text-emerald-700">{fmt(row.total)} ج</span> },
+            ]}
+          />
+          <div className="mt-2 flex justify-between rounded-lg border-t-2 border-slate-200 bg-slate-50 px-3 py-3 text-sm font-black">
+            <span>إجمالي الشقة</span>
+            <span>{fmt(totalArea)} م²</span>
+            <span>{fmt(rooms.reduce((sum, room) => sum + getRoomMeasures(room).walls, 0))} م²</span>
+            <span className="text-lg text-emerald-700">{fmt(estimateTotal)} ج</span>
+          </div>
         </div>
         <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-emerald-100 bg-white p-3 text-sm sm:grid-cols-3"><Metric label="تكلفة التنفيذ" value={`${fmt(totalCost)} ج`} /><Metric label="سعر البيع قبل الإضافات" value={`${fmt(estimateTotal)} ج`} /><Metric label="الربح الإجمالي وهامشه" value={`${fmt(grossProfit)} ج · ${fmt(estimateTotal ? grossProfit / estimateTotal * 100 : 0)}%`} /></div>
         <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl bg-emerald-700 px-4 py-3 text-white md:grid-cols-2 xl:grid-cols-5">

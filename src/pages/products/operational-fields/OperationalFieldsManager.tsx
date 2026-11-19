@@ -85,7 +85,7 @@ export const OperationalFieldsManager: React.FC = () => {
   };
 
   return (
-    <section className="space-y-4 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm sm:p-5" dir="rtl">
+    <section className="space-y-4 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm sm:p-5">
       <header className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-black text-slate-900">حقول السجلات التشغيلية</h2>

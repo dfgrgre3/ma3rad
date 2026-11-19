@@ -43,6 +43,8 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, formatDateTime, formatNumber, inputClass } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
+import { DataTable } from '../../components/ui/DataTable';
 type OperationsTab = 'jobs' | 'scheduled' | 'sync' | 'approvals' | 'maintenance' | 'errors' | 'usage';
 
 const CENTRAL_JOB_TYPE_MAP: Record<string, string> = {
@@ -75,6 +77,7 @@ function mapCentralJob(row: any): PlatformOpsJob {
 }
 
 export const PlatformOperationsSettingsPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<OperationsTab>('jobs');
   const centralActive = getCentralDataSourceState().active;
   const canManageOperations = canPlatform('operations');
@@ -198,47 +201,47 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   // Actions
   const handleRetryJob = (id: string) => {
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     if (centralActive) {
       centralPlatformClient.retryOpsJob(id)
         .then(loadData)
-        .catch((e) => alert((e as Error).message));
+        .catch((e) => toast.error((e as Error).message));
       return;
     }
     try {
       platformAdminService.retryOpsJob(id);
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   const handleCancelJob = (id: string) => {
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     if (!confirm('هل أنت متأكد من إلغاء هذه العملية؟')) return;
     if (centralActive) {
       centralPlatformClient.cancelOpsJob(id)
         .then(loadData)
-        .catch((e) => alert((e as Error).message));
+        .catch((e) => toast.error((e as Error).message));
       return;
     }
     try {
       platformAdminService.cancelOpsJob(id);
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   const handleCreateJob = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     if (centralActive) {
@@ -248,7 +251,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
         payload: { originalType: newJobType, priority: Number(newJobPriority) },
       })
         .then(() => { setNewJobModalOpen(false); loadData(); })
-        .catch((e) => alert((e as Error).message));
+        .catch((e) => toast.error((e as Error).message));
       return;
     }
     try {
@@ -260,14 +263,14 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       setNewJobModalOpen(false);
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   const handleCreateMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     if (!newMaintTitle || !newMaintStart || !newMaintEnd) return;
@@ -284,13 +287,13 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       setNewMaintDesc('');
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   const handleCancelMaintenance = (id: string) => {
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     if (!confirm('هل أنت متأكد من إلغاء نافذة الصيانة؟')) return;
@@ -298,14 +301,14 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       platformAdminService.cancelMaintenanceWindow(id);
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
   const handleConfirmApprovalAction = () => {
     if (!approvalActionModal) return;
     if (!canManageOperations) {
-      alert('لا تملك صلاحية إدارة العمليات.');
+      toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
     try {
@@ -318,7 +321,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       setApprovalNotes('');
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
@@ -379,7 +382,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   }, [jobs, jobSearch, activeTab]);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
         title="مركز التشغيل والموافقات"
@@ -543,94 +546,66 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                <tr>
-                  <th className="py-3 px-4">نوع العملية</th>
-                  <th className="py-3 px-4">العميل المرتبط</th>
-                  <th className="py-3 px-4">الحالة</th>
-                  <th className="py-3 px-4">الأولوية</th>
-                  <th className="py-3 px-4">المحاولات</th>
-                  <th className="py-3 px-4">التاريخ والجدولة</th>
-                  <th className="py-3 px-4 text-left">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {filteredJobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center">
-                      <EmptyState title="لا توجد مهام تشغيل تطابق الفلاتر المحددة" />
-                    </td>
-                  </tr>
-                ) : (
-                  filteredJobs.map((job) => (
-                    <tr key={job.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-zinc-200">{job.type}</div>
-                        <div className="text-xs text-zinc-500 font-mono mt-0.5">{job.id.substring(0, 8)}...</div>
-                        {job.errorMessage && (
-                          <div className="text-xs text-rose-400 mt-1 max-w-md truncate" title={job.errorMessage}>
-                            خطأ: {job.errorMessage}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {job.tenantId ? (
-                          <span className="text-zinc-300">
-                            {tenants.find((t) => t.id === job.tenantId)?.name || job.tenantId}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500 text-xs">نظام عام</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">{getJobStatusBadge(job.status)}</td>
-                      <td className="py-3 px-4">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                          {job.priority}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`text-xs ${job.retries > 0 ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
-                          {job.retries} / {job.maxRetries}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">
-                        <div>أنشئت: {formatDateTime(job.createdAt)}</div>
-                        {job.scheduledAt && <div className="text-blue-400">مجدولة: {formatDateTime(job.scheduledAt)}</div>}
-                      </td>
-                      <td className="py-3 px-4 text-left">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {canManageOperations && (job.status === 'FAILED' || job.status === 'CANCELLED') && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleRetryJob(job.id)}
-                              title="إعادة المحاولة فوراً"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5 ml-1 text-amber-400" />
-                              إعادة
-                            </Button>
-                          )}
-                          {canManageOperations && (job.status === 'PENDING' || job.status === 'RUNNING') && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleCancelJob(job.id)}
-                              title="إلغاء العملية"
-                            >
-                              <X className="w-3.5 h-3.5 ml-1" />
-                              إلغاء
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="مهام التشغيل"
+                      rows={filteredJobs}
+                      rowKey={(job) => job.id}
+                      emptyTitle="لا توجد مهام تشغيل تطابق الفلاتر المحددة"
+                      columns={[
+                        {
+                          key: 'type', header: 'نوع العملية',
+                          render: (job) => (
+                            <div>
+                              <div className="font-medium text-zinc-200">{job.type}</div>
+                              <div className="text-xs text-zinc-500 font-mono mt-0.5">{job.id.substring(0, 8)}...</div>
+                              {job.errorMessage && (
+                                <div className="text-xs text-rose-400 mt-1 max-w-md truncate" title={job.errorMessage}>
+                                  خطأ: {job.errorMessage}
+                                </div>
+                              )}
+                            </div>
+                          ),
+                        },
+                        {
+                          key: 'tenant', header: 'العميل المرتبط',
+                          render: (job) => job.tenantId ? (
+                            <span className="text-zinc-300">{tenants.find((t) => t.id === job.tenantId)?.name || job.tenantId}</span>
+                          ) : <span className="text-zinc-500 text-xs">نظام عام</span>,
+                        },
+                        { key: 'status', header: 'الحالة', render: (job) => getJobStatusBadge(job.status) },
+                        { key: 'priority', header: 'الأولوية', render: (job) => <span className="text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{job.priority}</span> },
+                        { key: 'retries', header: 'المحاولات', render: (job) => <span className={`text-xs ${job.retries > 0 ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>{job.retries} / {job.maxRetries}</span> },
+                        {
+                          key: 'date', header: 'التاريخ والجدولة',
+                          render: (job) => (
+                            <div className="text-xs text-zinc-400">
+                              <div>أنشئت: {formatDateTime(job.createdAt)}</div>
+                              {job.scheduledAt && <div className="text-blue-400">مجدولة: {formatDateTime(job.scheduledAt)}</div>}
+                            </div>
+                          ),
+                        },
+                        {
+                          key: 'actions', header: 'إجراءات', align: 'end',
+                          render: (job) => (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {canManageOperations && (job.status === 'FAILED' || job.status === 'CANCELLED') && (
+                                <Button variant="secondary" size="sm" onClick={() => handleRetryJob(job.id)} title="إعادة المحاولة فوراً">
+                                  <RotateCcw className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                                  إعادة
+                                </Button>
+                              )}
+                              {canManageOperations && (job.status === 'PENDING' || job.status === 'RUNNING') && (
+                                <Button variant="danger" size="sm" onClick={() => handleCancelJob(job.id)} title="إلغاء العملية">
+                                  <X className="w-3.5 h-3.5 ml-1" />
+                                  إلغاء
+                                </Button>
+                              )}
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
+
         </div>
       )}
 
@@ -655,64 +630,42 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                <tr>
-                  <th className="py-3 px-4">نوع المزامنة</th>
-                  <th className="py-3 px-4">العميل</th>
-                  <th className="py-3 px-4">الجهاز</th>
-                  <th className="py-3 px-4">الحالة</th>
-                  <th className="py-3 px-4">السجلات المتزامنة</th>
-                  <th className="py-3 px-4">التاريخ والوقت</th>
-                  <th className="py-3 px-4">التفاصيل</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {syncLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center">
-                      <EmptyState title="لا توجد سجلات مزامنة حالياً" />
-                    </td>
-                  </tr>
-                ) : (
-                  syncLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4 font-medium text-zinc-200">{log.syncType}</td>
-                      <td className="py-3 px-4">
-                        {log.tenantId ? (
-                          <span className="text-zinc-300">
-                            {tenants.find((t) => t.id === log.tenantId)?.name || log.tenantId}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-zinc-400">
-                        {log.deviceId ? log.deviceId.substring(0, 10) + '...' : 'الرئيسي'}
-                      </td>
-                      <td className="py-3 px-4">
-                        {log.status === 'SUCCESS' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ناجحة</span>
-                        )}
-                        {log.status === 'PARTIAL' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">جزئية</span>
-                        )}
-                        {log.status === 'FAIL' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">فشلت</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-zinc-200 font-semibold">{log.recordsSynced}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">{formatDateTime(log.createdAt)}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400 max-w-xs truncate" title={log.errorDetail || ''}>
-                        {log.errorDetail || '—'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="سجلات المزامنة"
+                      rows={syncLogs}
+                      rowKey={(log) => log.id}
+                      emptyTitle="لا توجد سجلات مزامنة حالياً"
+                      columns={[
+                        { key: 'type', header: 'نوع المزامنة', render: (log) => <span className="font-medium text-zinc-200">{log.syncType}</span> },
+                        {
+                          key: 'tenant', header: 'العميل',
+                          render: (log) => log.tenantId ? (
+                            <span className="text-zinc-300">{tenants.find((t) => t.id === log.tenantId)?.name || log.tenantId}</span>
+                          ) : <span className="text-zinc-500">—</span>,
+                        },
+                        { key: 'device', header: 'الجهاز', render: (log) => <span className="font-mono text-xs text-zinc-400">{log.deviceId ? log.deviceId.substring(0, 10) + '...' : 'الرئيسي'}</span> },
+                        {
+                          key: 'status', header: 'الحالة',
+                          render: (log) => (
+                            <>
+                              {log.status === 'SUCCESS' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ناجحة</span>
+                              )}
+                              {log.status === 'PARTIAL' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">جزئية</span>
+                              )}
+                              {log.status === 'FAIL' && (
+                                <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">فشلت</span>
+                              )}
+                            </>
+                          ),
+                        },
+                        { key: 'records', header: 'السجلات المتزامنة', render: (log) => <span className="text-zinc-200 font-semibold">{log.recordsSynced}</span> },
+                        { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="text-xs text-zinc-400">{formatDateTime(log.createdAt)}</span> },
+                        { key: 'details', header: 'التفاصيل', render: (log) => <span className="text-xs text-zinc-400 max-w-xs truncate block" title={log.errorDetail || ''}>{log.errorDetail || '—'}</span> },
+                      ]}
+                    />
+
         </div>
       )}
 
@@ -729,63 +682,36 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                <tr>
-                  <th className="py-3 px-4">نوع العملية</th>
-                  <th className="py-3 px-4">طالب العملية</th>
-                  <th className="py-3 px-4">الحالة</th>
-                  <th className="py-3 px-4">تاريخ الطلب</th>
-                  <th className="py-3 px-4">المسؤول / المعتمد</th>
-                  <th className="py-3 px-4">ملاحظات</th>
-                  <th className="py-3 px-4 text-left">القرار</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {approvals.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center">
-                      <EmptyState title="لا توجد طلبات موافقة معلقة أو مسجلة" />
-                    </td>
-                  </tr>
-                ) : (
-                  approvals.map((appr) => (
-                    <tr key={appr.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4 font-medium text-zinc-200">{appr.opType}</td>
-                      <td className="py-3 px-4 text-xs font-mono text-zinc-400">{appr.requestedBy}</td>
-                      <td className="py-3 px-4">{getApprovalStatusBadge(appr.status)}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400">{formatDateTime(appr.createdAt)}</td>
-                      <td className="py-3 px-4 text-xs font-mono text-zinc-400">{appr.approvedBy || '—'}</td>
-                      <td className="py-3 px-4 text-xs text-zinc-400 max-w-xs truncate">{appr.notes || '—'}</td>
-                      <td className="py-3 px-4 text-left">
-                        {appr.status === 'PENDING' && canManageOperations && (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="success"
-                              size="sm"
-                              onClick={() => setApprovalActionModal({ id: appr.id, type: 'approve' })}
-                            >
-                              <Check className="w-3.5 h-3.5 ml-1" />
-                              موافقة
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => setApprovalActionModal({ id: appr.id, type: 'reject' })}
-                            >
-                              <X className="w-3.5 h-3.5 ml-1" />
-                              رفض
-                            </Button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+                      ariaLabel="طلبات الموافقة"
+                      rows={approvals}
+                      rowKey={(appr) => appr.id}
+                      emptyTitle="لا توجد طلبات موافقة معلقة أو مسجلة"
+                      columns={[
+                        { key: 'type', header: 'نوع العملية', render: (appr) => <span className="font-medium text-zinc-200">{appr.opType}</span> },
+                        { key: 'requester', header: 'طالب العملية', render: (appr) => <span className="text-xs font-mono text-zinc-400">{appr.requestedBy}</span> },
+                        { key: 'status', header: 'الحالة', render: (appr) => getApprovalStatusBadge(appr.status) },
+                        { key: 'date', header: 'تاريخ الطلب', render: (appr) => <span className="text-xs text-zinc-400">{formatDateTime(appr.createdAt)}</span> },
+                        { key: 'approver', header: 'المسؤول / المعتمد', render: (appr) => <span className="text-xs font-mono text-zinc-400">{appr.approvedBy || '—'}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (appr) => <span className="text-xs text-zinc-400 max-w-xs truncate block">{appr.notes || '—'}</span> },
+                        {
+                          key: 'decision', header: 'القرار', align: 'end',
+                          render: (appr) => appr.status === 'PENDING' && canManageOperations ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button variant="success" size="sm" onClick={() => setApprovalActionModal({ id: appr.id, type: 'approve' })}>
+                                <Check className="w-3.5 h-3.5 ml-1" />
+                                موافقة
+                              </Button>
+                              <Button variant="danger" size="sm" onClick={() => setApprovalActionModal({ id: appr.id, type: 'reject' })}>
+                                <X className="w-3.5 h-3.5 ml-1" />
+                                رفض
+                              </Button>
+                            </div>
+                          ) : null,
+                        },
+                      ]}
+                    />
+
         </div>
       )}
 
@@ -1033,43 +959,35 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               description="ستظهر هنا أجهزة المستخدمين والفواتير والمدفوعات والتذاكر المفتوحة لكل منشأة."
             />
           ) : (
-            <div className="overflow-x-auto bg-zinc-900/40 rounded-xl border border-zinc-800">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800">
-                  <tr>
-                    <th className="py-3 px-4">المنشأة</th>
-                    <th className="py-3 px-4">الخطة</th>
-                    <th className="py-3 px-4">الأجهزة</th>
-                    <th className="py-3 px-4">المستخدمون</th>
-                    <th className="py-3 px-4">الفواتير</th>
-                    <th className="py-3 px-4">المدفوعات</th>
-                    <th className="py-3 px-4">تذاكر مفتوحة</th>
-                    <th className="py-3 px-4">آخر نشاط</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/60">
-                  {usageRows.map((u) => (
-                    <tr key={u.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-zinc-200">{u.name}</div>
-                        <div className="text-[10px] text-zinc-500 font-mono">{u.code}</div>
-                      </td>
-                      <td className="py-3 px-4 text-zinc-300">{u.plan_name ?? '—'}</td>
-                      <td className="py-3 px-4 text-zinc-300">{u.devices_active}/{u.devices_total}</td>
-                      <td className="py-3 px-4 text-zinc-300">{u.users_active}/{u.users_total}</td>
-                      <td className="py-3 px-4 text-zinc-300">{u.invoices_count}</td>
-                      <td className="py-3 px-4 text-zinc-300">{formatNumber(u.payments_total ?? 0)}</td>
-                      <td className="py-3 px-4">
-                        <span className={u.open_tickets > 0 ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
-                          {u.open_tickets}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-[11px] text-zinc-500">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+                          ariaLabel="استهلاك المنشآت"
+                          rows={usageRows}
+                          rowKey={(u) => u.id}
+                          minWidth={900}
+                          dense
+                          columns={[
+                            {
+                              key: 'tenant', header: 'المنشأة',
+                              render: (u) => (
+                                <div>
+                                  <div className="font-semibold text-zinc-200">{u.name}</div>
+                                  <div className="text-[10px] text-zinc-500 font-mono">{u.code}</div>
+                                </div>
+                              ),
+                            },
+                            { key: 'plan', header: 'الخطة', render: (u) => <span className="text-zinc-300">{u.plan_name ?? '—'}</span> },
+                            { key: 'devices', header: 'الأجهزة', render: (u) => <span className="text-zinc-300">{u.devices_active}/{u.devices_total}</span> },
+                            { key: 'users', header: 'المستخدمون', render: (u) => <span className="text-zinc-300">{u.users_active}/{u.users_total}</span> },
+                            { key: 'invoices', header: 'الفواتير', render: (u) => <span className="text-zinc-300">{u.invoices_count}</span> },
+                            { key: 'payments', header: 'المدفوعات', render: (u) => <span className="text-zinc-300">{formatNumber(u.payments_total ?? 0)}</span> },
+                            {
+                              key: 'tickets', header: 'تذاكر مفتوحة',
+                              render: (u) => <span className={u.open_tickets > 0 ? 'text-amber-400 font-bold' : 'text-zinc-400'}>{u.open_tickets}</span>,
+                            },
+                            { key: 'last', header: 'آخر نشاط', render: (u) => <span className="text-[11px] text-zinc-500">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</span> },
+                          ]}
+                        />
+
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { Profiler, useEffect, useState } from 'react';
+import { DataTable } from '../../../../components/ui/DataTable';
 import { createPortal } from 'react-dom';
 import { Check, ChevronLeft, ChevronRight, LoaderCircle, Search, Users, X } from 'lucide-react';
 import type { Customer } from '../../../../types';
@@ -203,58 +204,60 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               جارٍ تحميل العملاء…
             </div>
           ) : result?.items.length ? (
-            <table className="selection-list w-full min-w-[680px] border-separate border-spacing-0 text-right text-sm">
-              <thead className="sticky top-0 z-10 bg-slate-100 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                <tr>
-                  <th className="px-4 py-3">العميل</th>
-                  <th className="px-4 py-3">الهاتف</th>
-                  <th className="px-4 py-3">النوع</th>
-                  <th className="px-4 py-3">الرصيد</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3 text-center">الإجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.items.map((customer) => {
-                  const isActive = customer.isActive !== 0;
-                  const isSelected = customer.id === selectedCustomerId;
-                  return (
-                    <tr
-                      key={customer.id}
-                      aria-selected={isSelected}
-                      className={`selection-list__row ${isSelected ? 'is-selected' : ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-bold">{customer.name}</div>
-                        <div className="selection-list__meta mt-0.5 font-mono text-[11px]">{customer.code}</div>
-                      </td>
-                      <td className="selection-list__meta px-4 py-3 font-mono text-xs">{customer.phone}</td>
-                      <td className="px-4 py-3 text-xs">{CUSTOMER_TYPE_LABELS[customer.customerType]}</td>
-                      <td className="px-4 py-3 text-xs font-bold tabular-nums">{CeramicMath.formatCurrency(customer.currentBalance)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}>
-                          {isActive ? 'نشط' : 'موقوف'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          disabled={!isActive}
-                          onClick={() => {
-                            onSelectCustomer(customer);
-                            onClose();
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-                        >
-                          {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
-                          {isSelected ? 'محدد' : 'اختيار'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              ariaLabel="اختيار العميل"
+              rows={result.items}
+              rowKey={(customer: any) => String(customer.id)}
+              minWidth={680}
+              tableClassName="selection-list text-sm"
+              rowClassName={(customer: any) => `selection-list__row ${customer.id === selectedCustomerId ? 'is-selected' : ''}`}
+              columns={[
+                {
+                  key: 'customer', header: 'العميل',
+                  render: (customer: any) => (
+                    <div>
+                      <div className="font-bold">{customer.name}</div>
+                      <div className="selection-list__meta mt-0.5 font-mono text-[11px]">{customer.code}</div>
+                    </div>
+                  ),
+                },
+                { key: 'phone', header: 'الهاتف', render: (customer: any) => <span className="selection-list__meta font-mono text-xs">{customer.phone}</span> },
+                { key: 'type', header: 'النوع', render: (customer: any) => <span className="text-xs">{(CUSTOMER_TYPE_LABELS as Record<string, string>)[customer.customerType]}</span> },
+                { key: 'balance', header: 'الرصيد', render: (customer: any) => <span className="text-xs font-bold tabular-nums">{CeramicMath.formatCurrency(customer.currentBalance)}</span> },
+                {
+                  key: 'active', header: 'الحالة',
+                  render: (customer: any) => {
+                    const isActive = customer.isActive !== 0;
+                    return (
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}>
+                        {isActive ? 'نشط' : 'موقوف'}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'action', header: 'الإجراء', align: 'center',
+                  render: (customer: any) => {
+                    const isActive = customer.isActive !== 0;
+                    const isSelected = customer.id === selectedCustomerId;
+                    return (
+                      <button
+                        type="button"
+                        disabled={!isActive}
+                        onClick={() => {
+                          onSelectCustomer(customer);
+                          onClose();
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                      >
+                        {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                        {isSelected ? 'محدد' : 'اختيار'}
+                      </button>
+                    );
+                  },
+                },
+              ]}
+            />
           ) : (
             <div className="flex min-h-56 flex-col items-center justify-center gap-2 p-6 text-center">
               <Users className="h-9 w-9 text-slate-300 dark:text-slate-600" />

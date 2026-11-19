@@ -35,7 +35,9 @@ import { OperationalFieldService, type OperationalFieldDefinition } from '../../
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { normalizeDynamicAttributeValue } from '../../../services/domains/products/dynamicAttributes';
 
+import { useToast } from '../../../components/ui/Toast';
 export const SupplierDetailPage: React.FC = () => {
+  const toast = useToast();
   const paymentIdempotency = useIdempotencyKey();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -274,7 +276,7 @@ export const SupplierDetailPage: React.FC = () => {
       setIsEditModalOpen(false);
       loadSupplierData();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تحديث بيانات المورد');
+      toast.error(err?.message || 'تعذر تحديث بيانات المورد');
     }
   };
 
@@ -288,7 +290,7 @@ export const SupplierDetailPage: React.FC = () => {
       supplierService.updateSupplier(supplier.id, { isActive: nextStatus });
       loadSupplierData();
     } catch (err: any) {
-      alert(err?.message || 'تعذر تعديل حالة المورد');
+      toast.error(err?.message || 'تعذر تعديل حالة المورد');
     }
   };
 
@@ -338,7 +340,7 @@ export const SupplierDetailPage: React.FC = () => {
 
   if (!supplier) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center" dir="rtl">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
           <AlertTriangle className="w-8 h-8" />
         </div>
@@ -356,7 +358,7 @@ export const SupplierDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Top Header */}
       <SupplierHeader
         supplier={supplier}

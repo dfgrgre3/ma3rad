@@ -2,12 +2,14 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Star, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { ProductExtraService, ProductImage } from '../../../services/domains/products/ProductExtraService';
 
+import { useToast } from '../../../components/ui/Toast';
 interface ImagesTabProps {
   productId: string;
   canEdit: boolean;
 }
 
 export const ImagesTab: React.FC<ImagesTabProps> = ({ productId, canEdit }) => {
+  const toast = useToast();
   const service = useMemo(() => new ProductExtraService(), []);
   const [rows, setRows] = useState<ProductImage[]>([]);
   const [filePath, setFilePath] = useState('');
@@ -20,16 +22,16 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ productId, canEdit }) => {
     e.preventDefault();
     if (!filePath.trim()) return;
     try { service.addImage(productId, filePath.trim(), caption.trim() || undefined); setFilePath(''); setCaption(''); load(); }
-    catch (err: any) { alert(err?.message); }
+    catch (err: any) { toast.error(err?.message); }
   };
 
   const remove = (id: string) => {
     if (!confirm('حذف هذه الصورة؟')) return;
-    try { service.deleteImage(id); load(); } catch (err: any) { alert(err?.message); }
+    try { service.deleteImage(id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   const makePrimary = (id: string) => {
-    try { service.setPrimaryImage(productId, id); load(); } catch (err: any) { alert(err?.message); }
+    try { service.setPrimaryImage(productId, id); load(); } catch (err: any) { toast.error(err?.message); }
   };
 
   return (

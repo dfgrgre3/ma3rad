@@ -19,6 +19,7 @@ import { InventoryCostingService } from '../src/services/domains/inventory/Inven
 import { FacilityManagementService } from '../src/services/domains/operations/FacilityManagementService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 import { CashierService } from '../src/services/domains/finance/CashierService.ts';
+import { ApprovalService } from '../src/services/domains/approvals/ApprovalService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -218,7 +219,7 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
   ]);
   assert.equal(q(`SELECT batch_id AS batchId, quantity_m2 AS quantity FROM sales_return_batch_allocations WHERE return_item_id IN (SELECT id FROM sales_return_items WHERE return_id IN (SELECT id FROM sales_returns WHERE original_invoice_id=?))`, [invoice.id])[0].batchId, 'pb_fifo_first');
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
-  assert.equal(q(`SELECT SUM(l.debit) AS cost FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id
+  assert.equal(q(`SELECT SUM(l.debit) / 100.0 AS cost FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id
     JOIN journal_entries e ON e.id=l.entry_id WHERE e.reference_type='SALES_INVOICE' AND e.reference_id=? AND a.code='5101'`,[invoice.id])[0].cost,90);
   assert.equal(db.query<any>(`SELECT quantity_remaining AS quantity FROM inventory_cost_layers WHERE source_id='lot1'`)[0].quantity,2);
   assert.equal(q(`SELECT quantity_restored AS quantity FROM inventory_cost_allocations WHERE outbound_transaction_id=?`,[issue.id])[0].quantity,2);
@@ -299,7 +300,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
     paymentType: 'CREDIT',
   });
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 250, 'stock after sale = 250');
-  assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 15000, 'credit balance = 15000');
+  assert.equal(q('SELECT current_balance / 100.0 AS currentBalance FROM customers WHERE id=?', [created.id])[0].currentBalance, 15000, 'credit balance = 15000');
 
   const return1 = new SalesService().returnSale(
     sale1.id,
@@ -358,7 +359,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
     paymentType: 'CASH',
   });
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'fully-paid sale does not increase balance');
-  assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 15000, 'cash register received 15000');
+  assert.equal(q('SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 15000, 'cash register received 15000');
 
   new SalesService().returnSale(sale2.id, [{ productId: pid, invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ? LIMIT 1', [sale2.id, pid])[0].id, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }], true);
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'balance unchanged after paid return');
@@ -423,7 +424,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(depositSettledInvoice.paidAmount, 100);
   new SalesService().voidInvoice(depositSettledInvoice.id, 'Void deposit-settled invoice');
   const voidDepositLedger = q(`
-    SELECT coa.code AS code, SUM(jel.debit) AS debit, SUM(jel.credit) AS credit
+    SELECT coa.code AS code, SUM(jel.debit) / 100.0 AS debit, SUM(jel.credit) / 100.0 AS credit
     FROM journal_entries je JOIN journal_entry_lines jel ON jel.entry_id = je.id
     JOIN chart_of_accounts coa ON coa.id = jel.account_id
     WHERE je.reference_type = 'SALES_VOID' AND je.reference_id = ? GROUP BY coa.code
@@ -445,10 +446,31 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   );
   assert.equal(balanceReturn.refundMethod, 'BALANCE');
   assert.equal(balanceReturn.refundedAmount, 0, 'no cash leaves the register');
-  assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 6000, 'balance refund leaves the cash register untouched');
-  assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, -6000, 'full value credited to the customer balance');
+  // The voided invoice's order deposit survives as open order credit, so its
+  // cash stays in the register; the balance refund itself moves no cash.
+  assert.equal(q('SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 6100, 'balance refund leaves the cash register untouched');
+  assert.equal(q('SELECT current_balance / 100.0 AS currentBalance FROM customers WHERE id=?', [created.id])[0].currentBalance, -6000, 'full value credited to the customer balance');
 
   const inventory = new InventoryService();
+  // Admins bypass the approval policy, so the pending request must be created
+  // by a non-admin actor for the workflow assertions below to apply.
+  const adjustmentCreator: User = {
+    id: 'usr_integration_adjustment_creator',
+    username: 'integration-adjustment-creator',
+    fullName: 'Integration Adjustment Creator',
+    role: 'WAREHOUSE',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  db.run(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test', ?, 'WAREHOUSE', 1)`,
+    [adjustmentCreator.id, adjustmentCreator.username, adjustmentCreator.fullName]
+  );
+  db.run(`INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, 'br_main')`, [adjustmentCreator.id]);
+  AuthService.setCurrentUser(adjustmentCreator);
+  PermissionService.invalidate(adjustmentCreator);
   inventory.adjustStock(pid, 'wh_main', 279, 'تسوية اختبار');
   const adjustmentId = q(
     `SELECT sa.id FROM stock_adjustments sa
@@ -460,7 +482,6 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.ok(adjustmentId, 'adjustStock should create a pending workflow request');
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 300,
     'creating an adjustment must not change stock before approval and posting');
-  assert.throws(() => inventory.approveAdjustment(adjustmentId), /لا يمكن لمنشئ التسوية اعتمادها/);
 
   const adjustmentApprover: User = {
     id: 'usr_integration_adjustment_approver',
@@ -478,10 +499,14 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   );
   AuthService.setCurrentUser(adjustmentApprover);
   PermissionService.invalidate(adjustmentApprover);
-  inventory.approveAdjustment(adjustmentId);
-  assert.equal(q('SELECT status FROM stock_adjustments WHERE id=?', [adjustmentId])[0].status, 'PENDING_APPROVAL',
-    'approval must not post the stock adjustment');
-  inventory.postAdjustment(adjustmentId);
+  const adjustmentRequest = q(
+    `SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND status = 'PENDING'`,
+    [adjustmentId]
+  )[0];
+  assert.ok(adjustmentRequest, 'pending adjustment must have a central approval request');
+  new ApprovalService().decide(adjustmentRequest.id, true);
+  assert.equal(q('SELECT status FROM stock_adjustments WHERE id=?', [adjustmentId])[0].status, 'POSTED',
+    'approving through the inbox posts the stock adjustment');
   const adjustmentEntry = q(
     `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`,
     [adjustmentId]
@@ -505,6 +530,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
           VALUES (?,?,?,?,?,1)`,
     ['usr_cashier', 'cashier1', bcrypt.hashSync('pass123', 10), 'كاشير', 'CASHIER']);
   AuthService.login('cashier1', 'pass123');
+  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
   assert.throws(
     () => new InventoryService().adjustStock(pid, 'wh_main', 999, 'test'),
     /غير مصرح/

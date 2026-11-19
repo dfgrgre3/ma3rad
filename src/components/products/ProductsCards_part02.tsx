@@ -34,7 +34,7 @@ export const ProductsCards: React.FC<ProductsCardsProps> = ({
                 <div key={p.id} className={`flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md ${p.isActive ? '' : 'opacity-60'}`}>
                   <div className="relative h-36 bg-slate-100">
                     {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-10 w-10" /></div>}
-                    <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : CeramicMath.formatM2(stock.m2)}</span>
+                    <span className={`erp-badge absolute right-2 top-2 ${stockTone(p)}`}>{p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : CeramicMath.formatM2(stock.m2)}</span>
                     {(canExportProducts || canDeleteProduct) && <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => onToggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />}
                     {!p.isActive && <span className="absolute left-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">موقوف</span>}
                   </div>

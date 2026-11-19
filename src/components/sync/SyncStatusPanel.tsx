@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../ui/DataTable';
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Cloud, CloudOff, Inbox,
   Loader2, RefreshCw, ShieldAlert, Wifi, WifiOff,
@@ -6,7 +7,15 @@ import {
 import { SyncStatusService } from '../../sync/SyncStatusService';
 import type { SyncOverview } from '../../types/sync';
 import { useToast } from '../ui/Toast';
+import { StatCard as UiStatCard } from '../ui/Card';
 
+
+const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
+  /rose|red|danger/.test(cls) ? 'danger' : /amber|orange/.test(cls) ? 'warning' : /emerald|green|success/.test(cls) ? 'success' : 'default';
+
+const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; icon?: React.ReactNode; tone?: string }> = ({ label, value, hint, icon, tone }: any) => (
+  <UiStatCard label={label} value={value} hint={hint} icon={icon} tone={statTone(tone || '')} />
+);
 function formatTimestamp(value?: string | null): string {
   if (!value) return '—';
   try {
@@ -23,15 +32,6 @@ interface StatCardProps {
   tone: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, icon, tone }) => (
-  <div className={`rounded-2xl border p-3.5 ${tone}`}>
-    <div className="flex items-center justify-between">
-      <p className="text-[10px] font-bold opacity-80">{label}</p>
-      {icon}
-    </div>
-    <p className="mt-1 text-xl font-black">{value}</p>
-  </div>
-);
 
 /**
  * Live synchronization health: connection state, last successful contact,
@@ -132,56 +132,41 @@ export const SyncStatusPanel: React.FC<{ refreshToken?: number }> = ({ refreshTo
         <div className="border-b border-slate-100 px-4 py-2.5">
           <h4 className="text-xs font-black text-slate-800">حالة الفروع وآخر اتصال</h4>
         </div>
-        <table className="w-full text-right text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-            <tr>
-              <th className="px-3 py-2 font-bold">الفرع</th>
-              <th className="px-3 py-2 font-bold">الحالة</th>
-              <th className="px-3 py-2 font-bold">الاتصال</th>
-              <th className="px-3 py-2 font-bold">آخر تواصل</th>
-              <th className="px-3 py-2 font-bold">آخر مزامنة</th>
-              <th className="px-3 py-2 font-bold">الأجهزة</th>
-              <th className="px-3 py-2 font-bold">معلّق</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {overview.branches.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
-                  لا توجد فروع مسجّلة في المزامنة بعد.
-                </td>
-              </tr>
-            )}
-            {overview.branches.map((branch) => (
-              <tr key={branch.branchId} className="hover:bg-slate-50/60">
-                <td className="px-3 py-2 font-bold text-slate-900">{branch.name}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
-                    branch.isVerified
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-amber-200 bg-amber-50 text-amber-700'
-                  }`}>
-                    {branch.isVerified ? 'موثّق' : 'غير موثّق'}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${branch.online ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${branch.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    {branch.online ? 'Online' : 'Offline'}
-                  </span>
-                </td>
-                <td className="px-3 py-2 font-mono text-[10px] text-slate-500">{formatTimestamp(branch.lastContactAt)}</td>
-                <td className="px-3 py-2 font-mono text-[10px] text-slate-500">{formatTimestamp(branch.lastSyncAt)}</td>
-                <td className="px-3 py-2 text-[11px] font-bold text-slate-700">{branch.deviceCount}</td>
-                <td className="px-3 py-2">
-                  <span className={`text-[11px] font-black ${branch.pendingChanges > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                    {branch.pendingChanges}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="حالة الفروع"
+          rows={overview.branches}
+          rowKey={(branch: any) => String(branch.branchId)}
+          dense
+          tableClassName="text-xs"
+          columns={[
+            { key: 'name', header: 'الفرع', render: (branch: any) => <span className="font-bold text-slate-900">{branch.name}</span> },
+            {
+              key: 'status', header: 'الحالة',
+              render: (branch: any) => (
+                <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${branch.isVerified ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                  {branch.isVerified ? 'موثّق' : 'غير موثّق'}
+                </span>
+              ),
+            },
+            {
+              key: 'conn', header: 'الاتصال',
+              render: (branch: any) => (
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${branch.online ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${branch.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                  {branch.online ? 'Online' : 'Offline'}
+                </span>
+              ),
+            },
+            { key: 'contact', header: 'آخر تواصل', render: (branch: any) => <span className="font-mono text-[10px] text-slate-500">{formatTimestamp(branch.lastContactAt)}</span> },
+            { key: 'sync', header: 'آخر مزامنة', render: (branch: any) => <span className="font-mono text-[10px] text-slate-500">{formatTimestamp(branch.lastSyncAt)}</span> },
+            { key: 'devices', header: 'الأجهزة', render: (branch: any) => <span className="text-[11px] font-bold text-slate-700">{branch.deviceCount}</span> },
+            {
+              key: 'pending', header: 'معلّق',
+              render: (branch: any) => <span className={`text-[11px] font-black ${branch.pendingChanges > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{branch.pendingChanges}</span>,
+            },
+          ]}
+          emptyTitle="لا توجد فروع مسجّلة في المزامنة بعد."
+        />
       </div>
     </div>
   );

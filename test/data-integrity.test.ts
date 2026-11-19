@@ -22,13 +22,13 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
   manager.executeTransaction(() => {
     manager.run(`INSERT INTO customers (id,code,name,phone,current_balance,total_purchases)
       VALUES ('cust_integrity_ref','CUST-INTEGRITY-REF','Reference customer','01000000991',?,0)`,
-      [expected.customerBalance]);
+      [Math.round(expected.customerBalance * 100)]);
     manager.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases)
       VALUES ('sup_integrity_ref','SUP-INTEGRITY-REF','Reference supplier','01000000992',?,0)`,
-      [expected.supplierBalance]);
+      [Math.round(expected.supplierBalance * 100)]);
     manager.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,size,cost_price)
       VALUES ('prod_integrity_ref','SKU-INTEGRITY-REF','BAR-INTEGRITY-REF','Reference stock','cat_floor','br_cleo','60x60',?)`,
-      [expected.stockUnitCost]);
+      [Math.round(expected.stockUnitCost * 100)]);
     manager.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
       VALUES ('stock_integrity_ref','wh_main','prod_integrity_ref',?,0)`, [expected.stockQuantityM2]);
     manager.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
@@ -42,7 +42,7 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
       const current = Number(manager.query<any>(`SELECT COALESCE(SUM(l.debit-l.credit),0) AS v
         FROM journal_entry_lines l JOIN journal_entries e ON e.id=l.entry_id
         JOIN chart_of_accounts a ON a.id=l.account_id WHERE e.is_posted=1 AND a.code=?`, [code])[0].v);
-      return { code, delta: Math.round((target - current) * 100) / 100 };
+      return { code, delta: Number(((target - current) / 100).toFixed(2)) };
     }).filter((row) => Math.abs(row.delta) >= 0.01);
     const netDebit = adjustments.reduce((sum, row) => sum + row.delta, 0);
     const equityCode = manager.query<any>(`SELECT code FROM chart_of_accounts WHERE type='EQUITY' AND is_active=1 ORDER BY code LIMIT 1`)[0]?.code;
@@ -58,8 +58,10 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
       referenceType: 'TEST_DATA_INTEGRITY_BASELINE', referenceId: 'reference-opening-balances',
       createdBy: actor.id, branchId: 'br_main', lines,
     });
+  });
 
-    const checks = statements.getReconciliation();
+  {
+    const checks = await statements.getReconciliation();
     const byKey = new Map(checks.map((check) => [check.key, check]));
     for (const key of ['journal', 'cached', 'customers', 'suppliers', 'inventory']) {
       assert.equal(byKey.get(key)?.status, 'MATCH', `${key} should match the reference ledger: ${JSON.stringify(byKey.get(key))}`);
@@ -69,13 +71,13 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
     assert.equal(byKey.get('inventory')?.source, expected.stockValue);
 
     manager.run(`UPDATE customers SET current_balance=current_balance+1.11 WHERE id='cust_integrity_ref'`);
-    assert.equal(new Map(statements.getReconciliation().map((check) => [check.key, check])).get('customers')?.status,
+    assert.equal(new Map((await statements.getReconciliation()).map((check) => [check.key, check])).get('customers')?.status,
       'DIFFERENCE', 'customer subledger drift is detected');
     manager.run(`UPDATE suppliers SET current_balance=current_balance+2.22 WHERE id='sup_integrity_ref'`);
-    assert.equal(new Map(statements.getReconciliation().map((check) => [check.key, check])).get('suppliers')?.status,
+    assert.equal(new Map((await statements.getReconciliation()).map((check) => [check.key, check])).get('suppliers')?.status,
       'DIFFERENCE', 'supplier subledger drift is detected');
     manager.run(`UPDATE warehouse_stock SET quantity_m2=quantity_m2+1 WHERE id='stock_integrity_ref'`);
-    assert.equal(new Map(statements.getReconciliation().map((check) => [check.key, check])).get('inventory')?.status,
+    assert.equal(new Map((await statements.getReconciliation()).map((check) => [check.key, check])).get('inventory')?.status,
       'DIFFERENCE', 'physical stock value drift is detected');
-  });
+  }
 });

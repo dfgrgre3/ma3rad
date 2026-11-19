@@ -35,7 +35,7 @@ async function boot(): Promise<DatabaseManager> {
 test('partner accounts preserve financial history, post balanced entries and reconcile cash shifts', async () => {
   const db = await boot();
   db.run("UPDATE cash_registers SET current_balance = 0 WHERE id = 'cr_main'");
-  db.run("UPDATE chart_of_accounts SET balance = -1000 WHERE code = '3102'");
+  db.run("UPDATE chart_of_accounts SET balance = -100000 WHERE code = '3102'");
   const service = new PartnerService();
   const primary = service.createPartner({
     name: 'Partner Alpha',
@@ -115,7 +115,7 @@ test('partner accounts preserve financial history, post balanced entries and rec
   ), /Partner account history is immutable/);
 
   assert.equal(db.query<{ currentBalance: number }>(
-    "SELECT current_balance AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
+    "SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
   )[0].currentBalance, 725);
   const closedShift = cashier.closeShift(shift.id, 725, 'partner transactions');
   assert.equal(closedShift.expectedEndingCash, 725);
@@ -190,8 +190,8 @@ test('partner accounts preserve financial history, post balanced entries and rec
 
 test('partner accounts support loans, drawings, adjustments, filtered statements and auditable reversals', async () => {
   const db = await boot();
-  db.run("UPDATE cash_registers SET current_balance = 5000 WHERE id = 'cr_main'");
-  db.run("UPDATE chart_of_accounts SET balance = -1000 WHERE code = '3102'");
+  db.run("UPDATE cash_registers SET current_balance = 500000 WHERE id = 'cr_main'");
+  db.run("UPDATE chart_of_accounts SET balance = -100000 WHERE code = '3102'");
   const service = new PartnerService();
   const partner = service.createPartner({ name: 'Partner Gamma', ownershipPercent: 0, capitalAmount: 0 });
 
@@ -226,7 +226,7 @@ test('partner accounts support loans, drawings, adjustments, filtered statements
   assert.equal(statement.partner.adjustments, 100);
   assert.equal(statement.partner.netBalance, 600);
   assert.equal(db.query<{ currentBalance: number }>(
-    "SELECT current_balance AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
+    "SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
   )[0].currentBalance, 5500);
 
   const filtered = service.getPartnerStatement(partner.id, {
@@ -246,7 +246,7 @@ test('partner accounts support loans, drawings, adjustments, filtered statements
   const loan = statement.transactions.find((transaction) => transaction.transactionType === 'PARTNER_LOAN')!;
   service.reverseTransaction(loan.id, 'إلغاء القرض المكرر');
   assert.equal(db.query<{ currentBalance: number }>(
-    "SELECT current_balance AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
+    "SELECT current_balance / 100.0 AS currentBalance FROM cash_registers WHERE id = 'cr_main'"
   )[0].currentBalance, 4500);
   assert.throws(() => service.reverseTransaction(loan.id, 'محاولة ثانية'), /تم عكس هذه الحركة مسبقًا/);
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { CalendarCheck, Clock3, Coffee, Download, FileUp, Loader2, Search, Settings2, ShieldCheck, Users } from 'lucide-react';
 import type { AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
 import {
@@ -303,7 +304,7 @@ export const AttendancePage: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
@@ -372,95 +373,127 @@ export const AttendancePage: React.FC = () => {
             {tab === 'daily' && (
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-right min-w-[1100px]">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr>{['الموظف', 'الحالة', 'الدخول / الخروج', 'العمل والاستراحة', 'التأخير / المبكر', 'العمل الإضافي', 'إجراءات الوقت', 'تصحيح يدوي'].map((heading) =>
-                        <th key={heading} className="px-3 py-3 text-xs font-bold text-slate-500">{heading}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filtered.map((employee) => {
-                        const record = recordsByEmployee.get(employee.id);
-                        const form = getForm(employee.id, record);
-                        return (
-                          <tr key={employee.id} className="align-top hover:bg-slate-50/70">
-                            <td className="px-3 py-3">
-                              <div className="flex items-center gap-2">
-                                <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><Users className="w-4 h-4" /></span>
-                                <span><b className="block text-slate-800">{employee.name}</b><small className="text-slate-400">{employee.role}</small></span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              {record ? <span className={`text-[10px] px-2 py-1 rounded border font-bold ${STATUS_COLORS[record.status]}`}>{STATUS_LABELS[record.status]}</span>
-                                : <span className="text-xs text-slate-400">لم يسجل</span>}
-                              <div className="mt-1 text-[10px] text-slate-400">{record?.source ?? ''}</div>
-                            </td>
-                            <td className="px-3 py-3 font-mono text-xs">
-                              <div>دخول: {formatClock(record?.checkInAt)}</div><div>خروج: {formatClock(record?.checkOutAt)}</div>
-                            </td>
-                            <td className="px-3 py-3 text-xs">
-                              <div>{record ? formatMinutes(record.workedMinutes) : '—'} عمل</div>
-                              <div className="text-slate-500">{record ? formatMinutes(record.breakMinutes) : '—'} استراحة</div>
-                              {record && breaks.some((item) => item.attendanceId === record.id) && <details className="mt-1">
-                                <summary className="cursor-pointer text-[10px] text-sky-700">تفاصيل الاستراحات</summary>
-                                {breaks.filter((item) => item.attendanceId === record.id).map((item) => (
-                                  <div key={item.id} className="mt-1 text-[10px] text-slate-500">
-                                    {item.startedAt.slice(11, 16)}–{item.endedAt?.slice(11, 16) ?? 'مفتوحة'} ({item.minutes} د)
-                                  </div>
-                                ))}
-                              </details>}
-                            </td>
-                            <td className="px-3 py-3 text-xs">
-                              <div>{record?.lateMinutes ?? 0} د تأخير</div><div className="text-slate-500">{record?.earlyLeaveMinutes ?? 0} د مبكر</div>
-                            </td>
-                            <td className="px-3 py-3 text-xs">
-                              <div>{record?.overtimeMinutes ?? 0} د</div>
-                              {record?.overtimeMinutes ? record.overtimeApproved
-                                ? <span className="text-emerald-700">معتمد للرواتب</span>
-                                : <span className="text-amber-700">بانتظار الاعتماد</span> : null}
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                {!record?.checkInAt && <button disabled={!canManage || date !== today() || busy === employee.id}
-                                  onClick={() => runAction(employee.id, () => AttendanceService.punchIn(employee.id))}
-                                  className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold disabled:opacity-40"><Clock3 className="inline w-3 h-3 ml-1" />دخول</button>}
-                                {!!record?.checkInAt && !record.checkOutAt && <button disabled={!canManage || date !== today() || busy === employee.id}
-                                  onClick={() => runAction(employee.id, () => AttendanceService.punchOut(employee.id))}
-                                  className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold disabled:opacity-40">انصراف</button>}
-                                {!!record?.checkInAt && !record.checkOutAt && !record.activeBreak && <button disabled={!canManage || date !== today()}
-                                  onClick={() => runAction(employee.id, () => AttendanceService.startBreak(employee.id))}
-                                  className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 text-[10px] font-bold disabled:opacity-40"><Coffee className="inline w-3 h-3 ml-1" />استراحة</button>}
-                                {!!record?.activeBreak && <button disabled={!canManage || date !== today()}
-                                  onClick={() => runAction(employee.id, () => AttendanceService.endBreak(employee.id))}
-                                  className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold disabled:opacity-40">إنهاء الاستراحة</button>}
-                                {!!record?.overtimeMinutes && !record.overtimeApproved && canApprove && <button disabled={busy === record.id}
-                                  onClick={() => runAction(record.id, () => AttendanceService.approveOvertime(record.id))}
-                                  className="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold">اعتماد الإضافي</button>}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <details>
-                                <summary className="cursor-pointer text-xs text-sky-700 font-bold">طلب تعديل</summary>
-                                <div className="mt-2 grid grid-cols-2 gap-1.5 min-w-[230px]">
-                                  <select value={form.status} onChange={(event) => updateForm(employee.id, record, 'status', event.target.value)}
-                                    className="col-span-2 rounded border p-1 text-xs">
-                                    {EDITABLE_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-                                  </select>
-                                  <input aria-label="وقت الدخول" type="time" value={form.checkIn} onChange={(event) => updateForm(employee.id, record, 'checkIn', event.target.value)} className="rounded border p-1 text-xs" />
-                                  <input aria-label="وقت الخروج" type="time" value={form.checkOut} onChange={(event) => updateForm(employee.id, record, 'checkOut', event.target.value)} className="rounded border p-1 text-xs" />
-                                  <input aria-label="دقائق التأخير" type="number" min={0} value={form.late} onChange={(event) => updateForm(employee.id, record, 'late', event.target.value)} className="rounded border p-1 text-xs" placeholder="التأخير" />
-                                  <input aria-label="دقائق الإضافي" type="number" min={0} value={form.overtime} onChange={(event) => updateForm(employee.id, record, 'overtime', event.target.value)} className="rounded border p-1 text-xs" placeholder="الإضافي" />
-                                  <input value={form.notes} onChange={(event) => updateForm(employee.id, record, 'notes', event.target.value)} className="col-span-2 rounded border p-1 text-xs" placeholder="ملاحظات" />
-                                  <button disabled={!canManage} onClick={() => runAction(employee.id, () => saveManual(employee, record))}
-                                    className="col-span-2 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-bold text-white disabled:opacity-40">إرسال للموافقة</button>
+                  <DataTable
+                    ariaLabel="الحضور اليومي"
+                    rows={filtered.map((employee) => {
+                      const record = recordsByEmployee.get(employee.id);
+                      return { employee, record, form: getForm(employee.id, record) };
+                    })}
+                    rowKey={(row) => row.employee.id}
+                    minWidth={1100}
+                    dense
+                    tableClassName="text-sm"
+                    rowClassName={() => 'align-top hover:bg-slate-50/70'}
+                    columns={[
+                      {
+                        key: 'employee', header: 'الموظف',
+                        render: ({ employee }) => (
+                          <span className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><Users className="w-4 h-4" /></span>
+                            <span><b className="block text-slate-800">{employee.name}</b><small className="text-slate-400">{employee.role}</small></span>
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'status', header: 'الحالة',
+                        render: ({ record }) => (
+                          <span>
+                            {record ? <span className={`text-[10px] px-2 py-1 rounded border font-bold ${STATUS_COLORS[record.status]}`}>{STATUS_LABELS[record.status]}</span>
+                              : <span className="text-xs text-slate-400">لم يسجل</span>}
+                            <span className="mt-1 block text-[10px] text-slate-400">{record?.source ?? ''}</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'times', header: 'الدخول / الخروج',
+                        render: ({ record }) => (
+                          <span className="font-mono text-xs">
+                            <span className="block">دخول: {formatClock(record?.checkInAt)}</span><span className="block">خروج: {formatClock(record?.checkOutAt)}</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'work', header: 'العمل والاستراحة',
+                        render: ({ record }) => (
+                          <span className="text-xs">
+                            <span className="block">{record ? formatMinutes(record.workedMinutes) : '—'} عمل</span>
+                            <span className="block text-slate-500">{record ? formatMinutes(record.breakMinutes) : '—'} استراحة</span>
+                            {record && breaks.some((item) => item.attendanceId === record.id) && <details className="mt-1">
+                              <summary className="cursor-pointer text-[10px] text-sky-700">تفاصيل الاستراحات</summary>
+                              {breaks.filter((item) => item.attendanceId === record.id).map((item) => (
+                                <div key={item.id} className="mt-1 text-[10px] text-slate-500">
+                                  {item.startedAt.slice(11, 16)}–{item.endedAt?.slice(11, 16) ?? 'مفتوحة'} ({item.minutes} د)
                                 </div>
-                              </details>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {!filtered.length && <tr><td colSpan={8} className="py-12 text-center text-slate-400">لا يوجد موظفون مطابقون</td></tr>}
-                    </tbody>
-                  </table>
+                              ))}
+                            </details>}
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'late', header: 'التأخير / المبكر',
+                        render: ({ record }) => (
+                          <span className="text-xs">
+                            <span className="block">{record?.lateMinutes ?? 0} د تأخير</span><span className="block text-slate-500">{record?.earlyLeaveMinutes ?? 0} د مبكر</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'overtime', header: 'العمل الإضافي',
+                        render: ({ record }) => (
+                          <span className="text-xs">
+                            <span className="block">{record?.overtimeMinutes ?? 0} د</span>
+                            {record?.overtimeMinutes ? record.overtimeApproved
+                              ? <span className="text-emerald-700">معتمد للرواتب</span>
+                              : <span className="text-amber-700">بانتظار الاعتماد</span> : null}
+                          </span>
+                        ),
+                      },
+                      {
+                        key: 'actions', header: 'إجراءات الوقت',
+                        render: ({ employee, record }) => (
+                          <div className="flex flex-wrap gap-1">
+                            {!record?.checkInAt && <button disabled={!canManage || date !== today() || busy === employee.id}
+                              onClick={() => runAction(employee.id, () => AttendanceService.punchIn(employee.id))}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold disabled:opacity-40"><Clock3 className="inline w-3 h-3 ml-1" />دخول</button>}
+                            {!!record?.checkInAt && !record.checkOutAt && <button disabled={!canManage || date !== today() || busy === employee.id}
+                              onClick={() => runAction(employee.id, () => AttendanceService.punchOut(employee.id))}
+                              className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold disabled:opacity-40">انصراف</button>}
+                            {!!record?.checkInAt && !record.checkOutAt && !record.activeBreak && <button disabled={!canManage || date !== today()}
+                              onClick={() => runAction(employee.id, () => AttendanceService.startBreak(employee.id))}
+                              className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 text-[10px] font-bold disabled:opacity-40"><Coffee className="inline w-3 h-3 ml-1" />استراحة</button>}
+                            {!!record?.activeBreak && <button disabled={!canManage || date !== today()}
+                              onClick={() => runAction(employee.id, () => AttendanceService.endBreak(employee.id))}
+                              className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold disabled:opacity-40">إنهاء الاستراحة</button>}
+                            {!!record?.overtimeMinutes && !record.overtimeApproved && canApprove && <button disabled={busy === record.id}
+                              onClick={() => runAction(record.id, () => AttendanceService.approveOvertime(record.id))}
+                              className="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold">اعتماد الإضافي</button>}
+                          </div>
+                        ),
+                      },
+                      {
+                        key: 'correction', header: 'تصحيح يدوي',
+                        render: ({ employee, record, form }) => (
+                          <details>
+                            <summary className="cursor-pointer text-xs text-sky-700 font-bold">طلب تعديل</summary>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 min-w-[230px]">
+                              <select value={form.status} onChange={(event) => updateForm(employee.id, record, 'status', event.target.value)}
+                                className="col-span-2 rounded border p-1 text-xs">
+                                {EDITABLE_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
+                              </select>
+                              <input aria-label="وقت الدخول" type="time" value={form.checkIn} onChange={(event) => updateForm(employee.id, record, 'checkIn', event.target.value)} className="rounded border p-1 text-xs" />
+                              <input aria-label="وقت الخروج" type="time" value={form.checkOut} onChange={(event) => updateForm(employee.id, record, 'checkOut', event.target.value)} className="rounded border p-1 text-xs" />
+                              <input aria-label="دقائق التأخير" type="number" min={0} value={form.late} onChange={(event) => updateForm(employee.id, record, 'late', event.target.value)} className="rounded border p-1 text-xs" placeholder="التأخير" />
+                              <input aria-label="دقائق الإضافي" type="number" min={0} value={form.overtime} onChange={(event) => updateForm(employee.id, record, 'overtime', event.target.value)} className="rounded border p-1 text-xs" placeholder="الإضافي" />
+                              <input value={form.notes} onChange={(event) => updateForm(employee.id, record, 'notes', event.target.value)} className="col-span-2 rounded border p-1 text-xs" placeholder="ملاحظات" />
+                              <button disabled={!canManage} onClick={() => runAction(employee.id, () => saveManual(employee, record))}
+                                className="col-span-2 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-bold text-white disabled:opacity-40">إرسال للموافقة</button>
+                            </div>
+                          </details>
+                        ),
+                      },
+                    ]}
+                    emptyTitle="لا يوجد موظفون مطابقون"
+                  />
                 </div>
               </div>
             )}
@@ -536,15 +569,28 @@ export const AttendancePage: React.FC = () => {
                   <div className="text-xs text-slate-500">{report.length} سجل · العطلات المسجلة: {holidays.length}</div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1000px] text-right text-xs">
-                    <thead className="bg-slate-50"><tr>{['التاريخ', 'الموظف', 'الوردية', 'الحالة', 'الدخول', 'الخروج', 'العمل', 'التأخير', 'الانصراف المبكر', 'الاستراحة', 'الإضافي / الاعتماد'].map((label) => <th key={label} className="p-3">{label}</th>)}</tr></thead>
-                    <tbody className="divide-y">{report.map((row) => <tr key={row.id}>
-                      <td className="p-3">{row.date}</td><td className="p-3">{row.employeeName}</td><td className="p-3">{row.shiftName || '—'}</td>
-                      <td className="p-3">{STATUS_LABELS[row.status]}</td><td className="p-3 font-mono">{formatClock(row.checkInAt)}</td><td className="p-3 font-mono">{formatClock(row.checkOutAt)}</td>
-                      <td className="p-3">{formatMinutes(row.workedMinutes)}</td><td className="p-3">{row.lateMinutes} د</td><td className="p-3">{row.earlyLeaveMinutes} د</td>
-                      <td className="p-3">{row.breakMinutes} د</td><td className="p-3">{row.overtimeMinutes} د · {row.overtimeApproved ? 'معتمد' : 'غير معتمد'}</td>
-                    </tr>)}</tbody>
-                  </table>
+                  <DataTable
+                    ariaLabel="تقرير الحضور"
+                    rows={report}
+                    rowKey={(row) => row.id}
+                    minWidth={1000}
+                    dense
+                    tableClassName="text-xs"
+                    columns={[
+                      { key: 'date', header: 'التاريخ', render: (row) => row.date },
+                      { key: 'employee', header: 'الموظف', render: (row) => row.employeeName },
+                      { key: 'shift', header: 'الوردية', render: (row) => row.shiftName || '—' },
+                      { key: 'status', header: 'الحالة', render: (row) => STATUS_LABELS[row.status] },
+                      { key: 'in', header: 'الدخول', render: (row) => <span className="font-mono">{formatClock(row.checkInAt)}</span> },
+                      { key: 'out', header: 'الخروج', render: (row) => <span className="font-mono">{formatClock(row.checkOutAt)}</span> },
+                      { key: 'work', header: 'العمل', render: (row) => formatMinutes(row.workedMinutes) },
+                      { key: 'late', header: 'التأخير', render: (row) => `${row.lateMinutes} د` },
+                      { key: 'early', header: 'الانصراف المبكر', render: (row) => `${row.earlyLeaveMinutes} د` },
+                      { key: 'break', header: 'الاستراحة', render: (row) => `${row.breakMinutes} د` },
+                      { key: 'overtime', header: 'الإضافي / الاعتماد', render: (row) => `${row.overtimeMinutes} د · ${row.overtimeApproved ? 'معتمد' : 'غير معتمد'}` },
+                    ]}
+                    emptyTitle="لا توجد سجلات لهذا الشهر."
+                  />
                   {!report.length && <div className="p-10 text-center text-slate-400">لا توجد سجلات لهذا الشهر.</div>}
                 </div>
               </section>

@@ -1271,7 +1271,7 @@ export class ExecutiveCommandService {
     const company = this.branchAccess.companyScope('je.company_id', actor);
     const rows = this.db.query<any>(
       `SELECT a.code, a.name, a.type,
-              ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END), 2) AS amount
+              ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END) / 100.0, 2) AS amount
        FROM journal_entries je
        JOIN journal_entry_lines l ON l.entry_id = je.id
        JOIN chart_of_accounts a ON a.id = l.account_id

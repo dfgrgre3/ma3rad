@@ -861,7 +861,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   return (
     <div
       className="flex min-h-dvh w-full items-center justify-center bg-gradient-to-br from-slate-100 via-white to-sky-50 p-2 sm:p-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950"
-      dir="rtl"
     >
       <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl dark:border-slate-800 dark:bg-slate-900">
         {/* Header stays visible while only the step content scrolls. */}

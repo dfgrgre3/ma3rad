@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { BookOpen, Search, Download } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
@@ -248,7 +249,7 @@ export const StockLedgerPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -338,47 +339,33 @@ export const StockLedgerPage: React.FC = () => {
             <p className="text-sm">لا توجد حركات مطابقة</p>
           </div>
         ) : (
-          <table className="w-full text-xs min-w-[1250px]">
-            <thead className="bg-white sticky top-0 z-10">
-              <tr>
-                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'فقد / تلف', 'الرصيد السابق', 'الرصيد بعد الحركة', 'المرجع الأصلي', 'المستخدم'].map(h => (
-                  <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200/50">
-              {paginated.map((r) => {
-                const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-slate-500' };
-                return (
-                  <tr key={r.id} className="hover:bg-white transition">
-                    <td className="px-4 py-3 text-slate-500 font-mono whitespace-nowrap">{r.date}</td>
-                    <td className="px-4 py-3 text-slate-900 font-medium max-w-[200px] truncate">{r.product}</td>
-                    <td className="px-4 py-3 text-slate-700">{r.warehouse}</td>
-                    <td className="px-4 py-3">
-                      <span className={`font-bold ${typeInfo.color}`}>{typeInfo.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-emerald-600 font-bold">
-                      {r.qtyIn > 0 ? `+${formatProductQuantity(r.qtyIn, r)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-rose-600 font-bold">
-                      {r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-amber-600 font-bold">
-                      {r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 font-bold">
-                      {formatProductQuantity(r.previousBalance, r)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-900 font-bold">
-                      {formatProductQuantity(r.balance, r)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 font-mono">{r.ref || '—'}</td>
-                    <td className="px-4 py-3 text-slate-500">{r.user}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="دفتر حركة المخزون"
+            rows={paginated}
+            rowKey={(r: any) => String(r.id)}
+            minWidth={1250}
+            stickyHeader
+            tableClassName="text-xs"
+            columns={[
+              { key: 'date', header: 'التاريخ', render: (r: any) => <span className="whitespace-nowrap font-mono text-slate-500">{r.date}</span> },
+              { key: 'product', header: 'المنتج', render: (r: any) => <span className="block max-w-[200px] truncate font-medium text-slate-900">{r.product}</span> },
+              { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-slate-700">{r.warehouse}</span> },
+              {
+                key: 'type', header: 'النوع',
+                render: (r: any) => {
+                  const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-slate-500' };
+                  return <span className={`font-bold ${typeInfo.color}`}>{typeInfo.label}</span>;
+                },
+              },
+              { key: 'in', header: 'وارد', render: (r: any) => <span className="font-bold text-emerald-600">{r.qtyIn > 0 ? `+${formatProductQuantity(r.qtyIn, r)}` : '—'}</span> },
+              { key: 'out', header: 'صادر', render: (r: any) => <span className="font-bold text-rose-600">{r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}</span> },
+              { key: 'loss', header: 'فقد / تلف', render: (r: any) => <span className="font-bold text-amber-600">{r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}</span> },
+              { key: 'prev', header: 'الرصيد السابق', render: (r: any) => <span className="font-bold text-slate-700">{formatProductQuantity(r.previousBalance, r)}</span> },
+              { key: 'balance', header: 'الرصيد بعد الحركة', render: (r: any) => <span className="font-bold text-slate-900">{formatProductQuantity(r.balance, r)}</span> },
+              { key: 'ref', header: 'المرجع الأصلي', render: (r: any) => <span className="font-mono text-slate-500">{r.ref || '—'}</span> },
+              { key: 'user', header: 'المستخدم', render: (r: any) => <span className="text-slate-500">{r.user}</span> },
+            ]}
+          />
         )}
       </div>
 

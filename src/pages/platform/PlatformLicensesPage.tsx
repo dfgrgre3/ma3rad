@@ -1,4 +1,5 @@
 import React from 'react';
+import { DataTable } from '../../components/ui/DataTable';
 import {
   KeyRound,
   Plus,
@@ -30,7 +31,6 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useToast } from '../../components/ui/Toast';
 import {
   EmptyState,
   Field,
@@ -41,6 +41,7 @@ import {
   inputClass,
 } from './components/PlatformUI';
 
+import { useToast } from '../../components/ui/Toast';
 const LICENSE_STATUS_LABELS: Record<PlatformLicenseStatus, string> = {
   ISSUED: 'صادر',
   ACTIVE: 'نشط',
@@ -501,115 +502,96 @@ export const PlatformLicensesPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-right">
-              <thead className="bg-slate-50">
-                <tr className="text-[10.5px] text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">المفتاح</th>
-                  <th className="px-4 py-2.5 font-semibold">العميل</th>
-                  <th className="px-4 py-2.5 font-semibold">الخطة</th>
-                  <th className="px-4 py-2.5 font-semibold">الحالة</th>
-                  <th className="px-4 py-2.5 font-semibold">يبدأ من</th>
-                  <th className="px-4 py-2.5 font-semibold">ينتهي في</th>
-                  <th className="px-4 py-2.5 font-semibold">المستخدمون</th>
-                  <th className="px-4 py-2.5 font-semibold">الأجهزة</th>
-                  <th className="px-4 py-2.5 font-semibold">الفروع</th>
-                  <th className="px-4 py-2.5 font-semibold">الربط</th>
-                  <th className="px-4 py-2.5 font-semibold">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {licenses.map((license) => (
-                  <tr key={license.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5">
+            <DataTable
+              ariaLabel="التراخيص"
+              rows={licenses}
+              rowKey={(license: any) => String(license.id)}
+              minWidth={1000}
+              dense
+              tableClassName="text-[11px]"
+              rowClassName={() => 'transition hover:bg-slate-50/60'}
+              columns={[
+                {
+                  key: 'key', header: 'المفتاح',
+                  render: (license: any) => (
+                    <span className="block">
                       <span className="block font-mono text-[11px] font-bold text-slate-800" dir="ltr">{license.licenseKey}</span>
                       <span className="text-[10px] text-slate-400">{formatDate(license.issuedAt)}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-[12px] font-semibold text-slate-700">{license.tenantName || '—'}</td>
-                    <td className="px-4 py-2.5 text-[11.5px] text-slate-600">{license.planName || '—'}</td>
-                    <td className="px-4 py-2.5"><StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status]} /></td>
-                    <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDate(license.startsAt)}</td>
-                    <td className="px-4 py-2.5 text-[11px] text-slate-600">{formatDate(license.expiresAt)}</td>
-                    <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.seats}</td>
-                    <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.deviceLimit}</td>
-                    <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-700">{license.branchesLimit}</td>
-                    <td className="px-4 py-2.5 text-[10px] text-slate-500">{COUPLING_LABELS[license.couplingMode ?? 'FULL']}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1">
-                        {canManageLicenses && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => { setRenewTarget(license); setRenewMonths(12); }}
-                              className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
-                              title="تجديد"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }}
-                              className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
-                              title="ربط جهاز"
-                            >
-                              <Cpu className="h-3.5 w-3.5" />
-                            </button>
+                    </span>
+                  ),
+                },
+                { key: 'tenant', header: 'العميل', render: (license: any) => <span className="text-[12px] font-semibold text-slate-700">{license.tenantName || '—'}</span> },
+                { key: 'plan', header: 'الخطة', render: (license: any) => <span className="text-[11.5px] text-slate-600">{license.planName || '—'}</span> },
+                { key: 'status', header: 'الحالة', render: (license: any) => <StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status as keyof typeof LICENSE_STATUS_LABELS]} /> },
+                { key: 'start', header: 'يبدأ من', render: (license: any) => <span className="text-[11px] text-slate-600">{formatDate(license.startsAt)}</span> },
+                { key: 'end', header: 'ينتهي في', render: (license: any) => <span className="text-[11px] text-slate-600">{formatDate(license.expiresAt)}</span> },
+                { key: 'seats', header: 'المستخدمون', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.seats}</span> },
+                { key: 'devices', header: 'الأجهزة', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.deviceLimit}</span> },
+                { key: 'branches', header: 'الفروع', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.branchesLimit}</span> },
+                { key: 'coupling', header: 'الربط', render: (license: any) => <span className="text-[10px] text-slate-500">{COUPLING_LABELS[(license.couplingMode ?? 'FULL') as keyof typeof COUPLING_LABELS]}</span> },
+                {
+                  key: 'actions', header: 'إجراءات',
+                  render: (license: any) => (
+                    <span className="flex items-center gap-1">
+                      {canManageLicenses && (
+                        <>
+                          <button type="button" onClick={() => { setRenewTarget(license); setRenewMonths(12); }} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تجديد">
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="ربط جهاز">
+                            <Cpu className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
+                              void changeStatus(license, next);
+                            }}
+                            className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                            title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
+                          >
+                            {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
+                              <Ban className="h-3.5 w-3.5" />
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <button type="button" onClick={() => void changeStatus(license, 'REVOKED')} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء">
+                            <ShieldX className="h-3.5 w-3.5" />
+                          </button>
+                          {license.hardwareId && (!centralMode || deviceIdForLicense(license)) && (
                             <button
                               type="button"
                               onClick={() => {
-                                const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
-                                void changeStatus(license, next);
+                                const deviceId = deviceIdForLicense(license);
+                                if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
                               }}
-                              className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                              title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
+                              className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                              title="تحرير الجهاز"
                             >
-                              {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
-                                <Ban className="h-3.5 w-3.5" />
-                              ) : (
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              )}
+                              <Link className="h-3.5 w-3.5" />
                             </button>
+                          )}
+                          {license.status === 'ACTIVE' && (!centralMode || deviceIdForLicense(license)) && (
                             <button
                               type="button"
-                              onClick={() => void changeStatus(license, 'REVOKED')}
-                              className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="إلغاء"
+                              onClick={() => {
+                                const deviceId = deviceIdForLicense(license);
+                                if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
+                              }}
+                              className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
+                              title="إيقاف الجهاز"
                             >
-                              <ShieldX className="h-3.5 w-3.5" />
+                              <ShieldAlert className="h-3.5 w-3.5" />
                             </button>
-                            {license.hardwareId && (!centralMode || deviceIdForLicense(license)) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const deviceId = deviceIdForLicense(license);
-                                  if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
-                                }}
-                                className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-                                title="تحرير الجهاز"
-                              >
-                                <Link className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            {license.status === 'ACTIVE' && (!centralMode || deviceIdForLicense(license)) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const deviceId = deviceIdForLicense(license);
-                                  if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
-                                }}
-                                className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
-                                title="إيقاف الجهاز"
-                              >
-                                <ShieldAlert className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </section>

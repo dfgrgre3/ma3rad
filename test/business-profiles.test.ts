@@ -6,6 +6,7 @@ import { SettingsService } from '../src/services/domains/config/SettingsService.
 import { BusinessProfileService } from '../src/services/domains/config/BusinessProfileService.ts';
 import { ManufacturingService } from '../src/services/domains/manufacturing/ManufacturingService.ts';
 import { RestaurantService } from '../src/services/domains/restaurant/RestaurantService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { ConfigurationVersionService } from '../src/services/domains/config/ConfigurationVersionService.ts';
@@ -507,7 +508,13 @@ test('restaurant tickets consume recipe ingredients and issue one linked invoice
   await db.initialize();
   PermissionService.seed();
   AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) __u.mustChangePassword = false; }
+  { const __u = AuthService.getCurrentUser(); if (__u) {
+    __u.mustChangePassword = false;
+    const __open = db.query<{ id: string }>(
+      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
+    )[0];
+    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
+  } }
 
   const settingKeys = ['businessType', 'businessProfileConfig', 'enabledModules'];
   const previousSettings = new Map(settingKeys.map((key) => [
@@ -535,7 +542,7 @@ test('restaurant tickets consume recipe ingredients and issue one linked invoice
          cost_price, selling_price_m2, selling_price_box, wholesale_price_m2,
          min_selling_price_m2, min_stock_level, is_active)
        VALUES (?, 'GENERAL', '', ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', 'standard',
-         'PIECE', 'PIECE', 1, 1, ?, ?, ?, ?, 0, 0, 1)`,
+         'PIECE', 'PIECE', 1, 1, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, 0, 1)`,
       [id, `SKU-${id}`, `BAR-${id}`, name, cost, price, price, price]
     );
     insertProduct(dishId, 'طبق اختبار', 3, 15);

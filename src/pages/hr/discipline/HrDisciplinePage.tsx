@@ -3,6 +3,7 @@ import { ShieldAlert, FileText, AlertTriangle, MessageSquare, Scale, Paperclip }
 import { HrDisciplineService, HrViolation, HrWarning, HrPenalty, HrComplaint, HrAppeal, HrAttachment } from '../../../services/domains/hr/HrDisciplineService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
+import { useToast } from '../../../components/ui/Toast';
 type Tab = 'violations' | 'warnings' | 'penalties' | 'complaints' | 'appeals' | 'attachments';
 
 const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
@@ -15,6 +16,7 @@ const TAB_PERMISSIONS: Record<Tab, readonly string[]> = {
 };
 
 export const HrDisciplinePage: React.FC = () => {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('violations');
   const canTab = useTabPermissions<Tab>(TAB_PERMISSIONS);
   const anyTabAllowed = (['violations', 'warnings', 'penalties', 'complaints', 'appeals', 'attachments'] as Tab[]).some(canTab);
@@ -70,7 +72,7 @@ export const HrDisciplinePage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center">
           <ShieldAlert className="w-5 h-5 text-rose-600" />
@@ -153,7 +155,7 @@ export const HrDisciplinePage: React.FC = () => {
                       <div className="text-slate-500">{p.employeeId}</div>
                       {p.status === 'DRAFT' && (
                         <div className="flex gap-2 mt-1">
-                          <button onClick={() => { try { HrDisciplineService.requestPenaltyApproval(p.id); alert('تم إنشاء طلب اعتماد.'); } catch (e: any) { setError(e?.message); } }} className="text-sky-600 font-bold">طلب اعتماد</button>
+                          <button onClick={() => { try { HrDisciplineService.requestPenaltyApproval(p.id); toast.success('تم إنشاء طلب اعتماد.'); } catch (e: any) { setError(e?.message); } }} className="text-sky-600 font-bold">طلب اعتماد</button>
                           <button onClick={() => { try { HrDisciplineService.approvePenalty(p.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-emerald-600 font-bold">اعتماد وترحيل</button>
                           <button onClick={() => { try { HrDisciplineService.cancelPenalty(p.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-rose-600 font-bold">إلغاء</button>
                         </div>

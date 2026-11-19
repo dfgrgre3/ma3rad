@@ -303,7 +303,7 @@ export const CustomerStatementWhatsAppOptions: React.FC<CustomerStatementWhatsAp
         <MessageCircle className="w-3.5 h-3.5" /> {buttonLabel}
       </button>}
       {isOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4" dir="rtl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
           <button type="button" aria-label="إغلاق" onClick={closeOptions} className="absolute inset-0" />
           <section role="dialog" aria-modal="true" aria-labelledby="customer-whatsapp-options-title" className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <header className="flex items-center justify-between border-b border-slate-100 p-5">

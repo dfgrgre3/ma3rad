@@ -245,7 +245,7 @@ export const TodayPurchasesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100" dir="rtl">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PurchasesHeader
         date={date}
         todayDate={todayDate}

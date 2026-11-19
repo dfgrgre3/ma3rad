@@ -200,7 +200,7 @@ export class FinanceExtrasService {
     return this.db.query<Account>(
       `SELECT a.*, COALESCE(SUM(CASE WHEN e.is_posted = 1 THEN
                 CASE WHEN a.type IN ('LIABILITY', 'EQUITY', 'REVENUE') THEN l.credit - l.debit ELSE l.debit - l.credit END
-              ELSE 0 END), 0) AS computed_balance
+              ELSE 0 END) / 100.0, 0) AS computed_balance
        FROM chart_of_accounts a
        LEFT JOIN journal_entry_lines l ON l.account_id = a.id
        LEFT JOIN journal_entries e ON e.id = l.entry_id
@@ -1053,7 +1053,7 @@ export class FinanceExtrasService {
               actor_name AS actorName, reference_id AS referenceId, details
        FROM (
          SELECT e.date AS event_date, 'ACQUISITION' AS event_type, 'اقتناء الأصل' AS label,
-                e.total_debit AS amount, u.full_name AS actor_name, e.id AS reference_id,
+                e.total_debit / 100.0 AS amount, u.full_name AS actor_name, e.id AS reference_id,
                 e.description AS details, e.created_at AS sort_time
          FROM journal_entries e
          LEFT JOIN users u ON u.id = e.created_by
@@ -1088,8 +1088,8 @@ export class FinanceExtrasService {
          UNION ALL
          SELECT d.disposal_date, 'DISPOSAL', 'استبعاد معتمد', d.sale_proceeds / 100.0, u.full_name,
                 d.journal_entry_id,
-                d.reason || ' | القيمة الدفترية: ' || d.book_value / 100.0 ||
-                  ' | مصروفات: ' || d.expenses / 100.0 || ' | ربح/خسارة: ' || d.gain_loss / 100.0,
+                d.reason || ' | القيمة الدفترية: ' || (d.book_value / 100.0) ||
+                  ' | مصروفات: ' || (d.expenses / 100.0) || ' | ربح/خسارة: ' || (d.gain_loss / 100.0),
                 d.created_at
          FROM fixed_asset_disposals d
          JOIN users u ON u.id = d.approved_by

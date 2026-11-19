@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '../../../components/ui/DataTable';
 import { Archive, Download, Eye, FileText, History, Loader2, Pencil, Plus, RefreshCw, Upload, X } from 'lucide-react';
 import { EmployeeDocumentService } from '../../../services/domains/hr/EmployeeDocumentService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
@@ -282,7 +283,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
@@ -476,105 +477,92 @@ export const EmployeeDocumentsPage: React.FC = () => {
       )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-right text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500">
-            <tr>
-              <th className="p-3">الموظف</th>
-              <th className="p-3">النوع</th>
-              <th className="p-3">العنوان</th>
-              <th className="p-3">الرقم</th>
-              <th className="p-3">الانتهاء</th>
-              <th className="p-3">السرية</th>
-              <th className="p-3">الملف والنسخ</th>
-              <th className="p-3">الحالة</th>
-              <th className="p-3">الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={9} className="p-8 text-center text-slate-500">جارٍ التحميل…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={9} className="p-8 text-center text-slate-500">لا توجد مستندات مسجلة.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="p-3 font-medium text-slate-700">{row.employeeName}</td>
-                <td className="p-3">{typeLabels[row.documentType]}</td>
-                <td className="p-3">{row.title}</td>
-                <td className="p-3 font-mono text-xs text-slate-600">{row.documentNumber || '—'}</td>
-                <td className="p-3 text-slate-600">{row.expiresAt || '—'}</td>
-                <td className="p-3 text-slate-600">{confidentialityLabels[row.confidentiality]}</td>
-                <td className="p-3">
-                  {row.latestVersionId ? (
-                    <div className="text-xs">
-                      <p className="max-w-40 truncate font-medium text-slate-700" title={row.latestFileName || ''}>
-                        {row.latestFileName} — v{row.latestVersionNumber}
-                      </p>
-                      <p className="mt-1 text-slate-500">{row.versionCount} نسخة · رفعها {row.latestUploaderName || '—'}</p>
-                      <p className="mt-1 text-slate-500">
-                        آخر تعديل: {row.updatedByName || row.createdByName || '—'} · {new Date(row.updatedAt).toLocaleDateString('ar')}
-                      </p>
-                    </div>
-                  ) : <span className="text-xs text-amber-700">لا يوجد ملف مرفق</span>}
-                </td>
-                <td className="p-3">
-                  <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.effectiveStatus]}`}>
-                    {statusLabels[row.effectiveStatus]}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="flex flex-wrap gap-1">
-                    {row.latestVersionId && (
-                      <>
-                        <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
-                          onClick={() => {
-                            try {
-                              const version = service.getVersions(row.id)[0];
-                              if (version) void openVersion(row, version);
-                            } catch (error: any) { toast.error(error?.message || 'تعذر فتح المستند.'); }
-                          }} title="فتح داخل النظام">
-                          <Eye className="h-3.5 w-3.5" /> فتح
-                        </button>
-                        {canDownload && <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
-                          onClick={() => {
-                            try {
-                              const version = service.getVersions(row.id)[0];
-                              if (version) void downloadVersion(row, version);
-                            } catch (error: any) { toast.error(error?.message || 'تعذر تنزيل المستند.'); }
-                          }} title="تنزيل">
-                          <Download className="h-3.5 w-3.5" /> تنزيل
-                        </button>}
-                      </>
-                    )}
-                    <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
-                      onClick={() => showVersions(row)} title="سجل النسخ">
-                      <History className="h-3.5 w-3.5" /> النسخ
-                    </button>
-                    {canManage && row.status !== 'ARCHIVED' && (
-                      <>
-                        <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
-                          onClick={() => edit(row)} title="تعديل بيانات المستند">
-                          <Pencil className="h-3.5 w-3.5" /> تعديل
-                        </button>
-                        <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
-                          onClick={() => void addVersion(row)} title="إضافة نسخة جديدة">
-                          <Upload className="h-3.5 w-3.5" /> رفع نسخة
-                        </button>
-                        <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700"
-                          onClick={() => archive(row)} title="أرشفة">
-                          <Archive className="h-3.5 w-3.5" /> أرشفة
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          ariaLabel="مستندات الموظفين"
+          rows={rows}
+          rowKey={(row: any) => String(row.id)}
+          loading={loading}
+          tableClassName="text-sm"
+          rowClassName={() => 'border-t border-slate-100'}
+          columns={[
+            { key: 'emp', header: 'الموظف', render: (row: any) => <span className="font-medium text-slate-700">{row.employeeName}</span> },
+            { key: 'type', header: 'النوع', render: (row: any) => <span>{typeLabels[row.documentType as keyof typeof typeLabels]}</span> },
+            { key: 'title', header: 'العنوان', render: (row: any) => <span>{row.title}</span> },
+            { key: 'num', header: 'الرقم', render: (row: any) => <span className="font-mono text-xs text-slate-600">{row.documentNumber || '—'}</span> },
+            { key: 'expiry', header: 'الانتهاء', render: (row: any) => <span className="text-slate-600">{row.expiresAt || '—'}</span> },
+            { key: 'conf', header: 'السرية', render: (row: any) => <span className="text-slate-600">{confidentialityLabels[row.confidentiality as keyof typeof confidentialityLabels]}</span> },
+            {
+              key: 'file', header: 'الملف والنسخ',
+              render: (row: any) => row.latestVersionId ? (
+                <span className="block text-xs">
+                  <span className="block max-w-40 truncate font-medium text-slate-700" title={row.latestFileName || ''}>{row.latestFileName} — v{row.latestVersionNumber}</span>
+                  <span className="mt-1 block text-slate-500">{row.versionCount} نسخة · رفعها {row.latestUploaderName || '—'}</span>
+                  <span className="mt-1 block text-slate-500">آخر تعديل: {row.updatedByName || row.createdByName || '—'} · {new Date(row.updatedAt).toLocaleDateString('ar')}</span>
+                </span>
+              ) : <span className="text-xs text-amber-700">لا يوجد ملف مرفق</span>,
+            },
+            {
+              key: 'status', header: 'الحالة',
+              render: (row: any) => (
+                <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.effectiveStatus]}`}>{statusLabels[row.effectiveStatus]}</span>
+              ),
+            },
+            {
+              key: 'actions', header: 'الإجراء',
+              render: (row: any) => (
+                <span className="flex flex-wrap gap-1">
+                  {row.latestVersionId && (
+                    <>
+                      <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
+                        onClick={() => {
+                          try {
+                            const version = service.getVersions(row.id)[0];
+                            if (version) void openVersion(row, version);
+                          } catch (error: any) { toast.error(error?.message || 'تعذر فتح المستند.'); }
+                        }} title="فتح داخل النظام">
+                        <Eye className="h-3.5 w-3.5" /> فتح
+                      </button>
+                      {canDownload && <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                        onClick={() => {
+                          try {
+                            const version = service.getVersions(row.id)[0];
+                            if (version) void downloadVersion(row, version);
+                          } catch (error: any) { toast.error(error?.message || 'تعذر تنزيل المستند.'); }
+                        }} title="تنزيل">
+                        <Download className="h-3.5 w-3.5" /> تنزيل
+                      </button>}
+                    </>
+                  )}
+                  <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                    onClick={() => showVersions(row)} title="سجل النسخ">
+                    <History className="h-3.5 w-3.5" /> النسخ
+                  </button>
+                  {canManage && row.status !== 'ARCHIVED' && (
+                    <>
+                      <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                        onClick={() => edit(row)} title="تعديل بيانات المستند">
+                        <Pencil className="h-3.5 w-3.5" /> تعديل
+                      </button>
+                      <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
+                        onClick={() => void addVersion(row)} title="إضافة نسخة جديدة">
+                        <Upload className="h-3.5 w-3.5" /> رفع نسخة
+                      </button>
+                      <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700"
+                        onClick={() => archive(row)} title="أرشفة">
+                        <Archive className="h-3.5 w-3.5" /> أرشفة
+                      </button>
+                    </>
+                  )}
+                </span>
+              ),
+            },
+          ]}
+          emptyTitle="لا توجد مستندات مسجلة."
+        />
       </div>
 
       {historyDocument && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4" dir="rtl">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="employee-document-history-title"
             className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
             <header className="flex items-center justify-between border-b p-4">
@@ -635,7 +623,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
       )}
 
       {preview && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6" dir="rtl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6">
           <section role="dialog" aria-modal="true" aria-labelledby="employee-document-preview-title"
             className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
             <header className="flex items-center justify-between gap-3 border-b bg-slate-50 p-3">

@@ -30,7 +30,9 @@ import { OperationalFieldService, type OperationalFieldDefinition } from '../../
 import { setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 
+import { useToast } from '../../../components/ui/Toast';
 export const ProductDetailPage: React.FC = () => {
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const db = useMemo(() => DatabaseManager.getInstance(), []);
@@ -136,7 +138,7 @@ export const ProductDetailPage: React.FC = () => {
   const saveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!product || !form) return;
-    if (!form.name.trim()) return alert('اسم المنتج مطلوب.');
+    if (!form.name.trim()) return toast.warning('اسم المنتج مطلوب.');
     setSaving(true);
     try {
       productService.updateProduct(product.id, {
@@ -157,7 +159,7 @@ export const ProductDetailPage: React.FC = () => {
       });
       setEditOpen(false);
       load();
-    } catch (err: any) { alert(err?.message || 'تعذر حفظ المنتج.'); }
+    } catch (err: any) { toast.error(err?.message || 'تعذر حفظ المنتج.'); }
     finally { setSaving(false); }
   };
 
@@ -176,7 +178,7 @@ export const ProductDetailPage: React.FC = () => {
   const margin = product.costPrice > 0 ? ((product.sellingPriceM2 - product.costPrice) / product.costPrice) * 100 : null;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <ProductDetailHeader
         product={product}
         stock={stock}

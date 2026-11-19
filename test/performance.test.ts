@@ -133,7 +133,7 @@ test('realistic catalogue and invoice volume stays responsive', async () => {
   // Receivables aging joins every invoice against its allocations and returns,
   // so it is the heaviest realistic read the dashboard performs.
   const agingStart = Date.now();
-  const aging = new FinancialStatementsService().getCustomerAging('2026-12-31');
+  const aging = await new FinancialStatementsService().getCustomerAging('2026-12-31');
   const agingElapsed = Date.now() - agingStart;
   assert.ok(aging.rows.length > 0, 'aging must return the outstanding customers');
   assert.ok(agingElapsed < 15000, `customer aging over ${INVOICES} invoices took ${agingElapsed}ms`);

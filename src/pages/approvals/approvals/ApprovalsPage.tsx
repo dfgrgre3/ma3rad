@@ -4,6 +4,7 @@ import { ApprovalService, ApprovalRequest, ApprovalType } from '../../../service
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { SyncChangeApprovalsPanel } from '../../../components/sync/SyncChangeApprovalsPanel';
+import { useToast } from '../../../components/ui/Toast';
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string }> = {
   DISCOUNT: { label: 'خصم استثنائي', color: 'text-amber-700 bg-amber-50 border-amber-200' },
@@ -122,6 +123,7 @@ const ApprovalRequestCard: React.FC<ApprovalRequestCardProps> = ({
 };
 
 export const ApprovalsPage: React.FC = () => {
+  const toast = useToast();
   const service = useMemo(() => new ApprovalService(), []);
   const user = AuthService.getCurrentUser();
   // صلاحيات دقيقة لكل زر مع توافق خلفي مع أكواد approvals.* القديمة.
@@ -165,7 +167,7 @@ export const ApprovalsPage: React.FC = () => {
       service.decide(req.id, approved, notes);
       load();
     } catch (e: any) {
-      alert(e?.message || 'تعذر تنفيذ القرار.');
+      toast.error(e?.message || 'تعذر تنفيذ القرار.');
     }
   };
 
@@ -174,7 +176,7 @@ export const ApprovalsPage: React.FC = () => {
       service.cancel(req.id);
       load();
     } catch (e: any) {
-      alert(e?.message || 'تعذر إلغاء الطلب.');
+      toast.error(e?.message || 'تعذر إلغاء الطلب.');
     }
   };
 
@@ -194,14 +196,14 @@ export const ApprovalsPage: React.FC = () => {
       setStatusFilter('PENDING');
       load();
     } catch (err: any) {
-      alert(err?.message || 'تعذر إنشاء الطلب.');
+      toast.error(err?.message || 'تعذر إنشاء الطلب.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-yellow-50 border border-yellow-200 flex items-center justify-center">

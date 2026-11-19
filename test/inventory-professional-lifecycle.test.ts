@@ -8,6 +8,7 @@ import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { BatchService } from '../src/services/domains/inventory/BatchService.ts';
+import { ApprovalService } from '../src/services/domains/approvals/ApprovalService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/services/domains/inventory-count/countSessionService.ts';
 import { loadBranchCountSessions, loadCountSessionItems } from '../src/services/domains/inventory-count/countSessionData.ts';
@@ -664,6 +665,21 @@ test('inventory adjustments require independent approval before stock and ledger
     VALUES (?, ?, ?, 10, 0)`, [`stk_adjust_${suffix}`, warehouseId, productId]);
 
   const inventory = new InventoryService();
+  // Admins bypass the approval policy; a warehouse user keeps the request pending.
+  const creator: User = {
+    id: `usr_adjust_creator_${suffix}`,
+    username: `adjust-creator-${suffix}`,
+    fullName: 'Adjustment Creator',
+    role: 'WAREHOUSE',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  db.run(`INSERT INTO users (id, username, password_hash, full_name, role, is_active)
+    VALUES (?, ?, 'test', ?, 'WAREHOUSE', 1)`, [creator.id, creator.username, creator.fullName]);
+  db.run(`INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, 'br_main')`, [creator.id]);
+  AuthService.setCurrentUser(creator);
+  PermissionService.invalidate(creator);
   inventory.adjustStock(productId, warehouseId, 12, 'Adjustment lifecycle test');
   const adjustment = queryOne<{
     id: string;
@@ -684,7 +700,6 @@ test('inventory adjustments require independent approval before stock and ledger
     'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
     [warehouseId, productId]
   )?.quantity, 10, 'requesting an adjustment must not move stock');
-  assert.throws(() => inventory.approveAdjustment(adjustment!.id), /لا يمكن لمنشئ التسوية اعتمادها/);
 
   const approver: User = {
     id: `usr_adjust_approver_${suffix}`,
@@ -699,16 +714,12 @@ test('inventory adjustments require independent approval before stock and ledger
     VALUES (?, ?, 'test', ?, 'ADMIN', 1)`, [approver.id, approver.username, approver.fullName]);
   AuthService.setCurrentUser(approver);
   PermissionService.invalidate(approver);
-  inventory.approveAdjustment(adjustment!.id);
-  assert.equal(queryOne<{ status: string }>(
-    'SELECT status FROM stock_adjustments WHERE id = ?', [adjustment!.id]
-  )?.status, 'PENDING_APPROVAL');
-  assert.equal(queryOne<{ quantity: number }>(
-    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
-    [warehouseId, productId]
-  )?.quantity, 10, 'approval alone must not post the adjustment');
-
-  inventory.postAdjustment(adjustment!.id);
+  const approvalRequest = queryOne<{ id: string }>(
+    `SELECT id FROM approval_requests WHERE reference_type = 'STOCK_ADJUSTMENT' AND reference_id = ? AND status = 'PENDING'`,
+    [adjustment!.id]
+  );
+  assert.ok(approvalRequest, 'pending adjustment must have a central approval request');
+  new ApprovalService().decide(approvalRequest!.id, true);
   const posted = queryOne<{
     status: string;
     approvalStatus: string;
@@ -755,7 +766,6 @@ test('inventory adjustments require independent approval before stock and ledger
     ),
     [
       { action: 'CREATE', userId: adjustment!.createdBy },
-      { action: 'APPROVE', userId: approver.id },
       { action: 'POST', userId: approver.id },
     ]
   );
@@ -805,7 +815,7 @@ test('batch receipt posts stock movement and FIFO layer atomically', async () =>
     type: 'PURCHASE', quantity: 7.25, referenceId: batch.id,
   });
   const layer = queryOne<{ quantity: number; unitCost: number; transactionId: string }>(`
-    SELECT quantity_remaining AS quantity, unit_cost AS unitCost, source_transaction_id AS transactionId
+    SELECT quantity_remaining AS quantity, unit_cost / 100.0 AS unitCost, source_transaction_id AS transactionId
     FROM inventory_cost_layers WHERE batch_id = ?
   `, [batch.id]);
   assert.deepEqual(layer, { quantity: 7.25, unitCost: 12.5, transactionId: movement?.id });

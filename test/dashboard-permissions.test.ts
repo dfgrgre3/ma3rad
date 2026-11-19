@@ -22,7 +22,7 @@ test('dashboard.view alone cannot read embedded sales, finance or CRM data', asy
 
   AuthService.setCurrentUser(dashboardOnly);
   assert.equal(PermissionService.can(dashboardOnly, 'dashboard.view'), true);
-  assert.throws(() => new AccountingService().getDashboardMetrics(), /ui\.sales\.invoices\.view/);
+  assert.throws(() => new AccountingService().getDashboardMetrics(), /sales\.view/);
   assert.throws(() => new CrmService().getLeads(), /ui\.crm\.leads\.view/);
   assert.deepEqual(NavigationService.getRequiredPermissions('/central-activation'), ['admin.license.manage']);
 

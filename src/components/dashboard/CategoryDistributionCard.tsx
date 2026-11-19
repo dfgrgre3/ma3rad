@@ -13,7 +13,7 @@ export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> =
       <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">توزيع المبيعات حسب الفئة</h3>
       <p className="text-[11px] text-slate-400 mb-2">الحصة النسبية لكل تصنيف</p>
       <div className="h-44 w-full" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 176 }}>
           <PieChartRecharts>
             <Pie
               isAnimationActive={false}

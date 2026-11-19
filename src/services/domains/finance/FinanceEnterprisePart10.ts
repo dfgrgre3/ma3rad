@@ -24,7 +24,7 @@ public getMultiDimensionalPnL(filters: MultiDimensionalReportFilters = {}): {
 
     const rows = this.db.query<{ code: string; name: string; type: string; amount: number }>(`
       SELECT a.code, a.name, a.type,
-             ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END), 2) AS amount
+             ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END) / 100.0, 2) AS amount
       FROM journal_entries e
       JOIN journal_entry_lines l ON l.entry_id = e.id
       JOIN chart_of_accounts a ON a.id = l.account_id

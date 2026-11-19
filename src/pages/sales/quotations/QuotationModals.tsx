@@ -16,6 +16,7 @@ import { OperationalFieldsForm } from '../../../components/products/OperationalF
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 import { ProductPicker } from '../../../components/products/ProductPicker';
+import { DataTable } from '../../../components/ui/DataTable';
 
 export const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
   PENDING: { label: 'بانتظار الموافقة', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
@@ -252,67 +253,87 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       </div>
 
       <div className="border border-slate-200 rounded-xl overflow-hidden">
-        <table className="w-full text-right text-[11px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-36">الكمية / الوحدة</th><th className="px-3 py-2 w-28">سعر الوحدة</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {form.lines.map((l, idx) => {
-              const selectedProduct = products.find((p) => p.id === l.productId);
-              const units = selectedProduct ? getSellableUnits(selectedProduct) : [];
-              const baseQty = lineBaseQuantity(l);
-              const showEquivalent = Boolean(selectedProduct) && l.quantity > 0
-                && l.uom !== (selectedProduct?.baseUnit || 'M2');
-              return (
-              <tr key={idx}>
-                <td className="px-3 py-2">
-                  <ProductPicker
-                    value={l.productId}
-                    selectedLabel={selectedProduct?.name}
-                    ariaLabel={`استعراض أصناف عرض السعر للسطر ${idx + 1}`}
-                    onChange={(productId) => pickProduct(idx, productId)}
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={0}
-                      step={isWholeUnit(l.uom, selectedProduct) ? 1 : 0.01}
-                      aria-label={`الكمية ${getUomLabel(l.uom, selectedProduct)}`}
-                      value={l.quantity || ''}
-                      onChange={(e) => setLine(idx, { quantity: Number(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono"
-                    />
-                    {units.length > 1 && (
-                      <select
-                        value={l.uom}
-                        onChange={(e) => changeLineUnit(idx, e.target.value)}
-                        aria-label={`وحدة البند ${selectedProduct?.name || ''}`}
-                        className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
-                      >
-                        {units.map((unit) => (
-                          <option key={unit} value={unit}>{getUomLabel(unit, selectedProduct)}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  {showEquivalent && (
-                    <div className="text-[9px] text-slate-400 mt-1 font-normal">= {formatProductQuantity(baseQty, selectedProduct!)}</div>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(idx, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" />
-                  {selectedProduct && <div className="text-[9px] text-slate-400 mt-1 font-normal">/{getUomLabel(l.uom, selectedProduct)}</div>}
-                </td>
-                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.discountAmount || ''} onChange={(e) => setLine(idx, { discountAmount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantity * l.unitPrice - (l.discountAmount || 0))}</td>
-                <td className="px-3 py-2"><button type="button" onClick={() => setForm((p) => ({ ...p, lines: p.lines.length > 1 ? p.lines.filter((_, i) => i !== idx) : p.lines }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <DataTable
+                  ariaLabel="أصناف عرض السعر"
+                  rows={form.lines.map((l, i) => ({ ...l, _i: i }))}
+                  rowKey={(l) => String(l._i)}
+                  dense
+                  columns={[
+                    {
+                      key: 'product', header: 'الصنف',
+                      render: (l) => {
+                        const selectedProduct = products.find((p) => p.id === l.productId);
+                        return (
+                          <ProductPicker
+                            value={l.productId}
+                            selectedLabel={selectedProduct?.name}
+                            ariaLabel={`استعراض أصناف عرض السعر للسطر ${l._i + 1}`}
+                            onChange={(productId) => pickProduct(l._i, productId)}
+                          />
+                        );
+                      },
+                    },
+                    {
+                      key: 'qty', header: 'الكمية / الوحدة',
+                      render: (l) => {
+                        const selectedProduct = products.find((p) => p.id === l.productId);
+                        const units = selectedProduct ? getSellableUnits(selectedProduct) : [];
+                        const baseQty = lineBaseQuantity(l);
+                        const showEquivalent = Boolean(selectedProduct) && l.quantity > 0
+                          && l.uom !== (selectedProduct?.baseUnit || 'M2');
+                        return (
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                step={isWholeUnit(l.uom, selectedProduct) ? 1 : 0.01}
+                                aria-label={`الكمية ${getUomLabel(l.uom, selectedProduct)}`}
+                                value={l.quantity || ''}
+                                onChange={(e) => setLine(l._i, { quantity: Number(e.target.value) || 0 })}
+                                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono"
+                              />
+                              {units.length > 1 && (
+                                <select
+                                  value={l.uom}
+                                  onChange={(e) => changeLineUnit(l._i, e.target.value)}
+                                  aria-label={`وحدة البند ${selectedProduct?.name || ''}`}
+                                  className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
+                                >
+                                  {units.map((unit) => (
+                                    <option key={unit} value={unit}>{getUomLabel(unit, selectedProduct)}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            {showEquivalent && (
+                              <div className="text-[9px] text-slate-400 mt-1 font-normal">= {formatProductQuantity(baseQty, selectedProduct!)}</div>
+                            )}
+                          </div>
+                        );
+                      },
+                    },
+                    {
+                      key: 'price', header: 'سعر الوحدة',
+                      render: (l) => {
+                        const selectedProduct = products.find((p) => p.id === l.productId);
+                        return (
+                          <div>
+                            <input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(l._i, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" />
+                            {selectedProduct && <div className="text-[9px] text-slate-400 mt-1 font-normal">/{getUomLabel(l.uom, selectedProduct)}</div>}
+                          </div>
+                        );
+                      },
+                    },
+                    { key: 'discount', header: 'خصم البند', render: (l) => <input type="number" min={0} step="0.01" value={l.discountAmount || ''} onChange={(e) => setLine(l._i, { discountAmount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                    { key: 'total', header: 'الإجمالي', render: (l) => <span className="font-bold text-slate-700">{fmt(l.quantity * l.unitPrice - (l.discountAmount || 0))}</span> },
+                    {
+                      key: 'actions', header: '',
+                      render: (l) => <button type="button" onClick={() => setForm((p) => ({ ...p, lines: p.lines.length > 1 ? p.lines.filter((_, i) => i !== l._i) : p.lines }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button>,
+                    },
+                  ]}
+                />
+
         <div className="p-2 border-t border-slate-100">
           <button type="button" onClick={() => setForm((p) => ({ ...p, lines: [...p.lines, { productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة بند</button>
         </div>
@@ -320,25 +341,23 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
 
       <div className="border border-sky-200 rounded-xl overflow-hidden">
         <div className="px-3 py-2 bg-sky-50 text-[11px] font-black text-sky-800">الخدمات والعمالة</div>
-        <table className="w-full text-right text-[11px]">
-          <thead className="bg-slate-50 text-slate-500 font-bold">
-            <tr><th className="px-3 py-2">البيان</th><th className="px-3 py-2">الصنف المرتبط</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الوحدة</th><th className="px-3 py-2">سعر الوحدة</th><th className="px-3 py-2">الخصم</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {form.serviceLines.map((line, idx) => (
-              <tr key={idx}>
-                <td className="px-3 py-2"><input value={line.description} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, description: e.target.value } : x) }))} className="w-full min-w-36 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" placeholder="مثال: أجور تركيب السيراميك" /></td>
-                <td className="px-3 py-2"><select value={line.productId || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, productId: e.target.value || undefined } : x) }))} className="w-40 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"><option value="">بدون ربط</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></td>
-                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.quantity || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                <td className="px-3 py-2"><input value={line.unit} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, unit: e.target.value } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" /></td>
-                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.unitPrice || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, unitPrice: Number(e.target.value) || 0 } : x) }))} className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.discountAmount || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, discountAmount: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                <td className="px-3 py-2 font-bold">{fmt(line.quantity * line.unitPrice - line.discountAmount)}</td>
-                <td className="px-3 py-2"><button type="button" onClick={() => setForm((p) => ({ ...p, serviceLines: p.serviceLines.filter((_, i) => i !== idx) }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+                  ariaLabel="الخدمات والعمالة"
+                  rows={form.serviceLines.map((line, i) => ({ ...line, _i: i }))}
+                  rowKey={(line) => String(line._i)}
+                  dense
+                  columns={[
+                    { key: 'desc', header: 'البيان', render: (line) => <input value={line.description} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, description: e.target.value } : x) }))} className="w-full min-w-36 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" placeholder="مثال: أجور تركيب السيراميك" /> },
+                    { key: 'product', header: 'الصنف المرتبط', render: (line) => <select value={line.productId || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, productId: e.target.value || undefined } : x) }))} className="w-40 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"><option value="">بدون ربط</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select> },
+                    { key: 'qty', header: 'الكمية', render: (line) => <input type="number" min={0} step="0.01" value={line.quantity || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, quantity: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                    { key: 'unit', header: 'الوحدة', render: (line) => <input value={line.unit} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, unit: e.target.value } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" /> },
+                    { key: 'price', header: 'سعر الوحدة', render: (line) => <input type="number" min={0} step="0.01" value={line.unitPrice || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, unitPrice: Number(e.target.value) || 0 } : x) }))} className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                    { key: 'discount', header: 'الخصم', render: (line) => <input type="number" min={0} step="0.01" value={line.discountAmount || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === line._i ? { ...x, discountAmount: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /> },
+                    { key: 'total', header: 'الإجمالي', render: (line) => <span className="font-bold">{fmt(line.quantity * line.unitPrice - line.discountAmount)}</span> },
+                    { key: 'actions', header: '', render: (line) => <button type="button" onClick={() => setForm((p) => ({ ...p, serviceLines: p.serviceLines.filter((_, i) => i !== line._i) }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button> },
+                  ]}
+                />
+
         <div className="p-2 border-t border-slate-100">
           <button type="button" onClick={() => setForm((p) => ({ ...p, serviceLines: [...p.serviceLines, { description: '', unit: 'بند', quantity: 1, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-sky-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة خدمة أو عمالة</button>
         </div>
@@ -393,31 +412,32 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       />
     </div>
     <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-      <table className="w-full text-right text-[11px] min-w-[560px]">
-        <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">السعر</th><th className="px-3 py-2">الخصم</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
-        <tbody className="divide-y divide-slate-100">
-          {(detail.items || []).map((i) => (
-            <tr key={i.id}>
-              <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.size} • {i.grade}</div></td>
-              <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
-              <td className="px-3 py-2 font-mono">{i.productType === 'GENERAL' ? '—' : i.boxesCount}</td>
-              <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)} <span className="text-[9px] text-slate-400">/{getUomLabel(i.baseUnit, i)}</span></td>
-              <td className="px-3 py-2 font-mono text-rose-600">{i.discountAmount ? `-${fmt(i.discountAmount)}` : '—'}</td>
-              <td className="px-3 py-2 font-bold">{fmt(i.totalPrice)}</td>
-            </tr>
-          ))}
-          {(detail.serviceItems || []).map((item) => (
-            <tr key={item.id}>
-              <td className="px-3 py-2 font-bold text-slate-800">{item.description}<div className="text-[9px] text-slate-400 font-normal">خدمة / عمالة{item.productId ? ' • مرتبطة بصنف مخزني' : ''}</div></td>
-              <td className="px-3 py-2 font-mono">{item.quantity} {item.unit}</td>
-              <td className="px-3 py-2 font-mono">—</td>
-              <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)} / {item.unit}</td>
-              <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
-              <td className="px-3 py-2 font-bold">{fmt(item.totalPrice)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+              ariaLabel="أصناف عرض السعر"
+              rows={[
+                ...(detail.items || []).map((i: any) => ({ ...i, __kind: 'item' })),
+                ...(detail.serviceItems || []).map((item: any) => ({ ...item, __kind: 'service' })),
+              ]}
+              rowKey={(row: any) => `${row.__kind}:${row.id}`}
+              minWidth={560}
+              dense
+              columns={[
+                {
+                  key: 'product', header: 'الصنف',
+                  render: (row: any) => row.__kind === 'item' ? (
+                    <span className="font-bold text-slate-800">{row.productName}<div className="text-[9px] text-slate-400 font-normal">{row.size} • {row.grade}</div></span>
+                  ) : (
+                    <span className="font-bold text-slate-800">{row.description}<div className="text-[9px] text-slate-400 font-normal">خدمة / عمالة{row.productId ? ' • مرتبطة بصنف مخزني' : ''}</div></span>
+                  ),
+                },
+                { key: 'qty', header: 'الكمية', render: (row: any) => row.__kind === 'item' ? <span className="font-mono">{formatProductQuantity(Number(row.quantityM2), row)}</span> : <span className="font-mono">{row.quantity} {row.unit}</span> },
+                { key: 'boxes', header: 'الكراتين', render: (row: any) => row.__kind === 'item' ? <span className="font-mono">{row.productType === 'GENERAL' ? '—' : row.boxesCount}</span> : <span className="font-mono">—</span> },
+                { key: 'price', header: 'السعر', render: (row: any) => row.__kind === 'item' ? <span className="font-mono">{fmt(row.unitPrice)} <span className="text-[9px] text-slate-400">/{getUomLabel(row.baseUnit, row)}</span></span> : <span className="font-mono">{fmt(row.unitPrice)} / {row.unit}</span> },
+                { key: 'discount', header: 'الخصم', render: (row: any) => <span className="font-mono text-rose-600">{row.discountAmount ? `-${fmt(row.discountAmount)}` : '—'}</span> },
+                { key: 'total', header: 'الإجمالي', render: (row: any) => <span className="font-bold">{fmt(row.totalPrice)}</span> },
+              ]}
+            />
+
     </div>
     {(detail.serviceItems || []).length > 0 && (
       <div role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-[11px] text-sky-800">
