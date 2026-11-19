@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Users, Wallet } from 'lucide-react';
 import type { OperationShiftInstance } from '../../../../services/domains/operations/OperationsShiftService';
-import { money, STATUS_LABELS, STATUS_STYLES, timeOf } from '../constants';
+import { money, STATUS_LABELS, STATUS_STYLES, timeOf } from './constants';
 
 interface ShiftCardProps {
   shift: OperationShiftInstance;

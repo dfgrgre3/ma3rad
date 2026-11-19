@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, Clock3, Plus } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Clock3, Plus } from 'lucide-react';
 import type { FinancialCalendarEvent, ViewMode } from './types';
 import { amountText, dateString, eventStatus, fullDate, monthName, typeOptions } from './constants';
 import { EventButton } from './EventButton';

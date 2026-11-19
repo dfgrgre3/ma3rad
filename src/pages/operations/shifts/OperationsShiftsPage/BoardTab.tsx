@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import type { OperationShiftInstance } from '../../../../services/domains/operations/OperationsShiftService';
-import { money } from '../constants';
-import type { OperationsShiftsState } from '../useOperationsShifts';
+import { money } from './constants';
+import type { OperationsShiftsState } from './useOperationsShifts';
 import { ShiftCard } from './ShiftCard';
 import { ShiftDetailPanel } from './ShiftDetailPanel';
 

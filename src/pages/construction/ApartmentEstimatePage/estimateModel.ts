@@ -7,6 +7,13 @@ import {
 
 export type Room = EstimateRoom;
 export type CostLine = EstimateLine;
+export type ExecutionDraft = {
+  contractDate: string; terms: string; quotationId: string;
+  certificateDate: string; periodStart: string; periodEnd: string;
+  certificateDescription: string; progressPercent: number; certificateAmount: number;
+  costDate: string; costCategory: string; costDescription: string; costAmount: number;
+};
+export type PaymentDraftState = { date: string; amount: number; method: string; reference: string; notes: string };
 export type StockRow = { productId: string; availableM2: number };
 export type PurchasePriceSnapshot = { date: string; invoiceNumber: string; supplierName: string; effectiveUnitCost: number; quantityM2: number };
 export type LocalEstimate = {

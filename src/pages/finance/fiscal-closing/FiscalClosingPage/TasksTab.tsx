@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import type { FinanceEnterpriseService } from '../../../../services/domains/finance/FinanceEnterpriseService';
 import type { PeriodCloseTask } from '../../../../services/domains/finance/FinancePeriodCloseService';
 import type { FiscalPeriod } from '../../../../types/finance';
-import { formatDate, priorityLabel, taskStatusLabel } from '../utils';
+import { formatDate, priorityLabel, taskStatusLabel } from './utils';
 
 type RunAction = (action: () => void, successMessage: string, closeModal?: () => void) => void;
 

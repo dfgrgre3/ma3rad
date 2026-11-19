@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react';
 import type { FC } from 'react';
 import type { FinanceEnterpriseService } from '../../../../services/domains/finance/FinanceEnterpriseService';
 import type { PeriodAdjustment } from '../../../../services/domains/finance/FinancePeriodCloseService';
-import { adjustmentTypeLabel, formatMoney } from '../utils';
+import { adjustmentTypeLabel, formatMoney } from './utils';
 
 type RunAction = (action: () => void, successMessage: string, closeModal?: () => void) => void;
 

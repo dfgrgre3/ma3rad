@@ -3,8 +3,8 @@ import {
   AlertTriangle, ArrowRightLeft, Factory, PauseCircle, PlayCircle, Plus, Users, Wallet,
 } from 'lucide-react';
 import type { OperationShiftStaff } from '../../../../services/domains/operations/OperationsShiftService';
-import { money, STATUS_LABELS, STATUS_STYLES, timeOf } from '../constants';
-import type { OperationsShiftsState } from '../useOperationsShifts';
+import { money, STATUS_LABELS, STATUS_STYLES, timeOf } from './constants';
+import type { OperationsShiftsState } from './useOperationsShifts';
 
 interface ShiftDetailPanelProps {
   state: OperationsShiftsState;

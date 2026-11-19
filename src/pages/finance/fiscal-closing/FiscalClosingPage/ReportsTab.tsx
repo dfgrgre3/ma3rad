@@ -2,7 +2,7 @@ import { FileBarChart2 } from 'lucide-react';
 import type { FC } from 'react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import type { PeriodCloseReport } from '../../../../services/domains/finance/FinancePeriodCloseService';
-import { formatClosedAt, formatDate, formatMoney } from '../utils';
+import { formatClosedAt, formatDate, formatMoney } from './utils';
 
 interface ReportsTabProps {
   report: PeriodCloseReport | null;

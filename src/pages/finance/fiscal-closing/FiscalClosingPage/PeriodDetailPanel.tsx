@@ -1,7 +1,6 @@
 import type { ElementType, FC } from 'react';
-import type { FiscalPeriod } from '../../../../types/finance';
-import { formatDate, periodStatus, type PeriodTab } from '../utils';
-import type { FiscalClosingState } from '../useFiscalClosing';
+import { formatDate, periodStatus, type PeriodTab } from './utils';
+import type { FiscalClosingState } from './useFiscalClosing';
 import { OverviewTab } from './OverviewTab';
 import { ChecksTab } from './ChecksTab';
 import { TasksTab } from './TasksTab';

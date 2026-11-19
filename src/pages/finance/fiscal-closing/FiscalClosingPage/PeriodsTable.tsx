@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Circle, Lock } from 'lucide-react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import type { FiscalPeriod } from '../../../../types/finance';
-import { formatDate, periodStatus } from '../utils';
+import { formatDate, periodStatus } from './utils';
 
 interface PeriodsTableProps {
   periods: FiscalPeriod[];

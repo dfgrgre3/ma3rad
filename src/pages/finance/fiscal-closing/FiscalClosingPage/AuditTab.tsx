@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { formatClosedAt } from '../utils';
+import { formatClosedAt } from './utils';
 
 interface AuditTabProps {
   audit: any[];

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { FC } from 'react';
 import type { FiscalCloseCheck } from '../../../../services/domains/finance/FinancePeriodCloseService';
 import type { FiscalPeriod } from '../../../../types/finance';
-import { checkStatusStyle } from '../utils';
+import { checkStatusStyle } from './utils';
 
 interface ChecksTabProps {
   checks: FiscalCloseCheck[];

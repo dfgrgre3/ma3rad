@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Lock, ScrollText } from 'lucide-react';
 import type { FiscalCloseCheck } from '../../../../services/domains/finance/FinancePeriodCloseService';
 import type { FiscalYear } from '../../../../types/finance';
-import { formatDate } from '../utils';
+import { formatDate } from './utils';
 
 interface YearSummaryProps {
   selectedYear: FiscalYear;

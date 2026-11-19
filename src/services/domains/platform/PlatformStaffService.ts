@@ -280,10 +280,6 @@ export class PlatformStaffService {
     return sessions.revokeStaffSessionsForStaff(this.ctx, staffId);
   }
 
-  public revokeStaffSessionsForStaff(staffId: string): void {
-    return sessions.revokeStaffSessionsForStaff(this.ctx, staffId);
-  }
-
   // ─── Login Tracking ───────────────────────────────────────────────────────────
 
   public listStaffLogins(limit = 100, failedOnly = false, staffId?: string): PlatformStaffLogin[] {

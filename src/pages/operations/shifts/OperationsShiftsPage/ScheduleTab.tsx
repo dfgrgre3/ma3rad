@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { AlertTriangle, ArrowRightLeft } from 'lucide-react';
-import { timeOf } from '../constants';
-import type { OperationsShiftsState } from '../useOperationsShifts';
+import { timeOf } from './constants';
+import type { OperationsShiftsState } from './useOperationsShifts';
 
 interface ScheduleTabProps {
   state: OperationsShiftsState;
