@@ -50,5 +50,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "timeTrackingAndServiceBilling": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_professional_services",
+      "documentType": "sales_invoice",
+      "templateId": "modern",
+      "label": {
+        "ar": "فاتورة أتعاب مهنية",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

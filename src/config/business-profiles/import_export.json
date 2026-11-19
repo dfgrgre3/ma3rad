@@ -55,5 +55,16 @@
     "typedCustomFieldStorage": "not-implemented",
     "customsAndLandedCostWorkflows": "not-implemented",
     "multiCurrencyTradeProcessing": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_import_export",
+      "documentType": "sales_invoice",
+      "templateId": "detailed",
+      "label": {
+        "ar": "فاتورة تصدير تفصيلية",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

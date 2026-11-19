@@ -48,5 +48,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "serviceSchedulingAndDispatch": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_services",
+      "documentType": "sales_invoice",
+      "templateId": "modern",
+      "label": {
+        "ar": "فاتورة خدمات",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

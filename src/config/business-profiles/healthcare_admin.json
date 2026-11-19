@@ -48,5 +48,16 @@
     "typedCustomFieldStorage": "not-implemented",
     "clinicalAndPatientDataManagement": "not-implemented",
     "regulatoryCompliance": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_healthcare_admin",
+      "documentType": "sales_invoice",
+      "templateId": "modern",
+      "label": {
+        "ar": "فاتورة خدمات طبية",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

@@ -64,5 +64,16 @@
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_clothing",
+      "documentType": "sales_invoice",
+      "templateId": "table",
+      "label": {
+        "ar": "فاتورة الملابس",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

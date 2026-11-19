@@ -5,13 +5,18 @@ import { getBusinessProfileTemplateId } from './businessProfiles';
 import { BUSINESS_TERMINOLOGY, BUSINESS_TERM_DEFAULTS } from './businessTerminology_part01';
 import type { BusinessLanguage, BusinessTermKey } from './businessTerminology_part01';
 
+import { EXTRA_BUSINESS_PROFILE_TERMINOLOGY } from './businessTerminology_profiles_extra';
+
 export const BUSINESS_PROFILE_TERMINOLOGY: Record<
   string,
   Partial<Record<BusinessTermKey, Partial<Record<BusinessLanguage, string>>>>
 > = {
+  ...EXTRA_BUSINESS_PROFILE_TERMINOLOGY,
+  ...{
   ceramics: ceramicsTerms,
   services: servicesTerms,
   professional_services: professionalServicesTerms,
+  },
 };
 
 export type BusinessTermOverrides = Partial<

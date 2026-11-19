@@ -50,5 +50,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "workOrdersAndTechnicianScheduling": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_workshop",
+      "documentType": "sales_invoice",
+      "templateId": "compact",
+      "label": {
+        "ar": "فاتورة ورشة",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

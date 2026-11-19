@@ -60,5 +60,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
     "expiryBatchEnforcement": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_food",
+      "documentType": "sales_invoice",
+      "templateId": "thermal",
+      "label": {
+        "ar": "إيصال الكاشير",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

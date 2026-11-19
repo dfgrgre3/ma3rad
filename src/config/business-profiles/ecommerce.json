@@ -51,5 +51,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "webstoreAndPaymentGatewayIntegration": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_ecommerce",
+      "documentType": "sales_invoice",
+      "templateId": "table",
+      "label": {
+        "ar": "فاتورة طلب إلكتروني",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

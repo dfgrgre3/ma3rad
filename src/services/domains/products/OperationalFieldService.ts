@@ -168,6 +168,68 @@ export class OperationalFieldService {
     return id;
   }
 
+  /**
+   * Idempotently seeds field definitions declared by business activity
+   * profiles. Unlike addDefinition this is a system-level operation: it does
+   * not require the field-management permission and never overwrites fields
+   * the tenant already created (matched by entity_type + code).
+   */
+  public ensureSeedDefinitions(
+    definitions: Array<{
+      entityType: string;
+      code: string;
+      name: string;
+      dataType: DynamicAttributeDataType;
+      unit?: string;
+      isRequired?: boolean;
+      isFilterable?: boolean;
+      options?: string[];
+    }>,
+  ): { created: string[]; existing: string[] } {
+    const created: string[] = [];
+    const existing: string[] = [];
+    this.db.executeTransaction((tx) => {
+      for (const input of definitions) {
+        this.getEntity(input.entityType);
+        const code = input.code.trim().toUpperCase();
+        const name = input.name.trim();
+        if (!name || !/^[A-Z][A-Z0-9_]{1,63}$/.test(code)) continue;
+        if (!FIELD_TYPES.has(input.dataType)) continue;
+        const options = [...new Set((input.options || []).map((value) => value.trim()).filter(Boolean))];
+        if (options.length && !['SELECT', 'MULTI_SELECT'].includes(input.dataType)) continue;
+        if (['SELECT', 'MULTI_SELECT'].includes(input.dataType) && options.length === 0) continue;
+        const duplicate = tx.query(
+          'SELECT id FROM operational_field_definitions WHERE entity_type = ? AND code = ?',
+          [input.entityType, code],
+        )[0];
+        if (duplicate) {
+          existing.push(code);
+          continue;
+        }
+        const id = `op_field_${uuidv4().slice(0, 12)}`;
+        tx.run(
+          `INSERT INTO operational_field_definitions
+           (id, entity_type, code, name, data_type, unit, is_required, is_filterable, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1
+             FROM operational_field_definitions WHERE entity_type = ?))`,
+          [id, input.entityType, code, name, input.dataType, input.unit?.trim() || null,
+            input.isRequired ? 1 : 0, input.isFilterable === false ? 0 : 1, input.entityType],
+        );
+        options.forEach((value, index) => tx.run(
+          `INSERT INTO operational_field_options(id, field_id, value, label, sort_order)
+           VALUES (?, ?, ?, ?, ?)`,
+          [`op_opt_${uuidv4().slice(0, 12)}`, id, value, value, index],
+        ));
+        this.sync.capture(tx, 'operational_field', id, 'CREATE');
+        tx.query<{ id: string }>(
+          'SELECT id FROM operational_field_options WHERE field_id = ? ORDER BY sort_order', [id],
+        ).forEach((option) => this.sync.capture(tx, 'operational_field_option', option.id, 'CREATE'));
+        created.push(code);
+      }
+    });
+    return { created, existing };
+  }
+
   public updateDefinition(id: string, updates: {
     name?: string;
     unit?: string | null;

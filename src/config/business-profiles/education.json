@@ -50,5 +50,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "studentEnrollmentAndCourseManagement": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_education",
+      "documentType": "sales_invoice",
+      "templateId": "modern",
+      "label": {
+        "ar": "فاتورة رسوم دراسية",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

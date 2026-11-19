@@ -50,5 +50,16 @@
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_lighting",
+      "documentType": "sales_invoice",
+      "templateId": "table",
+      "label": {
+        "ar": "فاتورة الإضاءة",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

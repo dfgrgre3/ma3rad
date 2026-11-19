@@ -7,6 +7,8 @@ import {
 } from '../../../config/businessProfiles';
 import { SettingsService } from './SettingsService';
 import { getEffectiveBusinessType } from './BusinessTypeService';
+import { OperationalFieldService } from '../products/OperationalFieldService';
+import { ACTIVITY_FIELD_PRESETS } from '../../../config/activityFieldPresets';
 
 /**
  * Turns the attribute names declared by a business profile into real
@@ -225,7 +227,12 @@ export class BusinessProfileService {
     return { rolesCreated, permissionsAdded };
   }
   /** Apply the attributes declared by the currently saved business profile. */
-  public static applyFromSettings(): { created: string[]; existing: string[] } {
+  public static applyFromSettings(): {
+    created: string[];
+    existing: string[];
+    fieldsCreated: string[];
+    fieldsExisting: string[];
+  } {
     const businessType = getEffectiveBusinessType();
     const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
     const profiles = [businessType, ...config.additionalActivityIds].map(getBusinessProfile);
@@ -250,13 +257,18 @@ export class BusinessProfileService {
       definitionsByName.set(definition.name.trim().toLowerCase(), definition);
     }
     const definitions = [...definitionsByCode.values()];
+    const fieldPresets = [businessType, ...config.additionalActivityIds]
+      .flatMap((activityId) => ACTIVITY_FIELD_PRESETS[activityId] || []);
     const db = DatabaseManager.getInstance();
+    const fieldSeed = new OperationalFieldService().ensureSeedDefinitions(fieldPresets);
     return db.executeTransaction(() => {
       const typed = BusinessProfileService.ensureProfileAttributeDefinitions(definitions);
       const named = BusinessProfileService.ensureProfileAttributes(config.productAttributes);
       return {
         created: [...typed.created, ...named.created],
         existing: [...typed.existing, ...named.existing],
+        fieldsCreated: fieldSeed.created,
+        fieldsExisting: fieldSeed.existing,
       };
     });
   }

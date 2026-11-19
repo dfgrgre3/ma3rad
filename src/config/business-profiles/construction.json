@@ -55,5 +55,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "projectCostingAndProgressClaims": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_construction",
+      "documentType": "sales_invoice",
+      "templateId": "detailed",
+      "label": {
+        "ar": "مستخلص أعمال",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

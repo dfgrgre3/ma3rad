@@ -51,5 +51,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "routeAndFleetOptimization": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_logistics",
+      "documentType": "sales_invoice",
+      "templateId": "detailed",
+      "label": {
+        "ar": "بوليصة شحن تفصيلية",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

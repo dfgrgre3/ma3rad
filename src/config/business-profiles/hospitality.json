@@ -52,5 +52,16 @@
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented",
     "reservationsAndGuestManagement": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_hospitality",
+      "documentType": "sales_invoice",
+      "templateId": "thermal",
+      "label": {
+        "ar": "فاتورة الإقامة",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }

@@ -52,5 +52,16 @@
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
     "typedCustomFieldStorage": "not-implemented"
-  }
+  },
+  "printTemplates": [
+    {
+      "id": "sales_invoice_manufacturing",
+      "documentType": "sales_invoice",
+      "templateId": "detailed",
+      "label": {
+        "ar": "أمر تسليم تفصيلي",
+        "en": "Sales invoice"
+      }
+    }
+  ]
 }
