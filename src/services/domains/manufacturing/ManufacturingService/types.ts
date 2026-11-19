@@ -86,11 +86,65 @@ export interface ProductionOrder {
   branchName?: string | null;
   warehouseId: string | null;
   warehouseName?: string | null;
+  salesOrderId: string | null;
+  salesOrderNumber?: string | null;
+  orderItemId: string | null;
+  customerId: string | null;
+  customerName?: string | null;
+  notes: string | null;
   materials: ProductionOrderMaterial[];
   operations: ProductionOrderOperation[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductionOrderCost {
+  orderId: string;
+  orderNumber: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  status: ProductionOrderStatus;
+  materialCost: number;
+  laborCost: number;
+  totalCost: number;
+  costPerUnit: number;
+  currency?: string;
+}
+
+export interface ProductionCostReport {
+  orders: ProductionOrderCost[];
+  totalMaterialCost: number;
+  totalLaborCost: number;
+  totalCost: number;
+  totalQuantity: number;
+}
+
+export interface WorkCenterLoad {
+  workCenterId: string;
+  code: string;
+  name: string;
+  branchId: string;
+  capacityPerDay: number;
+  activeOrders: number;
+  plannedMinutes: number;
+  actualMinutes: number;
+  loadPercent: number | null;
+}
+
+export interface SalesOrderProductionCandidate {
+  orderItemId: string;
+  salesOrderId: string;
+  salesOrderNumber: string;
+  customerId: string;
+  customerName: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  bomId: string;
+  bomName: string;
 }
 
 export interface QualityCheck {
@@ -199,4 +253,20 @@ export interface CreateProductionOrderDTO {
   branchId?: string;
   warehouseId?: string;
   operations?: Array<{ workCenterId: string; plannedMinutes: number }>;
+  salesOrderId?: string;
+  orderItemId?: string;
+  customerId?: string;
+  notes?: string;
+}
+
+export interface CreateProductionOrderFromSalesItemDTO {
+  quantity?: number;
+  bomId?: string;
+  priority?: ProductionPriority;
+  startDate?: string;
+  dueDate?: string;
+  branchId?: string;
+  warehouseId?: string;
+  operations?: Array<{ workCenterId: string; plannedMinutes: number }>;
+  notes?: string;
 }

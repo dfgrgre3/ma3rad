@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   KeyRound,
+  LayoutGrid,
   LockKeyhole,
   Pencil,
   RefreshCw,
@@ -116,6 +117,7 @@ interface TenantDetailModalProps {
   pushConfig: () => void;
   remoteConfig: any[];
   remoteHistory: any[];
+  onOpenCatalog?: () => void;
 }
 
 export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
@@ -177,6 +179,7 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
   pushConfig,
   remoteConfig,
   remoteHistory,
+  onOpenCatalog,
 }) => (
   <>
       {/* Central customer file */}
@@ -273,6 +276,11 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
               <Button variant="danger" size="sm" leadingIcon={<XCircle className="h-3.5 w-3.5" />} onClick={cancelSubscription} loading={working} disabled={!canManageTenants}>
                 إلغاء الاشتراك
               </Button>
+              {onOpenCatalog && (
+                <Button variant="secondary" size="sm" leadingIcon={<LayoutGrid className="h-3.5 w-3.5" />} onClick={onOpenCatalog} disabled={!canManageTenants}>
+                  الصفحات والمميزات
+                </Button>
+              )}
               <Button variant="ghost" size="sm" leadingIcon={<Archive className="h-3.5 w-3.5" />} onClick={() => archive(tenant)} loading={working} disabled={!canManageTenants}>
                 أرشفة العميل
               </Button>

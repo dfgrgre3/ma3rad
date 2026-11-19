@@ -321,6 +321,7 @@ CREATE TABLE IF NOT EXISTS platform_feature_flags (
   category TEXT,
   is_enabled INTEGER NOT NULL DEFAULT 1 CHECK(is_enabled IN (0,1)),
   rollout_percent INTEGER NOT NULL DEFAULT 100 CHECK(rollout_percent BETWEEN 0 AND 100),
+  page_paths TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

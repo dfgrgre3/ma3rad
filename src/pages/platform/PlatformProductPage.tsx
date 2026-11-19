@@ -8,6 +8,7 @@ import type {
   PlatformFeatureFlag,
   PlatformFeatureOverride,
   PlatformModule,
+  PlatformPlan,
   PlatformRelease,
   PlatformReleaseTarget,
   PlatformTenant,
@@ -24,6 +25,7 @@ import {
   type ReleaseFormState,
 } from './PlatformProductPage/constants';
 import { ModulesTab } from './PlatformProductPage/ModulesTab';
+import { PlanMatrixTab } from './PlatformProductPage/PlanMatrixTab';
 import { FeaturesTab } from './PlatformProductPage/FeaturesTab';
 import { ReleasesTab } from './PlatformProductPage/ReleasesTab';
 import { FeatureModal } from './PlatformProductPage/FeatureModal';
@@ -35,9 +37,10 @@ import { RollbackModal } from './PlatformProductPage/RollbackModal';
 export const PlatformProductPage: React.FC = () => {
   const toast = useToast();
   const canManageProduct = canPlatform('product', 'platform.product.update');
-  const [tab, setTab] = React.useState<TabId>('modules');
+  const [tab, setTab] = React.useState<TabId>('matrix');
   const [modules, setModules] = React.useState<PlatformModule[]>([]);
   const [features, setFeatures] = React.useState<PlatformFeatureFlag[]>([]);
+  const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
   const [releases, setReleases] = React.useState<PlatformRelease[]>([]);
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -72,21 +75,24 @@ export const PlatformProductPage: React.FC = () => {
     try {
       const centralState = getCentralDataSourceState();
       if (centralState.active) {
-        const [releases, tenants, modules, features] = await Promise.all([
+        const [releases, tenants, modules, features, plans] = await Promise.all([
           centralPlatformClient.listReleases(),
           centralPlatformClient.listTenants(),
           centralPlatformClient.listModules(),
           centralPlatformClient.listFeatureFlags(),
+          centralPlatformClient.listPlans().catch(() => [] as PlatformPlan[]),
         ]);
         setReleases(releases);
         setTenants(tenants);
         setModules(modules as any);
         setFeatures(features as any);
+        setPlans(plans);
       } else {
         setReleases(platformAdminService.listReleases());
         setTenants(platformAdminService.listTenants());
         setModules(platformAdminService.listModules());
         setFeatures(platformAdminService.listFeatureFlags());
+        setPlans(platformAdminService.listPlans());
       }
       setError(null);
     } catch (err) {
@@ -99,6 +105,37 @@ export const PlatformProductPage: React.FC = () => {
   React.useEffect(() => {
     load();
   }, [load]);
+
+  // ─── Plan × Catalog matrix ─────────────────────────────────────────────
+
+  const togglePlanCatalogItem = (plan: PlatformPlan, section: 'modules' | 'features', code: string, checked: boolean) => {
+    const centralState = getCentralDataSourceState();
+    if (centralState.active) {
+      toast.error('غير مدعوم', 'تعديل خطط الاشتراك غير متاح في الوضع المركزي بعد.');
+      return;
+    }
+    try {
+      if (section === 'modules') {
+        const current = plan.includedModules ?? [];
+        platformAdminService.updatePlan(plan.id, {
+          name: plan.name,
+          code: plan.code,
+          includedModules: checked ? [...current, code] : current.filter((item) => item !== code),
+        });
+      } else {
+        const current = plan.features ?? [];
+        platformAdminService.updatePlan(plan.id, {
+          name: plan.name,
+          code: plan.code,
+          features: checked ? [...current, code] : current.filter((item) => item !== code),
+        });
+      }
+      toast.success(checked ? 'أُضيف العنصر للباقة' : 'أُزيل العنصر من الباقة', `${code} — ${plan.name}`);
+      setPlans(platformAdminService.listPlans());
+    } catch (err) {
+      toast.error('تعذر تحديث الباقة', err instanceof Error ? err.message : undefined);
+    }
+  };
 
   const toggleModule = (module: PlatformModule) => {
     try {
@@ -125,6 +162,7 @@ export const PlatformProductPage: React.FC = () => {
             rolloutPercent: flag.rolloutPercent,
             isStagingOnly: Boolean(flag.isStagingOnly),
             minPlanTier: flag.minPlanTier ?? '',
+            pagePathsText: (flag.pagePaths ?? []).join('\n'),
           }
         : { ...emptyFeature }
     );
@@ -138,6 +176,10 @@ export const PlatformProductPage: React.FC = () => {
         ...featureForm,
         rolloutPercent: Number(featureForm.rolloutPercent),
         minPlanTier: featureForm.minPlanTier || undefined,
+        pagePaths: featureForm.pagePathsText
+          .split(/[\n,]+/)
+          .map((p) => p.trim())
+          .filter(Boolean),
       });
       toast.success(featureForm.id ? 'تم تحديث الميزة' : 'تم إنشاء الميزة');
       setFeatureOpen(false);
@@ -367,6 +409,16 @@ export const PlatformProductPage: React.FC = () => {
         <div className="rounded-xl border border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-500 shadow-sm">
           جارٍ تحميل بيانات المنتج...
         </div>
+      ) : tab === 'matrix' ? (
+        <PlanMatrixTab
+          plans={plans}
+          modules={modules}
+          features={features}
+          centralActive={getCentralDataSourceState().active}
+          canManageProduct={canManageProduct}
+          saving={saving}
+          onToggle={togglePlanCatalogItem}
+        />
       ) : tab === 'modules' ? (
         <ModulesTab modules={modules} canManageProduct={canManageProduct} onToggleModule={toggleModule} />
       ) : tab === 'features' ? (

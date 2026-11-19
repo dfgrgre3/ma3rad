@@ -9,7 +9,8 @@ import type {
 
 /** Equipment maintenance queries. Extracted verbatim from ManufacturingService. */
 export class MaintenanceModule {
-  constructor(private ctx: ManufacturingContext) {}
+  private readonly ctx: ManufacturingContext;
+  constructor(ctx: ManufacturingContext) { this.ctx = ctx; }
 
   public createMaintenance(input: CreateMaintenanceDTO): MaintenanceRecord {
     this.ctx.guardWrites();

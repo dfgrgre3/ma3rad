@@ -40,6 +40,8 @@ export interface PlatformFeatureFlag {
   rolloutPercent: number;
   isStagingOnly?: boolean;
   minPlanTier?: string | null;
+  /** Tenant-app page paths owned by this feature (hidden when feature is inactive). */
+  pagePaths?: string[];
   overridesCount?: number;
   createdAt: string;
   updatedAt: string;

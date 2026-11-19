@@ -6,7 +6,8 @@ export interface SyncIpcBridge {
 }
 
 export class ElectronSyncTransport implements SyncTransport {
-  constructor(private readonly bridge: SyncIpcBridge) {}
+  private readonly bridge: SyncIpcBridge;
+  constructor(bridge: SyncIpcBridge) { this.bridge = bridge; }
 
   pushEvents(events: SyncEvent[]): Promise<SyncPushResult> {
     return this.bridge.pushEvents(events);

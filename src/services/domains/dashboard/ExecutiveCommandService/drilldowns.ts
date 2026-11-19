@@ -21,7 +21,8 @@ export class ExecutiveCommandDrilldowns {
   private branchAccess = new BranchAccessService();
   private scopes = new CommandScopes();
 
-  constructor(private aggregates: ExecutiveCommandAggregates) {}
+  private readonly aggregates: ExecutiveCommandAggregates;
+  constructor(aggregates: ExecutiveCommandAggregates) { this.aggregates = aggregates; }
 
   public invoiceDrilldown(key: DrilldownKey, title: string, subtitle: string, from: string, to: string): DrilldownResult {
     const sales = this.scopes.salesScopes();

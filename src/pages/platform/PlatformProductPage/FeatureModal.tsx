@@ -81,6 +81,19 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
         </div>
         <Toggle checked={form.isStagingOnly} onChange={(val) => setForm({ ...form, isStagingOnly: val })} label="Staging" />
       </div>
+      <Field label="مسارات الصفحات المرتبطة (سطر لكل مسار)">
+        <textarea
+          dir="ltr"
+          rows={3}
+          className={inputClass}
+          placeholder={'/reports/statements\n/reports/profit-loss'}
+          value={form.pagePathsText}
+          onChange={(e) => setForm({ ...form, pagePathsText: e.target.value })}
+        />
+        <p className="mt-1 text-[10px] text-slate-500">
+          صفحات التطبيق التي تملكها هذه الميزة — تُخفى تلقائياً عن العملاء غير المشمولين بها.
+        </p>
+      </Field>
       <Field label="الوصف التوضيحي" className="sm:col-span-2">
         <textarea rows={2} className={inputClass} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </Field>

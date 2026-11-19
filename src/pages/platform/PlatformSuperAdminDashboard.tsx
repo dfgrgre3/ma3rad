@@ -40,6 +40,7 @@ import {
   Plus,
   UserPlus,
   Banknote,
+  CreditCard,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import type {
@@ -521,7 +522,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           {
             label: 'عميل جديد',
@@ -543,6 +544,13 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             href: '/platform/subscriptions',
             icon: <CalendarClock className="h-5 w-5" />,
             chip: 'bg-violet-50 text-violet-600',
+          },
+          {
+            label: 'الخطط والاشتراكات',
+            hint: 'الباقات والأسعار والحدود',
+            href: '/platform/plans',
+            icon: <CreditCard className="h-5 w-5" />,
+            chip: 'bg-indigo-50 text-indigo-600',
           },
           {
             label: 'مركز الطوارئ',
@@ -954,6 +962,66 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           </div>
         ) : (
           <EmptyState icon={<Wallet className="h-5 w-5" />} title="لا توجد بيانات إيراد" />
+        )}
+      </Panel>
+
+      {/* Plans Overview */}
+      <Panel
+        title="نظرة على الباقات"
+        subtitle="خطط الاشتراك المعتمدة — الأسعار والحدود وعدد المشتركين"
+        icon={<CreditCard className="h-4 w-4" />}
+        iconClass="bg-indigo-50 text-indigo-600"
+        action={
+          <DrillDownLink label="إدارة الباقات" href="/platform/plans" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+        }
+      >
+        {plans.length === 0 ? (
+          <EmptyState icon={<CreditCard className="h-5 w-5" />} title="لا توجد باقات معرفة" />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {plans.map((plan) => (
+              <button
+                key={plan.id}
+                type="button"
+                onClick={() => go('/platform/plans')}
+                className="group rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm transition hover:border-indigo-300 hover:shadow"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-black text-slate-800">
+                      {plan.name}
+                      <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{plan.code}</span>
+                    </p>
+                    <p className="mt-0.5 text-[15px] font-black text-emerald-700">{formatMoney(plan.price, plan.currency)}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {plan.isDefault && (
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-700">افتراضية</span>
+                    )}
+                    <StatusBadge value={plan.isActive ? 'ACTIVE' : 'CANCELLED'} label={plan.isActive ? 'نشطة' : 'موقوفة'} />
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.seatsLimit)}</p>
+                    <p className="text-[9px] font-bold text-slate-400">مستخدم</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.branchesLimit)}</p>
+                    <p className="text-[9px] font-bold text-slate-400">فرع</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.devicesLimit)}</p>
+                    <p className="text-[9px] font-bold text-slate-400">جهاز</p>
+                  </div>
+                </div>
+                <p className="mt-2 truncate text-[10px] text-slate-400">
+                  {(plan.features ?? []).length} ميزة · {(plan.includedModules ?? []).length} وحدة
+                  {typeof plan.subscriberCount === 'number' ? ` · ${formatNumber(plan.subscriberCount)} مشترك` : ''}
+                </p>
+              </button>
+            ))}
+          </div>
         )}
       </Panel>
 

@@ -37,39 +37,70 @@ interface PlatformLayoutProps {
   onLogout: () => void;
 }
 
-const NAV_ITEMS = [
-  { to: '/platform', label: 'نظرة عامة', icon: LayoutDashboard, end: true },
-  { to: '/platform/tenants', label: 'العملاء', icon: Building2 },
-  { to: '/platform/subscriptions', label: 'إدارة الاشتراكات', icon: CalendarClock },
-  { to: '/platform/licenses', label: 'التراخيص', icon: KeyRound },
-  { to: '/platform/billing', label: 'المبيعات والفواتير', icon: ReceiptText },
-  { to: '/platform/plans', label: 'خطط الاشتراك', icon: Layers3 },
-  { to: '/platform/staff', label: 'فريق ومستخدمي المنصة', icon: Users },
-  { to: '/platform/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
-  { to: '/platform/releases', label: 'حزم الإصدارات', icon: Package },
-  { to: '/platform/product', label: 'المنتج والمزايا', icon: Boxes },
-  { to: '/platform/audit', label: 'سجل العمليات', icon: ScrollText },
-  { to: '/platform/user-platform-permissions', label: 'صفحات وصلاحيات المستخدمين', icon: ShieldCheck },
-  { to: '/platform/settings', label: 'إعدادات المنصة', icon: Settings },
-  { to: '/platform/activity', label: 'إعدادات النشاط', icon: Boxes },
-  { to: '/platform/operations', label: 'التشغيل والموافقات', icon: Settings },
-  { to: '/platform/branding', label: 'الهوية والمظهر', icon: Palette },
-  { to: '/platform/customization', label: 'تخصيص الواجهة', icon: SlidersHorizontal },
-  { to: '/platform/app-configuration', label: 'محرك التكوين الديناميكي', icon: SlidersHorizontal },
-  { to: '/platform/system-health', label: 'صحة النظام وتشخيصه', icon: Settings },
-  { to: '/platform/platform-health', label: 'صحة المنصة (جميع العملاء)', icon: ShieldCheck },
-  { to: '/platform/support', label: 'الدعم الفني', icon: ShieldCheck },
-  { to: '/platform/devices', label: 'الأجهزة', icon: ShieldCheck },
-  { to: '/platform/admin-control', label: 'مركز التحكم الإداري', icon: SlidersHorizontal },
-  { to: '/platform/security-center', label: 'مركز الأمان', icon: ShieldCheck },
-  { to: '/platform/analytics', label: 'التقارير والتحليلات', icon: BarChart3 },
-  { to: '/platform/sync', label: 'مراقبة المزامنة', icon: RefreshCw },
-  { to: '/platform/backups', label: 'النسخ الاحتياطي', icon: Database },
-  { to: '/platform/integrations', label: 'التكاملات و Webhooks', icon: Webhook },
-  { to: '/platform/notifications', label: 'مركز الإشعارات', icon: Bell },
-  { to: '/platform/policies', label: 'سياسات المنصة', icon: FileText },
-  { to: '/platform/emergency', label: 'إجراءات الطوارئ', icon: AlertOctagon },
-  { to: '/platform/customer-portal', label: 'تجربة بوابة العملاء', icon: Building2 },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  end?: boolean;
+}
+
+interface NavGroup {
+  label?: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      { to: '/platform', label: 'نظرة عامة', icon: LayoutDashboard, end: true },
+    ],
+  },
+  {
+    label: 'العملاء والاشتراكات',
+    items: [
+      { to: '/platform/tenants', label: 'العملاء', icon: Building2 },
+      { to: '/platform/subscriptions', label: 'إدارة الاشتراكات', icon: CalendarClock },
+      { to: '/platform/licenses', label: 'التراخيص', icon: KeyRound },
+      { to: '/platform/billing', label: 'المبيعات والفواتير', icon: ReceiptText },
+      { to: '/platform/support', label: 'الدعم الفني', icon: ShieldCheck },
+      { to: '/platform/customer-portal', label: 'تجربة بوابة العملاء', icon: Building2 },
+    ],
+  },
+  {
+    label: 'بناء وإدارة النظام',
+    items: [
+      { to: '/platform/plans', label: 'خطط الاشتراك', icon: Layers3 },
+      { to: '/platform/product', label: 'المنتج والصفحات والمزايا', icon: Boxes },
+      { to: '/platform/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
+      { to: '/platform/user-platform-permissions', label: 'صفحات وصلاحيات المستخدمين', icon: ShieldCheck },
+      { to: '/platform/releases', label: 'حزم الإصدارات', icon: Package },
+      { to: '/platform/app-configuration', label: 'محرك التكوين الديناميكي', icon: SlidersHorizontal },
+    ],
+  },
+  {
+    label: 'التشغيل والإعدادات',
+    items: [
+      { to: '/platform/staff', label: 'فريق ومستخدمي المنصة', icon: Users },
+      { to: '/platform/audit', label: 'سجل العمليات', icon: ScrollText },
+      { to: '/platform/settings', label: 'إعدادات المنصة', icon: Settings },
+      { to: '/platform/activity', label: 'إعدادات النشاط', icon: Boxes },
+      { to: '/platform/operations', label: 'التشغيل والموافقات', icon: Settings },
+      { to: '/platform/branding', label: 'الهوية والمظهر', icon: Palette },
+      { to: '/platform/customization', label: 'تخصيص الواجهة', icon: SlidersHorizontal },
+      { to: '/platform/system-health', label: 'صحة النظام وتشخيصه', icon: Settings },
+      { to: '/platform/platform-health', label: 'صحة المنصة (جميع العملاء)', icon: ShieldCheck },
+      { to: '/platform/devices', label: 'الأجهزة', icon: ShieldCheck },
+      { to: '/platform/admin-control', label: 'مركز التحكم الإداري', icon: SlidersHorizontal },
+      { to: '/platform/security-center', label: 'مركز الأمان', icon: ShieldCheck },
+      { to: '/platform/analytics', label: 'التقارير والتحليلات', icon: BarChart3 },
+      { to: '/platform/sync', label: 'مراقبة المزامنة', icon: RefreshCw },
+      { to: '/platform/backups', label: 'النسخ الاحتياطي', icon: Database },
+      { to: '/platform/integrations', label: 'التكاملات و Webhooks', icon: Webhook },
+      { to: '/platform/notifications', label: 'مركز الإشعارات', icon: Bell },
+      { to: '/platform/policies', label: 'سياسات المنصة', icon: FileText },
+      { to: '/platform/emergency', label: 'إجراءات الطوارئ', icon: AlertOctagon },
+    ],
+  },
 ];
 
 const TITLES: Record<string, string> = {
@@ -118,37 +149,53 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
   }, [location.pathname]);
 
   const permissionsOverride = PlatformStaffAuthService.getCurrentPermissionsOverride();
-  const visibleNavItems = NAV_ITEMS.filter((item) => {
+  const canSeeItem = (item: NavItem) => {
     if (item.to === '/platform') return true;
     const required = PLATFORM_ROUTE_PERMISSION_MAP[item.to];
     if (required) {
       return PlatformAuthorizationService.canAccessPermission(currentUser.role, required, permissionsOverride);
     }
     return PlatformAuthorizationService.canAccessRoute(currentUser.role, item.to, permissionsOverride);
-  });
+  };
+  const visibleNavGroups = NAV_GROUPS
+    .map((group) => ({ ...group, items: group.items.filter(canSeeItem) }))
+    .filter((group) => group.items.length > 0);
+
+  const renderNavLink = (item: NavItem) => {
+    const Icon = item.icon;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        className={({ isActive }) =>
+          `flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+            isActive
+              ? 'bg-emerald-500/15 text-emerald-300'
+              : 'text-slate-300 hover:bg-white/5 hover:text-white'
+          }`
+        }
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span>{item.label}</span>
+      </NavLink>
+    );
+  };
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-      {visibleNavItems.map((item) => {
-        const Icon = item.icon;
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
-                isActive
-                  ? 'bg-emerald-500/15 text-emerald-300'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
-              }`
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span>{item.label}</span>
-          </NavLink>
-        );
-      })}
+      {visibleNavGroups.map((group, groupIndex) => (
+        <div key={group.label ?? `group-${groupIndex}`} className={groupIndex > 0 ? 'mt-3' : ''}>
+          {group.label && (
+            <p className="mb-1.5 px-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+              {group.label}
+            </p>
+          )}
+          <div className="flex flex-col gap-1">
+            {group.items.map(renderNavLink)}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 

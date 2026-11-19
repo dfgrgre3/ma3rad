@@ -299,13 +299,13 @@ router.post(
   async (req, res, next) => {
     try {
       const db = getDb();
-      const { key, name, description, isEnabled, rolloutPercentage, targetTenants } = req.body || {};
+      const { key, name, description, isEnabled, rolloutPercentage, targetTenants, pagePaths } = req.body || {};
       if (!key || !name) return res.status(400).json({ error: 'key and name are required' });
       const id = `ff_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       await db.run(
-        `INSERT INTO platform_feature_flags (id, key, name, description, is_enabled, rollout_percentage, target_tenants, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, key, name, description || null, isEnabled ? 1 : 0, rolloutPercentage || 0, JSON.stringify(targetTenants || []), nowIso(), nowIso()]
+        `INSERT INTO platform_feature_flags (id, key, name, description, is_enabled, rollout_percentage, target_tenants, page_paths, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, key, name, description || null, isEnabled ? 1 : 0, rolloutPercentage || 0, JSON.stringify(targetTenants || []), JSON.stringify(pagePaths || []), nowIso(), nowIso()]
       );
       const flag = await db.get('SELECT * FROM platform_feature_flags WHERE id = ?', [id]);
       res.status(201).json({ data: flag, requestId: req.requestId });
@@ -322,7 +322,7 @@ router.put(
   async (req, res, next) => {
     try {
       const db = getDb();
-      const { name, description, isEnabled, rolloutPercentage, targetTenants } = req.body || {};
+      const { name, description, isEnabled, rolloutPercentage, targetTenants, pagePaths } = req.body || {};
       const updates = [];
       const params = [];
       if (name !== undefined) { updates.push('name = ?'); params.push(name); }
@@ -330,6 +330,7 @@ router.put(
       if (isEnabled !== undefined) { updates.push('is_enabled = ?'); params.push(isEnabled ? 1 : 0); }
       if (rolloutPercentage !== undefined) { updates.push('rollout_percentage = ?'); params.push(rolloutPercentage); }
       if (targetTenants !== undefined) { updates.push('target_tenants = ?'); params.push(JSON.stringify(targetTenants)); }
+      if (pagePaths !== undefined) { updates.push('page_paths = ?'); params.push(JSON.stringify(pagePaths)); }
       if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
       updates.push('updated_at = ?'); params.push(nowIso());
       params.push(req.params.id);

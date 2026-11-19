@@ -150,13 +150,13 @@ export function createSettingsApi(): SettingsApi {
       return Array.isArray(envelope.data) ? envelope.data : [];
     },
 
-    async createFeatureFlag(this: PlatformAdminApiCore, input: { key: string; name: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }) {
+    async createFeatureFlag(this: PlatformAdminApiCore, input: { key: string; name: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[]; pagePaths?: string[] }) {
       const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/feature-flags', method: 'POST', body: input });
       if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
       return envelope.data;
     },
 
-    async updateFeatureFlag(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }) {
+    async updateFeatureFlag(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[]; pagePaths?: string[] }) {
       const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/feature-flags/${encodeURIComponent(id)}`, method: 'PUT', body: input });
       if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
       return envelope.data;

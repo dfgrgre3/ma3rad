@@ -5,9 +5,11 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  LayoutGrid,
 } from 'lucide-react';
 
 export const TABS = [
+  { id: 'matrix', label: 'مصفوفة الخطط والصفحات', icon: LayoutGrid },
   { id: 'modules', label: 'الوحدات', icon: SlidersHorizontal },
   { id: 'features', label: 'المزايا والرايات (Feature Flags)', icon: Sparkles },
   { id: 'releases', label: 'الإصدارات وحزم التحديث', icon: Rocket },
@@ -44,6 +46,7 @@ export const emptyFeature = {
   rolloutPercent: 100,
   isStagingOnly: false,
   minPlanTier: '',
+  pagePathsText: '',
 };
 
 export type FeatureFormState = typeof emptyFeature;

@@ -5,6 +5,8 @@ const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess } = require('../middleware/auth');
 const { signString, getKeyId } = require('../lib/signing');
+const { platformCodesToRegistryIds } = require('../lib/platformModuleMap');
+const { FEATURE_CODE_TO_PAGE_PATHS } = require('../lib/featurePageMap');
 
 const router = express.Router();
 
@@ -51,6 +53,69 @@ router.get('/configuration/current', async (req, res, next) => {
       planId = sub?.planId || null;
     }
 
+    // Effective platform module set: license snapshot → plan defaults → tenant
+    // overrides (kind='MODULE'). Codes are platform catalog codes and are
+    // translated to tenant registry ids before being signed into the config.
+    let baseModules = license?.modules ? parseJsonArray(license.modules) : [];
+    let baseFeatures = license?.features ? parseJsonArray(license.features) : [];
+    if ((!baseModules.length || !baseFeatures.length) && planId) {
+      const plan = await db.get('SELECT included_modules AS includedModules, features AS planFeatures FROM platform_plans WHERE id = ?', [planId]);
+      if (!baseModules.length) baseModules = parseJsonArray(plan?.includedModules);
+      if (!baseFeatures.length) baseFeatures = parseJsonArray(plan?.planFeatures);
+    }
+    const moduleOverrides = await db.all(
+      `SELECT code, is_enabled AS isEnabled FROM platform_tenant_overrides
+       WHERE tenant_id = ? AND kind = 'MODULE'`,
+      [tenantId]
+    );
+    const effectiveModuleCodes = new Set(baseModules.map(String));
+    for (const row of moduleOverrides) {
+      const code = String(row.code || '');
+      if (!code) continue;
+      if (row.isEnabled) effectiveModuleCodes.add(code);
+      else effectiveModuleCodes.delete(code);
+    }
+    const allowedModuleIds = platformCodesToRegistryIds([...effectiveModuleCodes]);
+
+    // Effective feature set: license snapshot → plan defaults → tenant
+    // overrides (kind='FEATURE'). Features absent from the set hide the pages
+    // they own via hiddenMenus.
+    const featureOverrides = await db.all(
+      `SELECT code, is_enabled AS isEnabled FROM platform_tenant_overrides
+       WHERE tenant_id = ? AND kind = 'FEATURE'`,
+      [tenantId]
+    );
+    const effectiveFeatureCodes = new Set(baseFeatures.map(String));
+    for (const row of featureOverrides) {
+      const code = String(row.code || '');
+      if (!code) continue;
+      if (row.isEnabled) effectiveFeatureCodes.add(code);
+      else effectiveFeatureCodes.delete(code);
+    }
+    // Only gate feature-owned pages when the tenant actually has a feature
+    // set (license/plan features or explicit overrides) — otherwise tenants
+    // without plan features would lose pages they never had gated.
+    const featureGatingActive = baseFeatures.length > 0 || featureOverrides.length > 0;
+    let featureHiddenPaths = [];
+    if (featureGatingActive) {
+      // Dynamic page ownership: page_paths stored on each feature flag
+      // (admin-managed) merged over the built-in static map.
+      const flagRows = await db.all('SELECT key, page_paths AS pagePaths FROM platform_feature_flags').catch(() => []);
+      const dynamicMap = { ...FEATURE_CODE_TO_PAGE_PATHS };
+      for (const row of flagRows || []) {
+        const code = String(row.key || '');
+        if (!code) continue;
+        let paths = [];
+        try { paths = JSON.parse(row.pagePaths || '[]'); } catch { paths = []; }
+        if (Array.isArray(paths) && paths.length) {
+          dynamicMap[code] = [...new Set([...(dynamicMap[code] || []), ...paths.map(String)])];
+        }
+      }
+      featureHiddenPaths = Object.entries(dynamicMap)
+        .filter(([code]) => !effectiveFeatureCodes.has(code))
+        .flatMap(([, paths]) => paths);
+    }
+
     // Layered feature config: global → tenant → tenant+plan (later wins).
     const featureRows = await db.all(
       `SELECT tenant_id AS tenantId, plan_id AS planId, hidden_menus AS hiddenMenus,
@@ -73,6 +138,10 @@ router.get('/configuration/current', async (req, res, next) => {
       if (disabled.length) merged.disabledPermissions = disabled;
       if (features.length) merged.featurePermissions = features;
       if (row.updatedAt > maxFeatureUpdated) maxFeatureUpdated = row.updatedAt;
+    }
+    // Pages owned by features the tenant's plan/overrides exclude.
+    if (featureHiddenPaths.length) {
+      merged.hiddenMenus = [...new Set([...merged.hiddenMenus, ...featureHiddenPaths])];
     }
 
     // Permission limits: tenant-specific rows override global ('' tenant) rows.
@@ -100,7 +169,7 @@ router.get('/configuration/current', async (req, res, next) => {
       disabledPermissions: merged.disabledPermissions,
       featurePermissions: merged.featurePermissions,
       permissionLimits: [...limitsByCode.values()],
-      allowedModules: parseJsonArray(license?.modules),
+      allowedModules: allowedModuleIds,
       usageLimits: {},
     };
     const configurationVersion = Math.max(

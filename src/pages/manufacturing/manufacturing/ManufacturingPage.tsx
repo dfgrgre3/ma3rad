@@ -1,15 +1,60 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { DataTable } from '../../../components/ui/DataTable';
+import { Factory, Loader2, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { Factory, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { ManufacturingService } from '../../../services/domains/manufacturing/ManufacturingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
-import { ProductPicker } from '../../../components/products/ProductPicker';
 import { BranchService } from '../../../services/domains/organization/BranchService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { getProfileWorkflows } from '../../../config/businessProfiles';
+import { OverviewTab } from './tabs/OverviewTab';
+import { WorkCentersTab } from './tabs/WorkCentersTab';
+import { BomsTab } from './tabs/BomsTab';
+import { OrdersTab } from './tabs/OrdersTab';
+import { SalesCandidatesTab } from './tabs/SalesCandidatesTab';
+import { QualityTab } from './tabs/QualityTab';
+import { MaintenanceTab } from './tabs/MaintenanceTab';
+import { CostingTab } from './tabs/CostingTab';
+
+export interface ManufacturingData {
+  workCenters: any[];
+  boms: any[];
+  orders: any[];
+  products: any[];
+  branches: any[];
+  warehouses: any[];
+  qualityChecks: any[];
+  maintenance: any[];
+  wip: { orders: any[]; totalMaterialCost: number; totalQuantity: number };
+  costReport: { orders: any[]; totalMaterialCost: number; totalLaborCost: number; totalCost: number; totalQuantity: number };
+  capacityPlan: any[];
+  salesCandidates: any[];
+  analytics: { workCenterEfficiency: any[]; orderVariance: any[]; monthlyOutput: any[] };
+}
+
+const EMPTY_DATA: ManufacturingData = {
+  workCenters: [], boms: [], orders: [], products: [], branches: [], warehouses: [],
+  qualityChecks: [], maintenance: [],
+  wip: { orders: [], totalMaterialCost: 0, totalQuantity: 0 },
+  costReport: { orders: [], totalMaterialCost: 0, totalLaborCost: 0, totalCost: 0, totalQuantity: 0 },
+  capacityPlan: [], salesCandidates: [],
+  analytics: { workCenterEfficiency: [], orderVariance: [], monthlyOutput: [] },
+};
+
+const TABS = [
+  { key: 'overview', label: 'نظرة عامة' },
+  { key: 'orders', label: 'أوامر الإنتاج' },
+  { key: 'sales', label: 'من أوامر البيع' },
+  { key: 'workCenters', label: 'مراكز العمل' },
+  { key: 'boms', label: 'قوائم المواد' },
+  { key: 'quality', label: 'الجودة' },
+  { key: 'maintenance', label: 'الصيانة' },
+  { key: 'costing', label: 'التكاليف والسعة' },
+] as const;
+
+export type ManufacturingTab = typeof TABS[number]['key'];
 
 export const ManufacturingPage: React.FC = () => {
   const service = useMemo(() => new ManufacturingService(), []);
@@ -17,26 +62,28 @@ export const ManufacturingPage: React.FC = () => {
   const can = usePermission();
   const canManage = can('manufacturing.manage');
 
-  const [tab, setTab] = useState<'workCenters' | 'boms' | 'orders'>('workCenters');
-  const [workCenters, setWorkCenters] = useState<any[]>([]);
-  const [boms, setBoms] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
+  const [tab, setTab] = useState<ManufacturingTab>('overview');
+  const [data, setData] = useState<ManufacturingData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
-
-  const [wcForm, setWcForm] = useState({ code: '', name: '', branchId: '' });
-  const [bomForm, setBomForm] = useState({ productId: '', name: '', version: '1.0', componentProductId: '', quantity: '' });
-  const [orderForm, setOrderForm] = useState({ productId: '', bomId: '', quantity: '', branchId: '' });
 
   const load = useCallback(() => {
     setLoading(true);
     try {
-      setWorkCenters(service.getWorkCenters());
-      setBoms(service.getBoms());
-      setOrders(service.getProductionOrders());
-      setProducts(new ProductService().getAllProducts());
-      setBranches(new BranchService().getAllBranches());
+      setData({
+        workCenters: service.getWorkCenters(),
+        boms: service.getBoms(),
+        orders: service.getProductionOrders(),
+        products: new ProductService().getAllProducts(),
+        branches: new BranchService().getAllBranches(),
+        warehouses: new InventoryService().getAllWarehouses(),
+        qualityChecks: service.getQualityChecks(),
+        maintenance: service.getMaintenanceRecords(),
+        wip: service.getWipValuation(),
+        costReport: service.getProductionCostReport(),
+        capacityPlan: service.getCapacityPlan(),
+        salesCandidates: service.getSalesOrderProductionCandidates(),
+        analytics: service.getManufacturingAnalytics(),
+      });
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل بيانات التصنيع.');
     } finally {
@@ -46,80 +93,14 @@ export const ManufacturingPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const createWorkCenter = (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      service.createWorkCenter({ code: wcForm.code, name: wcForm.name, branchId: wcForm.branchId || undefined });
-      setWcForm({ code: '', name: '', branchId: '' });
-      toast.success('تم إضافة مركز العمل.');
-      load();
-    } catch (error: any) {
-      toast.error(error?.message || 'تعذر إضافة مركز العمل.');
-    }
-  };
-
-  const createBom = (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      service.createBom({
-        productId: bomForm.productId,
-        name: bomForm.name,
-        version: bomForm.version,
-        items: [{ componentProductId: bomForm.componentProductId, quantity: Number(bomForm.quantity) || 0 }],
-      });
-      setBomForm({ productId: '', name: '', version: '1.0', componentProductId: '', quantity: '' });
-      toast.success('تم إنشاء BOM.');
-      load();
-    } catch (error: any) {
-      toast.error(error?.message || 'تعذر إنشاء BOM.');
-    }
-  };
-
-  const createOrder = (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      service.createProductionOrder({
-        productId: orderForm.productId,
-        bomId: orderForm.bomId,
-        quantity: Number(orderForm.quantity) || 0,
-        branchId: orderForm.branchId || undefined,
-      });
-      setOrderForm({ productId: '', bomId: '', quantity: '', branchId: '' });
-      toast.success('تم إنشاء أمر الإنتاج.');
-      load();
-    } catch (error: any) {
-      toast.error(error?.message || 'تعذر إنشاء أمر الإنتاج.');
-    }
-  };
-
-  const release = (id: string) => {
-    try { service.releaseOrder(id); toast.success('تم إصدار الأمر.'); load(); }
-    catch (error: any) { toast.error(error?.message || 'تعذر إصدار الأمر.'); }
-  };
-
-  const start = (id: string) => {
-    try { service.startOrder(id); toast.success('تم بدء الأمر.'); load(); }
-    catch (error: any) { toast.error(error?.message || 'تعذر بدء الأمر.'); }
-  };
-
-  const complete = (id: string) => {
-    if (!window.confirm('إكمال أمر الإنتاج؟ سيتم صرف جميع المواد.')) return;
-    try { service.completeOrder(id); toast.success('تم إكمال الأمر.'); load(); }
-    catch (error: any) { toast.error(error?.message || 'تعذر إكمال الأمر.'); }
-  };
-
-  const cancel = (id: string) => {
-    if (!window.confirm('إلغاء أمر الإنتاج؟')) return;
-    try { service.cancelOrder(id); toast.success('تم إلغاء الأمر.'); load(); }
-    catch (error: any) { toast.error(error?.message || 'تعذر إلغاء الأمر.'); }
-  };
+  const shared = { service, data, reload: load, canManage, toast };
 
   return (
     <div className="space-y-4">
       <PageHeader
         icon={<Factory className="h-5 w-5" />}
         title="التصنيع"
-        description="BOM، مراكز عمل، وأوامر إنتاج مع تتبع المواد والعمليات."
+        description="إدارة متكاملة: أوامر إنتاج، قوائم مواد، جودة، صيانة، تكاليف وقدرة إنتاجية."
         actions={
           <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
             <RefreshCw className="h-4 w-4" />
@@ -135,18 +116,17 @@ export const ManufacturingPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-1 border-b border-slate-200">
-        {[
-          { key: 'workCenters', label: 'مراكز العمل' },
-          { key: 'boms', label: 'BOM' },
-          { key: 'orders', label: 'أوامر الإنتاج' },
-        ].map((item) => (
+      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+        {TABS.map((item) => (
           <button
             key={item.key}
-            onClick={() => setTab(item.key as any)}
+            onClick={() => setTab(item.key)}
             className={`px-4 py-2 text-xs font-bold rounded-t-lg transition ${tab === item.key ? 'bg-white border border-slate-200 border-b-white text-sky-600 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
           >
             {item.label}
+            {item.key === 'sales' && data.salesCandidates.length > 0 && (
+              <span className="mr-1 rounded-full bg-sky-100 px-1.5 text-[10px] text-sky-700">{data.salesCandidates.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -157,148 +137,14 @@ export const ManufacturingPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {tab === 'workCenters' && (
-            <div className="grid gap-3 lg:grid-cols-3">
-              <DataTable
-                                ariaLabel="مراكز العمل"
-                                rows={workCenters}
-                                rowKey={(row) => row.id}
-                                columns={[
-                                  { key: 'code', header: 'الرمز', render: (row) => <span className="font-mono text-xs">{row.code}</span> },
-                                  { key: 'name', header: 'الاسم', render: (row) => row.name },
-                                  { key: 'cost', header: 'التكلفة/ساعة', render: (row) => row.costPerHour },
-                                  { key: 'capacity', header: 'السعة/يوم', render: (row) => row.capacityPerDay },
-                                ]}
-                                emptyTitle="لا توجد مراكز عمل."
-                              />
-
-              {canManage && (
-                <form onSubmit={createWorkCenter} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                  <h3 className="font-black text-slate-900">إضافة مركز عمل</h3>
-                  <input required placeholder="الرمز" value={wcForm.code} onChange={(e) => setWcForm({ ...wcForm, code: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <input required placeholder="الاسم" value={wcForm.name} onChange={(e) => setWcForm({ ...wcForm, name: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <select value={wcForm.branchId} onChange={(e) => setWcForm({ ...wcForm, branchId: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5">
-                    <option value="">الفرع الافتراضي</option>
-                    {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                  </select>
-                  <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-sky-600 py-1.5 font-bold text-white">
-                    <Plus className="h-3.5 w-3.5" /> إضافة
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {tab === 'boms' && (
-            <div className="grid gap-3 lg:grid-cols-3">
-              <DataTable
-                                ariaLabel="قوائم المواد"
-                                rows={boms}
-                                rowKey={(bom) => bom.id}
-                                columns={[
-                                  { key: 'product', header: 'المنتج', render: (bom) => bom.productName },
-                                  { key: 'name', header: 'الاسم', render: (bom) => bom.name },
-                                  { key: 'version', header: 'الإصدار', render: (bom) => bom.version },
-                                  { key: 'status', header: 'الحالة', render: (bom) => bom.status },
-                                  { key: 'items', header: 'المكوّنات', render: (bom) => <span className="text-xs text-slate-500">{(bom.items || []).map((item: any) => `${item.componentName || item.componentProductId} × ${item.quantity}`).join('، ')}</span> },
-                                ]}
-                                emptyTitle="لا توجد BOM."
-                              />
-
-              {canManage && (
-                <form onSubmit={createBom} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                  <h3 className="font-black text-slate-900">إنشاء BOM</h3>
-                  <ProductPicker
-                    required
-                    value={bomForm.productId}
-                    selectedLabel={products.find((product) => product.id === bomForm.productId)?.name}
-                    placeholder="المنتج المصنّع"
-                    ariaLabel="استعراض المنتجات المصنّعة"
-                    onChange={(productId) => setBomForm({ ...bomForm, productId })}
-                  />
-                  <input required placeholder="اسم BOM" value={bomForm.name} onChange={(e) => setBomForm({ ...bomForm, name: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <input placeholder="الإصدار" value={bomForm.version} onChange={(e) => setBomForm({ ...bomForm, version: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <ProductPicker
-                    required
-                    value={bomForm.componentProductId}
-                    selectedLabel={products.find((product) => product.id === bomForm.componentProductId)?.name}
-                    placeholder="مكوّن"
-                    ariaLabel="استعراض مكونات المنتج"
-                    onChange={(productId) => setBomForm({ ...bomForm, componentProductId: productId })}
-                  />
-                  <input required type="number" min="0.001" step="0.001" placeholder="الكمية" value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-sky-600 py-1.5 font-bold text-white">
-                    <Plus className="h-3.5 w-3.5" /> إنشاء
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {tab === 'orders' && (
-            <div className="grid gap-3 lg:grid-cols-3">
-              <DataTable
-                                ariaLabel="أوامر الإنتاج"
-                                rows={orders}
-                                rowKey={(order) => order.id}
-                                columns={[
-                                  { key: 'number', header: 'الرقم', render: (order) => <span className="font-mono text-xs">{order.orderNumber}</span> },
-                                  { key: 'product', header: 'المنتج', render: (order) => order.productName },
-                                  { key: 'quantity', header: 'الكمية', render: (order) => order.quantity },
-                                  { key: 'status', header: 'الحالة', render: (order) => order.status },
-                                  {
-                                    key: 'action', header: 'الإجراء',
-                                    render: (order) => (
-                                      <div className="flex flex-wrap gap-1">
-                                        {canManage && order.status === 'PLANNED' && (
-                                          <button className="rounded bg-sky-50 px-2 py-1 text-xs text-sky-700" onClick={() => release(order.id)}>إصدار</button>
-                                        )}
-                                        {canManage && order.status === 'RELEASED' && (
-                                          <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => start(order.id)}>بدء</button>
-                                        )}
-                                        {canManage && order.status === 'IN_PROGRESS' && (
-                                          <>
-                                            <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => complete(order.id)}>إكمال</button>
-                                            <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
-                                          </>
-                                        )}
-                                        {canManage && order.status === 'PLANNED' && (
-                                          <button className="rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => cancel(order.id)}>إلغاء</button>
-                                        )}
-                                      </div>
-                                    ),
-                                  },
-                                ]}
-                                emptyTitle="لا توجد أوامر إنتاج."
-                              />
-
-              {canManage && (
-                <form onSubmit={createOrder} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                  <h3 className="font-black text-slate-900">إنشاء أمر إنتاج</h3>
-                  <ProductPicker
-                    required
-                    value={orderForm.productId}
-                    selectedLabel={products.find((product) => product.id === orderForm.productId)?.name}
-                    placeholder="المنتج"
-                    ariaLabel="استعراض أصناف أمر الإنتاج"
-                    onChange={(productId) => setOrderForm({ ...orderForm, productId })}
-                  />
-                  <select required value={orderForm.bomId} onChange={(e) => setOrderForm({ ...orderForm, bomId: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5">
-                    <option value="">BOM نشط</option>
-                    {boms.filter((bom) => bom.status === 'ACTIVE').map((bom) => <option key={bom.id} value={bom.id}>{bom.name} ({bom.version})</option>)}
-                  </select>
-                  <input required type="number" min="0.001" step="0.001" placeholder="الكمية" value={orderForm.quantity} onChange={(e) => setOrderForm({ ...orderForm, quantity: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5" />
-                  <select value={orderForm.branchId} onChange={(e) => setOrderForm({ ...orderForm, branchId: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-1.5">
-                    <option value="">الفرع الافتراضي</option>
-                    {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                  </select>
-                  <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-sky-600 py-1.5 font-bold text-white">
-                    <Plus className="h-3.5 w-3.5" /> إنشاء
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
+          {tab === 'overview' && <OverviewTab {...shared} />}
+          {tab === 'orders' && <OrdersTab {...shared} />}
+          {tab === 'sales' && <SalesCandidatesTab {...shared} />}
+          {tab === 'workCenters' && <WorkCentersTab {...shared} />}
+          {tab === 'boms' && <BomsTab {...shared} />}
+          {tab === 'quality' && <QualityTab {...shared} />}
+          {tab === 'maintenance' && <MaintenanceTab {...shared} />}
+          {tab === 'costing' && <CostingTab {...shared} />}
         </>
       )}
     </div>

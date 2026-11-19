@@ -3,17 +3,22 @@ import type {
   CreateBomDTO,
   CreateMaintenanceDTO,
   CreateProductionOrderDTO,
+  CreateProductionOrderFromSalesItemDTO,
   CreateQualityCheckDTO,
   CreateWorkCenterDTO,
   MaintenanceRecord,
+  ProductionCostReport,
   ProductionOrder,
+  ProductionOrderCost,
   ProductionOrderMaterial,
   ProductionOrderOperation,
   QualityCheck,
+  SalesOrderProductionCandidate,
   UpdateMaintenanceDTO,
   UpdateQualityCheckDTO,
   WipOrder,
   WorkCenter,
+  WorkCenterLoad,
 } from './ManufacturingService/types';
 import { ManufacturingContext } from './ManufacturingService/context';
 import { WorkCentersModule } from './ManufacturingService/workCenters';
@@ -21,6 +26,7 @@ import { BomsModule } from './ManufacturingService/boms';
 import { ProductionOrdersModule } from './ManufacturingService/productionOrders';
 import { QualityModule } from './ManufacturingService/quality';
 import { MaintenanceModule } from './ManufacturingService/maintenance';
+import { CostingModule } from './ManufacturingService/costing';
 
 export * from './ManufacturingService/types';
 
@@ -42,6 +48,7 @@ export class ManufacturingService {
   private orders = new ProductionOrdersModule(this.ctx, this.boms);
   private quality = new QualityModule(this.ctx, this.orders);
   private maintenance = new MaintenanceModule(this.ctx);
+  private costing = new CostingModule(this.ctx, this.orders);
 
   // ── Work centers ──────────────────────────────────────────────────────────
 
@@ -120,6 +127,48 @@ export class ManufacturingService {
 
   public cancelOrder(id: string, reason?: string): ProductionOrder {
     return this.orders.cancelOrder(id, reason);
+  }
+
+  // ── Sales-order linkage (make-to-order) ───────────────────────────────────
+
+  /** Sales order items ready to be turned into production orders. */
+  public getSalesOrderProductionCandidates(): SalesOrderProductionCandidate[] {
+    return this.orders.getSalesOrderProductionCandidates();
+  }
+
+  /** Create a production order from a sales order item. */
+  public createProductionOrderFromSalesItem(
+    orderItemId: string,
+    input?: CreateProductionOrderFromSalesItemDTO
+  ): ProductionOrder {
+    return this.orders.createProductionOrderFromSalesItem(orderItemId, input);
+  }
+
+  /** Production coverage progress for a sales order (manufactured items only). */
+  public getSalesOrderProductionProgress(salesOrderId: string) {
+    return this.orders.getSalesOrderProductionProgress(salesOrderId);
+  }
+
+  // ── Costing & capacity planning ───────────────────────────────────────────
+
+  /** Actual incurred cost (materials consumed + labor) for one order. */
+  public getProductionOrderCost(orderId: string): ProductionOrderCost {
+    return this.costing.getProductionOrderCost(orderId);
+  }
+
+  /** Cost report across all non-cancelled production orders. */
+  public getProductionCostReport(): ProductionCostReport {
+    return this.costing.getProductionCostReport();
+  }
+
+  /** Per-work-center planned/actual load for active orders. */
+  public getCapacityPlan(): WorkCenterLoad[] {
+    return this.costing.getCapacityPlan();
+  }
+
+  /** Efficiency, labor variance and monthly output analytics. */
+  public getManufacturingAnalytics() {
+    return this.costing.getManufacturingAnalytics();
   }
 
   // ── Quality checks ────────────────────────────────────────────────────────

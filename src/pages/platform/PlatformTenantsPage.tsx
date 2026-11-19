@@ -29,6 +29,7 @@ import { UserModal } from './PlatformTenantsPage/UserModal';
 import { BulkActionModal } from './PlatformTenantsPage/BulkActionModal';
 import { CsvImportModal } from './PlatformTenantsPage/CsvImportModal';
 import { BranchModal } from './PlatformTenantsPage/BranchModal';
+import { TenantCatalogWizard, TenantCreatedModal } from './PlatformTenantsPage/TenantCatalogWizard';
 
 export const PlatformTenantsPage: React.FC = () => {
   const toast = useToast();
@@ -55,6 +56,9 @@ export const PlatformTenantsPage: React.FC = () => {
   const [editing, setEditing] = React.useState<PlatformTenant | null>(null);
   const [form, setForm] = React.useState<PlatformTenantInput>(emptyForm);
   const [saving, setSaving] = React.useState(false);
+  const [createdTenant, setCreatedTenant] = React.useState<PlatformTenant | null>(null);
+  const [catalogTenant, setCatalogTenant] = React.useState<PlatformTenant | null>(null);
+  const [catalogOpen, setCatalogOpen] = React.useState(false);
 
   const centralState = React.useMemo(() => getCentralDataSourceState(), []);
   const centralActive = centralState.active;
@@ -136,10 +140,11 @@ export const PlatformTenantsPage: React.FC = () => {
 
   const save = () => {
     setSaving(true);
-    const done = () => {
+    const done = (created?: PlatformTenant | null) => {
       setFormOpen(false);
       if (detail.detailId && editing?.id === detail.detailId) detail.loadProfile(detail.detailId);
       load();
+      if (!editing && created) setCreatedTenant(created);
     };
     const fail = (err: unknown) => toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
     if (centralActive) {
@@ -147,7 +152,10 @@ export const PlatformTenantsPage: React.FC = () => {
         ? centralPlatformClient.updateTenant(editing.id, form as Record<string, any>)
         : centralPlatformClient.createTenant(form);
       request
-        .then(() => { toast.success(editing ? 'تم تحديث بيانات العميل' : 'تمت إضافة العميل بنجاح'); done(); })
+        .then((result: any) => {
+          toast.success(editing ? 'تم تحديث بيانات العميل' : 'تمت إضافة العميل بنجاح');
+          done(editing ? null : (result as PlatformTenant));
+        })
         .catch(fail)
         .finally(() => setSaving(false));
       return;
@@ -156,11 +164,12 @@ export const PlatformTenantsPage: React.FC = () => {
       if (editing) {
         platformAdminService.updateTenant(editing.id, form);
         toast.success('تم تحديث بيانات العميل');
+        done(null);
       } else {
-        platformAdminService.createTenant(form);
+        const created = platformAdminService.createTenant(form);
         toast.success('تمت إضافة العميل بنجاح');
+        done(created);
       }
-      done();
     } catch (err) {
       fail(err);
     } finally {
@@ -358,6 +367,33 @@ export const PlatformTenantsPage: React.FC = () => {
         pushConfig={remote.pushConfig}
         remoteConfig={remote.remoteConfig}
         remoteHistory={remote.remoteHistory}
+        onOpenCatalog={canManageTenants ? () => {
+          if (detail.tenant) {
+            setCatalogTenant(detail.tenant);
+            setCatalogOpen(true);
+          }
+        } : undefined}
+      />
+
+      <TenantCreatedModal
+        open={Boolean(createdTenant)}
+        tenant={createdTenant}
+        onClose={() => setCreatedTenant(null)}
+        onContinue={() => {
+          setCatalogTenant(createdTenant);
+          setCreatedTenant(null);
+          setCatalogOpen(true);
+        }}
+      />
+
+      <TenantCatalogWizard
+        open={catalogOpen}
+        onClose={() => { setCatalogOpen(false); setCatalogTenant(null); }}
+        tenant={catalogTenant}
+        plan={plans.find((plan) => plan.id === catalogTenant?.planId) ?? null}
+        centralActive={centralActive}
+        canManageTenants={canManageTenants}
+        onApplied={load}
       />
 
       <AccountModal

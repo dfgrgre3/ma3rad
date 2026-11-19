@@ -226,6 +226,7 @@ export class PlatformModuleFeatureService {
     rolloutPercentage?: number;
     isStagingOnly?: boolean;
     minPlanTier?: string | null;
+    pagePaths?: string[];
   }): PlatformFeatureFlag {
     PlatformModuleFeatureService.requirePlatformAccess('features', 'platform.features.create');
 
@@ -233,6 +234,7 @@ export class PlatformModuleFeatureService {
     if (!code) throw new Error('رمز الميزة مطلوب.');
     const isEnabled = input.isEnabled ?? input.isActive ?? input.defaultEnabled ?? true;
     const rolloutPercent = toNumber(input.rolloutPercent ?? input.rolloutPercentage, 100);
+    const pagePathsJson = input.pagePaths !== undefined ? JSON.stringify(input.pagePaths) : null;
     const now = nowIso();
 
     const existing = input.id
@@ -241,17 +243,17 @@ export class PlatformModuleFeatureService {
 
     if (existing) {
       this.db.run(
-        `UPDATE platform_feature_flags SET code = ?, name = ?, description = ?, category = ?, is_enabled = ?, rollout_percent = ?, is_staging_only = ?, min_plan_tier = ?, updated_at = ?
+        `UPDATE platform_feature_flags SET code = ?, name = ?, description = ?, category = ?, is_enabled = ?, rollout_percent = ?, is_staging_only = ?, min_plan_tier = ?, page_paths = ?, updated_at = ?
          WHERE id = ?`,
-        [code, input.name, input.description ?? null, input.category ?? null, isEnabled ? 1 : 0, rolloutPercent, input.isStagingOnly ? 1 : 0, input.minPlanTier ?? null, now, existing.id]
+        [code, input.name, input.description ?? null, input.category ?? null, isEnabled ? 1 : 0, rolloutPercent, input.isStagingOnly ? 1 : 0, input.minPlanTier ?? null, pagePathsJson, now, existing.id]
       );
       this.audit('تحديث علم ميزة', 'FEATURE_FLAG', existing.id, { code });
     } else {
       const id = `ff_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       this.db.run(
-        `INSERT INTO platform_feature_flags (id, code, name, description, category, is_enabled, rollout_percent, is_staging_only, min_plan_tier, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, code, input.name, input.description ?? null, input.category ?? null, isEnabled ? 1 : 0, rolloutPercent, input.isStagingOnly ? 1 : 0, input.minPlanTier ?? null, now, now]
+        `INSERT INTO platform_feature_flags (id, code, name, description, category, is_enabled, rollout_percent, is_staging_only, min_plan_tier, page_paths, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, code, input.name, input.description ?? null, input.category ?? null, isEnabled ? 1 : 0, rolloutPercent, input.isStagingOnly ? 1 : 0, input.minPlanTier ?? null, pagePathsJson, now, now]
       );
       this.audit('إنشاء علم ميزة', 'FEATURE_FLAG', id, { code });
     }
@@ -494,6 +496,10 @@ export class PlatformModuleFeatureService {
       rolloutPercent: toNumber(row.rollout_percent, 100),
       isStagingOnly: Boolean(row.is_staging_only),
       minPlanTier: row.min_plan_tier ?? null,
+      pagePaths: (() => {
+        try { const parsed = JSON.parse(row.page_paths ?? '[]'); return Array.isArray(parsed) ? parsed.map(String) : []; }
+        catch { return []; }
+      })(),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };

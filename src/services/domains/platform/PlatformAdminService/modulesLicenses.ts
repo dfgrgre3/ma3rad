@@ -47,6 +47,7 @@ export interface ModulesLicensesApi {
     rolloutPercentage?: number;
     isStagingOnly?: boolean;
     minPlanTier?: string | null;
+    pagePaths?: string[];
   }): PlatformFeatureFlag;
   setFeatureEnabled(id: string, enabled: boolean): void;
   listReleases(): PlatformRelease[];
@@ -173,6 +174,7 @@ export function createModulesLicensesApi(): ModulesLicensesApi {
       rolloutPercentage?: number;
       isStagingOnly?: boolean;
       minPlanTier?: string | null;
+      pagePaths?: string[];
     }) {
       return platformModuleFeatureService.upsertFeatureFlag(input);
     },

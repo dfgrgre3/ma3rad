@@ -4,7 +4,8 @@ import type { BillOfMaterials, BomItem, CreateBomDTO } from './types';
 
 /** Bill-of-materials queries. Extracted verbatim from ManufacturingService. */
 export class BomsModule {
-  constructor(private ctx: ManufacturingContext) {}
+  private readonly ctx: ManufacturingContext;
+  constructor(ctx: ManufacturingContext) { this.ctx = ctx; }
 
   public getBoms(productId?: string): BillOfMaterials[] {
     this.ctx.require('manufacturing.view');

@@ -119,6 +119,9 @@ async function migratePlatformIdentityTables() {
     await addColumnIfMissing('platform_roles', roleColumns, 'code', `code TEXT`);
     await addColumnIfMissing('platform_roles', roleColumns, 'is_system', `is_system INTEGER NOT NULL DEFAULT 0`);
     await addColumnIfMissing('platform_roles', roleColumns, 'updated_at', `updated_at TEXT`);
+
+    const flagColumns = (await db.all(`PRAGMA table_info('platform_feature_flags')`)).map((col) => col.name);
+    await addColumnIfMissing('platform_feature_flags', flagColumns, 'page_paths', `page_paths TEXT`);
     await db.exec('UPDATE platform_roles SET code = id WHERE code IS NULL');
     await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_roles_code ON platform_roles(code)');
   }
@@ -966,6 +969,7 @@ async function createTables() {
       is_enabled INTEGER NOT NULL DEFAULT 0,
       rollout_percentage INTEGER NOT NULL DEFAULT 0,
       target_tenants TEXT,
+      page_paths TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );

@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
+import { localDateString } from '../../../../utils/shared/date';
+import { postLedgerEntry } from '../../../../database/repositories/ledger';
 import { InventoryLocationStockService } from '../../inventory/InventoryLocationStockService';
 import type { ManufacturingContext } from './context';
 import type { ProductionOrdersModule } from './productionOrders';
@@ -10,7 +12,9 @@ import type {
 
 /** Manufacturing quality-check queries. Extracted verbatim from ManufacturingService. */
 export class QualityModule {
-  constructor(private ctx: ManufacturingContext, private orders: ProductionOrdersModule) {}
+  private readonly ctx: ManufacturingContext;
+  private readonly orders: ProductionOrdersModule;
+  constructor(ctx: ManufacturingContext, orders: ProductionOrdersModule) { this.ctx = ctx; this.orders = orders; }
 
   public createQualityCheck(input: CreateQualityCheckDTO): QualityCheck {
     this.ctx.guardWrites();
@@ -162,42 +166,62 @@ export class QualityModule {
 
     const order = this.orders.getOrderInternal(existing.productionOrderId);
     const warehouseId = order?.warehouseId || null;
+    const productId = order?.productId || null;
+    const now = new Date().toISOString();
 
-    // SCRAP reduces finished/ component stock? Here we scrap rejected finished goods from warehouse.
-    if (disposition === 'SCRAP' && qty > 0 && warehouseId) {
-      const productId = order?.productId;
-      if (productId) {
-        const stock = this.ctx.db.query<{ quantityM2: number }>(
+    this.ctx.db.executeFinancialTransaction((db) => {
+      // SCRAP reduces finished-goods stock and posts the write-off value to
+      // the ledger: Dr 5201 (Damage Loss) / Cr 1104 (Inventory).
+      if (disposition === 'SCRAP' && qty > 0 && warehouseId && productId) {
+        const stock = db.query<{ quantityM2: number }>(
           `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?`,
           [warehouseId, productId]
         )[0];
         const current = Number(stock?.quantityM2 || 0);
         if (current < qty) throw new Error('الرصيد المتاح غير كافٍ للإتلاف.');
-        this.ctx.db.run(
+        db.run(
           `UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, last_updated = ? WHERE warehouse_id = ? AND product_id = ?`,
-          [qty, new Date().toISOString(), warehouseId, productId]
+          [qty, now, warehouseId, productId]
         );
-        InventoryLocationStockService.release(this.ctx.db, {
+        InventoryLocationStockService.release(db, {
           warehouseId,
           productId,
           quantity: qty,
           actorId: actor.id,
           reason: 'إتلاف (Scrap)',
         });
-        const txNumber = this.ctx.db.nextNumber('INV');
-        this.ctx.db.run(
+        const txNumber = db.nextNumber('INV');
+        db.run(
           `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at)
            VALUES (?, ?, 'ADJUSTMENT_SUB', ?, ?, ?, 0, 0, 0, 'QUALITY_DISPOSITION', ?, 'إتلاف (Scrap)', ?, ?)`,
-          [`itx_${uuidv4().replace(/-/g, '').slice(0, 12)}`, txNumber, productId, warehouseId, qty, id, actor.id, new Date().toISOString()]
+          [`itx_${uuidv4().replace(/-/g, '').slice(0, 12)}`, txNumber, productId, warehouseId, qty, id, actor.id, now]
         );
-      }
-    }
 
-    const now = new Date().toISOString();
-    this.ctx.db.run(
-      `UPDATE manufacturing_quality_checks SET disposition = ?, disposition_qty = ?, disposition_at = ?, updated_at = ? WHERE id = ?`,
-      [disposition, qty, now, now, id]
-    );
+        const unitCost = Number(
+          db.query<{ costPrice: number }>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [productId])[0]?.costPrice || 0
+        ) / 100;
+        const scrapValue = Math.round(qty * unitCost * 100) / 100;
+        if (scrapValue > 0) {
+          postLedgerEntry(db.getDatabase(), {
+            date: localDateString(),
+            description: `إتلاف جودة - فحص ${id}: ${qty} وحدة`,
+            referenceType: 'QUALITY_SCRAP',
+            referenceId: id,
+            createdBy: actor.id,
+            branchId: order?.branchId || null,
+            lines: [
+              { accountCode: '5201', debit: scrapValue, credit: 0 },
+              { accountCode: '1104', debit: 0, credit: scrapValue },
+            ],
+          });
+        }
+      }
+
+      db.run(
+        `UPDATE manufacturing_quality_checks SET disposition = ?, disposition_qty = ?, disposition_at = ?, updated_at = ? WHERE id = ?`,
+        [disposition, qty, now, now, id]
+      );
+    });
     this.ctx.audit('قرار معالجة جودة', id, { disposition, quantity: qty });
     return this.getQualityCheck(id);
   }

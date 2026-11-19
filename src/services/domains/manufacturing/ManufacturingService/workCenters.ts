@@ -4,7 +4,8 @@ import type { CreateWorkCenterDTO, WorkCenter } from './types';
 
 /** Work-center (مراكز العمل) queries. Extracted verbatim from ManufacturingService. */
 export class WorkCentersModule {
-  constructor(private ctx: ManufacturingContext) {}
+  private readonly ctx: ManufacturingContext;
+  constructor(ctx: ManufacturingContext) { this.ctx = ctx; }
 
   public getWorkCenters(branchId?: string): WorkCenter[] {
     const actor = this.ctx.require('manufacturing.view');
