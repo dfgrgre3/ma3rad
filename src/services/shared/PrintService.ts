@@ -2,7 +2,7 @@ import { DatabaseManager } from '../../database/repositories/databaseManager';
 import type { SalesInvoice, SystemSettings } from '../../types';
 import { SettingsService } from '../domains/config/SettingsService';
 import { getEffectiveBusinessType } from '../domains/config/BusinessTypeService';
-import { getProfilePrintTemplate } from '../../config/businessProfiles';
+import { getProfilePrintTemplate, getBusinessProfile } from '../../config/businessProfiles';
 import { writeAndPrintWindow } from '../../utils/shared/printWindow';
 import type { InvoiceHtmlOptions, InvoiceSizeId, InvoiceTemplateId } from './PrintService/types';
 import { getSampleInvoice } from './PrintService/sampleInvoice';
@@ -51,6 +51,13 @@ export class PrintService {
       : (optionsOrAutoPrint || {});
 
     const settings = { ...this.getSettings(), ...(opts.settingsOverride || {}) };
+    // Services-based activities never sell by box/grade/m², so the
+    // ceramics-oriented invoice columns stay hidden regardless of the
+    // tenant's generic print preferences.
+    if (getBusinessProfile(getEffectiveBusinessType()).configuration.businessModel === 'services') {
+      settings.invoiceShowBoxesCount = false;
+      settings.invoiceShowItemSpecs = false;
+    }
     const size: InvoiceSizeId = opts.size || (settings.defaultInvoiceSize as InvoiceSizeId) || 'a4';
     const profileTemplate = getProfilePrintTemplate(getEffectiveBusinessType(), 'sales_invoice');
     const resolvedProfileTemplate =

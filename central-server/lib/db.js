@@ -445,7 +445,7 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS platform_signing_keys (
       id TEXT PRIMARY KEY,
       key_id TEXT UNIQUE NOT NULL,
-      private_key TEXT NOT NULL,
+      private_key TEXT,
       public_key TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -900,6 +900,38 @@ async function createTables() {
   await ensureColumns('platform_remote_sessions', [
     ['expires_at', 'expires_at TEXT'],
   ]);
+
+  // platform_signing_keys.private_key becomes nullable so externally managed
+  // keys (PLATFORM_SIGNING_PRIVATE_KEY / PLATFORM_SIGNING_KEY_FILE) keep only
+  // public metadata in the database. SQLite cannot drop NOT NULL via ALTER
+  // TABLE, so rebuild the table when the legacy constraint is still present.
+  const signingKeyColumns = await db.all(`PRAGMA table_info('platform_signing_keys')`);
+  const privateKeyColumn = signingKeyColumns.find((col) => col.name === 'private_key');
+  if (privateKeyColumn && privateKeyColumn.notnull) {
+    try {
+      await db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE platform_signing_keys_new (
+          id TEXT PRIMARY KEY,
+          key_id TEXT UNIQUE NOT NULL,
+          private_key TEXT,
+          public_key TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TEXT
+        );
+        INSERT INTO platform_signing_keys_new (id, key_id, private_key, public_key, is_active, created_at, expires_at)
+          SELECT id, key_id, private_key, public_key, is_active, created_at, expires_at FROM platform_signing_keys;
+        DROP TABLE platform_signing_keys;
+        ALTER TABLE platform_signing_keys_new RENAME TO platform_signing_keys;
+        COMMIT;
+      `);
+    } catch (err) {
+      try { await db.exec('ROLLBACK'); } catch { /* no open transaction */ }
+      throw err;
+    }
+    console.log('Migrated platform_signing_keys: private_key is now nullable for externally managed keys');
+  }
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at)');

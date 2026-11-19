@@ -7,6 +7,7 @@ import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
 import { withModuleDependencies } from '../config/moduleRegistry';
 import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
+import { isActivityPathHidden } from '../config/activityPageVisibility';
 import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../services/domains/licensing/CentralFeaturePermissionService';
 import { PermissionService } from '../services/domains/auth/PermissionService';
@@ -68,6 +69,9 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ currentUser, children 
   }
 
   if (!AppConfigService.isPageEnabled(pathname)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (isActivityPathHidden(pathname, businessType)) {
     return <Navigate to="/dashboard" replace />;
   }
   if (moduleId && (!modules.includes(moduleId) || (moduleId === 'inventory' && !businessConfig.trackInventory))) {

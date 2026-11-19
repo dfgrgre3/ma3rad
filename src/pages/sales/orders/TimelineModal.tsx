@@ -2,7 +2,7 @@ import React from 'react';
 import { X, History } from 'lucide-react';
 import { Order, OrderStatusEntry } from '../../../services/domains/sales/OrderService';
 import { Modal } from './ui';
-import { STATUS_LABELS } from '../../../types/sales/ordersPage';
+import { getOrderStatusLabel } from '../../../types/sales/ordersPage';
 
 interface TimelineModalProps {
   order: Order;
@@ -24,10 +24,10 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({ order, entries, on
           <li key={entry.id} className="relative">
             <span className="absolute -right-[27px] top-1 w-3 h-3 rounded-full bg-violet-500 border-2 border-white shadow" />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-black text-slate-800">{STATUS_LABELS[entry.toStatus]?.label || entry.toStatus}</span>
+              <span className="text-xs font-black text-slate-800">{getOrderStatusLabel(entry.toStatus).label}</span>
               <span className="text-[10px] font-mono text-slate-400">{new Date(entry.createdAt).toLocaleString('ar-EG')}</span>
             </div>
-            {entry.fromStatus && <div className="text-[10px] text-slate-400 mt-0.5">من: {STATUS_LABELS[entry.fromStatus]?.label || entry.fromStatus}</div>}
+            {entry.fromStatus && <div className="text-[10px] text-slate-400 mt-0.5">من: {getOrderStatusLabel(entry.fromStatus).label}</div>}
             {entry.note && <div className="text-[11px] text-slate-600 mt-1">{entry.note}</div>}
             <div className="text-[10px] text-slate-400 mt-0.5">بواسطة {entry.createdByName || '—'}</div>
           </li>

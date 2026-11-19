@@ -1,4 +1,4 @@
-import { Order } from '../../../services/domains/sales/OrderService';
+import { Order, OrderStatus } from '../../../services/domains/sales/OrderService';
 import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 
 export interface OrderDetailModalProps {
@@ -11,6 +11,7 @@ export interface OrderDetailModalProps {
   onOpenTimeline: (order: Order) => void;
   onOpenDelivery: (order: Order) => void;
   onAdvance: (order: Order) => void;
+  onSetStatus: (order: Order, status: OrderStatus) => void;
   onOpenConvert: (order: Order) => void;
   onCancel: (order: Order) => void;
   operationalFields: OperationalFieldDefinition[];

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import {
   RotateCcw, ShieldCheck, Search, Eye,
   Printer, Loader2, X, RefreshCw,
@@ -53,6 +54,7 @@ export const AfterSalesPage: React.FC = () => {
   const toast = useToast();
   const salesService = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
+  const pageCopy = useActivityPageCopy('afterSales');
 
   const [activeTab, setActiveTab] = useState<'returns' | 'warranty' | 'analytics'>('returns');
   // تبويب التحليلات يعرض تجميعات أوسع من السجل — يتطلب صلاحية التحليلات.
@@ -127,8 +129,8 @@ export const AfterSalesPage: React.FC = () => {
       {/* Page Header */}
       <PageHeader
         icon={<RotateCcw className="w-5 h-5" />}
-        title="خدمة ما بعد البيع والضمانات (After-Sales & Warranty)"
-        description="إدارة المرتجعات، الإشعارات الدائنة، متابعة جودة المنتجات والضمان، وتحليل أسباب شكاوى واستبدال السيراميك"
+        title={pageCopy?.title || 'خدمة ما بعد البيع والضمانات (After-Sales & Warranty)'}
+        description={pageCopy?.description || 'إدارة المرتجعات، الإشعارات الدائنة، متابعة جودة المنتجات والضمان، وتحليل أسباب شكاوى واستبدال السيراميك'}
         actions={
           <button
             onClick={loadData}

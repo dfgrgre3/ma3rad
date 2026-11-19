@@ -11,6 +11,7 @@ import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from '../licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../licensing/CentralFeaturePermissionService';
 import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
+import { getActivityHiddenPaths } from '../../../config/activityPageVisibility';
 import { Folder } from 'lucide-react';
 
 export interface NavOverrides {
@@ -153,6 +154,11 @@ export class NavigationService {
     '/suppliers': 'entities.suppliers.plural',
     '/inventory': 'modules.inventory',
     '/sales': 'documents.salesInvoices',
+    '/projects': 'entities.projects.plural',
+    '/reports': 'modules.reports',
+    '/operations': 'modules.operations',
+    '/purchase-orders': 'modules.purchasing',
+    '/purchasing': 'modules.purchasing',
   };
 
   private static readonly routePermissions: Array<{ path: string; all?: string[]; any?: string[] }> = [
@@ -283,6 +289,7 @@ export class NavigationService {
     const hiddenGroupSet = new Set(hiddenGroups ?? []);
     const groupAssignments = source.groupAssignments ?? {};
     const hiddenSet = new Set(hidden);
+    const activityHiddenSet = new Set(getActivityHiddenPaths());
     const businessType = ModuleRegistryService.getBusinessType();
     const termOverrides = TerminologyService.getOverrides();
     const term = (key: BusinessTermKey) => resolveBusinessTerm(key, {
@@ -303,7 +310,8 @@ export class NavigationService {
       const rank = new Map(order.map((path, index) => [path, index]));
       const items = assignedItems
         .filter(({ item, groupId }) =>
-          groupId === group.id && (options.includeHidden || !hiddenSet.has(item.to))
+          groupId === group.id
+          && (options.includeHidden || (!hiddenSet.has(item.to) && !activityHiddenSet.has(item.to)))
         )
         .map(({ item }) => item)
         .map((item) => {
@@ -344,7 +352,9 @@ export class NavigationService {
       const order = itemsOrder[g.id] || [];
       const rank = new Map(order.map((path, index) => [path, index]));
       const items = assignedItems
-        .filter(({ groupId }) => groupId === g.id)
+        .filter(({ item, groupId }) =>
+          groupId === g.id && !activityHiddenSet.has(item.to)
+        )
         .map(({ item }) => item)
         .map((item) => {
           const page = AppConfigService.getPage(item.to);

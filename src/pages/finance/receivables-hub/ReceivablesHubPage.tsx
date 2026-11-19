@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
 const DebtsDashboardPage = lazy(() => import('../debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
@@ -24,6 +25,7 @@ type TabId = (typeof tabs)[number]['id'];
 export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTab }) => {
   const [params, setParams] = useSearchParams();
   const canAccess = useRouteAccess();
+  const pageCopy = useActivityPageCopy('finance');
   const allowedTabs = useMemo(() => {
     const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path));
     const followUpAllowed = permitted.some((item) => item.id === 'debts' || item.id === 'installments');
@@ -48,8 +50,8 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
     <div className="w-full space-y-4">
       <PageHeader
         icon={<Banknote className="h-5 w-5" />}
-        title="مركز الذمم والتحصيل"
-        description="مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة."
+        title={pageCopy?.title || 'مركز الذمم والتحصيل'}
+        description={pageCopy?.description || 'مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة.'}
       />
       <nav className="flex flex-wrap gap-2" aria-label="أقسام مركز الذمم">
         {allowedTabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => select(id)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-violet-700 text-white' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}><Icon className="h-4 w-4" />{label}</button>)}

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { OperationsService, type Branch, type WarehouseRow } from '../../../services/domains/operations/OperationsService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { BranchService } from '../../../services/domains/organization/BranchService';
 import { CompanyService } from '../../../services/domains/organization/CompanyService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -57,6 +58,7 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100';
 
 export const BranchesPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('operations');
   const operations = useMemo(() => new OperationsService(), []);
   const branchService = useMemo(() => new BranchService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
@@ -345,8 +347,8 @@ export const BranchesPage: React.FC = () => {
       <div className="border-b border-slate-200 bg-white px-5 pt-4 sm:px-7">
         <PageHeader
           icon={<Building2 className="h-5 w-5" />}
-          title="إدارة الفروع والمعارض"
-          description="بيانات الفروع، المسؤولون، المخازن، المستخدمون، وحركة كل فرع"
+          title={pageCopy?.title || 'إدارة الفروع والمعارض'}
+          description={pageCopy?.description || 'بيانات الفروع، المسؤولون، المخازن، المستخدمون، وحركة كل فرع'}
           actions={<>
             <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث

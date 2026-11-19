@@ -66,5 +66,104 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "net_profit",
+      "label": {
+        "ar": "صافي الربح",
+        "en": "net_profit"
+      },
+      "source": "finance",
+      "format": "currency"
+    },
+    {
+      "id": "total_debt",
+      "label": {
+        "ar": "إجمالي المديونيات",
+        "en": "total_debt"
+      },
+      "source": "finance",
+      "format": "currency"
+    },
+    {
+      "id": "receivables",
+      "label": {
+        "ar": "ديون العملاء",
+        "en": "receivables"
+      },
+      "source": "finance",
+      "format": "currency"
+    },
+    {
+      "id": "gross_profit",
+      "label": {
+        "ar": "مجمل الربح",
+        "en": "gross_profit"
+      },
+      "source": "sales",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "sales-analysis",
+      "category": "sales",
+      "label": {
+        "ar": "sales-analysis",
+        "en": "sales-analysis"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "financial-position",
+      "category": "sales",
+      "label": {
+        "ar": "financial-position",
+        "en": "financial-position"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "period-comparison",
+      "category": "sales",
+      "label": {
+        "ar": "period-comparison",
+        "en": "period-comparison"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "ar-aging",
+      "category": "sales",
+      "label": {
+        "ar": "ar-aging",
+        "en": "ar-aging"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "branch-performance",
+      "category": "sales",
+      "label": {
+        "ar": "branch-performance",
+        "en": "branch-performance"
+      }
+    }
+  ],
+  "features": [
+    "مقاولات",
+    "مستخلصات",
+    "مشاريع"
   ]
 }

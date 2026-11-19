@@ -41,6 +41,12 @@ function publicKeyFromRaw(rawPublicKey) {
   });
 }
 
+function publicKeyFromPrivate(rawSeed) {
+  const publicKey = crypto.createPublicKey(privateKeyFromRaw(rawSeed));
+  const spki = publicKey.export({ format: 'der', type: 'spki' });
+  return Buffer.from(spki.subarray(spki.length - 32));
+}
+
 function sign(message, privateKey) {
   return crypto.sign(null, message, privateKeyFromRaw(privateKey));
 }
@@ -53,4 +59,4 @@ function verify(message, signature, publicKey) {
   }
 }
 
-module.exports = { generateKeyPair, sign, verify };
+module.exports = { generateKeyPair, privateKeyFromRaw, publicKeyFromRaw, publicKeyFromPrivate, sign, verify };

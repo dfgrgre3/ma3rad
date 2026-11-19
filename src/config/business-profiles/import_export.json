@@ -66,5 +66,113 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "today_purchases",
+      "label": {
+        "ar": "مشتريات اليوم",
+        "en": "today_purchases"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "inventory_value",
+      "label": {
+        "ar": "قيمة المخزون",
+        "en": "inventory_value"
+      },
+      "source": "inventory",
+      "format": "currency"
+    },
+    {
+      "id": "low_stock",
+      "label": {
+        "ar": "نواقص المخزون",
+        "en": "low_stock"
+      },
+      "source": "inventory",
+      "format": "number"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "purchase-analysis",
+      "category": "sales",
+      "label": {
+        "ar": "purchase-analysis",
+        "en": "purchase-analysis"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "supplier-prices",
+      "category": "sales",
+      "label": {
+        "ar": "supplier-prices",
+        "en": "supplier-prices"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "inventory-balances",
+      "category": "sales",
+      "label": {
+        "ar": "inventory-balances",
+        "en": "inventory-balances"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "financial-position",
+      "category": "sales",
+      "label": {
+        "ar": "financial-position",
+        "en": "financial-position"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "ar-aging",
+      "category": "sales",
+      "label": {
+        "ar": "ar-aging",
+        "en": "ar-aging"
+      }
+    },
+    {
+      "id": "r5",
+      "reportId": "credit-exposure",
+      "category": "sales",
+      "label": {
+        "ar": "credit-exposure",
+        "en": "credit-exposure"
+      }
+    },
+    {
+      "id": "r6",
+      "reportId": "period-comparison",
+      "category": "sales",
+      "label": {
+        "ar": "period-comparison",
+        "en": "period-comparison"
+      }
+    }
+  ],
+  "features": [
+    "استيراد",
+    "شحن دولي",
+    "اعتمادات"
   ]
 }

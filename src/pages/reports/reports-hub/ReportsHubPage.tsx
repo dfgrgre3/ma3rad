@@ -7,6 +7,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { ReportView } from './ReportView';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { getBusinessProfile, getProfileReports } from '../../../config/businessProfiles';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { NoResultsState } from '../../../components/ui/StateViews';
@@ -60,6 +61,7 @@ export const ReportsHubPage: React.FC = () => {
     PermissionService.can(currentUser, reportPermission(report));
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  const pageCopy = useActivityPageCopy('reports');
   const urlCategory = params.categoryId || searchParams.get('category');
   const [category, setCategory] = useState<ReportCategoryId | 'all'>(() =>
     REPORT_CATEGORIES.some((item) => item.id === urlCategory)
@@ -166,17 +168,32 @@ export const ReportsHubPage: React.FC = () => {
     <div className="erp-page">
       <PageHeader
         icon={<BarChart3 className="h-5 w-5" />}
-        title="مركز التقارير والتحليلات"
-        description={`${visibleCount} تقريرًا في الحركة والمبيعات والائتمان والمخزون والمالية والتوقعات — ابحث واختر التقرير المطلوب.`}
+        title={pageCopy?.title || 'مركز التقارير والتحليلات'}
+        description={pageCopy?.description || `${visibleCount} تقريرًا في الحركة والمبيعات والائتمان والمخزون والمالية والتوقعات — ابحث واختر التقرير المطلوب.`}
         meta={
           getProfileReports(getEffectiveBusinessType()).length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[var(--ui-font-2xs)] font-bold text-[var(--cerami-muted)]">
                 موصى بها للنشاط ({getBusinessProfile(getEffectiveBusinessType()).name.ar}):
               </span>
-              {getProfileReports(getEffectiveBusinessType()).map((r) => (
-                <span key={r.id} className="erp-badge">{r.label.ar}</span>
-              ))}
+              {getProfileReports(getEffectiveBusinessType()).map((r) => {
+                const definition = REPORT_DEFINITIONS.find((report) => report.id === r.reportId);
+                const recommended = definition && canSeeReport(definition) ? definition : null;
+                const chipClass = 'erp-badge inline-flex items-center gap-1';
+                return recommended ? (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => openReport(recommended)}
+                    className={`${chipClass} transition-colors hover:border-[var(--win-accent)] hover:bg-[var(--win-accent-soft)]`}
+                    title={`فتح تقرير ${r.label.ar}`}
+                  >
+                    {r.label.ar}
+                  </button>
+                ) : (
+                  <span key={r.id} className={chipClass}>{r.label.ar}</span>
+                );
+              })}
             </div>
           ) : undefined
         }

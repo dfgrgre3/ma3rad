@@ -23,6 +23,7 @@ export function convertToInvoice(
   const order = getOrder(db, access, id);
   if (!order) throw new Error('الطلب غير موجود.');
   if (order.invoiceId) throw new Error('تم إصدار فاتورة لهذا الطلب بالفعل.');
+  if (order.status === 'ON_HOLD') throw new Error('الطلب معلّق مؤقتًا؛ استأنفه قبل إصدار الفاتورة.');
   if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
     throw new Error('لا يمكن إصدار فاتورة لطلب مكتمل أو ملغي.');
   }

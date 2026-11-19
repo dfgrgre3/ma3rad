@@ -149,9 +149,11 @@ export function updateStatus(db: DatabaseManager, access: BranchAccessService, i
 
   const allowed: Record<OrderStatus, OrderStatus[]> = {
     PENDING: ['CONFIRMED', 'CANCELLED'],
-    CONFIRMED: ['PROCESSING', 'CANCELLED'],
-    PROCESSING: ['PARTIAL', 'CANCELLED'],
-    PARTIAL: ['CANCELLED'],
+    CONFIRMED: ['PROCESSING', 'ON_HOLD', 'CANCELLED'],
+    PROCESSING: ['PARTIAL', 'READY', 'ON_HOLD', 'CANCELLED'],
+    PARTIAL: ['READY', 'CANCELLED'],
+    READY: ['PROCESSING', 'PARTIAL', 'CANCELLED'],
+    ON_HOLD: ['CONFIRMED', 'PROCESSING', 'CANCELLED'],
     COMPLETED: [],
     CANCELLED: [],
   };
@@ -201,6 +203,9 @@ export function recordDelivery(
   PermissionService.require(actor, 'orders.approve');
   const order = getOrder(db, access, id);
   if (!order) throw new Error('الطلب غير موجود.');
+  if (order.status === 'ON_HOLD') {
+    throw new Error('الطلب معلّق مؤقتًا؛ استأنفه قبل تسجيل تسليم.');
+  }
   if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
     throw new Error('لا يمكن تسجيل تسليم لطلب مكتمل أو ملغي.');
   }

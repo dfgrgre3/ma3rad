@@ -61,5 +61,113 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "today_sales",
+      "label": {
+        "ar": "مبيعات اليوم",
+        "en": "today_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "gross_profit",
+      "label": {
+        "ar": "مجمل الربح",
+        "en": "gross_profit"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "avg_order",
+      "label": {
+        "ar": "متوسط الفاتورة",
+        "en": "avg_order"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "low_stock",
+      "label": {
+        "ar": "نواقص المخزون",
+        "en": "low_stock"
+      },
+      "source": "inventory",
+      "format": "number"
+    },
+    {
+      "id": "receivables",
+      "label": {
+        "ar": "ديون العملاء",
+        "en": "receivables"
+      },
+      "source": "finance",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "product-sales",
+      "category": "sales",
+      "label": {
+        "ar": "product-sales",
+        "en": "product-sales"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "slow-moving",
+      "category": "sales",
+      "label": {
+        "ar": "slow-moving",
+        "en": "slow-moving"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "sales-analysis",
+      "category": "sales",
+      "label": {
+        "ar": "sales-analysis",
+        "en": "sales-analysis"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "ar-aging",
+      "category": "sales",
+      "label": {
+        "ar": "ar-aging",
+        "en": "ar-aging"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "shift-closing",
+      "category": "sales",
+      "label": {
+        "ar": "shift-closing",
+        "en": "shift-closing"
+      }
+    }
+  ],
+  "features": [
+    "عربات صيانة",
+    "ضمان",
+    "فروع متعددة"
   ]
 }

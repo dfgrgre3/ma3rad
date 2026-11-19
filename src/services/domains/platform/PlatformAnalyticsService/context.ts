@@ -1,4 +1,4 @@
-import type { DatabaseManager } from '../../../database/repositories/databaseManager';
+import type { DatabaseManager } from '../../../../database/repositories/databaseManager';
 import type {
   PlatformPeriod,
   PlatformBusinessPerformance,

@@ -71,5 +71,120 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "today_sales",
+      "label": {
+        "ar": "مبيعات اليوم",
+        "en": "today_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "avg_order",
+      "label": {
+        "ar": "متوسط الطلب",
+        "en": "avg_order"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "gross_profit",
+      "label": {
+        "ar": "مجمل الربح",
+        "en": "gross_profit"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "receivables",
+      "label": {
+        "ar": "ديون الضيوف",
+        "en": "receivables"
+      },
+      "source": "finance",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "sales-analysis",
+      "category": "sales",
+      "label": {
+        "ar": "sales-analysis",
+        "en": "sales-analysis"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "product-sales",
+      "category": "sales",
+      "label": {
+        "ar": "product-sales",
+        "en": "product-sales"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "shift-closing",
+      "category": "sales",
+      "label": {
+        "ar": "shift-closing",
+        "en": "shift-closing"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "daily-movements",
+      "category": "sales",
+      "label": {
+        "ar": "daily-movements",
+        "en": "daily-movements"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "basket",
+      "category": "sales",
+      "label": {
+        "ar": "basket",
+        "en": "basket"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "dining",
+      "label": {
+        "ar": "دورة طلب المطعم",
+        "en": "dining"
+      },
+      "steps": [
+        "فتح طاولة",
+        "أخذ الطلب",
+        "إرسال للمطبخ",
+        "تقديم",
+        "إغلاق حساب"
+      ]
+    }
+  ],
+  "features": [
+    "طاولات",
+    "مطبخ",
+    "وصفات"
   ]
 }

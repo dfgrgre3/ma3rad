@@ -15,7 +15,7 @@ import { Card } from '../ui/Card';
 import { FilterToolbar } from '../ui/FilterToolbar';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
+import { useBusinessProfileMeta, useBusinessTerm, useActivityPageCopy } from '../../hooks/domains/config/useBusinessTerm';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { usePermission } from '../../hooks/domains/auth/usePermission';
 import { ConfiguredActionButton } from '../config/ConfiguredActionButton';
@@ -37,6 +37,7 @@ export const CustomersView: React.FC = () => {
   const customersLabel = useBusinessTerm('entities.customers.plural');
   const customerSingularLabel = useBusinessTerm('entities.customers.singular');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
+  const pageCopy = useActivityPageCopy('customers');
   const can = usePermission();
   const canCreate = can('customers.create');
   const canUpdate = can('customers.update');
@@ -205,8 +206,8 @@ export const CustomersView: React.FC = () => {
   return (
     <div className="erp-page">
       <PageHeader
-        title={`إدارة ${customersLabel}`}
-        description={`متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية · ${businessProfileLabel}`}
+        title={pageCopy?.title ? pageCopy.title : `إدارة ${customersLabel}`}
+        description={pageCopy?.description || `متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية · ${businessProfileLabel}`}
         icon={<Users className="h-5 w-5" />}
         actions={
           <ConfiguredActionButton

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Order } from '../../../services/domains/sales/OrderService';
 import { IconBtn } from './ui';
-import { STATUS_LABELS, fmt } from '../../../types/sales/ordersPage';
+import { getOrderStatusLabel, fmt } from '../../../types/sales/ordersPage';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -81,7 +81,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
         {
           key: 'status', header: 'الحالة',
           render: (o: any) => {
-            const st = (STATUS_LABELS as Record<string, { label: string; color: string }>)[o.status];
+            const st = getOrderStatusLabel(o.status);
             return (
               <div>
                 <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${st.color}`}>{st.label}</span>
@@ -106,10 +106,10 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
               {canUpdate && o.status === 'PENDING' && (
                 <IconBtn title="تعديل الطلب" onClick={() => onEditOrder(o)}><Pencil className="h-4 w-4" /></IconBtn>
               )}
-              {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(o.status) && (
+              {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
                 <IconBtn title="تسجيل تسليم" onClick={() => onOpenDelivery(o)}><PackageCheck className="h-4 w-4 text-sky-600" /></IconBtn>
               )}
-              {canUpdate && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(o.status) && (
+              {canUpdate && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
                 <button onClick={() => onOpenConvert(o)} className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"><Receipt className="h-3 w-3" /> فاتورة</button>
               )}
               {canDelete && o.status === 'CANCELLED' && (

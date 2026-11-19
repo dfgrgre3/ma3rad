@@ -78,18 +78,42 @@ async function getOrCreateEncryptionKey(): Promise<CryptoKey | null> {
       }
     }
 
-    // Legacy path: existing installs keep an exportable JWK in localStorage.
+    // Legacy migration: installs created before the non-extractable
+    // IndexedDB key may still hold an exportable JWK in localStorage. Re-wrap
+    // the same key material as a non-extractable CryptoKey, persist it in
+    // IndexedDB, then remove the raw key from localStorage so it no longer
+    // sits next to the data it protects.
     if (typeof localStorage !== 'undefined') {
       const storedKey = localStorage.getItem(DB_ENCRYPTION_KEY_KEY);
       if (storedKey) {
-        const keyData = JSON.parse(storedKey);
-        return await crypto.subtle.importKey(
-          'jwk',
-          keyData,
-          { name: 'AES-GCM', length: 256 },
-          true,
-          ['encrypt', 'decrypt']
-        );
+        try {
+          const keyData = JSON.parse(storedKey);
+          const jwkAlgorithm = { name: 'AES-GCM', length: 256 } as const;
+          const usages = ['encrypt', 'decrypt'] as const;
+          if (typeof indexedDB !== 'undefined') {
+            const migratedKey = await crypto.subtle.importKey('jwk', keyData, jwkAlgorithm, false, [...usages]);
+            const db = await openDatabaseStorage();
+            try {
+              await new Promise<void>((resolve, reject) => {
+                const transaction = db.transaction(DB_IDB_KEY_STORE, 'readwrite');
+                transaction.objectStore(DB_IDB_KEY_STORE).put(migratedKey, DB_IDB_ENCRYPTION_KEY_ID);
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+                transaction.onabort = () => reject(transaction.error || new Error('Browser key storage write aborted'));
+              });
+            } finally {
+              db.close();
+            }
+            localStorage.removeItem(DB_ENCRYPTION_KEY_KEY);
+            return migratedKey;
+          }
+          // IndexedDB is unavailable: keep using the legacy key for this
+          // session so existing snapshots remain readable, but never create
+          // or persist new exportable keys.
+          return await crypto.subtle.importKey('jwk', keyData, jwkAlgorithm, true, [...usages]);
+        } catch (error) {
+          console.warn('[database] Failed to migrate legacy localStorage encryption key:', error);
+        }
       }
     }
 
@@ -117,24 +141,15 @@ async function getOrCreateEncryptionKey(): Promise<CryptoKey | null> {
         }
         return key;
       } catch (error) {
-        console.warn('[database] Could not persist encryption key in IndexedDB; falling back to localStorage JWK:', error);
+        console.warn('[database] Could not persist encryption key in IndexedDB; encryption unavailable:', error);
+        return null;
       }
     }
 
-    // Last resort for environments without IndexedDB: exportable JWK in
-    // localStorage (legacy behaviour, weaker threat model).
-    if (typeof localStorage !== 'undefined') {
-      const exportableKey = await crypto.subtle.generateKey(
-        { name: 'AES-GCM', length: 256 },
-        true,
-        ['encrypt', 'decrypt']
-      );
-      const exportedKey = await crypto.subtle.exportKey('jwk', exportableKey);
-      localStorage.setItem(DB_ENCRYPTION_KEY_KEY, JSON.stringify(exportedKey));
-      return exportableKey;
-    }
-
-    return key;
+    // There is no safe at-rest location for key material without IndexedDB,
+    // so an exportable localStorage JWK is never created. Callers fall back
+    // to plaintext storage in development and fail closed in production.
+    return null;
   } catch (error) {
     console.warn('[database] Failed to setup encryption, using unencrypted storage:', error);
     return null;

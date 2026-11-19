@@ -27,6 +27,7 @@ export function recordDeposit(
   if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(paymentType)) throw new Error('طريقة الدفع غير مدعومة لعربون الطلب.');
   const order = getOrder(db, access, id);
   if (!order) throw new Error('الطلب غير موجود.');
+  if (order.status === 'ON_HOLD') throw new Error('الطلب معلّق مؤقتًا؛ استأنفه قبل تسجيل عربون.');
   if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
     throw new Error('لا يمكن تسجيل عربون لطلب مكتمل أو ملغي.');
   }
@@ -67,8 +68,8 @@ export function recordDeposit(
               status, billing_status AS billingStatus, customer_id AS customerId, branch_id AS branchId
        FROM orders WHERE id = ?`, [id]
     )[0];
-    if (!current || ['COMPLETED', 'CANCELLED'].includes(current.status) || current.billingStatus === 'INVOICED') {
-      throw new Error('Cannot record a deposit for a completed, cancelled, or invoiced order.');
+    if (!current || ['COMPLETED', 'CANCELLED', 'ON_HOLD'].includes(current.status) || current.billingStatus === 'INVOICED') {
+      throw new Error('Cannot record a deposit for a completed, cancelled, on-hold, or invoiced order.');
     }
     const newPaid = round2(Number(current.paidAmount || 0) + deposit);
     const newRemaining = round2(Number(current.remainingAmount || 0) - deposit);
@@ -77,7 +78,7 @@ export function recordDeposit(
     }
     tx.run(
       `UPDATE orders SET paid_amount = ROUND(?*100), remaining_amount = ROUND(?*100), financial_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED') AND billing_status != 'INVOICED'
+       WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED', 'ON_HOLD') AND billing_status != 'INVOICED'
          AND remaining_amount >= ROUND(?*100)`,
       [newPaid, Math.max(0, newRemaining), newPaid >= Number(current.totalAmount) - 0.009 ? 'PAID' : 'PARTIAL', id, deposit]
     );

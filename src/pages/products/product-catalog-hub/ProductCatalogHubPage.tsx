@@ -2,6 +2,7 @@ import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Barcode, FolderTree, Package, Ruler, Tags } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -30,6 +31,7 @@ const PAGE_BY_TAB = {
 export const ProductCatalogHubPage: React.FC = () => {
   const { pathname } = useLocation();
   const canAccess = useRouteAccess();
+  const pageCopy = useActivityPageCopy('products');
   // Tabs follow the exact same route rules as the MainLayout guard — no
   // per-tab permission map that can drift from ROUTE_PERMISSIONS.
   const tabs = TABS.filter((tab) => canAccess(tab.path));
@@ -48,8 +50,8 @@ export const ProductCatalogHubPage: React.FC = () => {
 
   return (
     <WorkspaceHub
-      title="كتالوج المنتجات"
-      description="إدارة الأصناف وتصنيفاتها وماركاتها وخصائصها وباركوداتها من مركز واحد."
+      title={pageCopy?.title || 'كتالوج المنتجات'}
+      description={pageCopy?.description || 'إدارة الأصناف وتصنيفاتها وماركاتها وخصائصها وباركوداتها من مركز واحد.'}
       icon={Package}
       tabs={tabs}
       activeTab={activeTab}

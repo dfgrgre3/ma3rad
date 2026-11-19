@@ -8,6 +8,7 @@ import { DocumentService } from '../../../services/domains/documents/DocumentSer
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { exportToExcel } from '../../../utils/export/export';
 import type {
   ContractEffectiveStatus,
@@ -68,6 +69,7 @@ async function pickAttachment(): Promise<EnterpriseDocumentVersion | null> {
 }
 
 export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' }) => {
+  const pageCopy = useActivityPageCopy('documents');
   const toast = useToast();
   const can = usePermission();
   const navigate = useNavigate();
@@ -447,8 +449,8 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 pt-4">
         <PageHeader
           icon={<FileText className="w-5 h-5" />}
-          title="مركز المستندات والعقود"
-          description="نسخ موثقة، صلاحيات وصول، ومتابعة تجديد العقود"
+          title={pageCopy?.title || 'مركز المستندات والعقود'}
+          description={pageCopy?.description || 'نسخ موثقة، صلاحيات وصول، ومتابعة تجديد العقود'}
           actions={<>
             <button onClick={load} className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50" title="تحديث">
               <RefreshCw className="w-4 h-4" />

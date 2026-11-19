@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Calendar, RefreshCw } from 'lucide-react';
 import { OrderStatus } from '../../../services/domains/sales/OrderService';
-import { STATUS_LABELS } from '../../../types/sales/ordersPage';
+import { getOrderStatusLabel, STATUS_LABELS } from '../../../types/sales/ordersPage';
 
 interface OrdersFiltersProps {
   search: string;
@@ -34,7 +34,7 @@ export const OrdersFilters: React.FC<OrdersFiltersProps> = ({
       </div>
       <select value={statusFilter} onChange={(e) => onStatusChange(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
         <option value="ALL">كل الحالات</option>
-        {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        {Object.keys(STATUS_LABELS).map((k) => <option key={k} value={k}>{getOrderStatusLabel(k as OrderStatus).label}</option>)}
       </select>
       <button onClick={onRefresh} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
     </div>

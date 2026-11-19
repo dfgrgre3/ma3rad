@@ -27,7 +27,7 @@ export function getThermalInvoiceHtml(
         <div style="font-weight: 700;">${esc(item.productName)}</div>
         <div style="font-size: 10px; color: #444;">${esc(item.productSku)} | ${esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}</div>
         <div style="display: flex; justify-content: space-between;">
-          <span>${formatProductQuantity(item.quantityM2, item)}${item.productType === 'GENERAL' ? '' : ` (${item.boxesCount} كرتونة)`} × ${item.unitPrice}</span>
+          <span>${formatProductQuantity(item.quantityM2, item)}${settings.invoiceShowBoxesCount !== false && item.productType !== 'GENERAL' ? ` (${item.boxesCount} كرتونة)` : ''} × ${item.unitPrice}</span>
           <span style="font-weight: 700;">${CeramicMath.formatCurrency(item.totalPrice)}</span>
         </div>
         ${settings.invoiceShowLineDiscount && item.discountAmount > 0 ? `<div style="display: flex; justify-content: space-between; color: #b91c1c; font-size: 10px;"><span>خصم</span><span>-${CeramicMath.formatCurrency(item.discountAmount)}</span></div>` : ''}

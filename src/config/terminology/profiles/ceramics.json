@@ -1,8 +1,20 @@
 {
+  "entities.products.singular": {
+    "ar": "بلاطة / صنف سيراميك"
+  },
   "entities.products.plural": {
-    "ar": "الأصناف"
+    "ar": "البلاط والسيراميك"
+  },
+  "entities.customers.plural": {
+    "ar": "العملاء والمهندسون"
   },
   "modules.inventory": {
     "ar": "مخزون المعرض"
+  },
+  "modules.sales": {
+    "ar": "مبيعات البلاط"
+  },
+  "documents.salesInvoices": {
+    "ar": "فواتير البلاط"
   }
 }

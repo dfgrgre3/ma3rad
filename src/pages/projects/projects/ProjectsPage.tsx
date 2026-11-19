@@ -14,6 +14,7 @@ import { OperationalFieldsRecordEditor } from '../../../components/products/Oper
 
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
   PLANNED:   { label: 'قيد التخطيط', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
   ACTIVE:    { label: 'جاري التنفيذ', color: 'text-sky-700',    bg: 'bg-sky-50 border-sky-200' },
@@ -25,6 +26,7 @@ const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
 export const ProjectsPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('projects');
   const toast = useToast();
   const service = new ProjectService();
   const fieldService = new OperationalFieldService();
@@ -113,7 +115,7 @@ export const ProjectsPage: React.FC = () => {
           icon={<Boxes className="w-5 h-5" />}
           title={
             <span className="flex items-center gap-2">
-              مشاريع المقاولين والعملاء
+              {pageCopy?.title || 'مشاريع المقاولين والعملاء'}
               <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold border border-violet-200">{projects.length}</span>
             </span>
           }

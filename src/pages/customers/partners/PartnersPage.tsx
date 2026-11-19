@@ -4,6 +4,7 @@ import {
   History, Plus, RefreshCw, Users, Wallet, BarChart3,
 } from 'lucide-react';
 import { usePartnersPage } from '../../../hooks/pages/customers/partners/usePartnersPage';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { SummaryCard } from './PartnersPage/PartnerUi';
@@ -19,6 +20,7 @@ import { PartnerProfitsModal } from './components/PartnerProfitsModal';
 
 export const PartnersPage: React.FC = () => {
   const vm = usePartnersPage();
+  const pageCopy = useActivityPageCopy('partners');
   const {
     partners, overview, tab, setTab, loading, error, modal,
     canManage, canDistribute, canExport,
@@ -46,8 +48,8 @@ export const PartnersPage: React.FC = () => {
 
       <PageHeader
         icon={<Users className="h-5 w-5" />}
-        title="حسابات الشركاء"
-        description="نسب الملكية ورأس المال والقروض والمسحوبات والأرباح والتسويات وكشوف الحساب."
+        title={pageCopy?.title || 'حسابات الشركاء'}
+        description={pageCopy?.description || 'نسب الملكية ورأس المال والقروض والمسحوبات والأرباح والتسويات وكشوف الحساب.'}
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={refresh} disabled={loading} leadingIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}>

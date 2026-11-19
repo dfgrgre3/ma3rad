@@ -71,5 +71,122 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "today_sales",
+      "label": {
+        "ar": "مبيعات اليوم",
+        "en": "today_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "inventory_value",
+      "label": {
+        "ar": "قيمة المخزون",
+        "en": "inventory_value"
+      },
+      "source": "inventory",
+      "format": "currency"
+    },
+    {
+      "id": "low_stock",
+      "label": {
+        "ar": "نواقص المخزون",
+        "en": "low_stock"
+      },
+      "source": "inventory",
+      "format": "number"
+    },
+    {
+      "id": "gross_profit",
+      "label": {
+        "ar": "مجمل الربح",
+        "en": "gross_profit"
+      },
+      "source": "sales",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "sales-analysis",
+      "category": "sales",
+      "label": {
+        "ar": "sales-analysis",
+        "en": "sales-analysis"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "product-sales",
+      "category": "sales",
+      "label": {
+        "ar": "product-sales",
+        "en": "product-sales"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "inventory-balances",
+      "category": "sales",
+      "label": {
+        "ar": "inventory-balances",
+        "en": "inventory-balances"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "slow-moving",
+      "category": "sales",
+      "label": {
+        "ar": "slow-moving",
+        "en": "slow-moving"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "count-variance",
+      "category": "sales",
+      "label": {
+        "ar": "count-variance",
+        "en": "count-variance"
+      }
+    },
+    {
+      "id": "r5",
+      "reportId": "daily-movements",
+      "category": "sales",
+      "label": {
+        "ar": "daily-movements",
+        "en": "daily-movements"
+      }
+    },
+    {
+      "id": "r6",
+      "reportId": "shift-closing",
+      "category": "sales",
+      "label": {
+        "ar": "shift-closing",
+        "en": "shift-closing"
+      }
+    }
+  ],
+  "features": [
+    "تاريخ صلاحية",
+    "باركود",
+    "أوزان"
   ]
 }

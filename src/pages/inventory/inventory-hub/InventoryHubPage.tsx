@@ -5,6 +5,7 @@ import {
   PackageSearch, Scale, ShieldAlert, Warehouse, Wrench,
 } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -59,6 +60,7 @@ const PAGE_BY_TAB = {
 export const InventoryHubPage: React.FC = () => {
   const { pathname } = useLocation();
   const canAccess = useRouteAccess();
+  const pageCopy = useActivityPageCopy('inventory');
   // Tabs follow the exact same route rules as the MainLayout guard — no
   // per-tab permission map that can drift from ROUTE_PERMISSIONS.
   const tabs = TABS.filter((tab) => canAccess(tab.path));
@@ -77,8 +79,8 @@ export const InventoryHubPage: React.FC = () => {
 
   return (
     <WorkspaceHub
-      title="مركز المخزون"
-      description="نظرة موحدة على الأرصدة والتنبيهات، مع بقاء عمليات المخزون المتخصصة مستقلة."
+      title={pageCopy?.title || 'مركز المخزون'}
+      description={pageCopy?.description || 'نظرة موحدة على الأرصدة والتنبيهات، مع بقاء عمليات المخزون المتخصصة مستقلة.'}
       icon={Layers}
       tabs={tabs}
       activeTab={activeTab}

@@ -1,5 +1,5 @@
-import { localDateString } from '../../../utils/shared/date';
-import { csvCell } from '../../../utils/export/csv';
+import { localDateString } from '../../../../utils/shared/date';
+import { csvCell } from '../../../../utils/export/csv';
 import {
   type BusinessPartner,
   type PartnerDraft,
@@ -9,7 +9,7 @@ import {
   type PartnerTransaction,
   type PartnerTransactionAction,
   type PartnerTransactionType,
-} from '../../../services/domains/customers/PartnerService';
+} from '../../../../services/domains/customers/PartnerService';
 
 export const formatNumber = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
 export const formatMoney = (value: number) => `${formatNumber.format(value || 0)} ج.م`;

@@ -1,23 +1,23 @@
 import React from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
-import { X, Printer, MessageCircle, History, PackageCheck, ChevronLeft, Receipt, Ban } from 'lucide-react';
+import { X, Printer, MessageCircle, History, PackageCheck, ChevronLeft, Receipt, Ban, Pause, Play } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { Modal, Info } from './ui';
-import { STATUS_LABELS, fmt } from '../../../types/sales/ordersPage';
+import { getOrderActionLabels, getOrderStatusLabel, fmt } from '../../../types/sales/ordersPage';
 import { summarizeOrderQuantity } from './helpers';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import type { OrderDetailModalProps } from './OrderDetailModal_part01';
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   order: detail, canUpdate, canApprove, onClose, onPrint, onShareOnWhatsApp,
-  onOpenTimeline, onOpenDelivery, onAdvance, onOpenConvert, onCancel,
+  onOpenTimeline, onOpenDelivery, onAdvance, onSetStatus, onOpenConvert, onCancel,
   operationalFields, operationalFieldValues,
 }) => (
   <Modal onClose={onClose} wide>
     <div className="flex items-start justify-between mb-4">
       <div>
         <h3 className="text-base font-black text-slate-900">طلب {detail.orderNumber}</h3>
-        <p className="text-[11px] text-slate-500 mt-1">{detail.date} • {detail.warehouseName} • {STATUS_LABELS[detail.status].label}</p>
+        <p className="text-[11px] text-slate-500 mt-1">{detail.date} • {detail.warehouseName} • {getOrderStatusLabel(detail.status).label}</p>
       </div>
       <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
       <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
@@ -81,16 +81,31 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
       <button onClick={() => onShareOnWhatsApp(detail)} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
       <button onClick={() => onOpenTimeline(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> سجل الحالات</button>
-      {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && (
+      {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && (
         <button onClick={() => onOpenDelivery(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تسجيل تسليم</button>
       )}
       {canApprove && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
         <button onClick={() => onAdvance(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
           <ChevronLeft className="w-3.5 h-3.5" />
-          {detail.status === 'PENDING' ? 'تأكيد الطلب' : 'بدء التجهيز'}
+          {detail.status === 'PENDING' ? getOrderActionLabels().confirm : getOrderActionLabels().start}
         </button>
       )}
-      {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
+      {canApprove && ['CONFIRMED', 'PROCESSING'].includes(detail.status) && (
+        <button onClick={() => onSetStatus(detail, 'ON_HOLD')} className="px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><Pause className="w-3.5 h-3.5" /> تعليق مؤقت</button>
+      )}
+      {canApprove && detail.status === 'ON_HOLD' && (
+        <>
+          <button onClick={() => onSetStatus(detail, 'CONFIRMED')} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تأكيد</button>
+          <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تجهيز</button>
+        </>
+      )}
+      {canApprove && detail.status === 'PROCESSING' && (
+        <button onClick={() => onSetStatus(detail, 'READY')} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تحديد كجاهز</button>
+      )}
+      {canApprove && detail.status === 'READY' && (
+        <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><ChevronLeft className="w-3.5 h-3.5" /> إعادة للتجهيز</button>
+      )}
+      {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
         <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
       )}
       {canApprove && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (

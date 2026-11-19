@@ -772,7 +772,7 @@ export function usePosView() {
     closingCash, setClosingCash, closingNotes, setClosingNotes,
     toneConflicts, setToneConflicts, isToneWarningOpen, setIsToneWarningOpen,
     newCustName, setNewCustName, newCustPhone, setNewCustPhone, newCustType, setNewCustType,
-    newCustCredit, setNewCustCredit, customerError,
+    newCustCredit, setNewCustCredit, customerError, setCustomerError,
     shiftRegisterId, setShiftRegisterId, openingBalance, setOpeningBalance,
     barcodeInputRef, paidInputRef,
     productService, operationalFieldService, inventoryService, customerService,

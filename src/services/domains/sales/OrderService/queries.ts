@@ -114,7 +114,7 @@ export function getStats(db: DatabaseManager, access: BranchAccessService): Orde
             COALESCE(SUM(total_amount) / 100.0, 0) AS totalValue,
             COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending,
             COALESCE(SUM(CASE WHEN status = 'PENDING' THEN total_amount ELSE 0 END) / 100.0, 0) AS pendingValue,
-            COALESCE(SUM(CASE WHEN status IN ('CONFIRMED','PROCESSING','PARTIAL') THEN 1 ELSE 0 END), 0) AS processing,
+            COALESCE(SUM(CASE WHEN status IN ('CONFIRMED','PROCESSING','PARTIAL','READY','ON_HOLD') THEN 1 ELSE 0 END), 0) AS processing,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END) / 100.0, 0) AS completedValue,
             COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled

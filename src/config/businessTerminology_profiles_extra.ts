@@ -14,17 +14,22 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
     'entities.products.singular': { ar: 'قطعة غيار' },
     'entities.products.plural': { ar: 'قطع الغيار' },
     'modules.inventory': { ar: 'مخزن القطع' },
+    'modules.sales': { ar: 'مبيعات القطع' },
     'documents.salesInvoices': { ar: 'فواتير القطع' },
   },
   building_materials: {
     'entities.products.singular': { ar: 'مادة بناء' },
     'entities.products.plural': { ar: 'مواد البناء' },
     'modules.inventory': { ar: 'مخزن الخامات' },
+    'modules.sales': { ar: 'مبيعات المواد' },
+    'documents.salesInvoices': { ar: 'فواتير المواد' },
   },
   clothing: {
     'entities.products.singular': { ar: 'قطعة ملابس' },
     'entities.products.plural': { ar: 'القطع' },
     'entities.customers.plural': { ar: 'العملاء' },
+    'modules.sales': { ar: 'مبيعات المحل' },
+    'documents.salesInvoices': { ar: 'فواتير المحل' },
   },
   construction: {
     'entities.customers.singular': { ar: 'صاحب مشروع' },
@@ -39,6 +44,8 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
   cosmetics: {
     'entities.products.singular': { ar: 'منتج تجميل' },
     'entities.products.plural': { ar: 'منتجات التجميل' },
+    'modules.sales': { ar: 'مبيعات التجميل' },
+    'documents.salesInvoices': { ar: 'فواتير التجميل' },
   },
   ecommerce: {
     'documents.salesInvoices': { ar: 'طلبات العملاء' },
@@ -55,6 +62,8 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
     'entities.products.singular': { ar: 'جهاز / إكسسوار' },
     'entities.products.plural': { ar: 'الأجهزة والإكسسوارات' },
     'modules.inventory': { ar: 'مخزن الأجهزة' },
+    'modules.sales': { ar: 'مبيعات الأجهزة' },
+    'documents.salesInvoices': { ar: 'فواتير الأجهزة' },
   },
   food: {
     'entities.products.singular': { ar: 'صنف غذائي' },
@@ -65,6 +74,8 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
     'entities.products.singular': { ar: 'قطعة أثاث' },
     'entities.products.plural': { ar: 'الأثاث' },
     'modules.inventory': { ar: 'مخزن الأثاث' },
+    'modules.sales': { ar: 'مبيعات الأثاث' },
+    'documents.salesInvoices': { ar: 'فواتير الأثاث' },
   },
   healthcare_admin: {
     'entities.customers.singular': { ar: 'مريض' },
@@ -77,6 +88,8 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
     'entities.products.singular': { ar: 'جهاز كهربائي' },
     'entities.products.plural': { ar: 'الأجهزة الكهربائية' },
     'modules.inventory': { ar: 'مخزن الأجهزة' },
+    'modules.sales': { ar: 'مبيعات الأجهزة' },
+    'documents.salesInvoices': { ar: 'فواتير الأجهزة' },
   },
   hospitality: {
     'entities.customers.singular': { ar: 'نزيل' },
@@ -94,6 +107,8 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
   lighting: {
     'entities.products.singular': { ar: 'منتج إضاءة' },
     'entities.products.plural': { ar: 'منتجات الإضاءة' },
+    'modules.sales': { ar: 'مبيعات الإضاءة' },
+    'documents.salesInvoices': { ar: 'فواتير الإضاءة' },
   },
   logistics: {
     'entities.products.singular': { ar: 'شحنة' },
@@ -120,5 +135,24 @@ export const EXTRA_BUSINESS_PROFILE_TERMINOLOGY: Record<
     'entities.products.singular': { ar: 'أداة صحية' },
     'entities.products.plural': { ar: 'الأدوات الصحية' },
     'modules.inventory': { ar: 'مخزن الأدوات' },
+    'modules.sales': { ar: 'مبيعات الأدوات' },
+    'documents.salesInvoices': { ar: 'فواتير الأدوات' },
+  },
+  workshop: {
+    'entities.products.singular': { ar: 'قطعة غيار' },
+    'entities.products.plural': { ar: 'قطع الغيار' },
+    'entities.customers.singular': { ar: 'عميل / سيارة' },
+    'entities.customers.plural': { ar: 'السيارات والعملاء' },
+    'modules.inventory': { ar: 'مخزن القطع' },
+    'modules.sales': { ar: 'ورشة الصيانة' },
+    'documents.salesInvoices': { ar: 'فواتير الصيانة' },
+  },
+  general: {
+    'modules.sales': { ar: 'المبيعات' },
+    'documents.salesInvoices': { ar: 'فواتير المبيعات' },
+  },
+  custom: {
+    'modules.sales': { ar: 'المبيعات' },
+    'documents.salesInvoices': { ar: 'فواتير المبيعات' },
   },
 };

@@ -3,7 +3,7 @@ import type { PaymentType } from '../../../../types';
 export const ORDER_MONEY_FIELDS = ['subtotal', 'discount_amount', 'tax_amount', 'shipping_cost', 'total_amount', 'paid_amount', 'remaining_amount'] as const;
 export const ORDER_ITEM_MONEY_FIELDS = ['unit_price', 'discount_amount', 'total_price'] as const;
 
-export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'READY' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
 
 export interface Order {
   id: string;

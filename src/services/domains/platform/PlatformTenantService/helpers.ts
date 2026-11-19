@@ -1,4 +1,4 @@
-import type { DatabaseManager } from '../../../database/repositories/databaseManager';
+import type { DatabaseManager } from '../../../../database/repositories/databaseManager';
 import { safeJsonArray } from '../platformUtils';
 
 export function generateTenantCode(db: DatabaseManager, name: string): string {

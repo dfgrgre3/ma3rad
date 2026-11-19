@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { BusinessTermKey } from '../../../config/businessTerminology';
 import { getBusinessProfile } from '../../../config/businessProfiles';
+import { getActivityPageCopy, type ActivityPageKey, type ActivityPageCopy } from '../../../config/activityPageCopy';
 import { TerminologyService } from '../../../services/domains/config/TerminologyService';
 import { SettingsService } from '../../../services/domains/config/SettingsService';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
@@ -14,6 +15,17 @@ export function useBusinessTerm(
     () => TerminologyService.getTerm(key),
     [key],
   );
+}
+
+/**
+ * Sector page copy for a workspace hub or main page. Returns undefined when
+ * the activity has no specific wording — callers should keep their default
+ * title/description in that case.
+ */
+export function useActivityPageCopy(page: ActivityPageKey): ActivityPageCopy | undefined {
+  useTheme();
+  const businessType = getEffectiveBusinessType();
+  return useMemo(() => getActivityPageCopy(page, businessType), [page, businessType]);
 }
 
 export function useBusinessProfileMeta() {

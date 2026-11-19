@@ -3,7 +3,25 @@ import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { writeAndPrintWindow } from '../../../utils/shared/printWindow';
 import { SettingsService } from '../../domains/config/SettingsService';
+import { getBusinessProfile } from '../../../config/businessProfiles';
+import { getEffectiveBusinessType } from '../../domains/config/BusinessTypeService';
 import { esc, printOverride } from './invoiceHtmlHelpers';
+
+/**
+ * Documents adapt to the active business activity: services-based activities
+ * (workshop, professional services, education...) print service lines without
+ * the ceramics-oriented grade / boxes / m² columns.
+ */
+function docColumnMode(): 'standard' | 'services' {
+  return getBusinessProfile(getEffectiveBusinessType()).configuration.businessModel === 'services'
+    ? 'services'
+    : 'standard';
+}
+
+const SERVICES_HEAD = '<th>#</th><th>البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th>';
+const SERVICES_COLSPAN = 5;
+const STANDARD_HEAD = '<th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th>';
+const STANDARD_COLSPAN = 7;
 
 function openDocument(title: string, body: string): void {
   const win = window.open('about:blank', '_blank', 'width=900,height=900');
@@ -57,9 +75,17 @@ function header(settings: SystemSettings, title: string, docNo: string, date: st
 
 export function printQuotationDocument(quotation: any): void {
   const settings = SettingsService.getSettings();
+  const mode = docColumnMode();
   const quotationTitle = printOverride('quotation.a4', 'عرض سعر / مقايسة');
   const quotationFooter = printOverride('quotation.a4.footer', settings.receiptFooter || '');
-  const productItems = (quotation.items || []).map((item: any, i: number) => `
+  const productItems = (quotation.items || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName)}${item.size ? ` (${esc(item.size)})` : ''}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
+      </tr>` : `
       <tr>
         <td>${i + 1}</td>
         <td class="name">${esc(item.productName)}${item.size ? ` (${esc(item.size)})` : ''}</td>
@@ -69,7 +95,14 @@ export function printQuotationDocument(quotation: any): void {
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
       </tr>`).join('');
-  const serviceItems = (quotation.serviceItems || []).map((item: any, i: number) => `
+  const serviceItems = (quotation.serviceItems || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${(quotation.items || []).length + i + 1}</td>
+        <td class="name">${esc(item.description || 'خدمة / عمالة')}</td>
+        <td>${esc(item.quantity || 0)} ${esc(item.unit || 'بند')}</td>
+        <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
+      </tr>` : `
       <tr>
         <td>${(quotation.items || []).length + i + 1}</td>
         <td class="name">${esc(item.description || 'خدمة / عمالة')}</td>
@@ -84,6 +117,8 @@ export function printQuotationDocument(quotation: any): void {
   const statusLabel = quotation.status === 'CONVERTED' ? 'محوّل إلى فاتورة'
     : quotation.status === 'EXPIRED' ? 'منتهي الصلاحية'
     : quotation.status === 'CANCELLED' ? 'ملغي' : 'بانتظار الموافقة';
+  const head = mode === 'services' ? SERVICES_HEAD : STANDARD_HEAD;
+  const colspan = mode === 'services' ? SERVICES_COLSPAN : STANDARD_COLSPAN;
 
   openDocument(`عرض سعر ${quotation.quotationNumber}`, `
       ${header(settings, quotationTitle, quotation.quotationNumber, quotation.date, `صالح لغاية: ${esc(quotation.validUntil)}`)}
@@ -94,8 +129,8 @@ export function printQuotationDocument(quotation: any): void {
         <div><b>عدد البنود:</b> ${itemCount}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
-        <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
       </table>
       <div class="totals">
         <div class="row"><span>المجموع الفرعي</span><span>${CeramicMath.formatCurrency(quotation.subtotal || 0)}</span></div>
@@ -111,7 +146,15 @@ export function printQuotationDocument(quotation: any): void {
 
 export function printOrderDocument(order: any): void {
   const settings = SettingsService.getSettings();
-  const items = (order.items || []).map((item: any, i: number) => `
+  const mode = docColumnMode();
+  const items = (order.items || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName)}${item.size ? ` (${esc(item.size)})` : ''}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
+      </tr>` : `
       <tr>
         <td>${i + 1}</td>
         <td class="name">${esc(item.productName)}${item.size ? ` (${esc(item.size)})` : ''}</td>
@@ -121,6 +164,8 @@ export function printOrderDocument(order: any): void {
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
       </tr>`).join('');
+  const head = mode === 'services' ? SERVICES_HEAD : STANDARD_HEAD;
+  const colspan = mode === 'services' ? SERVICES_COLSPAN : STANDARD_COLSPAN;
 
   openDocument(`طلب ${order.orderNumber}`, `
       ${header(settings, 'طلب حجز بضاعة', order.orderNumber, order.date, order.expectedDeliveryDate ? `التسليم المتوقع: ${esc(order.expectedDeliveryDate)}` : '')}
@@ -131,8 +176,8 @@ export function printOrderDocument(order: any): void {
         <div><b>الحالة:</b> ${esc(order.status)}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
-        <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
       </table>
       <div class="totals">
         <div class="row"><span>المجموع الفرعي</span><span>${CeramicMath.formatCurrency(order.subtotal || 0)}</span></div>
@@ -148,7 +193,15 @@ export function printOrderDocument(order: any): void {
 
 export function printSalesReturnDocument(salesReturn: any): void {
   const settings = SettingsService.getSettings();
-  const items = (salesReturn.items || []).map((item: any, i: number) => `
+  const mode = docColumnMode();
+  const items = (salesReturn.items || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
+      </tr>` : `
       <tr>
         <td>${i + 1}</td>
         <td class="name">${esc(item.productName)}</td>
@@ -158,6 +211,10 @@ export function printSalesReturnDocument(salesReturn: any): void {
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
       </tr>`).join('');
+  const head = mode === 'services'
+    ? '<th>#</th><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>قيمة الارتجاع</th>'
+    : '<th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>قيمة الارتجاع</th>';
+  const colspan = mode === 'services' ? 5 : 7;
 
   openDocument(`مرتجع ${salesReturn.returnNumber}`, `
       ${header(settings, 'سند مرتجع مبيعات', salesReturn.returnNumber, salesReturn.date, `الفاتورة الأصلية: ${esc(salesReturn.originalInvoiceNumber || '')}`)}
@@ -168,8 +225,8 @@ export function printSalesReturnDocument(salesReturn: any): void {
         <div><b>عدد البنود:</b> ${(salesReturn.items || []).length}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>قيمة الارتجاع</th></tr></thead>
-        <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
       </table>
       <div class="totals">
         <div class="row"><span>صافي المرتجع قبل الضريبة</span><span>${CeramicMath.formatCurrency(salesReturn.totalAmount || 0)}</span></div>
@@ -185,7 +242,15 @@ export function printSalesReturnDocument(salesReturn: any): void {
 
 export function printPurchaseReturnDocument(purchaseReturn: any): void {
   const settings = SettingsService.getSettings();
-  const items = (purchaseReturn.items || []).map((item: any, i: number) => `
+  const mode = docColumnMode();
+  const items = (purchaseReturn.items || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitCost || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
+      </tr>` : `
       <tr>
         <td>${i + 1}</td>
         <td class="name">${esc(item.productName)}</td>
@@ -195,6 +260,10 @@ export function printPurchaseReturnDocument(purchaseReturn: any): void {
         <td>${CeramicMath.formatCurrency(item.unitCost || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
       </tr>`).join('');
+  const head = mode === 'services'
+    ? '<th>#</th><th>الصنف</th><th>الكمية</th><th>تكلفة الوحدة</th><th>قيمة الارتجاع</th>'
+    : '<th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>تكلفة الوحدة</th><th>قيمة الارتجاع</th>';
+  const colspan = mode === 'services' ? 5 : 7;
 
   const isCash = Number(purchaseReturn.refundedAmount || 0) > 0;
 
@@ -207,8 +276,8 @@ export function printPurchaseReturnDocument(purchaseReturn: any): void {
         <div><b>طريقة التسوية:</b> ${isCash ? 'استرداد نقدي من الخزينة' : 'خصم من حساب المورد'}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>تكلفة الوحدة</th><th>قيمة الارتجاع</th></tr></thead>
-        <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
       </table>
       <div class="totals">
         <div class="row"><span>إجمالي قيمة المرتجع</span><span>${CeramicMath.formatCurrency(purchaseReturn.totalAmount || 0)}</span></div>

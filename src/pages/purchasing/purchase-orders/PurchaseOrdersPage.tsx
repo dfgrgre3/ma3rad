@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ClipboardCheck, Plus, Search, X, Loader2, Trash2, Eye, RefreshCw, Truck, Send, Ban, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderStatus } from '../../../services/domains/purchases/PurchaseOrderService';
 import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
@@ -32,6 +33,7 @@ const STATUS: Record<PurchaseOrderStatus, { label: string; color: string }> = {
 type Line = { productId: string; quantityM2: number; unitCost: number; boxesCount: number };
 
 export const PurchaseOrdersPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('purchaseOrders');
   const service = useMemo(() => new PurchaseOrderService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const toast = useToast();
@@ -154,8 +156,8 @@ export const PurchaseOrdersPage: React.FC = () => {
       <div className="bg-white px-6 pt-4">
         <PageHeader
           icon={<ClipboardCheck className="w-5 h-5" />}
-          title="أوامر الشراء"
-          description="من أمر الشراء إلى فاتورة التوريد واستلام المخزون"
+          title={pageCopy?.title || 'أوامر الشراء'}
+          description={pageCopy?.description || 'من أمر الشراء إلى فاتورة التوريد واستلام المخزون'}
           actions={<>
             <button onClick={load} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

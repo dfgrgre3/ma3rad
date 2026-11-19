@@ -9,6 +9,21 @@ const fsSync = require('node:fs');
 const crypto = require('node:crypto');
 const { execFile } = require('child_process');
 
+// Backup file names embed the creation time as an ISO-8601 stamp with ':' and
+// '.' replaced by '-' (e.g. ceramisys_daily_2026-11-19T10-20-30-123Z.sqlite.enc,
+// optionally followed by a suffix such as the auto-updater random hex). The
+// name is the authoritative timestamp: stat.birthtime is unreliable across
+// platforms (often unsupported on Linux) and can change when a file is copied
+// or restored, which would corrupt retention ordering and deletion decisions.
+const BACKUP_NAME_STAMP = /(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/;
+
+function timestampFromBackupName(fileName) {
+  const match = BACKUP_NAME_STAMP.exec(fileName);
+  if (!match) return null;
+  const date = new Date(`${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /**
  * تحقق من حالة النسخ الاحتياطية المحلية والحوم 2:
  * - النسخة الحية (当前的database)
@@ -38,7 +53,9 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
     for (const file of backupFiles) {
       const filePath = path.join(BACKUP_DIR, file);
       const stat = await fs.stat(filePath);
-      const date = stat.birthtime; // or mtime
+      // Prefer the timestamp embedded in the file name; fall back to mtime
+      // (never birthtime) for names without a parseable stamp.
+      const date = timestampFromBackupName(file) || stat.mtime;
 
       const fileInfo = {
         name: file,

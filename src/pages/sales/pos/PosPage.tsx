@@ -29,7 +29,7 @@ export const PosView: React.FC = () => {
     activeCartIndex, setActiveCartIndex, productViewMode, setProductViewMode,
     couponCode, setCouponCode, appliedPromotion, promotionDiscount, redeemPoints, setRedeemPoints,
     loyaltyDiscount, setLoyaltyDiscount, notes, setNotes,
-    setIsCalculatorOpen, setIsCustomerModalOpen,
+    setIsCalculatorOpen, setIsCustomerModalOpen, setCustomerError,
     setIsHeldModalOpen, setIsShortcutsOpen,
     setIsShiftModalOpen, setIsCloseShiftModalOpen,
     shiftRegisterId, setShiftRegisterId, setOpeningBalance,

@@ -2,6 +2,7 @@ import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Receipt, BarChart3, Workflow, UserRound, BookmarkPlus, ShieldCheck, FileText, Package2, RotateCcw, FileWarning } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -45,6 +46,7 @@ const PAGE_BY_TAB = {
 export const SalesHubPage: React.FC = () => {
   const { pathname } = useLocation();
   const canAccess = useRouteAccess();
+  const pageCopy = useActivityPageCopy('sales');
   // Tabs follow the exact same route rules as the MainLayout guard — no
   // per-tab permission map that can drift from ROUTE_PERMISSIONS.
   const tabs = TABS.filter((tab) => canAccess(tab.path));
@@ -66,8 +68,8 @@ export const SalesHubPage: React.FC = () => {
 
   return (
     <WorkspaceHub
-      title="مركز المبيعات"
-      description="إدارة فواتير المبيعات والطلبات والمرتجعات والتحليلات من مكان واحد."
+      title={pageCopy?.title || 'مركز المبيعات'}
+      description={pageCopy?.description || 'إدارة فواتير المبيعات والطلبات والمرتجعات والتحليلات من مكان واحد.'}
       icon={Receipt}
       tabs={tabs}
       activeTab={activeTab}

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Warehouse, Plus, Search, MapPin, Database, Loader2, X, AlertTriangle, Pencil, Power, Star, ArrowLeftRight } from 'lucide-react';
 import { OperationsService, WarehouseRow } from '../../../services/domains/operations/OperationsService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
@@ -41,6 +42,7 @@ const formatQuantitiesByUnit = (quantities: Record<string, number>) => {
 };
 
 export const WarehousesPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('inventory');
   const toast = useToast();
   const service = new OperationsService();
   const fieldService = new OperationalFieldService();
@@ -290,8 +292,8 @@ export const WarehousesPage: React.FC = () => {
       <div className="bg-white px-6 pt-4">
         <PageHeader
           icon={<Warehouse className="h-5 w-5" />}
-          title="المخازن والمستودعات"
-          description="متابعة الأرصدة الفعلية، قيمة المخزون، وتنبيهات النقص لكل مخزن"
+          title={pageCopy?.title || 'المخازن والمستودعات'}
+          description={pageCopy?.description || 'متابعة الأرصدة الفعلية، قيمة المخزون، وتنبيهات النقص لكل مخزن'}
           actions={
             <CentralLimitGuard metric="maxWarehouses">
               {canManage && (

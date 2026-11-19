@@ -59,5 +59,95 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات الشهر",
+        "en": "month_sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "net_profit",
+      "label": {
+        "ar": "صافي الربح",
+        "en": "net_profit"
+      },
+      "source": "finance",
+      "format": "currency"
+    },
+    {
+      "id": "receivables",
+      "label": {
+        "ar": "الذمم المدينة",
+        "en": "receivables"
+      },
+      "source": "finance",
+      "format": "currency"
+    },
+    {
+      "id": "avg_order",
+      "label": {
+        "ar": "متوسط الفاتورة",
+        "en": "avg_order"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "total_debt",
+      "label": {
+        "ar": "الديون",
+        "en": "total_debt"
+      },
+      "source": "finance",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "ar-aging",
+      "category": "credit",
+      "label": {
+        "ar": "ar-aging",
+        "en": "ar-aging"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "payment-behavior",
+      "category": "credit",
+      "label": {
+        "ar": "payment-behavior",
+        "en": "payment-behavior"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "sales-analysis",
+      "category": "credit",
+      "label": {
+        "ar": "sales-analysis",
+        "en": "sales-analysis"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "branch-performance",
+      "category": "credit",
+      "label": {
+        "ar": "branch-performance",
+        "en": "branch-performance"
+      }
+    }
+  ],
+  "features": [
+    "أوامر خدمة",
+    "عقود صيانة",
+    "فنيون"
   ]
 }

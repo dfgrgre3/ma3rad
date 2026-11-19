@@ -2,6 +2,7 @@ import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Activity, LayoutDashboard, Megaphone, Users, Workflow } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -33,6 +34,7 @@ const PAGE_BY_TAB = {
 export const CRMHubPage: React.FC = () => {
   const { pathname } = useLocation();
   const canAccess = useRouteAccess();
+  const pageCopy = useActivityPageCopy('crm');
   // Tabs follow the exact same route rules as the MainLayout guard — no
   // per-tab permission map that can drift from ROUTE_PERMISSIONS.
   const tabs = TABS.filter((tab) => canAccess(tab.path));
@@ -51,8 +53,8 @@ export const CRMHubPage: React.FC = () => {
 
   return (
     <WorkspaceHub
-      title="مركز علاقات العملاء"
-      description="تابع العملاء المحتملين ومسار البيع والأنشطة والحملات من مساحة عمل موحدة."
+      title={pageCopy?.title || 'مركز علاقات العملاء'}
+      description={pageCopy?.description || 'تابع العملاء المحتملين ومسار البيع والأنشطة والحملات من مساحة عمل موحدة.'}
       icon={Users}
       tabs={tabs}
       activeTab={activeTab}

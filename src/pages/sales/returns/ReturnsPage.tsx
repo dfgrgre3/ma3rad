@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { useLocation } from 'react-router-dom';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
@@ -82,6 +83,7 @@ export const ReturnsPage: React.FC = () => {
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.create');
   const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.approve');
+  const pageCopy = useActivityPageCopy('returns');
   const [showHistoricalReconciliation, setShowHistoricalReconciliation] = useState(false);
 
   const [docPreview, setDocPreview] = useState<{
@@ -380,8 +382,8 @@ export const ReturnsPage: React.FC = () => {
       <div className="bg-white border-b border-slate-200 px-6 pt-4">
         <PageHeader
           icon={<RotateCcw className="w-5 h-5" />}
-          title="مرتجع مبيعات المعرض"
-          description="تسجيل المرتجعات، إرجاع البضاعة للمخزن، وتحديث الأثر المالي ورصيد العميل"
+          title={pageCopy?.title || 'مرتجع مبيعات المعرض'}
+          description={pageCopy?.description || 'تسجيل المرتجعات، إرجاع البضاعة للمخزن، وتحديث الأثر المالي ورصيد العميل'}
           actions={<>
             <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
             <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>

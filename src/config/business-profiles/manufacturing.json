@@ -63,5 +63,111 @@
         "en": "Sales invoice"
       }
     }
+  ],
+  "dashboard": [
+    {
+      "id": "today_purchases",
+      "label": {
+        "ar": "مشتريات اليوم",
+        "en": "today_purchases"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "inventory_value",
+      "label": {
+        "ar": "قيمة المخزون",
+        "en": "inventory_value"
+      },
+      "source": "inventory",
+      "format": "currency"
+    },
+    {
+      "id": "low_stock",
+      "label": {
+        "ar": "نواقص المواد",
+        "en": "low_stock"
+      },
+      "source": "inventory",
+      "format": "number"
+    },
+    {
+      "id": "gross_profit",
+      "label": {
+        "ar": "مجمل الربح",
+        "en": "gross_profit"
+      },
+      "source": "sales",
+      "format": "currency"
+    }
+  ],
+  "reports": [
+    {
+      "id": "r0",
+      "reportId": "mfg-production-kpis",
+      "category": "operations",
+      "label": {
+        "ar": "mfg-production-kpis",
+        "en": "mfg-production-kpis"
+      }
+    },
+    {
+      "id": "r1",
+      "reportId": "inventory-balances",
+      "category": "operations",
+      "label": {
+        "ar": "inventory-balances",
+        "en": "inventory-balances"
+      }
+    },
+    {
+      "id": "r2",
+      "reportId": "purchase-analysis",
+      "category": "operations",
+      "label": {
+        "ar": "purchase-analysis",
+        "en": "purchase-analysis"
+      }
+    },
+    {
+      "id": "r3",
+      "reportId": "count-variance",
+      "category": "operations",
+      "label": {
+        "ar": "count-variance",
+        "en": "count-variance"
+      }
+    },
+    {
+      "id": "r4",
+      "reportId": "slow-moving",
+      "category": "operations",
+      "label": {
+        "ar": "slow-moving",
+        "en": "slow-moving"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "production",
+      "label": {
+        "ar": "دورة الإنتاج",
+        "en": "production"
+      },
+      "steps": [
+        "طلب إنتاج",
+        "تجهيز المواد",
+        "تنفيذ التصنيع",
+        "فحص الجودة",
+        "إدخال المخزن",
+        "تسليم"
+      ]
+    }
+  ],
+  "features": [
+    "قوائم مواد BOM",
+    "تشغيلات إنتاج"
   ]
 }

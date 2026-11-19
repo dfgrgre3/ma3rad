@@ -283,16 +283,22 @@ function validateBusinessProfile(value: unknown): BusinessProfile {
     fail('support status must explicitly declare profile defaults.');
   }
   if (profile.dashboard !== undefined) {
-    const d = profile.dashboard;
-    if (!d || typeof d !== 'object' || !Array.isArray(d.kpis) || d.kpis.length === 0) {
+    // Profiles historically declare `dashboard` as a flat KPI array; accept
+    // that shape as well as the wrapped `{ kpis }` form and normalize it.
+    const raw = profile.dashboard as unknown;
+    const kpis = (Array.isArray(raw) ? raw : (raw as BusinessProfileDashboard | undefined)?.kpis) ?? [];
+    if (kpis.length === 0) {
       fail('dashboard must declare at least one KPI.');
     }
-    for (const kpi of d.kpis) {
+    for (const kpi of kpis) {
       if (!kpi || typeof kpi.id !== 'string' || !kpi.id.trim()
         || !kpi.label?.ar?.trim() || !kpi.label?.en?.trim()
         || !['sales', 'inventory', 'finance', 'customers', 'manufacturing', 'restaurant'].includes(kpi.source)) {
         fail('dashboard KPI is invalid.');
       }
+    }
+    if (Array.isArray(raw)) {
+      profile.dashboard = { kpis: kpis as BusinessProfileDashboardKpi[] };
     }
   }
   if (profile.reports !== undefined) {

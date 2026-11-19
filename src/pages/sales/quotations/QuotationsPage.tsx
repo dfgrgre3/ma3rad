@@ -6,6 +6,7 @@ import {
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
@@ -54,6 +55,7 @@ export const QuotationsPage: React.FC = () => {
   const canUpdate = PermissionService.can(user, 'ui.quotations.quotations.update');
   const canDelete = PermissionService.can(user, 'ui.quotations.quotations.delete');
   const canApprove = PermissionService.can(user, 'ui.quotations.quotations.approve');
+  const pageCopy = useActivityPageCopy('quotations');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -443,8 +445,8 @@ export const QuotationsPage: React.FC = () => {
       <div className="bg-white border-b border-slate-200 px-6 pt-4">
         <PageHeader
           icon={<FileText className="w-5 h-5" />}
-          title="عروض الأسعار والمقايسات"
-          description="إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة"
+          title={pageCopy?.title || 'عروض الأسعار والمقايسات'}
+          description={pageCopy?.description || 'إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة'}
           meta={<OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />}
           actions={<>
             <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>

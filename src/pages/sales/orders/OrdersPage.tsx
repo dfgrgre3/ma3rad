@@ -253,6 +253,11 @@ export const OrdersPage: React.FC = () => {
     catch (e: any) { toast.warning(e?.message); }
   };
 
+  const setStatus = (order: Order, status: OrderStatus) => {
+    try { service.updateStatus(order.id, status); load(); setDetail(null); }
+    catch (e: any) { toast.warning(e?.message); }
+  };
+
   const cancel = (order: Order) => {
     if (!window.confirm(`إلغاء الطلب ${order.orderNumber}؟ سيتم تحرير الكميات المحجوزة من المخزن.`)) return;
     try { service.cancelOrder(order.id); load(); setDetail(null); }
@@ -469,6 +474,7 @@ export const OrdersPage: React.FC = () => {
           onOpenTimeline={openTimeline}
           onOpenDelivery={openDelivery}
           onAdvance={advance}
+          onSetStatus={setStatus}
           onOpenConvert={openConvert}
           onCancel={cancel}
           operationalFields={operationalFields}

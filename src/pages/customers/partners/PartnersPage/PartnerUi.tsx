@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users } from 'lucide-react';
-import { Modal } from '../../../components/ui/Modal';
+import { Modal } from '../../../../components/ui/Modal';
 
 export const SummaryCard: React.FC<{
   label: string;
