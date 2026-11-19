@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { CalendarCheck, Clock3, Coffee, Download, FileUp, Loader2, Search, Settings2, ShieldCheck, Users } from 'lucide-react';
 import type { AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
 import {
@@ -305,24 +306,20 @@ export const AttendancePage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <CalendarCheck className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">الحضور والانصراف</h1>
-            <p className="text-xs text-slate-500 font-medium">سجل زمني، ورديات، استراحات وتصحيحات معتمدة</p>
-          </div>
-        </div>
-        {tab === 'daily' && canManage && (
-          <button onClick={() => filtered.filter((employee) => !recordsByEmployee.has(employee.id)).forEach((employee) => {
-            try { AttendanceService.saveManualRecord({ employeeId: employee.id, date, status: 'PRESENT' }); }
-            catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر تسجيل الموظفين.'); }
-          })} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold">
-            تسجيل غير المسجلين حاضرين
-          </button>
-        )}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<CalendarCheck className="h-5 w-5" />}
+          title="الحضور والانصراف"
+          description="سجل زمني، ورديات، استراحات وتصحيحات معتمدة"
+          actions={tab === 'daily' && canManage && (
+            <button onClick={() => filtered.filter((employee) => !recordsByEmployee.has(employee.id)).forEach((employee) => {
+              try { AttendanceService.saveManualRecord({ employeeId: employee.id, date, status: 'PRESENT' }); }
+              catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر تسجيل الموظفين.'); }
+            })} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold">
+              تسجيل غير المسجلين حاضرين
+            </button>
+          )}
+        />
       </div>
 
       <div className="bg-white border-b border-slate-200 px-6 flex gap-2 overflow-auto">

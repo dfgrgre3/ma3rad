@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertCircle,
   ArrowDownToLine,
@@ -120,25 +121,19 @@ export const AuditLogPage: React.FC = () => {
   return (
     <main className="erp-page">
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-950 text-indigo-100 shadow-sm">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">سجل المراجعة والأمان</h1>
-                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-800">
-                  <Fingerprint className="h-3 w-3" aria-hidden="true" />
-                  مصدران محفوظان
-                </span>
-              </div>
-              <p className="mt-1 max-w-2xl text-sm text-slate-600">
-                سجل زمني موحّد لعمليات الأعمال ومحاولات الدخول المسجلة في قاعدة البيانات.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <PageHeader
+          icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />}
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              سجل المراجعة والأمان
+              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-800">
+                <Fingerprint className="h-3 w-3" aria-hidden="true" />
+                مصدران محفوظان
+              </span>
+            </span>
+          }
+          description="سجل زمني موحّد لعمليات الأعمال ومحاولات الدخول المسجلة في قاعدة البيانات."
+          actions={<>
             {canExportAudit && (
               <button
                 type="button"
@@ -159,8 +154,8 @@ export const AuditLogPage: React.FC = () => {
               <RefreshCw className={`h-4 w-4 ${isLoadingInitial || isLoadingLogs ? 'animate-spin' : ''}`} aria-hidden="true" />
               تحديث السجل
             </button>
-          </div>
-        </header>
+          </>}
+        />
 
         {error && (
           <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">

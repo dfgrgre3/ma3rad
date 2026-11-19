@@ -7,6 +7,7 @@ import { SettingsService } from '../../../services/domains/config/SettingsServic
 import { Product } from '../../../types';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { OperationalFieldService } from '../../../services/domains/products/OperationalFieldService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 interface LabelSettings {
   labelSize: '50x30' | '60x40' | '80x50' | 'A4_SHEET';
@@ -69,26 +70,21 @@ export const BarcodesPrintPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header (Hidden when printing) */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
-            <Barcode className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">استوديو طباعة باركود وملصقات السيراميك (Barcode Studio)</h1>
-            <p className="text-xs text-slate-500 font-medium">
-              تصميم وتجهيز باركود الكراتين والعينات مع المقاس والفرز والأسعار للطابعات الحرارية
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
-        >
-          <Printer className="w-4 h-4" />
-          طباعة الملصقات ({labelCopies} نسخة)
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4 no-print">
+        <PageHeader
+          icon={<Barcode className="w-5 h-5" />}
+          title="استوديو طباعة باركود وملصقات السيراميك (Barcode Studio)"
+          description="تصميم وتجهيز باركود الكراتين والعينات مع المقاس والفرز والأسعار للطابعات الحرارية"
+          actions={
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
+            >
+              <Printer className="w-4 h-4" />
+              طباعة الملصقات ({labelCopies} نسخة)
+            </button>
+          }
+        />
       </div>
 
       {/* Main Body */}

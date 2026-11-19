@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CalendarDays, Plus, Search, Calendar, CheckCircle2, Check, CreditCard,
 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InstallmentService } from '../../../services/domains/finance/InstallmentService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -241,26 +242,21 @@ export const InstallmentsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-            <CalendarDays className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">إدارة الأقساط والتحصيلات المجدولة (Installment Plans)</h1>
-            <p className="text-xs text-slate-500 font-medium">
-              جدولة الأقساط الشهرية، تسجيل سندات السداد، ومتابعة المتأخرات مع إدراجها بالخزينة تلقائياً
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowCreateModal(true)} disabled={!canManage}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-amber-600/20 active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          إنشاء خطة تقسيط جديدة
-        </button>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<CalendarDays className="h-5 w-5" />}
+          title="إدارة الأقساط والتحصيلات المجدولة (Installment Plans)"
+          description="جدولة الأقساط الشهرية، تسجيل سندات السداد، ومتابعة المتأخرات مع إدراجها بالخزينة تلقائياً"
+          actions={
+            <button
+              onClick={() => setShowCreateModal(true)} disabled={!canManage}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-amber-600/20 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              إنشاء خطة تقسيط جديدة
+            </button>
+          }
+        />
       </div>
 
       {/* Metrics Row */}

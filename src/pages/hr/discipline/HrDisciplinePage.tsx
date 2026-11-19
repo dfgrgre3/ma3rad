@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, FileText, AlertTriangle, MessageSquare, Scale, Paperclip } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { HrDisciplineService, HrViolation, HrWarning, HrPenalty, HrComplaint, HrAppeal, HrAttachment } from '../../../services/domains/hr/HrDisciplineService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
@@ -73,14 +74,12 @@ export const HrDisciplinePage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center">
-          <ShieldAlert className="w-5 h-5 text-rose-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">الجزاءات والمخالفات والشكاوى</h1>
-          <p className="text-xs text-slate-500 font-medium">مخالفات، إنذارات، جزاءات (بعد اعتماد)، شكاوى، تظلمات، مرفقات</p>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<ShieldAlert className="h-5 w-5" />}
+          title="الجزاءات والمخالفات والشكاوى"
+          description="مخالفات، إنذارات، جزاءات (بعد اعتماد)، شكاوى، تظلمات، مرفقات"
+        />
       </div>
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

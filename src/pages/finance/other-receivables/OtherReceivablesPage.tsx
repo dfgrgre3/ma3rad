@@ -5,6 +5,7 @@ import { AuthService } from "../../../services/domains/auth/AuthService";
 import { PermissionService } from "../../../services/domains/auth/PermissionService";
 import { BranchAccessService } from "../../../services/domains/auth/BranchAccessService";
 import { useToast } from "../../../components/ui/Toast";
+import { PageHeader } from "../../../components/ui/PageHeader";
 import { v4 as uuidv4 } from "uuid";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";
 import { unscaleMoneyRow } from "../../../utils/money";
@@ -376,45 +377,43 @@ export const OtherReceivablesPage: React.FC = () => {
   };
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
-      <header className="bg-white border-b p-5 flex items-center gap-3">
-        <div>
-          <h1 className="text-lg font-black">المستحقات الأخرى</h1>
-          <p className="text-xs text-slate-500">
-            حقوق مالية وغير مالية منفصلة عن الفواتير والبضائع المنتظرة
-          </p>
-        </div>
-        <div className="mr-auto flex gap-2">
-          {canExport && (
-            <>
+      <div className="bg-white px-5 pt-4 pb-1">
+        <PageHeader
+          title="المستحقات الأخرى"
+          description="حقوق مالية وغير مالية منفصلة عن الفواتير والبضائع المنتظرة"
+          actions={<div className="flex gap-2">
+            {canExport && (
+              <>
+                <button
+                  onClick={() => exportReport("excel")}
+                  className="px-3 py-2 bg-emerald-700 text-white rounded-xl text-sm"
+                >
+                  جدول بيانات
+                </button>
+                <button
+                  onClick={() => exportReport("pdf")}
+                  className="px-3 py-2 bg-slate-700 text-white rounded-xl text-sm"
+                >
+                  طباعة / مستند
+                </button>
+              </>
+            )}
+            {canCreate && (
               <button
-                onClick={() => exportReport("excel")}
-                className="px-3 py-2 bg-emerald-700 text-white rounded-xl text-sm"
+                onClick={() => {
+                  setSelectedId(null);
+                  setNewFiles([]);
+                  setForm(blank);
+                  setOpen(true);
+                }}
+                className="px-4 py-2 bg-sky-700 text-white rounded-xl text-sm font-bold inline-flex gap-2"
               >
-                جدول بيانات
+                <Plus className="w-4 h-4" /> مستحق جديد
               </button>
-              <button
-                onClick={() => exportReport("pdf")}
-                className="px-3 py-2 bg-slate-700 text-white rounded-xl text-sm"
-              >
-                طباعة / مستند
-              </button>
-            </>
-          )}
-          {canCreate && (
-            <button
-              onClick={() => {
-                setSelectedId(null);
-                setNewFiles([]);
-                setForm(blank);
-                setOpen(true);
-              }}
-              className="px-4 py-2 bg-sky-700 text-white rounded-xl text-sm font-bold inline-flex gap-2"
-            >
-              <Plus className="w-4 h-4" /> مستحق جديد
-            </button>
-          )}
-        </div>
-      </header>
+            )}
+          </div>}
+        />
+      </div>
       <div className="p-4 bg-white border-b flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute right-3 top-3 w-4 h-4 text-slate-400" />

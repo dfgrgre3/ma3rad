@@ -10,6 +10,7 @@ import {
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { useExecutiveCommandCenter } from '../../../hooks/domains/dashboard/useExecutiveCommandCenter';
 import { commandFormatters } from '../../../services/domains/dashboard/ExecutiveCommandService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { COMMAND_RANGES, type CommandRange, type DrilldownKey } from '../../../types/dashboard/executiveCommand';
 import { CommandKpiCard } from './CommandKpiCard';
 import { DrilldownModal } from './DrilldownModal';
@@ -116,14 +117,11 @@ export const ExecutiveCommandCenter: React.FC = () => {
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-base font-black text-[#1b1b1b] dark:text-[#f5f5f5] sm:text-lg">مركز القيادة التنفيذي</h1>
-          <p className="mt-0.5 text-[11px] text-[#767676] dark:text-[#a6a6a6]">
-            {data.period.label} · {data.period.from} ← {data.period.to} · آخر تحديث {latestUpdate.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+      <PageHeader
+        icon={<Activity className="h-5 w-5" />}
+        title="مركز القيادة التنفيذي"
+        description={`${data.period.label} · ${data.period.from} ← ${data.period.to} · آخر تحديث ${latestUpdate.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`}
+        actions={<>
           {COMMAND_RANGES.map((item) => (
             <button
               key={item.id}
@@ -148,8 +146,8 @@ export const ExecutiveCommandCenter: React.FC = () => {
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             تحديث
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {error && (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-[2px] border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">

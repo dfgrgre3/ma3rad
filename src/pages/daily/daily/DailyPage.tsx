@@ -21,6 +21,7 @@ import {
 } from '../../../components/daily/DailyModals';
 import { TodayPurchasesPage as PurchasesPage } from '../today-purchases/TodayPurchasesPage';
 import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
 
@@ -418,71 +419,63 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   return (
     <div className={`h-full flex flex-col overflow-hidden ${kind === 'sales' ? 'bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {kind === 'sales' ? (
-        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
-          <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
-                <Receipt className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <h1 className="text-base font-black text-slate-900 dark:text-white">مبيعات اليوم</h1>
+        <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+          <div className="mx-auto max-w-screen-2xl">
+            <PageHeader
+              icon={<Receipt className="h-5 w-5" />}
+              title={
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  مبيعات اليوم
                   <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {date === todayDate ? 'اليوم' : formatDate(date)}
                   </span>
+                </span>
+              }
+              description={meta.subtitle}
+              actions={<>
+                <CentralLimitGuard metric="maxInvoices">
+                  {canCreateSale && (
+                    <button
+                      type="button"
+                      onClick={() => setQuickSaleOpen(true)}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                    >
+                      <Plus className="h-4 w-4" /> بيع سريع
+                    </button>
+                  )}
+                </CentralLimitGuard>
+                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+                  <button type="button" onClick={() => setDate(todayDate)} aria-pressed={date === todayDate} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === todayDate ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>اليوم</button>
+                  <button type="button" onClick={() => setDate(moveDate(todayDate, -1))} aria-pressed={date === moveDate(todayDate, -1)} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === moveDate(todayDate, -1) ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>أمس</button>
+                  <label className="relative flex min-h-8 items-center gap-1.5 border-r border-slate-200 px-2 dark:border-slate-700">
+                    <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                    <span className="sr-only">اختيار تاريخ المبيعات</span>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(event) => setDate(event.target.value || todayDate)}
+                      aria-label="اختيار تاريخ المبيعات"
+                      className="w-[130px] bg-transparent text-xs font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-200"
+                    />
+                  </label>
                 </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{meta.subtitle}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <CentralLimitGuard metric="maxInvoices">
-                {canCreateSale && (
-                  <button
-                    type="button"
-                    onClick={() => setQuickSaleOpen(true)}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                  >
-                    <Plus className="h-4 w-4" /> بيع سريع
-                  </button>
-                )}
-              </CentralLimitGuard>
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
-                <button type="button" onClick={() => setDate(todayDate)} aria-pressed={date === todayDate} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === todayDate ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>اليوم</button>
-                <button type="button" onClick={() => setDate(moveDate(todayDate, -1))} aria-pressed={date === moveDate(todayDate, -1)} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === moveDate(todayDate, -1) ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>أمس</button>
-                <label className="relative flex min-h-8 items-center gap-1.5 border-r border-slate-200 px-2 dark:border-slate-700">
-                  <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
-                  <span className="sr-only">اختيار تاريخ المبيعات</span>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(event) => setDate(event.target.value || todayDate)}
-                    aria-label="اختيار تاريخ المبيعات"
-                    className="w-[130px] bg-transparent text-xs font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-200"
-                  />
-                </label>
-              </div>
-              <button type="button" onClick={load} aria-label="تحديث بيانات المبيعات" title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-              <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                <Download className="h-4 w-4" /> تصدير جدول بيانات
-              </button>
-            </div>
+                <button type="button" onClick={load} aria-label="تحديث بيانات المبيعات" title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <Download className="h-4 w-4" /> تصدير جدول بيانات
+                </button>
+              </>}
+            />
           </div>
-        </header>
+        </div>
       ) : (
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl border flex items-center justify-center ${meta.color}`}>
-              <Icon className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-base font-black text-slate-900">{meta.title}</h1>
-              <p className="text-xs text-slate-500 mt-0.5">{meta.subtitle}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Icon className="w-5 h-5" />}
+          title={meta.title}
+          description={meta.subtitle}
+          actions={<>
             {kind === 'purchases' && canCreatePurchase && (
               <button onClick={() => setQuickPurchaseOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-orange-600 text-white rounded-xl text-xs font-bold hover:bg-orange-700">
                 <Plus className="w-4 h-4" /> فاتورة توريد
@@ -512,8 +505,8 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
             >
               <Download className="w-4 h-4" /> تصدير
             </button>
-          </div>
-        </div>
+          </>}
+        />
       </div>
       )}
 

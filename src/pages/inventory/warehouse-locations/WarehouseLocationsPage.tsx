@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   Barcode, Plus, Search, RefreshCw, Printer, 
   Eye, Edit3, Trash2, X
@@ -175,35 +176,30 @@ export const WarehouseLocationsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-violet-600/20">
-            <Barcode className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">مواقع الرفوف والباركود الداخلي (Warehouse Locations & Bins)</h1>
-            <p className="text-xs text-slate-500 font-medium">إدارة ممرات ورفوف وخانات التخزين وتوليد ملصقات الباركود الداخلية</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {canManage && (
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Barcode className="w-5 h-5" />}
+          title="مواقع الرفوف والباركود الداخلي (Warehouse Locations & Bins)"
+          description="إدارة ممرات ورفوف وخانات التخزين وتوليد ملصقات الباركود الداخلية"
+          actions={<>
+            {canManage && (
+              <button
+                onClick={handleOpenCreate}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-md shadow-violet-600/20 transition active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                إضافة موقع تخزين
+              </button>
+            )}
             <button
-              onClick={handleOpenCreate}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-md shadow-violet-600/20 transition active:scale-95"
+              onClick={loadData}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              title="تحديث"
             >
-              <Plus className="w-4 h-4" />
-              إضافة موقع تخزين
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-          <button
-            onClick={loadData}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
-            title="تحديث"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+          </>}
+        />
       </div>
 
       {/* Filters bar */}

@@ -9,6 +9,7 @@ import {
   HiringRequisition, HiringRequisitionStatus,
 } from '../../../services/domains/hr/WorkforcePlanningService';
 import { EmployeeOrganizationService, EmployeeDepartment } from '../../../services/domains/hr/EmployeeOrganizationService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
@@ -273,14 +274,12 @@ export const WorkforcePlanningPage: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50">
-          <Briefcase className="h-5 w-5 text-violet-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">تخطيط القوى العاملة</h1>
-          <p className="text-xs font-medium text-slate-500">مقارنة الاحتياج المخطط بالعدد الفعلي، اعتماد الخطط، وإدارة طلبات التوظيف</p>
-        </div>
+      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Briefcase className="h-5 w-5" />}
+          title="تخطيط القوى العاملة"
+          description="مقارنة الاحتياج المخطط بالعدد الفعلي، اعتماد الخطط، وإدارة طلبات التوظيف"
+        />
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">

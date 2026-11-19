@@ -34,6 +34,7 @@ import {
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -476,84 +477,80 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-            aria-label="العودة لمركز التقارير"
-          >
-            <ArrowRight className="h-4 w-4" />
-          </button>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 text-teal-600">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">{definition.title}</h1>
-            <p className="max-w-3xl text-xs font-medium text-slate-500">{definition.description}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
+      <div className="border-b border-slate-200 bg-white px-5 py-4">
+        <PageHeader
+          icon={<Icon className="h-5 w-5" />}
+          title={definition.title}
+          description={definition.description}
+          actions={<>
             <button
               type="button"
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                viewMode === 'table' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={onBack}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+              aria-label="العودة لمركز التقارير"
             >
-              <Table className="h-3.5 w-3.5" /> جدول
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <div className="flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                  viewMode === 'table' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Table className="h-3.5 w-3.5" /> جدول
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('chart')}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                  viewMode === 'chart' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <BarChart2 className="h-3.5 w-3.5" /> رسم بياني
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters((current) => !current)}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+            >
+              <SlidersHorizontal className="h-4 w-4" /> فلترة متقدمة
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('chart')}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                viewMode === 'chart' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setRefreshToken((current) => current + 1)}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
             >
-              <BarChart2 className="h-3.5 w-3.5" /> رسم بياني
+              <RefreshCw className="h-4 w-4" /> تحديث
             </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowAdvancedFilters((current) => !current)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-          >
-            <SlidersHorizontal className="h-4 w-4" /> فلترة متقدمة
-          </button>
-          <button
-            type="button"
-            onClick={() => setRefreshToken((current) => current + 1)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-          >
-            <RefreshCw className="h-4 w-4" /> تحديث
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            disabled={!result || rows.length === 0}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Printer className="h-4 w-4" /> طباعة / PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={!result || rows.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-teal-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" /> تصدير Excel
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={!result || rows.length === 0}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" /> CSV
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={!result || rows.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Printer className="h-4 w-4" /> طباعة / PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={!result || rows.length === 0}
+              className="flex items-center gap-2 rounded-xl bg-teal-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> تصدير Excel
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={!result || rows.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> CSV
+            </button>
+          </>}
+        />
       </div>
 
       <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-5 py-3">

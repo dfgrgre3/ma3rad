@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Factory, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { ManufacturingService } from '../../../services/domains/manufacturing/ManufacturingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -115,17 +116,16 @@ export const ManufacturingPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
-            <Factory className="h-5 w-5 text-sky-600" /> التصنيع
-          </h1>
-          <p className="text-sm text-slate-500">BOM، مراكز عمل، وأوامر إنتاج مع تتبع المواد والعمليات.</p>
-        </div>
-        <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
-          <RefreshCw className="h-4 w-4" />
-        </button>
-      </div>
+      <PageHeader
+        icon={<Factory className="h-5 w-5" />}
+        title="التصنيع"
+        description="BOM، مراكز عمل، وأوامر إنتاج مع تتبع المواد والعمليات."
+        actions={
+          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        }
+      />
       {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
           <span className="font-bold text-slate-500">سير عمل النشاط: </span>

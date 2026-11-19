@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ClipboardCheck, Plus, Search, X, Loader2, Trash2, Eye, RefreshCw, Truck, Send, Ban, CheckCircle2 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderStatus } from '../../../services/domains/purchases/PurchaseOrderService';
 import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
@@ -150,26 +151,22 @@ export const PurchaseOrdersPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center">
-            <ClipboardCheck className="w-5 h-5 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">أوامر الشراء</h1>
-            <p className="text-xs text-slate-500 font-medium">من أمر الشراء إلى فاتورة التوريد واستلام المخزون</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          {canCreate && (
-            <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold">
-              <Plus className="w-4 h-4" /> أمر شراء جديد
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<ClipboardCheck className="w-5 h-5" />}
+          title="أوامر الشراء"
+          description="من أمر الشراء إلى فاتورة التوريد واستلام المخزون"
+          actions={<>
+            <button onClick={load} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-        </div>
+            {canCreate && (
+              <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold">
+                <Plus className="w-4 h-4" /> أمر شراء جديد
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row gap-3">

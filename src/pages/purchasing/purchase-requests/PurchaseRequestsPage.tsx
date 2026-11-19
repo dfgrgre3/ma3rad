@@ -3,6 +3,7 @@ import {
   ClipboardList, Plus, Search, FileText, Loader2, X, Trash2,
   XCircle, Truck, FileSpreadsheet, Sparkles, CheckCircle2
 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/domains/purchases/PurchaseRequestService';
 import { ProcurementService, ReorderSuggestion } from '../../../services/domains/procurement/ProcurementService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -212,35 +213,30 @@ export const PurchaseRequestsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center">
-            <ClipboardList className="w-5 h-5 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">طلبات الشراء والتوريد الداخلي</h1>
-            <p className="text-xs text-slate-500 font-medium">اقتراحات حد إعادة الطلب، طلبات التوريد، والاعتماد المتدرج حسب القيمة المالية</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {canCreate && (
-            <button
-              onClick={openReorderSuggestions}
-              className="flex items-center gap-2 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold transition"
-            >
-              <Sparkles className="w-4 h-4 text-amber-600" /> اقتراحات حد إعادة الطلب
-            </button>
-          )}
-          {canCreate && (
-            <button
-              onClick={openModal}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition shrink-0"
-            >
-              <Plus className="w-4 h-4" /> طلب توريد جديد
-            </button>
-          )}
-        </div>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<ClipboardList className="w-5 h-5" />}
+          title="طلبات الشراء والتوريد الداخلي"
+          description="اقتراحات حد إعادة الطلب، طلبات التوريد، والاعتماد المتدرج حسب القيمة المالية"
+          actions={<>
+            {canCreate && (
+              <button
+                onClick={openReorderSuggestions}
+                className="flex items-center gap-2 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold transition"
+              >
+                <Sparkles className="w-4 h-4 text-amber-600" /> اقتراحات حد إعادة الطلب
+              </button>
+            )}
+            {canCreate && (
+              <button
+                onClick={openModal}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition shrink-0"
+              >
+                <Plus className="w-4 h-4" /> طلب توريد جديد
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       {/* Filter bar */}

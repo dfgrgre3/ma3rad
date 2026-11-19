@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { ReceiptText, Loader2, Download, CalendarDays } from 'lucide-react';
 import { FinanceExtrasService } from '../../../services/domains/finance/FinanceExtrasService';
 import { localDateString } from '../../../utils/shared/date';
@@ -46,17 +47,17 @@ export const TaxReportPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center"><ReceiptText className="w-5 h-5 text-teal-600" /></div>
-          <div>
-            <h1 className="text-base font-black">تقرير ضريبة القيمة المضافة</h1>
-            <p className="text-xs text-slate-500 font-medium">ملخص ضريبة المخرجات والمدخلات المسجلة للفترة — للمراجعة وليس إقرارًا ضريبيًا نهائيًا</p>
-          </div>
-        </div>
-        <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold transition shrink-0">
-          <Download className="w-4 h-4" /> تصدير CSV
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<ReceiptText className="w-5 h-5" />}
+          title="تقرير ضريبة القيمة المضافة"
+          description="ملخص ضريبة المخرجات والمدخلات المسجلة للفترة — للمراجعة وليس إقرارًا ضريبيًا نهائيًا"
+          actions={
+            <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+              <Download className="w-4 h-4" /> تصدير CSV
+            </button>
+          }
+        />
       </div>
 
       <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-end gap-3">

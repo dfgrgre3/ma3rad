@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   Trash2, AlertTriangle, Database, CalendarRange, Rows3, ShieldAlert,
   RefreshCw, CheckCircle2, Table2, Search,
@@ -237,22 +238,16 @@ export const DataDeletionPage: React.FC = () => {
     <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6">
       <div className="w-full space-y-5">
         {/* Header */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-rose-500 to-red-600 text-white shadow-lg shadow-rose-500/25">
-              <Trash2 className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">حذف البيانات</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                حذف كامل لبيانات النظام أو بيانات جدول معيّن أو سجلات محددة أو نطاق زمني
-              </p>
-            </div>
-          </div>
-          <button onClick={load} className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-            <RefreshCw className="h-4 w-4" /> تحديث الأعداد
-          </button>
-        </div>
+        <PageHeader
+          icon={<Trash2 className="h-5 w-5" />}
+          title="حذف البيانات"
+          description="حذف كامل لبيانات النظام أو بيانات جدول معيّن أو سجلات محددة أو نطاق زمني"
+          actions={
+            <button onClick={load} className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+              <RefreshCw className="h-4 w-4" /> تحديث الأعداد
+            </button>
+          }
+        />
 
         <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

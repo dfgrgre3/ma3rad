@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   Plus, Search, TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
   X, Award, FileSpreadsheet,
@@ -203,25 +204,21 @@ export const SupplierQuotationsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center">
-            <FileSpreadsheet className="w-6 h-6 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">طلب عروض أسعار الموردين ومقارنة العروض (RFQ)</h1>
-            <p className="text-xs text-slate-500 font-medium">طرح الاحتياجات للمصانع، تسجيل العروض التنافسية، والترسية مع توليد أمر الشراء آلياً</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button
-            onClick={handleOpenNewRfq}
-            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold shadow-md shadow-orange-600/20 transition shrink-0"
-          >
-            <Plus className="w-4 h-4" /> طلب عروض أسعار جديد (RFQ)
-          </button>
-        )}
-      </header>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<FileSpreadsheet className="w-5 h-5" />}
+          title="طلب عروض أسعار الموردين ومقارنة العروض (RFQ)"
+          description="طرح الاحتياجات للمصانع، تسجيل العروض التنافسية، والترسية مع توليد أمر الشراء آلياً"
+          actions={canCreate && (
+            <button
+              onClick={handleOpenNewRfq}
+              className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold shadow-md shadow-orange-600/20 transition shrink-0"
+            >
+              <Plus className="w-4 h-4" /> طلب عروض أسعار جديد (RFQ)
+            </button>
+          )}
+        />
+      </div>
 
       {/* Filter bar */}
       <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap gap-3 items-center">

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   ArrowDownUp, Building2, CalendarDays, Check, ClipboardList, Download, Loader2,
   MapPin, Pencil, Plus, Search, SlidersHorizontal, Trash2, TrendingDown, Wallet,
@@ -248,21 +249,12 @@ export const FixedAssetsPage: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-[var(--cerami-canvas)] dark:text-[var(--cerami-text)]">
-      <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-700 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-violet-200 bg-violet-50">
-              <Building2 aria-hidden="true" className="h-5 w-5 text-violet-700" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-black tracking-tight">الأصول الثابتة</h1>
-                <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">إدارة مالية</span>
-              </div>
-              <p className="mt-1 text-xs font-medium text-slate-500">سجل الاقتناء والقيمة الدفترية ومتابعة الإهلاك</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="shrink-0 bg-white px-4 pt-4 dark:bg-[var(--cerami-surface)] sm:px-6">
+        <PageHeader
+          icon={<Building2 aria-hidden="true" className="h-5 w-5" />}
+          title={<>الأصول الثابتة <span className="mr-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 align-middle text-[10px] font-bold text-slate-500">إدارة مالية</span></>}
+          description="سجل الاقتناء والقيمة الدفترية ومتابعة الإهلاك"
+          actions={<>
             {canExport && (
               <>
                 <button type="button" onClick={() => exportAssets()} disabled={loading || visibleRows.length === 0}
@@ -300,9 +292,9 @@ export const FixedAssetsPage: React.FC = () => {
                 onChanged={load}
               />
             )}
-          </div>
-        </div>
-      </header>
+          </>}
+        />
+      </div>
 
       <section aria-label="مسارات إدارة الأصول" className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-[var(--cerami-surface)] sm:px-6">
         <div className="flex flex-col gap-3 rounded-lg border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900/70 dark:bg-violet-950/30 sm:flex-row sm:items-center sm:justify-between sm:px-4">

@@ -3,6 +3,7 @@ import { Activity, Link2, ShieldCheck, RefreshCw } from 'lucide-react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { SyncStatusPanel } from '../../../components/sync/SyncStatusPanel';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AccountLinksPanel } from '../../../components/sync/AccountLinksPanel';
 import { SyncChangeApprovalsPanel } from '../../../components/sync/SyncChangeApprovalsPanel';
 
@@ -27,25 +28,21 @@ export const SyncStatusPage: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50">
-            <Activity className="h-5 w-5 text-indigo-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">مركز مزامنة الفروع والحسابات</h1>
-            <p className="text-xs text-slate-500">
-              حالة الاتصال، ربط حساب شركة أخرى بكود أو مفتاح API، واعتماد تعديلات الفروع
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setRefreshToken((value) => value + 1)}
-          className="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:self-auto"
-        >
-          <RefreshCw className="h-4 w-4" /> تحديث الكل
-        </button>
+      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Activity className="h-5 w-5" />}
+          title="مركز مزامنة الفروع والحسابات"
+          description="حالة الاتصال، ربط حساب شركة أخرى بكود أو مفتاح API، واعتماد تعديلات الفروع"
+          actions={
+            <button
+              type="button"
+              onClick={() => setRefreshToken((value) => value + 1)}
+              className="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:self-auto"
+            >
+              <RefreshCw className="h-4 w-4" /> تحديث الكل
+            </button>
+          }
+        />
       </div>
 
       <div className="border-b border-slate-200 bg-white px-4">

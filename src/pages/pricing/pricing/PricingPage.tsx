@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -111,21 +112,17 @@ export const PricingPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <Percent className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">قوائم تسعير السيراميك والمواد</h1>
-            <p className="text-xs text-slate-500 font-medium">إعداد الخصومات وقوائم الأسعار المخصصة للمقاولين والتجار وكبار العملاء</p>
-          </div>
-        </div>
-        {canManage && (
-          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Percent className="w-5 h-5" />}
+          title="قوائم تسعير السيراميك والمواد"
+          description="إعداد الخصومات وقوائم الأسعار المخصصة للمقاولين والتجار وكبار العملاء"
+          actions={canManage && (
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">

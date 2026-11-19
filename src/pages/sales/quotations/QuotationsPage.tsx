@@ -5,6 +5,7 @@ import {
   ChevronRight, Percent, Clock, CheckCircle2, AlertTriangle,
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
@@ -439,22 +440,20 @@ export const QuotationsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><FileText className="w-5 h-5 text-amber-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">عروض الأسعار والمقايسات</h1>
-            <p className="text-xs text-slate-500 font-medium">إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة</p>
-          </div>
-          <div className="mt-3"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
-          <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>
-          {canCreate && (
-            <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition"><Plus className="w-4 h-4" /> عرض أسعار جديد</button>
-          )}
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<FileText className="w-5 h-5" />}
+          title="عروض الأسعار والمقايسات"
+          description="إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة"
+          meta={<OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />}
+          actions={<>
+            <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
+            <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>
+            {canCreate && (
+              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition"><Plus className="w-4 h-4" /> عرض أسعار جديد</button>
+            )}
+          </>}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Target, ListChecks, Award, ClipboardList, TrendingUp, Gift } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { PerformanceService, PerformanceCycle, PerformanceKpi, PerformanceGoal, PerformanceEvaluation, PerformancePip, PerformanceReward } from '../../../services/domains/hr/PerformanceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
@@ -122,14 +123,12 @@ export const PerformancePage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
-          <Target className="w-5 h-5 text-indigo-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">تقييم أداء الموظفين</h1>
-          <p className="text-xs text-slate-500 font-medium">دورات، مؤشرات، أهداف، تقييمات، خطط تحسين، مكافآت</p>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Target className="h-5 w-5" />}
+          title="تقييم أداء الموظفين"
+          description="دورات، مؤشرات، أهداف، تقييمات، خطط تحسين، مكافآت"
+        />
       </div>
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

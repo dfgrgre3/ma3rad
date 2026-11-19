@@ -7,6 +7,7 @@ import {
 import { DocumentService } from '../../../services/domains/documents/DocumentService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { exportToExcel } from '../../../utils/export/export';
 import type {
   ContractEffectiveStatus,
@@ -443,31 +444,27 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center">
-            <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">مركز المستندات والعقود</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">نسخ موثقة، صلاحيات وصول، ومتابعة تجديد العقود</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50" title="تحديث">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {(tab === 'documents' ? can('documents.create') : can('contracts.create')) && (
-            <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition">
-              <Plus className="w-4 h-4" /> {tab === 'documents' ? 'مستند جديد' : 'عقد جديد'}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 pt-4">
+        <PageHeader
+          icon={<FileText className="w-5 h-5" />}
+          title="مركز المستندات والعقود"
+          description="نسخ موثقة، صلاحيات وصول، ومتابعة تجديد العقود"
+          actions={<>
+            <button onClick={load} className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50" title="تحديث">
+              <RefreshCw className="w-4 h-4" />
             </button>
-          )}
-          {(tab === 'documents' ? canExportDocuments : canExportContracts) && (
-            <button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold">
-              <Download className="w-4 h-4" /> تصدير
-            </button>
-          )}
-        </div>
+            {(tab === 'documents' ? can('documents.create') : can('contracts.create')) && (
+              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition">
+                <Plus className="w-4 h-4" /> {tab === 'documents' ? 'مستند جديد' : 'عقد جديد'}
+              </button>
+            )}
+            {(tab === 'documents' ? canExportDocuments : canExportContracts) && (
+              <button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold">
+                <Download className="w-4 h-4" /> تصدير
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2 md:grid-cols-4">

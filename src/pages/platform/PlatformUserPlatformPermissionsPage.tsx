@@ -1,5 +1,6 @@
 import React from 'react';
 import { DataTable } from '../../components/ui/DataTable';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { GRANULAR_PERMISSIONS } from '../../config/permissionMatrix';
 import { ROUTE_PERMISSIONS } from '../../config/routePermissions';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -119,40 +120,44 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-bold text-slate-900">منصة المستخدمين — صفحات وصلاحيات</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          عرض كامل لجميع صفحات المنصة وكل الصلاحيات على كل صفحة، مع التحكم الفعلي في ظهور القوائم
-          وتعطيل الصلاحيات على مستوى العميل أو الخطة — محفوظ على السيرفر المركزي، وليس على هذا الجهاز.
-        </p>
-        <p className="mt-1 text-xs text-slate-500">
-          الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين» (grant/deny لكل حساب)، وعلى مستوى
-          الدور من مصفوفة الصلاحيات. الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي
-          (requirePlatformPermission / requireTenantScope) وفي خدمة التفويض المحلية.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <label className="font-semibold text-slate-700">مفتاح عميل/خطة:</label>
-          <input
-            value={tenantKey}
-            onChange={(e) => setTenantKey(e.target.value || 'global')}
-            className="rounded border border-slate-300 px-2 py-1 text-xs"
-            placeholder="global أو tenantId أو plan:<planId>"
-          />
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {loading ? 'جارٍ التحميل…' : 'إعادة التحميل'}
-          </button>
-        </div>
-        {error && <div role="alert" className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</div>}
-        {notice && <div role="status" className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{notice}</div>}
-        <div className="mt-3 flex gap-4 text-xs text-slate-500">
-          <span>مسارات مخفية لهذا النطاق: {featurePermissions.hiddenMenus.length}</span>
-          <span>صلاحيات معطلة: {featurePermissions.disabledPermissions.length}</span>
-          <span>صلاحيات (featurePermissions): {featurePermissions.featurePermissions.length}</span>
-        </div>
+        <PageHeader
+          bordered={false}
+          title="منصة المستخدمين — صفحات وصلاحيات"
+          description="عرض كامل لجميع صفحات المنصة وكل الصلاحيات على كل صفحة، مع التحكم الفعلي في ظهور القوائم وتعطيل الصلاحيات على مستوى العميل أو الخطة — محفوظ على السيرفر المركزي، وليس على هذا الجهاز."
+          meta={
+            <>
+              <p className="mt-1 text-xs text-slate-500">
+                الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين» (grant/deny لكل حساب)، وعلى مستوى
+                الدور من مصفوفة الصلاحيات. الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي
+                (requirePlatformPermission / requireTenantScope) وفي خدمة التفويض المحلية.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label className="font-semibold text-slate-700">مفتاح عميل/خطة:</label>
+                <input
+                  value={tenantKey}
+                  onChange={(e) => setTenantKey(e.target.value || 'global')}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs"
+                  placeholder="global أو tenantId أو plan:<planId>"
+                />
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {loading ? 'جارٍ التحميل…' : 'إعادة التحميل'}
+                </button>
+              </div>
+              {error && <div role="alert" className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</div>}
+              {notice && <div role="status" className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{notice}</div>}
+              <div className="mt-3 flex gap-4 text-xs text-slate-500">
+                <span>مسارات مخفية لهذا النطاق: {featurePermissions.hiddenMenus.length}</span>
+                <span>صلاحيات معطلة: {featurePermissions.disabledPermissions.length}</span>
+                <span>صلاحيات (featurePermissions): {featurePermissions.featurePermissions.length}</span>
+              </div>
+            </>
+          }
+        />
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

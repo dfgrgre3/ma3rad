@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   CreditCard,
   Plus,
@@ -152,46 +153,39 @@ export const EPaymentSettlementPage: React.FC = () => {
   return (
     <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-            <CreditCard className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">حسابات وبوابات الدفع الإلكتروني والتسويات البنكية</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              إدارة ماكينات الـ POS ونقاط البيع وبوابات الدفع والمحافظ الإلكترونية، مع تسوية العمولات والإيداع البنكي
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadData}
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-            title="تحديث البيانات"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {canManage && (
-            <>
-              <button
-                onClick={() => setShowGatewayModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-              >
-                <Plus className="w-4 h-4" />
-                <span>بوابة / ماكينة جديدة</span>
-              </button>
-              <button
-                onClick={() => setShowSettlementModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-              >
-                <ArrowRightLeft className="w-4 h-4" />
-                <span>تسوية وإيداع بنكي</span>
-              </button>
-            </>
-          )}
-        </div>
+      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+        <PageHeader
+          icon={<CreditCard className="h-5 w-5" />}
+          title="حسابات وبوابات الدفع الإلكتروني والتسويات البنكية"
+          description="إدارة ماكينات الـ POS ونقاط البيع وبوابات الدفع والمحافظ الإلكترونية، مع تسوية العمولات والإيداع البنكي"
+          actions={<>
+            <button
+              onClick={loadData}
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              title="تحديث البيانات"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            {canManage && (
+              <>
+                <button
+                  onClick={() => setShowGatewayModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>بوابة / ماكينة جديدة</span>
+                </button>
+                <button
+                  onClick={() => setShowSettlementModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+                >
+                  <ArrowRightLeft className="w-4 h-4" />
+                  <span>تسوية وإيداع بنكي</span>
+                </button>
+              </>
+            )}
+          </>}
+        />
       </div>
 
       {/* Metric Cards */}

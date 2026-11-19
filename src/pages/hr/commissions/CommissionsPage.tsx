@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { CommissionService, CommissionRow, CommissionStats } from '../../../services/domains/hr/CommissionService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -91,31 +92,27 @@ export const CommissionsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
-            <BadgeDollarSign className="w-5 h-5 text-indigo-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">عمولات المبيعات</h1>
-            <p className="text-xs text-slate-500 font-medium">احتساب واعتماد وصرف عمولات مندوبي المبيعات</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
-            <option value="ALL">كل الحالات</option>
-            <option value="PENDING">قيد الاعتماد</option>
-            <option value="APPROVED">معتمدة</option>
-            <option value="PAID">مدفوعة</option>
-            <option value="CANCELLED">ملغاة</option>
-          </select>
-          {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} احتساب الشهر
-          </button>}
-          <button onClick={() => load()} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-          <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
-        </div>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<BadgeDollarSign className="h-5 w-5" />}
+          title="عمولات المبيعات"
+          description="احتساب واعتماد وصرف عمولات مندوبي المبيعات"
+          actions={<>
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+              <option value="ALL">كل الحالات</option>
+              <option value="PENDING">قيد الاعتماد</option>
+              <option value="APPROVED">معتمدة</option>
+              <option value="PAID">مدفوعة</option>
+              <option value="CANCELLED">ملغاة</option>
+            </select>
+            {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} احتساب الشهر
+            </button>}
+            <button onClick={() => load()} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+            <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
+          </>}
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">

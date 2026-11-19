@@ -8,6 +8,7 @@ import { TYPE_CONFIG } from './crmActivityConfig';
 import { CrmActivityModal } from './CrmActivityModal';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 export const CrmActivitiesPage: React.FC = () => {
   const toast = useToast();
   const service = new CrmService();
@@ -70,21 +71,17 @@ export const CrmActivitiesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-violet-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">الأنشطة والمتابعات</h1>
-            <p className="text-xs text-slate-500">سجل وتخطيط الفعاليات والمتابعات مع العملاء</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto">
-            <Plus className="w-4 h-4" /> جدولة نشاط جديد
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Activity className="w-5 h-5" />}
+          title="الأنشطة والمتابعات"
+          description="سجل وتخطيط الفعاليات والمتابعات مع العملاء"
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto">
+              <Plus className="w-4 h-4" /> جدولة نشاط جديد
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 flex gap-3">

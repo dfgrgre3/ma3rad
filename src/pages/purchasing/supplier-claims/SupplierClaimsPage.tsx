@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   ShieldAlert, Plus, Search, ChevronDown, X, Layers,
 } from 'lucide-react';
@@ -197,25 +198,21 @@ export const SupplierClaimsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center">
-            <ShieldAlert className="w-6 h-6 text-rose-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">مطالبات عيوب ونقص توريد الموردين</h1>
-            <p className="text-xs text-slate-500 font-medium">توثيق الكسر، العيوب، فروق الأسعار، وإصدار إشعارات الخصم (Debit Notes) المعتمدة</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition shrink-0"
-          >
-            <Plus className="w-4 h-4" /> تسجيل مطالبة جديدة
-          </button>
-        )}
-      </header>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<ShieldAlert className="w-5 h-5" />}
+          title="مطالبات عيوب ونقص توريد الموردين"
+          description="توثيق الكسر، العيوب، فروق الأسعار، وإصدار إشعارات الخصم (Debit Notes) المعتمدة"
+          actions={canCreate && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold shadow-md shadow-rose-600/20 transition shrink-0"
+            >
+              <Plus className="w-4 h-4" /> تسجيل مطالبة جديدة
+            </button>
+          )}
+        />
+      </div>
 
       {/* Filter bar */}
       <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap gap-3 items-center">

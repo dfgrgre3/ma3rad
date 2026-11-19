@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { CalendarDays, Check, ChevronDown, Clock3, PackageCheck, Search, Truck, Warehouse } from 'lucide-react';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderItem } from '../../../services/domains/purchases/PurchaseOrderService';
 import { useToast } from '../../../components/ui/Toast';
@@ -97,11 +98,14 @@ export const IncomingProductsPage: React.FC = () => {
   };
 
   return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-    <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center gap-3">
-      <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center"><PackageCheck className="w-5 h-5 text-amber-700" /></div>
-      <div><h1 className="text-lg font-black">البضائع المنتظرة</h1><p className="text-xs text-slate-500">طلبات الشراء المفتوحة والكميات التي لم تصل بعد</p></div>
-      <div className="mr-auto rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-black text-amber-800">{filtered.length} طلب مفتوح</div>
-    </header>
+    <div className="bg-white border-b border-slate-200 px-6 pt-4">
+      <PageHeader
+        icon={<PackageCheck className="w-5 h-5" />}
+        title="البضائع المنتظرة"
+        description="طلبات الشراء المفتوحة والكميات التي لم تصل بعد"
+        meta={<div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-black text-amber-800">{filtered.length} طلب مفتوح</div>}
+      />
+    </div>
     <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap gap-3 items-center">
       <div className="relative flex-1 min-w-56"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالمنتج أو المورد أو رقم الطلب" className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-sm" /></div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} /> المتأخرة فقط</label>

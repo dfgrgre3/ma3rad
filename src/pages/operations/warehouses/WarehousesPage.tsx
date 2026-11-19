@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Warehouse, Plus, Search, MapPin, Database, Loader2, X, AlertTriangle, Pencil, Power, Star, ArrowLeftRight } from 'lucide-react';
 import { OperationsService, WarehouseRow } from '../../../services/domains/operations/OperationsService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
@@ -286,21 +287,21 @@ export const WarehousesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center"><Warehouse className="w-5 h-5 text-violet-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">المخازن والمستودعات</h1>
-            <p className="text-xs text-slate-500 font-medium">متابعة الأرصدة الفعلية، قيمة المخزون، وتنبيهات النقص لكل مخزن</p>
-          </div>
-        </div>
-        <CentralLimitGuard metric="maxWarehouses">
-          {canManage && (
-            <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-              <Plus className="w-4 h-4" /> إضافة مخزن جديد
-            </button>
-          )}
-        </CentralLimitGuard>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Warehouse className="h-5 w-5" />}
+          title="المخازن والمستودعات"
+          description="متابعة الأرصدة الفعلية، قيمة المخزون، وتنبيهات النقص لكل مخزن"
+          actions={
+            <CentralLimitGuard metric="maxWarehouses">
+              {canManage && (
+                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+                  <Plus className="w-4 h-4" /> إضافة مخزن جديد
+                </button>
+              )}
+            </CentralLimitGuard>
+          }
+        />
       </div>
 
       {/* Global Summary Cards */}

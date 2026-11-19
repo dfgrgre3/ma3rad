@@ -6,6 +6,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
@@ -149,24 +150,20 @@ export const LeadsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-pink-50 border border-pink-200 flex items-center justify-center">
-            <UserRound className="w-5 h-5 text-pink-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">العملاء المحتملون (Leads)</h1>
-            <p className="text-xs text-slate-500">متابعة الفرص التسويقية والمهتمين بالمعرض</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" /> إضافة عميل محتمل
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<UserRound className="w-5 h-5" />}
+          title="العملاء المحتملون (Leads)"
+          description="متابعة الفرص التسويقية والمهتمين بالمعرض"
+          actions={canCreate && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" /> إضافة عميل محتمل
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 flex flex-col md:flex-row gap-3">

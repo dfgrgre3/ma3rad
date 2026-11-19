@@ -9,6 +9,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { SalesFinancialReconciliation } from '../../../components/reports/SalesFinancialReconciliation';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { round2 } from '../../../services/domains/finance/financials';
@@ -443,34 +444,26 @@ export const SalesReportsPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow">
-            <BarChart3 className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">
-              {activeSection === 'reports' ? 'تقارير المبيعات المتقدمة' : 'بوابة المصالحة المالية'}
-            </h1>
-            <p className="text-xs text-slate-400">
-              {activeSection === 'reports'
-                ? 'تحليل مفصل حسب الفئة والمنتج والعميل والمندوب والمنطقة'
-                : 'مراجعة المبيعات والمرتجعات والدفتر العام والأرصدة التشغيلية'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeSection === 'reports' && (
-            <button onClick={handleExport} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
-              <Download className="w-3.5 h-3.5" /> تصدير
-            </button>
-          )}
-          {activeSection === 'reports' && (
-            <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
-              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          )}
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0">
+        <PageHeader
+          icon={<BarChart3 className="w-5 h-5" />}
+          title={activeSection === 'reports' ? 'تقارير المبيعات المتقدمة' : 'بوابة المصالحة المالية'}
+          description={activeSection === 'reports'
+            ? 'تحليل مفصل حسب الفئة والمنتج والعميل والمندوب والمنطقة'
+            : 'مراجعة المبيعات والمرتجعات والدفتر العام والأرصدة التشغيلية'}
+          actions={<>
+            {activeSection === 'reports' && (
+              <button onClick={handleExport} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5" /> تصدير
+              </button>
+            )}
+            {activeSection === 'reports' && (
+              <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
+                <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       {/* Filters */}

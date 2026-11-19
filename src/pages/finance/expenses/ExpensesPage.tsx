@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { CalendarDays, Download, Loader2, Pencil, Plus, Search, Tag, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import { CashierService } from '../../../services/domains/finance/CashierService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -80,19 +81,17 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center"><TrendingDown className="w-5 h-5 text-rose-600" /></div>
-          <div>
-            <h1 className="text-base font-black">إدارة المصروفات التشغيلية</h1>
-        <p className="text-xs text-slate-500">{dateMode === 'today' ? 'مصروفات اليوم' : 'مصروفات الفروع ضمن الفترة المحددة'}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
-          {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل مصروف جديد</button>}
-        </div>
-      </header>
+      <div className="shrink-0 bg-white px-6 pt-4">
+        <PageHeader
+          icon={<TrendingDown className="h-5 w-5" />}
+          title="إدارة المصروفات التشغيلية"
+          description={dateMode === 'today' ? 'مصروفات اليوم' : 'مصروفات الفروع ضمن الفترة المحددة'}
+          actions={<>
+            {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
+            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل مصروف جديد</button>}
+          </>}
+        />
+      </div>
 
       <section className="p-4 bg-white border-b border-slate-200 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between px-6">
         <form onSubmit={(event) => event.preventDefault()} className="relative flex-1 max-w-md">

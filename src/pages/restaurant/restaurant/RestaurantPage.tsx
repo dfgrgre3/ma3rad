@@ -6,6 +6,7 @@ import { InventoryService } from '../../../services/domains/inventory/InventoryS
 import { ManufacturingService, type BillOfMaterials } from '../../../services/domains/manufacturing/ManufacturingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { isServiceProduct } from '../../../utils/products/productUnits';
 import {
   RestaurantService,
@@ -286,17 +287,16 @@ export const RestaurantPage: React.FC = () => {
 
   return (
     <div className="space-y-5 p-4 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
-            <Utensils className="h-5 w-5 text-emerald-600" /> إدارة المطعم
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">الطاولات والطلبات والمطبخ والوصفات والمخزون.</p>
-        </div>
-        <button onClick={load} className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
-          <RefreshCw className="h-4 w-4" /> تحديث
-        </button>
-      </header>
+      <PageHeader
+        icon={<Utensils className="h-5 w-5" />}
+        title="إدارة المطعم"
+        description="الطاولات والطلبات والمطبخ والوصفات والمخزون."
+        actions={
+          <button onClick={load} className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+            <RefreshCw className="h-4 w-4" /> تحديث
+          </button>
+        }
+      />
       {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
           <span className="font-bold text-slate-500">سير عمل النشاط: </span>

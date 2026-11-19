@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AnalyticsService } from '../../../services/domains/reports/AnalyticsService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
@@ -117,10 +118,15 @@ export const SalesAnalyticsPage: React.FC = () => {
 
   return <main className="erp-page">
     <div className="w-full space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-3xl bg-gradient-to-l from-slate-950 via-slate-900 to-emerald-950 p-6 text-white shadow-xl md:flex-row md:items-center md:p-8">
-        <div><div className="mb-3 flex items-center gap-2 text-emerald-300"><Activity size={18}/><span className="text-sm font-bold">مركز أداء المبيعات</span></div><h1 className="text-2xl font-black md:text-3xl">كل حركة البيع في مكان واحد</h1><p className="mt-2 text-sm text-slate-300">تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً.</p></div>
-        <div className="flex flex-wrap gap-2">{canOpenPos && <Link to="/pos" className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-emerald-400">نقطة بيع جديدة</Link>}<Link to="/sales" className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold hover:bg-white/15">الفواتير</Link></div>
-      </header>
+      <PageHeader
+        eyebrow={<span className="flex items-center gap-2"><Activity size={14}/> مركز أداء المبيعات</span>}
+        title="كل حركة البيع في مكان واحد"
+        description="تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً."
+        actions={<>
+          {canOpenPos && <Link to="/pos" className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-emerald-400">نقطة بيع جديدة</Link>}
+          <Link to="/sales" className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">الفواتير</Link>
+        </>}
+      />
       <section className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2 text-sm font-bold text-slate-600"><CalendarDays size={17}/> الفترة الزمنية</div><div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">{([['today','اليوم'],['7days','7 أيام'],['30days','30 يومًا'],['all','الكل']] as const).map(([key,label])=><button key={key} onClick={()=>setPeriod(key)} className={`rounded-lg px-3 py-2 text-xs font-bold ${period===key?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}`}>{label}</button>)}</div></section>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({label,value,note,icon:Icon,tone})=><article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-slate-500">{label}</p><p className="mt-3 text-2xl font-black text-slate-900">{value}</p></div><span className={`rounded-xl p-3 ${toneClasses[tone]}`}><Icon size={21}/></span></div><p className="mt-3 text-xs text-slate-500">{note}</p></article>)}</section>
       <section className="grid gap-5 xl:grid-cols-5">

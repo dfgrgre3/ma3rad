@@ -5,6 +5,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 type CampaignStatus = 'PLANNED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 type Channel = 'WHATSAPP' | 'SMS' | 'EMAIL' | 'PHONE' | 'SOCIAL' | 'WALK_IN' | 'REFERRAL' | 'OTHER';
 
@@ -126,17 +127,17 @@ export const CampaignsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-pink-50 border border-pink-200 flex items-center justify-center"><Megaphone className="w-5 h-5 text-pink-600" /></div>
-          <div>
-            <h1 className="text-base font-black">الحملات التسويقية</h1>
-            <p className="text-xs text-slate-500 font-medium">تخطيط الحملات ومتابعة الميزانية والعملاء المحتملين الناتجين عنها</p>
-          </div>
-        </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition shrink-0">
-          <Plus className="w-4 h-4" /> حملة جديدة
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Megaphone className="w-5 h-5" />}
+          title="الحملات التسويقية"
+          description="تخطيط الحملات ومتابعة الميزانية والعملاء المحتملين الناتجين عنها"
+          actions={
+            <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+              <Plus className="w-4 h-4" /> حملة جديدة
+            </button>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-white border-b border-slate-200">

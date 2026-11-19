@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
 import { InventoryValuationService, type WarehouseValuation } from '../../../services/domains/inventory/InventoryValuationService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -59,20 +60,16 @@ export const InventoryValuationPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-            <Scale className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">تقييم المخزون (Inventory Valuation)</h1>
-            <p className="text-xs text-slate-500 font-medium">حساب القيمة المالية الحالية للبضائع المتاحة بسعر التكلفة وسعر البيع</p>
-          </div>
-        </div>
-        {canExport && <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shrink-0">
-          <Download className="w-4 h-4" />
-          تصدير التقرير المالي في جدول بيانات
-        </button>}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Scale className="w-5 h-5" />}
+          title="تقييم المخزون (Inventory Valuation)"
+          description="حساب القيمة المالية الحالية للبضائع المتاحة بسعر التكلفة وسعر البيع"
+          actions={canExport && <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <Download className="w-4 h-4" />
+            تصدير التقرير المالي في جدول بيانات
+          </button>}
+        />
       </div>
 
       {/* Summary Cards */}

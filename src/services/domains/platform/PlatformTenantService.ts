@@ -1,12 +1,9 @@
-import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PlatformStaffAuthService } from './PlatformStaffAuthService';
 import { PlatformAuthorizationService } from './PlatformAuthorizationService';
 import { centralAuditService } from './CentralAuditService';
-import { provisioningQueueService } from './ProvisioningQueueService';
-import { provisioningExecutorService } from './ProvisioningExecutorService';
+import { safeJsonArray, toNumber } from './platformUtils';
 import type {
   PlatformTenant,
   PlatformTenantInput,
@@ -19,22 +16,29 @@ import type {
   PlatformTenantUserProvisioningResult,
   PlatformTenantOverride,
   PlatformTenantOverrideInput,
-  PlatformPlan,
-  PlatformSubscription,
-  PlatformLicense,
-  PlatformInvoice,
-  PlatformPayment,
-  PlatformAuditEntry,
-  PlatformTenantUsage,
   PlatformActivationDetails,
-  PlatformTenantActivityConfig,
-  PlatformTenantActivityInput,
-  PlatformTenantActivityVersion,
 } from './platformTypes';
-import { nowIso, toNumber, formatCount, formatMoneyText, safeJsonArray, safeJsonObject, addMonths, addDays, randomToken, generateTemporaryPassword, generateActivationCode, mapTenantAccount, mapTenantOverride } from './platformUtils';
+import type { TenantServiceContext, TenantAuditOptions } from './PlatformTenantService/context';
+import { mapTenantUser } from './PlatformTenantService/mappers';
+import * as tenantCrud from './PlatformTenantService/tenantCrud';
+import * as tenantProfile from './PlatformTenantService/tenantProfile';
+import * as tenantAccount from './PlatformTenantService/tenantAccount';
+import * as tenantUsers from './PlatformTenantService/tenantUsers';
+import * as tenantOverrides from './PlatformTenantService/tenantOverrides';
 
 export class PlatformTenantService {
   private db = DatabaseManager.getInstance();
+
+  private readonly ctx: TenantServiceContext = {
+    db: this.db,
+    audit: (action, entityType, entityId, details, options) => this.audit(action, entityType, entityId, details, options),
+    requirePlatformAccess: (modules, action) => PlatformTenantService.requirePlatformAccess(modules, action),
+    staffTenantScope: (user) => PlatformTenantService.staffTenantScope(user),
+    setting: (key, fallback) => this.setting(key, fallback),
+    getTenant: (id) => this.getTenant(id),
+    getTenantAccount: (tenantId) => this.getTenantAccount(tenantId),
+    getTenantUser: (id) => this.getTenantUser(id),
+  };
 
   private static requirePlatformAccess(modules: string | string[], action?: string) {
     const user = AuthService.getCurrentUser();
@@ -81,18 +85,7 @@ export class PlatformTenantService {
     entityType: string,
     entityId: string | null,
     details?: unknown,
-    options?: {
-      severity?: import('./platformTypes').AuditSeverity;
-      status?: import('./platformTypes').AuditStatus;
-      actorType?: import('./platformTypes').AuditActorType;
-      tenantId?: string | null;
-      deviceId?: string | null;
-      deviceName?: string | null;
-      ipAddress?: string | null;
-      oldValues?: unknown;
-      newValues?: unknown;
-      errorMessage?: string | null;
-    }
+    options?: TenantAuditOptions
   ): void {
     const actor = AuthService.getCurrentUser();
     if (!actor) throw new Error('هذه العملية تتطلب جلسة منصة صالحة.');
@@ -130,882 +123,107 @@ export class PlatformTenantService {
   // ─── Tenant CRUD ──────────────────────────────────────────────────────────────
 
   public listTenants(search = '', status = '', planId = ''): PlatformTenant[] {
-    const user = PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-    const scopeIds = PlatformTenantService.staffTenantScope(user);
-
-    const where: string[] = [];
-    const params: (string | number)[] = [];
-
-    if (scopeIds !== null) {
-      if (!scopeIds.length) return [];
-      where.push(`t.id IN (${scopeIds.map(() => '?').join(',')})`);
-      params.push(...scopeIds);
-    }
-
-    if (search) {
-      where.push('(t.name LIKE ? OR t.code LIKE ? OR COALESCE(t.email,\'\') LIKE ? OR COALESCE(t.phone,\'\') LIKE ?)');
-      const term = `%${search}%`;
-      params.push(term, term, term, term);
-    }
-    if (status) {
-      where.push('t.status = ?');
-      params.push(status);
-    }
-    if (planId) {
-      where.push('t.plan_id = ?');
-      params.push(planId);
-    }
-
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-
-    const rows = this.db.query<any>(
-      `SELECT t.*,
-              p.name AS planName, p.price / 100.0 AS planPrice,
-              (SELECT COUNT(*) FROM platform_subscriptions s WHERE s.tenant_id = t.id AND s.status IN ('ACTIVE','TRIAL')) AS activeLicenses,
-              (SELECT COUNT(*) FROM platform_licenses l WHERE l.tenant_id = t.id) AS licensesTotal,
-              (SELECT COUNT(*) FROM platform_devices d
-               JOIN platform_licenses l ON l.id = d.license_id
-               WHERE l.tenant_id = t.id AND d.status = 'ACTIVE') AS devicesUsed,
-              COALESCE((
-                SELECT SUM(total - COALESCE(paid_amount, 0)) / 100.0
-                FROM platform_invoices i
-                WHERE i.tenant_id = t.id AND i.status IN ('SENT','PARTIAL','OVERDUE')
-              ), 0) AS outstanding
-       FROM platform_tenants t
-       LEFT JOIN platform_plans p ON p.id = t.plan_id
-       ${whereSql}
-       ORDER BY t.created_at DESC`,
-      params
-    );
-
-    return rows.map((row) => ({
-      id: String(row.id),
-      code: String(row.code),
-      name: String(row.name),
-      contactName: row.contactName ?? null,
-      email: row.email ?? null,
-      phone: row.phone ?? null,
-      country: row.country ?? null,
-      city: row.city ?? null,
-      address: row.address ?? null,
-      businessType: row.businessType ?? null,
-      status: row.status as PlatformTenantStatus,
-      planId: row.planId ?? null,
-      planName: row.planName ?? null,
-      planPrice: row.planPrice ?? null,
-      subscriptionStartedAt: row.subscription_started_at ?? null,
-      subscriptionExpiresAt: row.subscription_expires_at ?? null,
-      seatsLimit: toNumber(row.seats_limit, 1),
-      branchesLimit: toNumber(row.branches_limit, 1),
-      devicesLimit: toNumber(row.devices_limit, 1),
-      notes: row.notes ?? null,
-      activeLicenses: toNumber(row.activeLicenses, 0),
-      licensesTotal: toNumber(row.licensesTotal, 0),
-      devicesUsed: toNumber(row.devicesUsed, 0),
-      outstanding: toNumber(row.outstanding, 0),
-      subscriptionId: row.subscription_id ?? null,
-      price: row.price != null ? Number(row.price) / 100 : null,
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    }));
+    return tenantCrud.listTenants(this.ctx, search, status, planId);
   }
 
   public getTenant(id: string): PlatformTenant | null {
-    const user = PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-    const scopeIds = PlatformTenantService.staffTenantScope(user);
-    if (scopeIds !== null && !scopeIds.includes(String(id))) {
-      throw new Error('هذا العميل خارج نطاق البيانات المخصص لك.');
-    }
-    const row = this.db.query<any>('SELECT * FROM platform_tenants WHERE id = ?', [id])[0];
-    if (!row) return null;
-    return {
-      id: String(row.id),
-      code: String(row.code),
-      name: String(row.name),
-      contactName: row.contactName ?? null,
-      email: row.email ?? null,
-      phone: row.phone ?? null,
-      country: row.country ?? null,
-      city: row.city ?? null,
-      address: row.address ?? null,
-      businessType: row.businessType ?? null,
-      status: row.status as PlatformTenantStatus,
-      planId: row.plan_id ?? null,
-      planName: null,
-      planPrice: null,
-      subscriptionStartedAt: row.subscription_started_at ?? null,
-      subscriptionExpiresAt: row.subscription_expires_at ?? null,
-      seatsLimit: toNumber(row.seats_limit, 1),
-      branchesLimit: toNumber(row.branches_limit, 1),
-      devicesLimit: toNumber(row.devices_limit, 1),
-      notes: row.notes ?? null,
-      activeLicenses: 0,
-      licensesTotal: 0,
-      devicesUsed: 0,
-      outstanding: 0,
-      subscriptionId: row.subscription_id ?? null,
-      price: row.price != null ? Number(row.price) / 100 : null,
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    };
+    return tenantCrud.getTenant(this.ctx, id);
   }
 
   public createTenant(input: PlatformTenantInput): PlatformTenant {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.create');
-
-    const code = input.code?.trim() || this.generateTenantCode(input.name);
-    if (this.db.query('SELECT 1 FROM platform_tenants WHERE code = ?', [code]).length) {
-      throw new Error('رمز العميل مستخدم بالفعل.');
-    }
-    if (input.name.length < 2) throw new Error('اسم العميل مطلوب (حرفان على الأقل).');
-
-    const plan = input.planId
-      ? this.db.query<any>('SELECT * FROM platform_plans WHERE id = ? AND is_active = 1', [input.planId])[0]
-      : this.db.query<any>('SELECT * FROM platform_plans WHERE is_default = 1 AND is_active = 1 LIMIT 1')[0];
-
-    const id = `ten_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const now = nowIso();
-
-    this.db.run(
-      `INSERT INTO platform_tenants
-        (id, code, name, contact_name, email, phone, country, city, address, business_type,
-         status, plan_id, seats_limit, branches_limit, devices_limit, notes,
-         subscription_started_at, subscription_expires_at, subscription_id, price,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, ?)`,
-      [
-        id, code, input.name.trim(), input.contactName?.trim() ?? null, input.email?.trim() ?? null,
-        input.phone?.trim() ?? null, input.country?.trim() ?? null, input.city?.trim() ?? null,
-        input.address?.trim() ?? null, input.businessType?.trim() ?? null,
-        input.status ?? 'TRIAL', plan?.id ?? null,
-        toNumber(input.seatsLimit, plan?.seatsLimit ?? 1),
-        toNumber(input.branchesLimit, plan?.branchesLimit ?? 1),
-        toNumber(input.devicesLimit, plan?.devicesLimit ?? 1),
-        input.notes?.trim() ?? null,
-        plan ? now : null,
-        plan ? addMonths(new Date(), plan.trialDays).toISOString() : null,
-        plan ? `sub_${uuidv4().replace(/-/g, '').slice(0, 12)}` : null,
-        toNumber(plan?.price, 0),
-        now, now,
-      ]
-    );
-
-    if (plan) {
-      this.db.run(
-        `INSERT INTO platform_subscriptions
-          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
-        [
-          `sub_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, plan.id,
-          now, addMonths(new Date(), plan.trialDays).toISOString(),
-          toNumber(input.seatsLimit, plan.seatsLimit), toNumber(plan.price), plan.billingCycle,
-          toNumber(input.branchesLimit, plan.branchesLimit),
-        ]
-      );
-    }
-
-    this.audit('إنشاء عميل', 'TENANT', id, { name: input.name, code, planId: plan?.id ?? null });
-
-    const tenant = this.getTenant(id);
-    if (!tenant) throw new Error('فشل إنشاء العميل.');
-    return tenant;
+    return tenantCrud.createTenant(this.ctx, input);
   }
 
   public updateTenant(id: string, input: PlatformTenantInput): PlatformTenant {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(id);
-    if (!tenant) throw new Error('العميل غير موجود.');
-    if (input.name.length < 2) throw new Error('اسم العميل مطلوب.');
-
-    const plan = input.planId
-      ? this.db.query<any>('SELECT * FROM platform_plans WHERE id = ? AND is_active = 1', [input.planId])[0]
-      : null;
-
-    const now = nowIso();
-    this.db.run(
-      `UPDATE platform_tenants SET
-         name = ?, contact_name = ?, email = ?, phone = ?, country = ?, city = ?, address = ?, business_type = ?,
-         status = ?, plan_id = ?, seats_limit = ?, branches_limit = ?, devices_limit = ?, notes = ?, updated_at = ?
-       WHERE id = ?`,
-      [
-        input.name.trim(), input.contactName?.trim() ?? null, input.email?.trim() ?? null,
-        input.phone?.trim() ?? null, input.country?.trim() ?? null, input.city?.trim() ?? null,
-        input.address?.trim() ?? null, input.businessType?.trim() ?? null,
-        input.status ?? tenant.status, plan?.id ?? tenant.planId,
-        toNumber(input.seatsLimit, plan?.seatsLimit ?? tenant.seatsLimit),
-        toNumber(input.branchesLimit, plan?.branchesLimit ?? tenant.branchesLimit),
-        toNumber(input.devicesLimit, plan?.devicesLimit ?? tenant.devicesLimit),
-        input.notes?.trim() ?? null, now, id,
-      ]
-    );
-
-    this.audit('تحديث عميل', 'TENANT', id, { name: input.name });
-
-    const updated = this.getTenant(id);
-    if (!updated) throw new Error('فشل تحديث العميل.');
-    return updated;
+    return tenantCrud.updateTenant(this.ctx, id, input);
   }
 
   public setTenantStatus(id: string, status: PlatformTenantStatus): void {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(id);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_tenants SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
-
-    this.audit('تغيير حالة العميل', 'TENANT', id, { status });
+    return tenantCrud.setTenantStatus(this.ctx, id, status);
   }
 
   public archiveTenant(id: string): void {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.delete');
-
-    const tenant = this.getTenant(id);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_tenants SET status = \'CANCELLED\', updated_at = ? WHERE id = ?', [now, id]);
-
-    // Cancel active subscriptions
-    this.db.run(
-      `UPDATE platform_subscriptions SET status = 'CANCELLED', auto_renew = 0, updated_at = ?
-       WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE','SUSPENDED')`,
-      [now, id]
-    );
-
-    // Revoke active licenses
-    this.db.run(
-      `UPDATE platform_licenses SET status = 'REVOKED', updated_at = ?
-       WHERE tenant_id = ? AND status IN ('ACTIVE','ISSUED','SUSPENDED')`,
-      [now, id]
-    );
-
-    this.audit('أرشفة العميل', 'TENANT', id, {});
+    return tenantCrud.archiveTenant(this.ctx, id);
   }
 
   public getTenantProfile(id: string): PlatformTenantProfile {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-
-    const tenant = this.getTenant(id);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const plan = tenant.planId
-      ? this.db.query<any>('SELECT * FROM platform_plans WHERE id = ?', [tenant.planId])[0]
-      : null;
-
-    const account = this.getTenantAccount(id);
-    const subscriptions = this.db.query<any>('SELECT * FROM platform_subscriptions WHERE tenant_id = ? ORDER BY created_at DESC', [id]);
-    const licenses = this.db.query<any>('SELECT * FROM platform_licenses WHERE tenant_id = ? ORDER BY created_at DESC', [id]);
-    const invoices = this.db.query<any>('SELECT * FROM platform_invoices WHERE tenant_id = ? ORDER BY created_at DESC', [id]);
-    const payments = this.db.query<any>('SELECT * FROM platform_payments WHERE tenant_id = ? ORDER BY created_at DESC', [id]);
-    const activationLog = this.db.query<any>('SELECT * FROM platform_audit WHERE entity_type = \'TENANT\' AND entity_id = ? ORDER BY created_at DESC LIMIT 50', [id]);
-    const changeLog = this.db.query<any>('SELECT * FROM platform_audit WHERE entity_type IN (\'SUBSCRIPTION\',\'LICENSE\',\'INVOICE\',\'PAYMENT\') AND (details LIKE ? OR details LIKE ?) ORDER BY created_at DESC LIMIT 100', [`%${id}%`, `%"tenantId":"${id}"%`]);
-    const activityLog = this.db.query<any>('SELECT * FROM platform_audit WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200', [id]);
-
-    const seatsUsed = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_tenant_users WHERE tenant_id = ? AND is_active = 1', [id])[0]?.c ?? 0;
-    const branchesUsed = this.db.query<any>('SELECT COUNT(*) AS c FROM platform_branches WHERE tenant_id = ?', [id])[0]?.c ?? 0;
-    const devicesUsed = this.db.query<any>(
-      `SELECT COUNT(*) AS c FROM platform_devices d
-       JOIN platform_licenses l ON l.id = d.license_id
-       WHERE l.tenant_id = ? AND d.status = 'ACTIVE'`,
-      [id]
-    )[0]?.c ?? 0;
-    const modulesCount = this.db.query<any>('SELECT COUNT(DISTINCT json_each.value) AS c FROM platform_licenses, json_each(modules) WHERE tenant_id = ? AND status IN (\'ACTIVE\',\'ISSUED\')', [id])[0]?.c ?? 0;
-
-    return {
-      tenant,
-      plan: plan ? this.mapPlan(plan) : null,
-      account,
-      subscriptions: subscriptions.map(this.mapSubscription),
-      licenses: licenses.map(this.mapLicense),
-      invoices: invoices.map(this.mapInvoice),
-      payments: payments.map(this.mapPayment),
-      activationLog: activationLog.map(this.mapAuditEntry),
-      changeLog: changeLog.map(this.mapAuditEntry),
-      activityLog: activityLog.map(this.mapAuditEntry),
-      usage: {
-        seatsLimit: tenant.seatsLimit,
-        devicesLimit: tenant.devicesLimit,
-        devicesUsed: toNumber(devicesUsed, 0),
-        branchesLimit: tenant.branchesLimit,
-        branchesUsed: toNumber(branchesUsed, 0),
-        modulesCount: toNumber(modulesCount, 0),
-      },
-    };
+    return tenantProfile.getTenantProfile(this.ctx, id);
   }
 
   // ─── Tenant Account ───────────────────────────────────────────────────────────
 
   public getTenantAccount(tenantId: string): PlatformTenantAccount | null {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-    const row = this.db.query<any>('SELECT * FROM platform_tenant_accounts WHERE tenant_id = ?', [tenantId])[0];
-    return row ? mapTenantAccount(row) : null;
+    return tenantAccount.getTenantAccount(this.ctx, tenantId);
   }
 
   public createTenantAccount(
     tenantId: string,
     input: PlatformTenantAccountInput
   ): PlatformActivationDetails {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(tenantId);
-    if (!tenant) throw new Error('العميل غير موجود.');
-    if (this.getTenantAccount(tenantId)) throw new Error('هذا العميل لديه حساب بالفعل.');
-
-    const username = input.username?.trim() || this.generateUsername(tenant.name);
-    const temporaryPassword = input.password || generateTemporaryPassword();
-    const passwordHash = bcrypt.hashSync(temporaryPassword, 10);
-    const activationCode = generateActivationCode();
-    const id = `acc_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const now = nowIso();
-
-    this.db.run(
-      `INSERT INTO platform_tenant_accounts
-        (id, tenant_id, username, email, full_name, password_hash, is_active, activation_code, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-      [id, tenantId, username, input.email?.trim() ?? null, input.fullName?.trim() ?? null, passwordHash, activationCode, now, now]
-    );
-
-    this.audit('إنشاء حساب عميل', 'TENANT_ACCOUNT', id, { tenantId, username });
-
-    return {
-      tenant,
-      account: this.getTenantAccount(tenantId)!,
-      username,
-      temporaryPassword,
-      activationCode,
-      planName: tenant.planName ?? null,
-      licenseKey: this.getActiveLicenseKey(tenantId),
-      licenseExpiresAt: tenant.subscriptionExpiresAt ?? null,
-      modules: tenant.planId ? this.getPlanModules(tenant.planId) : [],
-      loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
-      generatedAt: now,
-    };
+    return tenantAccount.createTenantAccount(this.ctx, tenantId, input);
   }
 
   public resetTenantAccountPassword(tenantId: string, temporaryPassword?: string): PlatformActivationDetails {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(tenantId);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const account = this.getTenantAccount(tenantId);
-    if (!account) throw new Error('لا يوجد حساب لهذا العميل. أنشئ حساباً أولاً.');
-
-    const pwd = temporaryPassword || generateTemporaryPassword();
-    if (pwd.length < 8) throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
-
-    const passwordHash = bcrypt.hashSync(pwd, 10);
-    const activationCode = generateActivationCode();
-    const now = nowIso();
-
-    this.db.run(
-      'UPDATE platform_tenant_accounts SET password_hash = ?, activation_code = ?, updated_at = ? WHERE tenant_id = ?',
-      [passwordHash, activationCode, now, tenantId]
-    );
-
-    this.audit('إعادة تعيين كلمة مرور حساب العميل', 'TENANT_ACCOUNT', account.id, { tenantId });
-
-    return {
-      tenant,
-      account: this.getTenantAccount(tenantId)!,
-      username: account.username,
-      temporaryPassword: pwd,
-      activationCode,
-      planName: tenant.planName ?? null,
-      licenseKey: this.getActiveLicenseKey(tenantId),
-      licenseExpiresAt: tenant.subscriptionExpiresAt ?? null,
-      modules: tenant.planId ? this.getPlanModules(tenant.planId) : [],
-      loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
-      generatedAt: now,
-    };
+    return tenantAccount.resetTenantAccountPassword(this.ctx, tenantId, temporaryPassword);
   }
 
   public setTenantAccountActive(tenantId: string, active: boolean): PlatformTenantAccount {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const account = this.getTenantAccount(tenantId);
-    if (!account) throw new Error('لا يوجد حساب لهذا العميل.');
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_tenant_accounts SET is_active = ?, updated_at = ? WHERE tenant_id = ?', [active ? 1 : 0, now, tenantId]);
-
-    this.audit(active ? 'تفعيل حساب العميل' : 'تعطيل حساب العميل', 'TENANT_ACCOUNT', account.id, { tenantId });
-
-    const updated = this.getTenantAccount(tenantId);
-    if (!updated) throw new Error('فشل تحديث الحساب.');
-    return updated;
+    return tenantAccount.setTenantAccountActive(this.ctx, tenantId, active);
   }
 
   // ─── Tenant Users (Provisioning) ──────────────────────────────────────────────
 
   public listTenantUsers(tenantId: string): PlatformTenantUser[] {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-    const rows = this.db.query<any>('SELECT * FROM platform_tenant_users WHERE tenant_id = ? ORDER BY created_at DESC', [tenantId]);
-    return rows.map(this.mapTenantUser);
+    return tenantUsers.listTenantUsers(this.ctx, tenantId);
   }
 
   public createTenantUser(tenantId: string, input: PlatformTenantUserInput): PlatformTenantUserProvisioningResult {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(tenantId);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const fullName = input.fullName.trim();
-    if (fullName.length < 2) throw new Error('اسم المستخدم مطلوب (حرفان على الأقل).');
-
-    let username = input.username?.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
-    if (!username) {
-      username = this.generateUsername(fullName, tenantId);
-    } else {
-      const unique = username;
-      let conflict = this.db.query<any>('SELECT 1 FROM platform_tenant_users WHERE tenant_id = ? AND username = ?', [tenantId, unique])[0];
-      let index = 2;
-      while (conflict) {
-        username = `${unique}${index}`;
-        conflict = this.db.query<any>('SELECT 1 FROM platform_tenant_users WHERE tenant_id = ? AND username = ?', [tenantId, username])[0];
-        index++;
-      }
-    }
-
-    const id = `tu_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const now = nowIso();
-    const provisionIdentity = input.provisionIdentity !== false;
-    const mode: 'INVITE' | 'DIRECT_CREATE' = input.provisioningMode === 'INVITE' ? 'INVITE' : 'DIRECT_CREATE';
-    const inviteCode = generateActivationCode();
-    const temporaryPassword = input.password || generateTemporaryPassword();
-    const inviteCodeHash = bcrypt.hashSync(inviteCode, 10);
-    const tempPasswordHash = bcrypt.hashSync(temporaryPassword, 10);
-    const inviteExpiresAt = addDays(new Date(), 7).toISOString();
-    const provisioningStatus = !provisionIdentity ? 'DIRECTORY_ONLY' : mode === 'INVITE' ? 'INVITED' : 'PENDING';
-    const status = provisionIdentity && mode === 'INVITE' ? 'INVITED' : 'ACTIVE';
-
-    this.db.run(
-      `INSERT INTO platform_tenant_users
-        (id, tenant_id, username, full_name, email, phone, role, status, notes, provisioning_status, provisioning_mode, scope,
-         invite_code, temporary_password, invite_expires_at, password_hash, is_active, provisioned, identity_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NULL, ?, ?)`,
-      [id, tenantId, username, fullName, input.email?.trim() ?? null, input.phone?.trim() ?? null,
-       input.role ?? 'USER', status, input.notes ?? null, provisioningStatus, provisionIdentity ? mode : null,
-       input.scope ?? null, provisionIdentity ? inviteCodeHash : null, provisionIdentity ? tempPasswordHash : null,
-       provisionIdentity ? inviteExpiresAt : null, tempPasswordHash, now, now]
-    );
-
-    if (provisionIdentity) {
-      provisioningQueueService.enqueue(tenantId, id, 'TENANT_USER_PROVISION', {
-        tenantId,
-        tenantUserId: id,
-        username,
-        fullName,
-        email: input.email?.trim() ?? null,
-        phone: input.phone?.trim() ?? null,
-        role: input.role ?? 'USER',
-        scope: input.scope ?? null,
-        mode,
-      }, inviteExpiresAt);
-      provisioningExecutorService.requestDrain();
-    }
-
-    this.audit('إنشاء مستخدم عميل', 'TENANT_USER', id, { tenantId, username, role: input.role ?? 'USER', provisioningStatus });
-
-    return {
-      user: this.getTenantUser(id)!,
-      inviteCode: provisionIdentity ? inviteCode : null,
-      temporaryPassword,
-      loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
-      provisioned: false,
-      message: provisionIdentity
-        ? (mode === 'INVITE' ? 'تم إنشاء الدعوة بنجاح' : 'تم إنشاء طلب التوفير بنجاح')
-        : 'تم إنشاء المستخدم في الدليل فقط',
-    };
+    return tenantUsers.createTenantUser(this.ctx, tenantId, input);
   }
 
   public updateTenantUser(id: string, input: PlatformTenantUserInput): PlatformTenantUser {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const existing = this.getTenantUser(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
-
-    const fullName = input.fullName.trim();
-    if (fullName.length < 2) throw new Error('اسم المستخدم مطلوب.');
-
-    let username = existing.username;
-    if (input.username?.trim()) {
-      username = input.username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
-      if (username !== existing.username) {
-        const conflict = this.db.query<any>('SELECT 1 FROM platform_tenant_users WHERE tenant_id = ? AND username = ? AND id <> ?', [existing.tenantId, username, id])[0];
-        if (conflict) throw new Error('اسم المستخدم مستخدم بالفعل لهذا العميل.');
-      }
-    }
-
-    const now = nowIso();
-    this.db.run(
-      `UPDATE platform_tenant_users SET
-         username = ?, full_name = ?, email = ?, phone = ?, role = ?, updated_at = ?
-       WHERE id = ?`,
-      [username, fullName, input.email?.trim() ?? null, input.phone?.trim() ?? null, input.role ?? existing.role, now, id]
-    );
-
-    this.audit('تحديث مستخدم عميل', 'TENANT_USER', id, { tenantId: existing.tenantId });
-
-    const updated = this.getTenantUser(id);
-    if (!updated) throw new Error('فشل تحديث المستخدم.');
-    return updated;
+    return tenantUsers.updateTenantUser(this.ctx, id, input);
   }
 
   public setTenantUserActive(id: string, active: boolean): PlatformTenantUser {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const existing = this.getTenantUser(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_tenant_users SET is_active = ?, updated_at = ? WHERE id = ?', [active ? 1 : 0, now, id]);
-
-    this.audit(active ? 'تفعيل مستخدم عميل' : 'تعطيل مستخدم عميل', 'TENANT_USER', id, { tenantId: existing.tenantId });
-
-    const updated = this.getTenantUser(id);
-    if (!updated) throw new Error('فشل تحديث المستخدم.');
-    return updated;
+    return tenantUsers.setTenantUserActive(this.ctx, id, active);
   }
 
   public deleteTenantUser(id: string): void {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.delete');
-
-    const existing = this.getTenantUser(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
-
-    this.db.run('DELETE FROM platform_tenant_users WHERE id = ?', [id]);
-    this.audit('حذف مستخدم عميل', 'TENANT_USER', id, { tenantId: existing.tenantId });
+    return tenantUsers.deleteTenantUser(this.ctx, id);
   }
 
   public resendTenantUserInvite(id: string): PlatformTenantUserProvisioningResult {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const existing = this.getTenantUser(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
-
-    const raw = this.db.query<any>('SELECT * FROM platform_tenant_users WHERE id = ?', [id])[0];
-    if (!raw) throw new Error('المستخدم غير موجود.');
-
-    const inviteCode = generateActivationCode();
-    const temporaryPassword = generateTemporaryPassword();
-    const inviteCodeHash = bcrypt.hashSync(inviteCode, 10);
-    const tempPasswordHash = bcrypt.hashSync(temporaryPassword, 10);
-    const inviteExpiresAt = addDays(new Date(), 7).toISOString();
-    const now = nowIso();
-
-    this.db.run(
-      `UPDATE platform_tenant_users
-         SET invite_code = ?, temporary_password = ?, password_hash = ?, invite_expires_at = ?,
-             provisioning_status = 'INVITED', status = 'INVITED', last_error = NULL, updated_at = ?
-       WHERE id = ?`,
-      [inviteCodeHash, tempPasswordHash, tempPasswordHash, inviteExpiresAt, now, id]
-    );
-
-    provisioningQueueService.enqueue(String(raw.tenant_id ?? raw.tenantId), id, 'TENANT_USER_PROVISION', {
-      tenantId: String(raw.tenant_id ?? raw.tenantId),
-      tenantUserId: id,
-      username: raw.username ?? null,
-      fullName: raw.full_name ?? raw.fullName ?? null,
-      email: raw.email ?? null,
-      phone: raw.phone ?? null,
-      role: raw.role ?? null,
-      scope: raw.scope ?? null,
-      mode: 'INVITE',
-    }, inviteExpiresAt);
-    provisioningExecutorService.requestDrain();
-
-    this.audit('إعادة إرسال دعوة مستخدم عميل', 'TENANT_USER', id, { tenantId: existing.tenantId });
-
-    return {
-      user: this.getTenantUser(id)!,
-      inviteCode,
-      temporaryPassword,
-      loginUrl: `${this.setting('platform.clientUrl', 'https://app.ceramisys.com')}/login`,
-      provisioned: false,
-      message: 'تم إعادة إرسال الدعوة بنجاح',
-    };
+    return tenantUsers.resendTenantUserInvite(this.ctx, id);
   }
 
   public markTenantUserProvisioned(id: string, identityUserId?: string): PlatformTenantUser {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const existing = this.getTenantUser(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
-
-    const now = nowIso();
-    this.db.run(
-      `UPDATE platform_tenant_users
-         SET provisioned = 1, provisioning_status = 'PROVISIONED', provisioned_at = ?, identity_user_id = COALESCE(?, identity_user_id), updated_at = ?
-       WHERE id = ?`,
-      [now, identityUserId ?? null, now, id]
-    );
-
-    this.audit('وضع علامة مستخدم عميل كمُجهز', 'TENANT_USER', id, { tenantId: existing.tenantId, identityUserId });
-
-    const updated = this.getTenantUser(id);
-    if (!updated) throw new Error('فشل تحديث المستخدم.');
-    return updated;
+    return tenantUsers.markTenantUserProvisioned(this.ctx, id, identityUserId);
   }
 
   // ─── Tenant Overrides ─────────────────────────────────────────────────────────
 
   public listTenantOverrides(tenantId: string): PlatformTenantOverride[] {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.view');
-    const rows = this.db.query<any>('SELECT * FROM platform_tenant_overrides WHERE tenant_id = ? ORDER BY created_at DESC', [tenantId]);
-    return rows.map(mapTenantOverride);
+    return tenantOverrides.listTenantOverrides(this.ctx, tenantId);
   }
 
   public addTenantOverride(tenantId: string, input: PlatformTenantOverrideInput): PlatformTenantOverride {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const tenant = this.getTenant(tenantId);
-    if (!tenant) throw new Error('العميل غير موجود.');
-
-    const id = `ovr_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-    const now = nowIso();
-
-    this.db.run(
-      `INSERT INTO platform_tenant_overrides
-        (id, tenant_id, kind, code, value, is_enabled, expires_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
-      [id, tenantId, input.kind, input.code, input.value ?? null, input.expiresAt ?? null, input.notes ?? null, now, now]
-    );
-
-    this.audit('إضافة تجاوز عميل', 'TENANT_OVERRIDE', id, { tenantId, kind: input.kind, code: input.code });
-
-    const row = this.db.query<any>('SELECT * FROM platform_tenant_overrides WHERE id = ?', [id])[0];
-    return mapTenantOverride(row);
+    return tenantOverrides.addTenantOverride(this.ctx, tenantId, input);
   }
 
   public setTenantOverrideEnabled(id: string, enabled: boolean): PlatformTenantOverride {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.update');
-
-    const row = this.db.query<any>('SELECT * FROM platform_tenant_overrides WHERE id = ?', [id])[0];
-    if (!row) throw new Error('التجاوز غير موجود.');
-
-    const now = nowIso();
-    this.db.run('UPDATE platform_tenant_overrides SET is_enabled = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, now, id]);
-
-    this.audit(enabled ? 'تفعيل تجاوز عميل' : 'تعطيل تجاوز عميل', 'TENANT_OVERRIDE', id, {});
-
-    const updated = this.db.query<any>('SELECT * FROM platform_tenant_overrides WHERE id = ?', [id])[0];
-    return mapTenantOverride(updated);
+    return tenantOverrides.setTenantOverrideEnabled(this.ctx, id, enabled);
   }
 
   public removeTenantOverride(id: string): void {
-    PlatformTenantService.requirePlatformAccess('tenants', 'platform.tenants.delete');
-
-    const row = this.db.query<any>('SELECT * FROM platform_tenant_overrides WHERE id = ?', [id])[0];
-    if (!row) throw new Error('التجاوز غير موجود.');
-
-    this.db.run('DELETE FROM platform_tenant_overrides WHERE id = ?', [id]);
-    this.audit('إزالة تجاوز عميل', 'TENANT_OVERRIDE', id, {});
+    return tenantOverrides.removeTenantOverride(this.ctx, id);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  private generateTenantCode(name: string): string {
-    const base = name.trim().replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, '').slice(0, 8).toUpperCase() || 'TEN';
-    let index = 1;
-    let candidate = `${base}-${String(index).padStart(4, '0')}`;
-    while (this.db.query('SELECT 1 FROM platform_tenants WHERE code = ?', [candidate]).length) {
-      index++;
-      candidate = `${base}-${String(index).padStart(4, '0')}`;
-    }
-    return candidate;
-  }
-
-  private generateUsername(name: string, tenantId?: string): string {
-    const base = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16) || 'user';
-    let index = 1;
-    let candidate = `${base}${index}`;
-    const checkSql = tenantId
-      ? 'SELECT 1 FROM platform_tenant_users WHERE tenant_id = ? AND username = ?'
-      : 'SELECT 1 FROM platform_staff WHERE username = ?';
-    const checkParams = tenantId ? [tenantId, candidate] : [candidate];
-    while (this.db.query(checkSql, checkParams).length) {
-      index++;
-      candidate = `${base}${index}`;
-    }
-    return candidate;
-  }
-
-  private getActiveLicenseKey(tenantId: string): string | null {
-    const row = this.db.query<any>(
-      `SELECT license_key FROM platform_licenses
-       WHERE tenant_id = ? AND status IN ('ACTIVE','ISSUED')
-       ORDER BY created_at DESC LIMIT 1`,
-      [tenantId]
-    )[0];
-    return row?.license_key ?? row?.licenseKey ?? null;
-  }
-
-  private getPlanModules(planId: string): string[] {
-    const plan = this.db.query<any>('SELECT included_modules FROM platform_plans WHERE id = ?', [planId])[0];
-    return plan ? safeJsonArray(plan.included_modules) : [];
-  }
-
   private getTenantUser(id: string): PlatformTenantUser | null {
     const row = this.db.query<any>('SELECT * FROM platform_tenant_users WHERE id = ?', [id])[0];
-    return row ? this.mapTenantUser(row) : null;
-  }
-
-  private mapTenantUser(row: any): PlatformTenantUser {
-    return {
-      id: String(row.id),
-      tenantId: String(row.tenant_id),
-      username: String(row.username),
-      fullName: String(row.full_name),
-      email: row.email ?? null,
-      phone: row.phone ?? null,
-      role: String(row.role),
-      status: row.status as 'ACTIVE' | 'SUSPENDED' | 'INVITED',
-      isActive: row.status === 'ACTIVE',
-      provisioningStatus: row.provisioning_status as any ?? 'NOT_REQUESTED',
-      provisioningMode: row.provisioning_mode ?? null,
-      identityUserId: row.identity_user_id ?? null,
-      scope: row.scope ?? null,
-      inviteExpiresAt: row.invite_expires_at ?? null,
-      lastError: row.last_error ?? null,
-      notes: row.notes ?? null,
-      provisionedAt: row.provisioned_at ?? null,
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    };
-  }
-
-  private mapPlan(row: any): PlatformPlan {
-    return {
-      id: String(row.id),
-      code: String(row.code),
-      name: String(row.name),
-      description: row.description ?? null,
-      billingCycle: row.billing_cycle,
-      price: toNumber(row.price, 0) / 100,
-      monthlyPrice: toNumber(row.monthly_price, 0) / 100,
-      yearlyPrice: toNumber(row.yearly_price, 0) / 100,
-      currency: row.currency ?? 'EGP',
-      seatsLimit: toNumber(row.seats_limit, 1),
-      branchesLimit: toNumber(row.branches_limit, 1),
-      devicesLimit: toNumber(row.devices_limit, 1),
-      storageLimitMb: toNumber(row.storage_limit_mb, 500),
-      maxProducts: toNumber(row.max_products, 1000),
-      maxWarehouses: toNumber(row.max_warehouses, 2),
-      trialDays: toNumber(row.trial_days, 14),
-      includedModules: safeJsonArray(row.included_modules),
-      features: safeJsonArray(row.features),
-      permissions: safeJsonArray(row.permissions),
-      isActive: Boolean(row.is_active),
-      isDefault: Boolean(row.is_default),
-      sortOrder: toNumber(row.sort_order, 0),
-      subscriberCount: toNumber(row.subscriber_count, 0),
-      offlineGracePeriodDays: toNumber(row.offline_grace_period_days, 14),
-      versioned: Boolean(row.versioned),
-      currentVersion: row.current_version ?? null,
-    };
-  }
-
-  private mapSubscription(row: any): PlatformSubscription {
-    return {
-      id: String(row.id),
-      tenantId: String(row.tenant_id),
-      planId: String(row.plan_id),
-      status: row.status,
-      startDate: String(row.start_date),
-      endDate: row.end_date ?? null,
-      seats: toNumber(row.seats, 1),
-      price: toNumber(row.price, 0) / 100,
-      billingCycle: row.billing_cycle,
-      autoRenew: Boolean(row.auto_renew),
-      branchesLimit: toNumber(row.branches_limit, 1),
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    };
-  }
-
-  private mapLicense(row: any): PlatformLicense {
-    return {
-      id: String(row.id),
-      tenantId: String(row.tenant_id),
-      subscriptionId: String(row.subscription_id),
-      planId: String(row.plan_id),
-      licenseKey: String(row.license_key),
-      status: row.status,
-      issuedAt: String(row.issued_at),
-      startsAt: String(row.starts_at),
-      expiresAt: row.expires_at ?? null,
-      seats: toNumber(row.seats, 1),
-      deviceLimit: toNumber(row.device_limit, 1),
-      branchesLimit: toNumber(row.branches_limit, 1),
-      modules: safeJsonArray(row.modules),
-      features: safeJsonArray(row.features),
-      activationCode: row.activation_code ?? null,
-      certificate: row.certificate ?? null,
-      offlineGracePeriodDays: toNumber(row.offline_grace_period_days, 14),
-      couplingMode: row.coupling_mode,
-      notes: row.notes ?? null,
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    };
-  }
-
-  private mapInvoice(row: any): PlatformInvoice {
-    return {
-      id: String(row.id),
-      number: String(row.number ?? row.id),
-      tenantId: String(row.tenant_id),
-      subscriptionId: row.subscription_id ?? null,
-      status: row.status,
-      total: toNumber(row.total, 0) / 100,
-      paidAmount: toNumber(row.paid_amount ?? row.paidAmount ?? row.paid, 0) / 100,
-      currency: row.currency ?? 'EGP',
-      dueDate: row.due_date ?? null,
-      issueDate: String(row.issued_at),
-      notes: row.notes ?? null,
-      createdAt: String(row.created_at),
-      subtotal: toNumber(row.subtotal, 0) / 100,
-      discount: toNumber(row.discount, 0) / 100,
-      tax: toNumber(row.tax, 0) / 100,
-    };
-  }
-
-  private mapPayment(row: any): PlatformPayment {
-    return {
-      id: String(row.id),
-      tenantId: String(row.tenant_id),
-      invoiceId: row.invoice_id ?? null,
-      amount: toNumber(row.amount, 0) / 100,
-      method: row.method,
-      reference: row.reference ?? null,
-      paidAt: String(row.received_at),
-      notes: row.notes ?? null,
-    };
-  }
-
-  private mapAuditEntry(row: any): PlatformAuditEntry {
-    return {
-      id: String(row.id),
-      actorId: String(row.actor_id),
-      actorType: row.actor_type,
-      action: String(row.action),
-      entityType: row.entity_type,
-      entityId: row.entity_id ?? null,
-      details: row.details ?? null,
-      severity: row.severity,
-      status: row.status,
-      tenantId: row.tenant_id ?? null,
-      deviceId: row.device_id ?? null,
-      deviceName: row.device_name ?? null,
-      ipAddress: row.ip_address ?? null,
-      oldValues: row.old_values ?? null,
-      newValues: row.new_values ?? null,
-      errorMessage: row.error_message ?? null,
-      createdAt: String(row.created_at),
-    };
+    return row ? mapTenantUser(row) : null;
   }
 }
 

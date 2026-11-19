@@ -7,6 +7,7 @@ import { ExecutiveSalesChart } from './ExecutiveSalesChart';
 import { LowStockAlertsCard } from './LowStockAlertsCard';
 import { ExecutiveBottomGrid } from './ExecutiveBottomGrid';
 import { useTheme } from '../../../contexts/useTheme';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import type { DateRange } from '../../../types/dashboard/executive';
 
 const RANGES: { id: DateRange; label: string }[] = [
@@ -47,13 +48,10 @@ export const ExecutiveDashboard: React.FC = () => {
   return (
     <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
       {/* Header */}
-      <div className="flex min-w-0 items-center justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">لوحة المعلومات التنفيذية</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">آخر تحديث: {format(lastRefresh, 'HH:mm:ss')}</p>
-        </div>
-
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <PageHeader
+        title="لوحة المعلومات التنفيذية"
+        description={`آخر تحديث: ${format(lastRefresh, 'HH:mm:ss')}`}
+        actions={<>
           {RANGES.map((r) => (
             <button
               key={r.id}
@@ -82,8 +80,8 @@ export const ExecutiveDashboard: React.FC = () => {
           >
             تحديث
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center h-64">

@@ -1,0 +1,64 @@
+import { Plus } from 'lucide-react';
+import type { FC } from 'react';
+import type { FinanceEnterpriseService } from '../../../../services/domains/finance/FinanceEnterpriseService';
+import type { PeriodAdjustment } from '../../../../services/domains/finance/FinancePeriodCloseService';
+import { adjustmentTypeLabel, formatMoney } from '../utils';
+
+type RunAction = (action: () => void, successMessage: string, closeModal?: () => void) => void;
+
+interface AdjustmentsTabProps {
+  adjustments: PeriodAdjustment[];
+  canManage: boolean;
+  canClose: boolean;
+  service: FinanceEnterpriseService;
+  runAction: RunAction;
+  onNewAdjustment: () => void;
+}
+
+/** Period adjustments list with submit/approve/post workflow buttons. */
+export const AdjustmentsTab: FC<AdjustmentsTabProps> = ({
+  adjustments,
+  canManage,
+  canClose,
+  service,
+  runAction,
+  onNewAdjustment,
+}) => (
+  <div className="space-y-3">
+    <div className="flex flex-wrap gap-2">
+      {canManage && (
+        <button type="button" onClick={onNewAdjustment} className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-800">
+          <Plus className="h-4 w-4" /> تسوية جديدة
+        </button>
+      )}
+      <span className="text-xs text-slate-500">تُنشأ التسويات كمسودة، ثم تُرسل للاعتماد، ثم تُرحّل كقيد محاسبي متوازن.</span>
+    </div>
+    {adjustments.length === 0 && <p className="text-sm text-slate-500">لا توجد تسويات لهذه الفترة.</p>}
+    <div className="space-y-2">
+      {adjustments.map((adjustment) => (
+        <article key={adjustment.id} className="rounded-xl border border-slate-200 p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-bold text-slate-800">{adjustmentTypeLabel[adjustment.adjustmentType] || adjustment.adjustmentType}: {adjustment.description}</p>
+              <p className="mt-1 text-xs text-slate-500">مدين {adjustment.debitAccountCode} / دائن {adjustment.creditAccountCode} · {formatMoney(adjustment.amount)}</p>
+              {adjustment.journalEntryId && <p className="mt-1 text-xs text-emerald-700">قيد الترحيل: {adjustment.journalEntryId}</p>}
+              {adjustment.rejectionReason && <p className="mt-1 text-xs text-rose-700">سبب الرفض: {adjustment.rejectionReason}</p>}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700">{adjustment.status}</span>
+              {canManage && adjustment.status === 'DRAFT' && (
+                <button type="button" onClick={() => runAction(() => service.submitPeriodAdjustment(adjustment.id), 'تم إرسال التسوية للاعتماد.')} className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-800">إرسال</button>
+              )}
+              {canManage && adjustment.status === 'PENDING_APPROVAL' && (
+                <button type="button" onClick={() => runAction(() => service.approvePeriodAdjustment(adjustment.id), 'تم اعتماد التسوية.')} className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">اعتماد</button>
+              )}
+              {canClose && adjustment.status === 'APPROVED' && (
+                <button type="button" onClick={() => runAction(() => service.postPeriodAdjustment(adjustment.id), 'تم ترحيل التسوية.')} className="rounded-lg bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-800">ترحيل</button>
+              )}
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+);

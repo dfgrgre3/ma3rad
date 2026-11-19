@@ -23,6 +23,7 @@ import { FinancialCalendarEventsService, type FinancialCalendarEvent, type Finan
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 type ViewMode = 'month' | 'week' | 'day';
 type PartyOption = { id: string; name: string };
@@ -567,25 +568,23 @@ export const FinancialEventsCalendar: React.FC = () => {
 
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-100/70 p-4 text-slate-900 sm:p-6">
-      <header className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between sm:p-5">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2.5 text-cyan-300"><CalendarDays className="h-6 w-6" /></div>
-          <div>
-            <h1 className="text-xl font-black">التقويم المالي</h1>
-            <p className="mt-1 text-sm text-slate-300">{options?.branchName || 'مواعيد الاستحقاق والتحصيل والسداد'} · أحداثك المالية في عرض واحد</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canManage && (
-            <button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-bold text-white hover:bg-cyan-800">
-              <Plus className="h-4 w-4" /> حدث مالي جديد
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+        <PageHeader
+          icon={<CalendarDays className="h-5 w-5" />}
+          title="التقويم المالي"
+          description={`${options?.branchName || 'مواعيد الاستحقاق والتحصيل والسداد'} · أحداثك المالية في عرض واحد`}
+          actions={<>
+            {canManage && (
+              <button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-bold text-white hover:bg-cyan-800">
+                <Plus className="h-4 w-4" /> حدث مالي جديد
+              </button>
+            )}
+            <button type="button" onClick={loadEvents} disabled={loading} aria-label="تحديث الأحداث" className="rounded-xl border border-slate-300 bg-white p-2.5 text-slate-600 transition hover:bg-slate-100 disabled:opacity-50">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-          <button type="button" onClick={loadEvents} disabled={loading} aria-label="تحديث الأحداث" className="rounded-xl border border-slate-600 bg-slate-800 p-2.5 text-slate-200 transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-50">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </header>
+          </>}
+        />
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className={`rounded-xl border p-4 shadow-sm ${overdueCount ? 'border-rose-200 border-r-4 border-r-rose-500 bg-rose-50/70' : 'border-slate-200 border-r-4 border-r-emerald-500 bg-white'}`}>

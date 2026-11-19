@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   FileText, Search, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
   Users, RefreshCw, Eye, X, Printer, Download, MessageCircle,
@@ -463,21 +464,17 @@ export const CustomerStatementPage: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">كشوفات حسابات العملاء</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">الرصيد الحالي — الفواتير المستحقة — المتأخرات</p>
-            </div>
-          </div>
-          <button onClick={load} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="تحديث">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 pt-4">
+        <PageHeader
+          icon={<FileText className="w-5 h-5" />}
+          title="كشوفات حسابات العملاء"
+          description="الرصيد الحالي — الفواتير المستحقة — المتأخرات"
+          actions={
+            <button onClick={load} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="تحديث">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          }
+        />
       </div>
 
       {/* Filters */}

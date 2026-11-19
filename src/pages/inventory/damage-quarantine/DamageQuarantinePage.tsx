@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   ShieldAlert, AlertTriangle, Eye, 
   RefreshCw, Plus, Search, 
@@ -207,36 +208,31 @@ export const DamageQuarantinePage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-rose-500/20">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">إدارة الكسر والتالف والحجر الصحي (Damage & Quarantine)</h1>
-            <p className="text-xs text-slate-500 font-medium">عزل البضائع غير الصالحة، الفحص الفني، والإعدام المخزني المحاسبي أو التخفيض</p>
-          </div>
-        </div>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<ShieldAlert className="w-5 h-5" />}
+          title="إدارة الكسر والتالف والحجر الصحي (Damage & Quarantine)"
+          description="عزل البضائع غير الصالحة، الفحص الفني، والإعدام المخزني المحاسبي أو التخفيض"
+          actions={<>
+            {canManage && (
+              <button
+                onClick={handleOpenCreate}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                تسجيل كسر / تالف / حجر
+              </button>
+            )}
 
-        <div className="flex items-center gap-2">
-          {canManage && (
             <button
-              onClick={handleOpenCreate}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition active:scale-95"
+              onClick={loadData}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              title="تحديث"
             >
-              <Plus className="w-4 h-4" />
-              تسجيل كسر / تالف / حجر
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-
-          <button
-            onClick={loadData}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
-            title="تحديث"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+          </>}
+        />
       </div>
 
       {/* KPI Cards */}

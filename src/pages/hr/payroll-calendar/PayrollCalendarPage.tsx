@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   Calendar, Loader2, AlertTriangle, ChevronRight, Wallet,
   CheckCircle2, Clock, Banknote, RotateCw, Activity, X,
@@ -146,28 +147,24 @@ export const PayrollCalendarPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600">
-            <Calendar className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">تقويم الرواتب وجدول الصرف الشهري</h1>
-            <p className="text-xs text-slate-400">جدولة دفع الرواتب، تتبع حالات الصرف، والدفعات الناقصة</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={prevMonth} disabled={loading} className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50">
-            <ChevronRight className="w-4 h-4 rotate-180" />
-          </button>
-          <span className="font-bold text-slate-900 whitespace-nowrap">
-            {monthName} {year}
-          </span>
-          <button onClick={nextMonth} disabled={loading} className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button onClick={goToToday} className="text-xs font-bold text-sky-600 hover:text-sky-700">اليوم</button>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4 pb-1 flex-shrink-0">
+        <PageHeader
+          icon={<Calendar className="h-5 w-5" />}
+          title="تقويم الرواتب وجدول الصرف الشهري"
+          description="جدولة دفع الرواتب، تتبع حالات الصرف، والدفعات الناقصة"
+          actions={<>
+            <button onClick={prevMonth} disabled={loading} className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50">
+              <ChevronRight className="w-4 h-4 rotate-180" />
+            </button>
+            <span className="font-bold text-slate-900 whitespace-nowrap">
+              {monthName} {year}
+            </span>
+            <button onClick={nextMonth} disabled={loading} className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button onClick={goToToday} className="text-xs font-bold text-sky-600 hover:text-sky-700">اليوم</button>
+          </>}
+        />
       </div>
 
       {error && (

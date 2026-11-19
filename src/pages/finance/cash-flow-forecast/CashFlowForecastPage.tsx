@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertTriangle,
   TrendingUp,
@@ -52,49 +53,42 @@ export const CashFlowForecastPage: React.FC = () => {
   return (
     <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">توقع التدفقات النقدية والسيولة المستقبلية</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              نموذج تنبؤي استباقي للسيولة المالية بناءً على مواعيد استحقاق الفواتير والشيكات والأقساط والالتزامات
-            </p>
-          </div>
-        </div>
+      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+        <PageHeader
+          icon={<TrendingUp className="h-5 w-5" />}
+          title="توقع التدفقات النقدية والسيولة المستقبلية"
+          description="نموذج تنبؤي استباقي للسيولة المالية بناءً على مواعيد استحقاق الفواتير والشيكات والأقساط والالتزامات"
+          actions={<>
+            <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200 text-xs font-semibold">
+              <button
+                onClick={() => setDaysHorizon(30)}
+                className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 30 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
+              >
+                30 يوم
+              </button>
+              <button
+                onClick={() => setDaysHorizon(60)}
+                className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 60 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
+              >
+                60 يوم
+              </button>
+              <button
+                onClick={() => setDaysHorizon(90)}
+                className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 90 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
+              >
+                90 يوم
+              </button>
+            </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200 text-xs font-semibold">
             <button
-              onClick={() => setDaysHorizon(30)}
-              className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 30 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
+              onClick={loadData}
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              title="تحديث الحسابات"
             >
-              30 يوم
+              <RefreshCw className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setDaysHorizon(60)}
-              className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 60 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
-            >
-              60 يوم
-            </button>
-            <button
-              onClick={() => setDaysHorizon(90)}
-              className={`px-3 py-1.5 rounded-lg transition ${daysHorizon === 90 ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-600'}`}
-            >
-              90 يوم
-            </button>
-          </div>
-
-          <button
-            onClick={loadData}
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-            title="تحديث الحسابات"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+          </>}
+        />
       </div>
 
       {/* Risk Alert Banner if negative cash projected */}

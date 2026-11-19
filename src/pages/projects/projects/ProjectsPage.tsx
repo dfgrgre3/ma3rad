@@ -13,6 +13,7 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
   PLANNED:   { label: 'قيد التخطيط', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
   ACTIVE:    { label: 'جاري التنفيذ', color: 'text-sky-700',    bg: 'bg-sky-50 border-sky-200' },
@@ -107,17 +108,21 @@ export const ProjectsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Boxes className="w-5 h-5 text-violet-600" />
-          <h1 className="text-base font-black text-slate-900">مشاريع المقاولين والعملاء</h1>
-          <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold border border-violet-200">{projects.length}</span>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
-            <Plus className="w-4 h-4" /> مشروع جديد
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Boxes className="w-5 h-5" />}
+          title={
+            <span className="flex items-center gap-2">
+              مشاريع المقاولين والعملاء
+              <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold border border-violet-200">{projects.length}</span>
+            </span>
+          }
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
+              <Plus className="w-4 h-4" /> مشروع جديد
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

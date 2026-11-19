@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Globe, Lock, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 
 export const LicenseModeSettingsPage: React.FC = () => {
@@ -62,17 +63,11 @@ export const LicenseModeSettingsPage: React.FC = () => {
   return (
     <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 dark:bg-slate-950 p-4 lg:p-6 dir-rtl">
       <div className="w-full space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-500/25">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">إعدادات التشغيل على أي جهاز</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              حدد كيف يرتبط الترخيص بالجهاز المثبت عليه البرنامج.
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          icon={<Shield className="w-5 h-5" />}
+          title="إعدادات التشغيل على أي جهاز"
+          description="حدد كيف يرتبط الترخيص بالجهاز المثبت عليه البرنامج."
+        />
 
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-800">

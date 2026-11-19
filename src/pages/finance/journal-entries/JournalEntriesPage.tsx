@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../../services/domains/finance/FinanceExtrasService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -88,17 +89,15 @@ export const JournalEntriesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
-          <div>
-            <h1 className="text-base font-black">القيود اليومية وميزان المراجعة</h1>
-            <p className="text-xs text-slate-500 font-medium">تسجيل القيود المحاسبية المزدوجة ومتابعة أرصدة الحسابات</p>
-          </div>
-        </div>
-        {canManage && <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shrink-0">
-          <Plus className="w-4 h-4" /> قيد جديد
-        </button>}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<FileText className="h-5 w-5" />}
+          title="القيود اليومية وميزان المراجعة"
+          description="تسجيل القيود المحاسبية المزدوجة ومتابعة أرصدة الحسابات"
+          actions={canManage && <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+            <Plus className="w-4 h-4" /> قيد جديد
+          </button>}
+        />
       </div>
 
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1">

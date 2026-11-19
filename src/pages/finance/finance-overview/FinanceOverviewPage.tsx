@@ -11,6 +11,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { queryFinanceOverviewMetrics } from '../../../services/domains/dashboard/DashboardQueryScopeService';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 interface Metrics {
   totalRevenue: number;
@@ -90,21 +91,20 @@ export const FinanceOverviewPage: React.FC = () => {
 
   return (
     <div className="erp-page">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-black text-slate-900">المؤشرات المالية</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            إيرادات ومصروفات وأرباح وسيولة وذمم. إدارة شجرة الحسابات والقيود في الصفحات المتخصصة.
-          </p>
-        </div>
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="p-2.5 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300 transition"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
+      <PageHeader
+        icon={<BarChart3 className="h-5 w-5" />}
+        title="المؤشرات المالية"
+        description="إيرادات ومصروفات وأرباح وسيولة وذمم. إدارة شجرة الحسابات والقيود في الصفحات المتخصصة."
+        actions={
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300 transition"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        }
+      />
 
       {loadError && (
         <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">

@@ -10,6 +10,7 @@ import { OperationsService, Delivery } from '../../../services/domains/operation
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 
 const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
@@ -206,27 +207,23 @@ export const FleetDashboardPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow">
-            <Truck className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">لوحة تحكم التوصيل والأسطول</h1>
-            <p className="text-xs text-slate-400">إدارة التوصيل والسائقين والمركبات</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/deliveries')} className="text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
-            <Truck className="w-3.5 h-3.5" /> التوصيلات
-          </button>
-          <button onClick={() => navigate('/drivers')} className="text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-sky-200">
-            <UserRound className="w-3.5 h-3.5" /> السائقون
-          </button>
-          <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
-            <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+      <div className="bg-white px-6 pt-4 flex-shrink-0">
+        <PageHeader
+          icon={<Truck className="h-5 w-5" />}
+          title="لوحة تحكم التوصيل والأسطول"
+          description="إدارة التوصيل والسائقين والمركبات"
+          actions={<>
+            <button onClick={() => navigate('/deliveries')} className="text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5" /> التوصيلات
+            </button>
+            <button onClick={() => navigate('/drivers')} className="text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-sky-200">
+              <UserRound className="w-3.5 h-3.5" /> السائقون
+            </button>
+            <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
+              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </>}
+        />
       </div>
 
       {error && (

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Plus, Search, Loader2, X, Calendar, Fuel } from 'lucide-react';
 import { OperationsService, Vehicle, Driver } from '../../../services/domains/operations/OperationsService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
@@ -89,19 +90,17 @@ export const VehiclesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center"><Truck className="w-5 h-5 text-teal-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">المركبات</h1>
-            <p className="text-xs text-slate-500 font-medium">أسطول التوصيل وحالات المركبات</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> إضافة مركبة
-          </button>
-        )}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Truck className="h-5 w-5" />}
+          title="المركبات"
+          description="أسطول التوصيل وحالات المركبات"
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> إضافة مركبة
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">

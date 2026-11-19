@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 const DebtsDashboardPage = lazy(() => import('../debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
 const OtherReceivablesPage = lazy(() => import('../other-receivables/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));
@@ -45,7 +46,11 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
 
   return <div className="h-full overflow-y-auto bg-slate-100 p-3 lg:p-4">
     <div className="w-full space-y-4">
-      <header><h1 className="text-xl font-black text-slate-900">مركز الذمم والتحصيل</h1><p className="mt-1 text-sm text-slate-500">مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة.</p></header>
+      <PageHeader
+        icon={<Banknote className="h-5 w-5" />}
+        title="مركز الذمم والتحصيل"
+        description="مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة."
+      />
       <nav className="flex flex-wrap gap-2" aria-label="أقسام مركز الذمم">
         {allowedTabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => select(id)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-violet-700 text-white' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>

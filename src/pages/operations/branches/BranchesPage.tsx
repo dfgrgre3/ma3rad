@@ -5,6 +5,7 @@ import {
   UserRound, Users, Warehouse, X,
 } from 'lucide-react';
 import { OperationsService, type Branch, type WarehouseRow } from '../../../services/domains/operations/OperationsService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { BranchService } from '../../../services/domains/organization/BranchService';
 import { CompanyService } from '../../../services/domains/organization/CompanyService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -341,29 +342,25 @@ export const BranchesPage: React.FC = () => {
   );
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <header className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-600">
-            <Building2 className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-black">إدارة الفروع والمعارض</h1>
-            <p className="mt-0.5 text-xs text-slate-500">بيانات الفروع، المسؤولون، المخازن، المستخدمون، وحركة كل فرع</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
-          </button>
-          <CentralLimitGuard metric="maxBranches">
-            {canCreate && (
-              <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-700">
-                <Plus className="h-4 w-4" /> إضافة فرع
-              </button>
-            )}
-          </CentralLimitGuard>
-        </div>
-      </header>
+      <div className="border-b border-slate-200 bg-white px-5 pt-4 sm:px-7">
+        <PageHeader
+          icon={<Building2 className="h-5 w-5" />}
+          title="إدارة الفروع والمعارض"
+          description="بيانات الفروع، المسؤولون، المخازن، المستخدمون، وحركة كل فرع"
+          actions={<>
+            <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
+            </button>
+            <CentralLimitGuard metric="maxBranches">
+              {canCreate && (
+                <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-700">
+                  <Plus className="h-4 w-4" /> إضافة فرع
+                </button>
+              )}
+            </CentralLimitGuard>
+          </>}
+        />
+      </div>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}

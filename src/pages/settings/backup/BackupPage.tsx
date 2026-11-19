@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   Download, Upload, HardDrive, ShieldCheck, CheckCircle2,
   AlertTriangle, RefreshCw, FileText, Lock, X, Eye, EyeOff, Key
@@ -328,28 +329,21 @@ export const BackupPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-10 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
-            <Download className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)</h1>
-            <p className="text-xs text-slate-500 font-medium">
-              يعمل النظام محليًا على هذا الجهاز فقط؛ النسخ الاحتياطي لحماية بياناته وليس لمزامنتها بين الأجهزة
-            </p>
-          </div>
-        </div>
-
-        {canManage && (
-          <button
-            onClick={openExportModal}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
-          >
-            <Download className="w-4 h-4" />
-            تصدير وتحميل نسخة فورية الآن
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4 sticky top-0 z-10">
+        <PageHeader
+          icon={<Download className="w-5 h-5" />}
+          title="النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)"
+          description="يعمل النظام محليًا على هذا الجهاز فقط؛ النسخ الاحتياطي لحماية بياناته وليس لمزامنتها بين الأجهزة"
+          actions={canManage && (
+            <button
+              onClick={openExportModal}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              تصدير وتحميل نسخة فورية الآن
+            </button>
+          )}
+        />
       </div>
 
       {message && (

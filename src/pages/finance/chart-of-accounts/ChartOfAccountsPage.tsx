@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   BookOpen, ChevronDown, ChevronLeft, ChevronsDownUp, ChevronsUpDown,
   Loader2, Pencil, Plus, Power, RotateCcw, Search, Trash2, X,
@@ -230,27 +231,21 @@ export const ChartOfAccountsPage: React.FC = () => {
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200 bg-sky-50">
-              <BookOpen className="h-5 w-5 text-sky-600" />
-            </div>
-            <div>
-              <h1 className="text-base font-black">دليل الحسابات العام</h1>
-              <p className="mt-1 text-xs font-medium text-slate-500">هيكل الحسابات المحاسبية وأرصدتها المستخرجة من القيود</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3 sm:justify-end">
+      <div className="shrink-0 bg-white px-4 pt-4 sm:px-6">
+        <PageHeader
+          icon={<BookOpen className="h-5 w-5" />}
+          title="دليل الحسابات العام"
+          description="هيكل الحسابات المحاسبية وأرصدتها المستخرجة من القيود"
+          actions={<>
             <span className="text-xs font-semibold text-slate-500">{accounts.length} حساب</span>
             {canManage && (
               <button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
                 <Plus className="h-4 w-4" /> إضافة حساب رئيسي
               </button>
             )}
-          </div>
-        </div>
-      </header>
+          </>}
+        />
+      </div>
 
       <section aria-label="ملخص الأرصدة حسب نوع الحساب" className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-200 bg-white p-3 sm:grid-cols-3 sm:gap-3 sm:px-6 sm:py-4 lg:grid-cols-5">
         {(Object.keys(TYPE_LABELS) as AccountType[]).map((type) => (

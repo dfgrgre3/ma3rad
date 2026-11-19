@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Archive, Download, Eye, FileText, History, Loader2, Pencil, Plus, RefreshCw, Upload, X } from 'lucide-react';
 import { EmployeeDocumentService } from '../../../services/domains/hr/EmployeeDocumentService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
@@ -284,14 +285,11 @@ export const EmployeeDocumentsPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
-            <FileText className="h-5 w-5 text-sky-600" /> مستندات الموظفين
-          </h1>
-          <p className="text-sm text-slate-500">هويات، شهادات، تقارير طبية ومستندات أخرى مع تتبع الانتهاء.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={<FileText className="h-5 w-5" />}
+        title="مستندات الموظفين"
+        description="هويات، شهادات، تقارير طبية ومستندات أخرى مع تتبع الانتهاء."
+        actions={<>
           <select
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
             value={employeeFilter}
@@ -337,8 +335,8 @@ export const EmployeeDocumentsPage: React.FC = () => {
               <Plus className="h-4 w-4" /> مستند جديد
             </button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[

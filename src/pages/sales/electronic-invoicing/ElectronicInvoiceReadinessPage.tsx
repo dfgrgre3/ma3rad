@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { AlertTriangle, CheckCircle2, FileWarning, XCircle } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { ElectronicInvoiceService } from '../../../services/domains/sales/ElectronicInvoiceService';
 
 export const ElectronicInvoiceReadinessPage: React.FC = () => {
@@ -12,15 +13,11 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 p-5 sm:p-8">
-      <header className="flex items-start gap-3">
-        <span className="rounded-xl bg-sky-100 p-3 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-          <FileWarning className="h-6 w-6" />
-        </span>
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white">الفاتورة الإلكترونية</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">حالة جاهزية الإرسال إلى مصلحة الضرائب المصرية</p>
-        </div>
-      </header>
+      <PageHeader
+        icon={<FileWarning className="h-5 w-5" />}
+        title="الفاتورة الإلكترونية"
+        description="حالة جاهزية الإرسال إلى مصلحة الضرائب المصرية"
+      />
 
       <section className={`rounded-2xl border p-5 ${readiness.ready ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30' : 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'}`} role="status" aria-live="polite">
         <div className="flex items-start gap-3">

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   BriefcaseBusiness, CalendarPlus, Clock3, FilePlus2, Loader2, Plus, RefreshCw,
   Search, UserRound, UserRoundCheck, Users, X,
@@ -457,14 +458,11 @@ export const RecruitmentPage: React.FC = () => {
 
   return (
     <div className="space-y-5 p-4 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-            <BriefcaseBusiness className="h-5 w-5 text-sky-600" /> التوظيف والمرشحون
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">إدارة الوظائف الشاغرة ومتابعة المرشحين من التقديم حتى التعيين.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<BriefcaseBusiness className="h-5 w-5" />}
+        title="التوظيف والمرشحون"
+        description="إدارة الوظائف الشاغرة ومتابعة المرشحين من التقديم حتى التعيين."
+        actions={<>
           <button
             type="button"
             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
@@ -483,8 +481,8 @@ export const RecruitmentPage: React.FC = () => {
               {showForm ? 'إغلاق' : tab === 'jobs' ? 'وظيفة جديدة' : 'تسجيل مرشح'}
             </button>
           )}
-        </div>
-      </header>
+        </>}
+      />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="وظائف مفتوحة" value={summary.openJobs} icon={BriefcaseBusiness} tone="bg-sky-50 text-sky-700" />

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AlertTriangle, Bell, Search, Download, RefreshCw, CircleDollarSign, Package } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -150,22 +151,20 @@ export const InventoryAlertsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-rose-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">تنبيهات المخزون المنخفض</h1>
-            <p className="text-xs text-slate-500 font-medium">مراقبة الأصناف التي وصلت إلى مستوى منخفض أو نفدت عبر جميع المخازن</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={loadData} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-            <RefreshCw className="w-4 h-4" /> تحديث
-          </button>
-          <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition">
-            <Download className="w-4 h-4" /> تصدير Excel
-          </button>
-        </div>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<AlertTriangle className="w-5 h-5" />}
+          title="تنبيهات المخزون المنخفض"
+          description="مراقبة الأصناف التي وصلت إلى مستوى منخفض أو نفدت عبر جميع المخازن"
+          actions={<>
+            <button onClick={loadData} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+              <RefreshCw className="w-4 h-4" /> تحديث
+            </button>
+            <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition">
+              <Download className="w-4 h-4" /> تصدير Excel
+            </button>
+          </>}
+        />
       </div>
 
       {/* Summary Cards */}

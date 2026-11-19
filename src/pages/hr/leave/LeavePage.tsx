@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { CalendarDays, Check, Loader2, Plus, RefreshCw, X } from 'lucide-react';
 import { LeaveService } from '../../../services/domains/hr/LeaveService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
@@ -280,14 +281,11 @@ export const LeavePage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
-            <CalendarDays className="h-5 w-5 text-sky-600" /> الإجازات
-          </h1>
-          <p className="text-sm text-slate-500">طلبات الإجازة واعتمادها ومتابعة الأرصدة المستخدمة.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<CalendarDays className="h-5 w-5" />}
+        title="الإجازات"
+        description="طلبات الإجازة واعتمادها ومتابعة الأرصدة المستخدمة."
+        actions={<>
           <select
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
             value={status}
@@ -309,8 +307,8 @@ export const LeavePage: React.FC = () => {
               <Plus className="h-4 w-4" /> طلب إجازة
             </button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">

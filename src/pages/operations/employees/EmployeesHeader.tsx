@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle, Download, HardHat, Plus } from 'lucide-react';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 interface EmployeesHeaderProps {
   loading: boolean;
@@ -22,34 +23,32 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
   return (
     <>
       {/* Header Banner */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
-            <HardHat className="w-6 h-6 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-lg font-black text-slate-900">إدارة شؤون وأجور العمال</h1>
-            <p className="text-xs text-slate-500 font-medium">تصنيف وتوزيع العمال في المستودعات والمعارض ومتابعة السلفيات، الرواتب، والأجور اليومية</p>
-          </div>
-        </div>
-        <CentralLimitGuard metric="maxEmployees">
-          <button
-            onClick={onAddEmployee}
-            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-600/10 transition-all transform active:scale-95 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            إضافة عامل / موظف جديد
-          </button>
-        </CentralLimitGuard>
-          {canExport && onExport && (
-            <button
-              onClick={onExport}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shrink-0"
-            >
-              <Download className="w-4 h-4" />
-              تصدير
-            </button>
-          )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<HardHat className="h-5 w-5" />}
+          title="إدارة شؤون وأجور العمال"
+          description="تصنيف وتوزيع العمال في المستودعات والمعارض ومتابعة السلفيات، الرواتب، والأجور اليومية"
+          actions={<>
+            <CentralLimitGuard metric="maxEmployees">
+              <button
+                onClick={onAddEmployee}
+                className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-600/10 transition-all transform active:scale-95 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                إضافة عامل / موظف جديد
+              </button>
+            </CentralLimitGuard>
+            {canExport && onExport && (
+              <button
+                onClick={onExport}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                تصدير
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       {loading && (

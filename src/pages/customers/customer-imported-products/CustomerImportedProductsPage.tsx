@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, PackageCheck, Phone, RefreshCw, Search, X } from 'lucide-react';
 import { CustomerSupplyService } from '../../../services/domains/customers/CustomerSupplyService';
@@ -108,9 +109,16 @@ export const CustomerImportedProductsPage: React.FC = () => {
   if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700">ليس لديك صلاحية عرض هذه الصفحة.</div>;
 
   return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-    <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3"><button onClick={() => navigate(id && id !== 'imported-products' ? `/customers/${id}` : '/customers')} className="p-2 rounded-lg hover:bg-slate-100" title="رجوع"><ArrowRight className="w-4 h-4" /></button><div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center"><PackageCheck className="w-5 h-5 text-emerald-700" /></div><div><h1 className="text-lg font-black">منتجات العملاء المطلوبة من الخارج</h1><p className="text-xs text-slate-500">تابع الكميات المطلوبة وتواصل مع العميل عند توفرها</p></div></div>
-      <button onClick={refresh} disabled={loading} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold hover:bg-slate-50"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />تحديث</button>
+    <header className="bg-white border-b border-slate-200 px-6 pt-4">
+      <PageHeader
+        icon={<PackageCheck className="w-5 h-5" />}
+        title="منتجات العملاء المطلوبة من الخارج"
+        description="تابع الكميات المطلوبة وتواصل مع العميل عند توفرها"
+        actions={<>
+          <button onClick={() => navigate(id && id !== 'imported-products' ? `/customers/${id}` : '/customers')} className="p-2 rounded-lg hover:bg-slate-100" title="رجوع"><ArrowRight className="w-4 h-4" /></button>
+          <button onClick={refresh} disabled={loading} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold hover:bg-slate-50"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />تحديث</button>
+        </>}
+      />
     </header>
     <div className="p-4 bg-white border-b border-slate-200"><div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث باسم العميل أو رقم الفاتورة أو المنتج" className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-sm" /></div></div>
     <main className="flex-1 overflow-auto p-4 space-y-4">

@@ -5,6 +5,7 @@ import {
 import { useAppConfig } from '../../../hooks/domains/config/useAppConfig';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { ActionRegistryService } from '../../../services/domains/config/ActionRegistryService';
 import { FeatureService } from '../../../services/domains/config/FeatureService';
 import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
@@ -99,18 +100,17 @@ export const ConfigurationStudioPage: React.FC = () => {
 
   return (
     <div className="space-y-4 p-3 lg:p-4">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900">استوديو التكوين الديناميكي</h1>
-          <p className="text-sm text-slate-500">
-            إدارة الأزرار والميزات والنطاقات (مستأجر / شركة / فرع / جهاز / مستخدم) مع الوراثة والتشخيص.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">
-          <ShieldCheck className="h-4 w-4 text-emerald-500" />
-          <span>الحالة: {state.entries.length} إعداد أساسي · {state.scopedEntries.length} تجاوز نطاق</span>
-        </div>
-      </header>
+      <PageHeader
+        icon={<ShieldCheck className="h-5 w-5" />}
+        title="استوديو التكوين الديناميكي"
+        description="إدارة الأزرار والميزات والنطاقات (مستأجر / شركة / فرع / جهاز / مستخدم) مع الوراثة والتشخيص."
+        meta={
+          <span className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            <span>الحالة: {state.entries.length} إعداد أساسي · {state.scopedEntries.length} تجاوز نطاق</span>
+          </span>
+        }
+      />
 
       <nav className="flex flex-wrap gap-2">
         {TABS.map((tab) => {

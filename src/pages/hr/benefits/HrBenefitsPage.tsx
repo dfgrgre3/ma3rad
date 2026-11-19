@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Gift, HeartPulse, Landmark, CalendarCheck, PiggyBank } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   HrBenefitsService, HrAllowance, HrBenefit, HrLoan, HrLoanInstallment, HrLeaveSettlement,
 } from '../../../services/domains/hr/HrBenefitsService';
@@ -76,14 +77,12 @@ export const HrBenefitsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-          <Gift className="w-5 h-5 text-emerald-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">المزايا والبدلات والتأمينات</h1>
-          <p className="text-xs text-slate-500 font-medium">بدلات شهرية، مزايا وتأمينات، قروض وأقساط، تسويات إجازات غير مستخدمة</p>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Gift className="h-5 w-5" />}
+          title="المزايا والبدلات والتأمينات"
+          description="بدلات شهرية، مزايا وتأمينات، قروض وأقساط، تسويات إجازات غير مستخدمة"
+        />
       </div>
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

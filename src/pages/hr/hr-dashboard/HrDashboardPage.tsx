@@ -5,6 +5,7 @@ import {
   RefreshCw, UserCheck, BarChart3, HardHat, Clock, UserX, CheckCircle2,
   DollarSign, Building2,
 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeService, Employee, AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -270,32 +271,28 @@ export const HrDashboardPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow">
-            <HardHat className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">لوحة تحكم الموارد البشرية</h1>
-            <p className="text-xs text-slate-400">الموظفون والرواتب والحضور والأداء</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/employees')} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> إدارة الموظفين
-          </button>
-          <button onClick={() => navigate('/employees/attendance')} className="text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-sky-200">
-            <Clock className="w-3.5 h-3.5" /> الحضور
-          </button>
-          {canViewRecruitment && (
-            <button onClick={() => navigate('/employees/recruitment')} className="text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-violet-200">
-              <BriefcaseBusiness className="w-3.5 h-3.5" /> التوظيف
+      <div className="bg-white px-6 pt-4 flex-shrink-0">
+        <PageHeader
+          icon={<HardHat className="h-5 w-5" />}
+          title="لوحة تحكم الموارد البشرية"
+          description="الموظفون والرواتب والحضور والأداء"
+          actions={<>
+            <button onClick={() => navigate('/employees')} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" /> إدارة الموظفين
             </button>
-          )}
-          <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
-            <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+            <button onClick={() => navigate('/employees/attendance')} className="text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-sky-200">
+              <Clock className="w-3.5 h-3.5" /> الحضور
+            </button>
+            {canViewRecruitment && (
+              <button onClick={() => navigate('/employees/recruitment')} className="text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-violet-200">
+                <BriefcaseBusiness className="w-3.5 h-3.5" /> التوظيف
+              </button>
+            )}
+            <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
+              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </>}
+        />
       </div>
 
       {error && (

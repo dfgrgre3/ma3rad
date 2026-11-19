@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   History,
 } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { FinanceExtrasService, Cheque, ChequeType } from '../../../services/domains/finance/FinanceExtrasService';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -214,24 +215,18 @@ export const ChequesPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">
-            <CreditCard className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">إدارة ودورة حياة الشيكات</h1>
-            <p className="text-xs text-slate-500 font-medium">
-              إيداع، تحصيل، ارتداد، إعادة تقديم، وربط تلقائي بالقيود المحاسبية
-            </p>
-          </div>
-        </div>
-        {canManageCheques && <button
-          onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition shrink-0"
-        >
-          <Plus className="w-4 h-4" /> تسجيل شيك
-        </button>}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<CreditCard className="h-5 w-5" />}
+          title="إدارة ودورة حياة الشيكات"
+          description="إيداع، تحصيل، ارتداد، إعادة تقديم، وربط تلقائي بالقيود المحاسبية"
+          actions={canManageCheques && <button
+            onClick={openNew}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition shrink-0"
+          >
+            <Plus className="w-4 h-4" /> تسجيل شيك
+          </button>}
+        />
       </div>
 
       {/* KPI Cards */}

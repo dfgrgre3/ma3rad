@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   TrendingDown, AlertTriangle, Package, RefreshCw, 
   Search, SlidersHorizontal, ShoppingCart, ShieldAlert, Clock, BarChart3, X
@@ -182,47 +183,42 @@ export const ReorderPlanningPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
-            <BarChart3 className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black">لوحة التخطيط وإعادة الطلب (Planning & Reorder)</h1>
-            <p className="text-xs text-slate-500 font-medium">مراقبة حدود الأمان ومعدل المبيعات اليومي واقتراح طلبيات الشراء آلياً</p>
-          </div>
-        </div>
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<BarChart3 className="w-5 h-5" />}
+          title="لوحة التخطيط وإعادة الطلب (Planning & Reorder)"
+          description="مراقبة حدود الأمان ومعدل المبيعات اليومي واقتراح طلبيات الشراء آلياً"
+          actions={<>
+            {canCreatePurchaseRequest && selectedProductIds.size > 0 && (
+              <button
+                onClick={handleCreatePurchaseRequest}
+                disabled={creatingPO}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition active:scale-95 disabled:opacity-50"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                إنشاء طلب شراء للمحدد ({selectedProductIds.size})
+              </button>
+            )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {canCreatePurchaseRequest && selectedProductIds.size > 0 && (
+            {canCreatePurchaseRequest && (
+              <button
+                onClick={selectAllCritical}
+                disabled={!selectedWarehouseId}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {selectedWarehouseId ? 'تحديد الأصناف الحرجة' : 'اختر مستودعاً أولاً'}
+              </button>
+            )}
+
             <button
-              onClick={handleCreatePurchaseRequest}
-              disabled={creatingPO}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition active:scale-95 disabled:opacity-50"
+              onClick={loadData}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              title="تحديث"
             >
-              <ShoppingCart className="w-4 h-4" />
-              إنشاء طلب شراء للمحدد ({selectedProductIds.size})
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-
-          {canCreatePurchaseRequest && (
-            <button
-              onClick={selectAllCritical}
-              disabled={!selectedWarehouseId}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {selectedWarehouseId ? 'تحديد الأصناف الحرجة' : 'اختر مستودعاً أولاً'}
-            </button>
-          )}
-
-          <button
-            onClick={loadData}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
-            title="تحديث"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+          </>}
+        />
       </div>
 
       {/* KPI Cards */}

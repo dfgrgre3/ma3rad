@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
@@ -145,33 +146,27 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 p-4 sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${isComparison ? 'border-sky-200 bg-sky-50' : 'border-violet-200 bg-violet-50'}`}>
-            {isComparison
-              ? <Building2 className="h-5 w-5 text-sky-600" />
-              : <WarehouseIcon className="h-5 w-5 text-violet-600" />}
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">
-              {isComparison ? 'مخزون المعرض ومقارنته بالمخزن' : 'الأصناف الموجودة في المخزن'}
-            </h1>
-            <p className="text-xs text-slate-500">
-              {isComparison
-                ? 'قارن أرصدة جميع الأصناف بين المعرض والمخزن، بما فيها الأصناف غير المسجلة بأحدهما.'
-                : 'عرض كل الأصناف ذات الرصيد الموجود في المخازن.'}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          تحديث البيانات
-        </button>
+      <div className="mb-5 bg-white px-5 pt-4 rounded-2xl border border-slate-200 shadow-sm">
+        <PageHeader
+          icon={isComparison
+            ? <Building2 className="h-5 w-5" />
+            : <WarehouseIcon className="h-5 w-5" />}
+          title={isComparison ? 'مخزون المعرض ومقارنته بالمخزن' : 'الأصناف الموجودة في المخزن'}
+          description={isComparison
+            ? 'قارن أرصدة جميع الأصناف بين المعرض والمخزن، بما فيها الأصناف غير المسجلة بأحدهما.'
+            : 'عرض كل الأصناف ذات الرصيد الموجود في المخازن.'}
+          actions={
+            <button
+              type="button"
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              تحديث البيانات
+            </button>
+          }
+        />
       </div>
 
       <div className="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-2">

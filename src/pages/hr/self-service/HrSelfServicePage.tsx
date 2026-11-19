@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   UserRound, Wallet, CheckSquare, CalendarDays, ShieldAlert, GraduationCap,
   Star, Gift, Inbox, Send, ChevronRight, Printer, X,
@@ -122,15 +123,15 @@ export const HrSelfServicePage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center">
-          <UserRound className="w-5 h-5 text-sky-600" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-base font-black">بوابة الموظف الذاتية</h1>
-          <p className="text-xs text-slate-500 font-medium">{profile ? `${profile.fullName} • ${profile.jobTitle}${profile.departmentName ? ` • ${profile.departmentName}` : ''}` : 'بياناتك الشخصية فقط'}</p>
-        </div>
-        <button onClick={load} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحديث</button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<UserRound className="h-5 w-5" />}
+          title="بوابة الموظف الذاتية"
+          description={profile ? `${profile.fullName} • ${profile.jobTitle}${profile.departmentName ? ` • ${profile.departmentName}` : ''}` : 'بياناتك الشخصية فقط'}
+          actions={
+            <button onClick={load} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحديث</button>
+          }
+        />
       </div>
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

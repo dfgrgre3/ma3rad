@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertTriangle, Building2, CalendarClock, Check, ClipboardCheck, FileText, MapPin,
   Plus, RefreshCw, Search, ShieldCheck, Wrench, X, Edit3, Trash2, Archive,
@@ -521,17 +522,16 @@ export const FacilityManagementPage: React.FC = () => {
   const activeTabInfo = tabs.find((tab) => tab.key === activeTab)!;
   return (
     <main className="mx-auto max-w-[1500px] space-y-5 p-4 pb-10 md:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-sm font-bold text-teal-700"><Building2 size={17} /> إدارة المنشأة</div>
-          <h1 className="text-2xl font-black text-slate-900">المرافق والأصول التشغيلية</h1>
-          <p className="mt-1 text-sm text-slate-500">المواقع، الأصول، أوامر العمل، العقود، وسجلات السلامة مع دورة حياة كاملة وسجل تغييرات.</p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        eyebrow="إدارة المنشأة"
+        icon={<Building2 size={17} />}
+        title="المرافق والأصول التشغيلية"
+        description="المواقع، الأصول، أوامر العمل، العقود، وسجلات السلامة مع دورة حياة كاملة وسجل تغييرات."
+        actions={<>
           <button onClick={load} title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"><RefreshCw size={17} /></button>
           {canManage && <button onClick={() => openForm(activeTab)} className="inline-flex h-10 items-center gap-2 rounded bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800"><Plus size={17} /> إضافة {activeTab === 'locations' ? 'موقع' : activeTab === 'assets' ? 'أصل' : activeTab === 'maintenance' ? 'طلب صيانة' : activeTab === 'contracts' ? 'عقد' : 'سجل سلامة'}</button>}
-        </div>
-      </header>
+        </>}
+      />
 
       {notice && <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="إغلاق" className="p-1"><X size={15} /></button></div>}
       {error && !modalOpen && !woDetailId && <div role="alert" className="flex items-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertTriangle size={17} />{error}</div>}

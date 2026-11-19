@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Users, Plus, Search, Phone, Loader2, X, Power, Truck } from 'lucide-react';
 import { OperationsService, Driver } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -54,19 +55,17 @@ export const DriversPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center"><Users className="w-5 h-5 text-amber-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">السائقون</h1>
-            <p className="text-xs text-slate-500 font-medium">بيانات السائقين والرخص وعدد الرحلات</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> إضافة سائق
-          </button>
-        )}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Users className="h-5 w-5" />}
+          title="السائقون"
+          description="بيانات السائقين والرخص وعدد الرحلات"
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> إضافة سائق
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">

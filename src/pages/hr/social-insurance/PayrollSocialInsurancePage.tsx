@@ -8,6 +8,7 @@ import {
 } from '../../../services/domains/hr/PayrollSocialInsuranceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 
 const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
@@ -252,14 +253,12 @@ export const PayrollSocialInsurancePage: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50">
-          <Landmark className="h-5 w-5 text-indigo-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">التأمينات الاجتماعية ونهاية الخدمة</h1>
-          <p className="text-xs font-medium text-slate-500">ضبط نسب الاشتراك والحدود، قواعد مكافأة نهاية الخدمة، وحسابات تقديرية</p>
-        </div>
+      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Landmark className="h-5 w-5" />}
+          title="التأمينات الاجتماعية ونهاية الخدمة"
+          description="ضبط نسب الاشتراك والحدود، قواعد مكافأة نهاية الخدمة، وحسابات تقديرية"
+        />
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">

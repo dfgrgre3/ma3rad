@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertCircle, ArrowDownRight, ArrowUpRight, Check, CheckCircle2, Clock,
   Download, FileText, Printer, RefreshCw, Search, SlidersHorizontal, X
@@ -272,41 +273,33 @@ export const SupplierStatementPage: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-700">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-base font-black text-slate-900 sm:text-lg">كشف حساب المورد</h1>
-              <p className="mt-0.5 text-xs leading-5 text-slate-500">مراجعة الحركات المالية ومطابقة سندات الصرف بفواتير الشراء</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canExport && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleExport('excel')}
-                  disabled={!statementData || loading}
-                  className="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5" /> تصدير Excel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport('pdf')}
-                  disabled={!statementData || loading}
-                  className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Printer className="h-3.5 w-3.5" /> طباعة / PDF
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <div className="border-b border-slate-200 bg-white px-4 pt-4 sm:px-6">
+        <PageHeader
+          icon={<FileText className="h-5 w-5" />}
+          title="كشف حساب المورد"
+          description="مراجعة الحركات المالية ومطابقة سندات الصرف بفواتير الشراء"
+          actions={canExport && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleExport('excel')}
+                disabled={!statementData || loading}
+                className="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" /> تصدير Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExport('pdf')}
+                disabled={!statementData || loading}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer className="h-3.5 w-3.5" /> طباعة / PDF
+              </button>
+            </>
+          )}
+        />
+      </div>
 
       <section className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6" aria-label="مرشحات كشف الحساب">
         <div className="flex flex-wrap items-end gap-3">

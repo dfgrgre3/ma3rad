@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PieChart, Loader2, Download, CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
 import { AccountingService } from '../../../services/domains/finance/AccountingService';
 import { localDateString } from '../../../utils/shared/date';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
@@ -85,17 +86,17 @@ export const ProfitLossPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center"><PieChart className="w-5 h-5 text-emerald-600" /></div>
-          <div>
-            <h1 className="text-base font-black">قائمة الأرباح والخسائر</h1>
-            <p className="text-xs text-slate-500 font-medium">تحليل الإيرادات والتكاليف والمصروفات للفترة المحددة</p>
-          </div>
-        </div>
-        <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition shrink-0">
-          <Download className="w-4 h-4" /> تصدير CSV
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<PieChart className="w-5 h-5" />}
+          title="قائمة الأرباح والخسائر"
+          description="تحليل الإيرادات والتكاليف والمصروفات للفترة المحددة"
+          actions={
+            <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+              <Download className="w-4 h-4" /> تصدير CSV
+            </button>
+          }
+        />
       </div>
 
       <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-end gap-3">

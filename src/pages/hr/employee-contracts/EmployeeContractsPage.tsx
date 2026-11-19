@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock3, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { ContractService } from '../../../services/domains/hr/ContractService';
@@ -230,14 +231,11 @@ export const EmployeeContractsPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800">
-            <FileSignature className="h-5 w-5 text-sky-600" /> عقود الموظفين
-          </h1>
-          <p className="text-sm text-slate-500">مسودات وعقود نشطة وتجديد وإنهاء مع تنبيه قرب الانتهاء.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<FileSignature className="h-5 w-5" />}
+        title="عقود الموظفين"
+        description="مسودات وعقود نشطة وتجديد وإنهاء مع تنبيه قرب الانتهاء."
+        actions={<>
           <select
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
             value={status}
@@ -259,8 +257,8 @@ export const EmployeeContractsPage: React.FC = () => {
               <Plus className="h-4 w-4" /> عقد جديد
             </button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[

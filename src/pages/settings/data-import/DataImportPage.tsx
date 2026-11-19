@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AlertCircle, CheckCircle2, Download, Eye, EyeOff, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
@@ -433,10 +434,12 @@ export const DataImportPage: React.FC = () => {
       </Link>
     </div>
 
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><div className="flex items-center gap-3"><span className="rounded-2xl bg-sky-100 p-3 text-sky-700"><FileSpreadsheet className="w-6 h-6" /></span><div><h1 className="text-2xl font-black text-slate-900">مركز استيراد البيانات</h1><p className="mt-1 text-sm text-slate-500">استورد الجداول والمستندات والصور، راجع البيانات وطابق الحقول قبل الحفظ، أو ادمج نسخة مشفرة.</p></div></div></div>
-      {data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
-    </div>
+    <PageHeader
+      icon={<FileSpreadsheet className="w-5 h-5" />}
+      title="مركز استيراد البيانات"
+      description="استورد الجداول والمستندات والصور، راجع البيانات وطابق الحقول قبل الحفظ، أو ادمج نسخة مشفرة."
+      actions={data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
+    />
 
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">

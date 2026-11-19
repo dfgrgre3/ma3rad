@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Calendar, Printer, FileDown, Loader2, AlertTriangle, Wallet, Clock } from 'lucide-react';
 import { EmployeeService, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -196,21 +197,15 @@ export const PayslipsPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">كشوف المرتبات الشهرية</h1>
-            <p className="text-xs text-slate-400">عرض وطباعة وتصدير كشوف رواتب الموظفين لكل فترة</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {run && <button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+      <div className="bg-white border-b border-slate-200 px-6 pt-4 pb-1 flex-shrink-0">
+        <PageHeader
+          icon={<Wallet className="h-5 w-5" />}
+          title="كشوف المرتبات الشهرية"
+          description="عرض وطباعة وتصدير كشوف رواتب الموظفين لكل فترة"
+          actions={run && <button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
             <FileDown className="w-3.5 h-3.5" /> تصدير الفترة CSV
           </button>}
-        </div>
+        />
       </div>
 
       {error && (

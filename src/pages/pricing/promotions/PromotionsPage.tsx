@@ -5,6 +5,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 const TYPE_LABELS: Record<Promotion['promotionType'], string> = {
   PERCENTAGE: 'نسبة خصم %',
   FIXED_AMOUNT: 'خصم مبلغ ثابت',
@@ -109,21 +110,17 @@ export const PromotionsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">
-            <Star className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">العروض الترويجية والخصومات</h1>
-            <p className="text-xs text-slate-500 font-medium">إنشاء وجدولة الحملات الترويجية والخصومات الموسمية للمعارض</p>
-          </div>
-        </div>
-        {canManage && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> إنشاء عرض جديد
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Star className="w-5 h-5" />}
+          title="العروض الترويجية والخصومات"
+          description="إنشاء وجدولة الحملات الترويجية والخصومات الموسمية للمعارض"
+          actions={canManage && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> إنشاء عرض جديد
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">

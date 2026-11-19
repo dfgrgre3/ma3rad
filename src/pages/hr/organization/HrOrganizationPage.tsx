@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, GitBranch, Briefcase, Wallet, MoveRight, Activity, RefreshCw } from 'lucide-react';
 import { EmployeeOrganizationService, EmployeeDepartment, EmployeeJobTitle, EmployeeJobGrade, EmployeeCostCenter, EmployeeTransfer, EmployeeLifecycleEvent, DepartmentNode } from '../../../services/domains/hr/EmployeeOrganizationService';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { fmt } from '../../operations/payroll/payrollDisplay';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 
@@ -244,17 +245,17 @@ export const HrOrganizationPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center">
-          <Building2 className="w-5 h-5 text-teal-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">الهيكل التنظيمي ودورة حياة الموظف</h1>
-          <p className="text-xs text-slate-500 font-medium">أقسام، درجات، مراكز تكلفة، انتقالات وأحداث دورة الحياة</p>
-        </div>
-        <button onClick={load} className="mr-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
-          <RefreshCw className="h-3.5 w-3.5" /> تحديث
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Building2 className="h-5 w-5" />}
+          title="الهيكل التنظيمي ودورة حياة الموظف"
+          description="أقسام، درجات، مراكز تكلفة، انتقالات وأحداث دورة الحياة"
+          actions={
+            <button onClick={load} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+              <RefreshCw className="h-3.5 w-3.5" /> تحديث
+            </button>
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">

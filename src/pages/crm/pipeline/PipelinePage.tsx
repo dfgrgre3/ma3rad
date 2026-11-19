@@ -6,6 +6,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 const STAGES: { id: LeadStage; label: string; color: string; bg: string; border: string }[] = [
   { id: 'NEW',         label: 'عميل محتمل',  color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },
   { id: 'CONTACTED',   label: 'تم التواصل',  color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200' },
@@ -58,17 +59,23 @@ export const PipelinePage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Workflow className="w-5 h-5 text-violet-600" />
-          <h1 className="text-base font-black text-slate-900">Pipeline المبيعات</h1>
-          <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold border border-violet-200">
-            {leads.length} فرصة — {fmt(total)}
-          </span>
-        </div>
-        <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-sky-600 hover:text-sky-700 transition">
-          إدارة العملاء المحتملين
-        </button>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Workflow className="w-5 h-5" />}
+          title={
+            <span className="flex items-center gap-2">
+              Pipeline المبيعات
+              <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold border border-violet-200">
+                {leads.length} فرصة — {fmt(total)}
+              </span>
+            </span>
+          }
+          actions={
+            <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-sky-600 hover:text-sky-700 transition">
+              إدارة العملاء المحتملين
+            </button>
+          }
+        />
       </div>
 
       {error && <div className="mx-4 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

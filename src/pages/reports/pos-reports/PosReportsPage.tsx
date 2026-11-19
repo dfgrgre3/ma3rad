@@ -7,6 +7,7 @@ import { BranchAccessService } from '../../../services/domains/auth/BranchAccess
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel } from '../../../utils/export/export';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
@@ -162,17 +163,18 @@ export function PosReportsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2"><BarChart3 className="w-6 h-6 text-sky-600" /> تقارير نقطة البيع (POS)</h1>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<BarChart3 className="w-5 h-5" />}
+        title="تقارير نقطة البيع (POS)"
+        actions={<>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
           <span className="text-slate-400">إلى</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
           <button onClick={load} disabled={loading} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-sm flex items-center gap-1.5 disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {loadError && (
         <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">

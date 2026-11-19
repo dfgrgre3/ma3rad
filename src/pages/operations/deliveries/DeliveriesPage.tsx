@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Truck, Plus, Search, Loader2, MapPin, User, Phone, Calendar } from 'lucide-react';
 import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -90,19 +91,17 @@ export const DeliveriesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center"><Truck className="w-5 h-5 text-sky-600" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">أوامر التسليم</h1>
-            <p className="text-xs text-slate-500 font-medium">جدولة الشحنات ومتابعة حالة التوصيل</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> أمر تسليم جديد
-          </button>
-        )}
+      <div className="bg-white px-6 pt-4">
+        <PageHeader
+          icon={<Truck className="h-5 w-5" />}
+          title="أوامر التسليم"
+          description="جدولة الشحنات ومتابعة حالة التوصيل"
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> أمر تسليم جديد
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row gap-3">

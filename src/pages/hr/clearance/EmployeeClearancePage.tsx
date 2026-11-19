@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   CheckCircle2, ClipboardCheck, FileBadge, MessageSquareText, Plus, RefreshCw,
   ShieldCheck, Trash2, UserMinus, XCircle,
@@ -245,14 +246,12 @@ export const EmployeeClearancePage: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200 bg-teal-50">
-          <ShieldCheck className="h-5 w-5 text-teal-600" />
-        </div>
-        <div>
-          <h1 className="text-base font-black">إخلاء الطرف</h1>
-          <p className="text-xs font-medium text-slate-500">متابعة إنهاء خدمة الموظفين، إعادة الأصول، التسوية المالية، ومقابلات الخروج</p>
-        </div>
+      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+        <PageHeader
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="إخلاء الطرف"
+          description="متابعة إنهاء خدمة الموظفين، إعادة الأصول، التسوية المالية، ومقابلات الخروج"
+        />
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">

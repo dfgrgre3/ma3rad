@@ -18,6 +18,7 @@ import {
 import { getRegisteredConfigTargets } from '../../../config/appConfigTargets';
 import { APP_ROUTE_PATHS } from '../../../router/routePaths';
 import { NAV_GROUPS } from '../../../config/navigation';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { AppConfigService, MAX_APP_CONFIG_IMPORT_LENGTH, type AppConfigVersion, type AppConfigState } from '../../../services/domains/config/AppConfigService';
 import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -361,27 +362,19 @@ export const AppConfigurationPage: React.FC = () => {
   return (
     <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6" data-config-ignore>
       <div className="w-full space-y-4">
-        <header className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-500 to-sky-600 text-white shadow-lg shadow-violet-500/25">
-              <Wand2 className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">محرك التكوين الديناميكي</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                تحكم في الصفحات والأقسام والحقول والنصوص والسياسات والترقيم وقوالب الطباعة دون تعديل الكود.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <PageHeader
+          icon={<Wand2 className="h-5 w-5" />}
+          title="محرك التكوين الديناميكي"
+          description="تحكم في الصفحات والأقسام والحقول والنصوص والسياسات والترقيم وقوالب الطباعة دون تعديل الكود."
+          actions={<>
             <button onClick={resetDraft} disabled={!dirty} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
               <RotateCcw className="h-3.5 w-3.5" /> تراجع
             </button>
             <button onClick={save} disabled={readOnly || !dirty} className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40">
               <Save className="h-4 w-4" /> حفظ وتطبيق
             </button>
-          </div>
-        </header>
+          </>}
+        />
 
         {readOnly && (
           <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">

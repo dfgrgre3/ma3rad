@@ -6,6 +6,7 @@ import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { OperationalFieldsManager } from '../operational-fields/OperationalFieldsManager';
 
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
   TILE_GRADES: Shield, TILE_EDGES: Layers,
@@ -110,19 +111,17 @@ export const ProductAttributesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600"><Ruler className="w-5 h-5" /></div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">الخصائص والمواصفات الفنية (Tile Attributes)</h1>
-            <p className="text-xs text-slate-500 font-medium">تعريف مقاسات السيراميك، التشطيبات، الفئات وأماكن الاستخدام</p>
-          </div>
-        </div>
-        {canManage && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> خاصية جديدة
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Ruler className="w-5 h-5" />}
+          title="الخصائص والمواصفات الفنية (Tile Attributes)"
+          description="تعريف مقاسات السيراميك، التشطيبات، الفئات وأماكن الاستخدام"
+          actions={canManage && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> خاصية جديدة
+            </button>
+          )}
+        />
       </div>
 
       {error && <div className="mx-4 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}

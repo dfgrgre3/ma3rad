@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Wallet, Loader2, Trash2, Users, Banknote, Calculator, CheckCircle2, FileDown, Printer, LockKeyhole } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, PayrollRun, PayrollRunItem, PayrollPayOptions, PayrollPaymentMethod, PayrollPaymentReconciliation } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -208,12 +209,12 @@ export const PayrollPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center"><Wallet className="w-5 h-5 text-sky-600" /></div>
-        <div>
-          <h1 className="text-base font-black">الرواتب والمسحوبات</h1>
-          <p className="text-xs text-slate-500 font-medium">احتساب مستحقات الموظفين وصرف الرواتب والسلف والمكافآت</p>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<Wallet className="h-5 w-5" />}
+          title="الرواتب والمسحوبات"
+          description="احتساب مستحقات الموظفين وصرف الرواتب والسلف والمكافآت"
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">

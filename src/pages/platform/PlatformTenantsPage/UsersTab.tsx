@@ -1,0 +1,75 @@
+import React from 'react';
+import { Ban, CheckCircle2, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
+import { DataTable } from '../../../components/ui/DataTable';
+import { EmptyState, StatusBadge } from '../components/PlatformUI';
+import { SectionCard } from './shared';
+
+interface UsersTabProps {
+  users: any[];
+  canManageTenants: boolean;
+  openUserCreate: () => void;
+  openUserEdit: (user: any) => void;
+  toggleUser: (user: any, active: boolean) => void;
+  deleteUser: (user: any) => void;
+}
+
+export const UsersTab: React.FC<UsersTabProps> = ({
+  users,
+  canManageTenants,
+  openUserCreate,
+  openUserEdit,
+  toggleUser,
+  deleteUser,
+}) => (
+              <div className="space-y-3">
+                <SectionCard
+                  title="مستخدمو العميل"
+                  subtitle={`${users.length} مستخدم مسجل`}
+                  icon={<Users className="h-4 w-4" />}
+                  action={
+                    canManageTenants ? (<Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openUserCreate}>
+                      إضافة مستخدم
+                    </Button>) : null
+                  }
+                >
+                  {users.length === 0 ? (
+                    <EmptyState icon={<Users className="h-5 w-5" />} title="لا يوجد مستخدمون مسجلون" description="أضف مستخدمين (مسؤولون، كاشير، ...) لإدارة هذا العميل." />
+                  ) : (
+                                        <DataTable
+                      ariaLabel="مستخدمو العميل"
+                      rows={users}
+                      rowKey={(item) => item.id}
+                      minWidth={720}
+                      dense
+                      columns={[
+                        { key: 'name', header: 'الاسم', render: (user) => <span className="text-[11.5px] font-bold text-slate-800">{user.fullName}</span> },
+                        { key: 'username', header: 'اسم المستخدم', render: (user) => <span className="font-mono text-[10.5px]" dir="ltr">{user.username || '—'}</span> },
+                        { key: 'email', header: 'البريد', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.email || '—'}</span> },
+                        { key: 'phone', header: 'الهاتف', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.phone || '—'}</span> },
+                        { key: 'role', header: 'الدور', render: (user) => <span className="text-[10.5px] font-semibold text-slate-700">{user.role}</span> },
+                        {
+                          key: 'status', header: 'الحالة',
+                          render: (user) => <StatusBadge value={user.status === 'ACTIVE' ? 'ACTIVE' : user.status === 'SUSPENDED' ? 'SUSPENDED' : 'TRIAL'} label={user.status === 'ACTIVE' ? 'نشط' : user.status === 'SUSPENDED' ? 'موقوف' : 'مدعو'} />,
+                        },
+                        { key: 'notes', header: 'ملاحظات', render: (user) => <span className="text-[10.5px] text-slate-500">{user.notes || '—'}</span> },
+                        {
+                          key: 'action', header: 'إجراء',
+                          render: (user) => (
+                            <div className="flex items-center gap-1">
+                              {canManageTenants && (<>
+                                <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل"><Pencil className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => toggleUser(user, user.status !== 'ACTIVE')} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}>
+                                  {user.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                </button>
+                                <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </>)}
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
+                  )}
+                </SectionCard>
+              </div>
+);

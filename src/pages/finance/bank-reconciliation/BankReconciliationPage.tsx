@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   Plus,
   RefreshCw,
@@ -168,37 +169,30 @@ export const BankReconciliationPage: React.FC = () => {
   return (
     <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-xl">
-            <Scale className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">مطابقة كشف الحساب البنكي والصناديق</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              مقارنة رصيد كشف الحساب البنكي الخارجي برصيد الدفاتر وحركات القيود والشيكات المعلقة
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadData}
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-            title="تحديث البيانات"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {canManageAccounts && (
+      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+        <PageHeader
+          icon={<Scale className="h-5 w-5" />}
+          title="مطابقة كشف الحساب البنكي والصناديق"
+          description="مقارنة رصيد كشف الحساب البنكي الخارجي برصيد الدفاتر وحركات القيود والشيكات المعلقة"
+          actions={<>
             <button
-              onClick={() => setShowBankModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition"
+              onClick={loadData}
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              title="تحديث البيانات"
             >
-              <Plus className="w-4 h-4" />
-              <span>حساب بنكي جديد</span>
+              <RefreshCw className="w-4 h-4" />
             </button>
-          )}
-        </div>
+            {canManageAccounts && (
+              <button
+                onClick={() => setShowBankModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>حساب بنكي جديد</span>
+              </button>
+            )}
+          </>}
+        />
       </div>
 
       {/* Control Strip */}

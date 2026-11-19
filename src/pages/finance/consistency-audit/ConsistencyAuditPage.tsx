@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { Play, RefreshCw, Loader2, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConsistencyAuditService } from '../../../services/domains/finance/ConsistencyAuditService';
 import { useToast } from '../../../components/ui/Toast';
@@ -122,37 +123,31 @@ export const ConsistencyAuditPage: React.FC = () => {
 
   return (
     <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">تدقيق اتساق البيانات المالية والمخزون</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              فحص دوري يقارن الأرصدة والقيود والحركات والكميات — ويُسجَّل تلقائيًا مرة يوميًا عند بدء التشغيل.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={loadRuns}
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-            title="تحديث"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={runNow}
-            disabled={running}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
-          >
-            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-            {running ? 'جارٍ التدقيق...' : 'تشغيل التدقيق الآن'}
-          </button>
-        </div>
+      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+        <PageHeader
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="تدقيق اتساق البيانات المالية والمخزون"
+          description="فحص دوري يقارن الأرصدة والقيود والحركات والكميات — ويُسجَّل تلقائيًا مرة يوميًا عند بدء التشغيل."
+          actions={<>
+            <button
+              type="button"
+              onClick={loadRuns}
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              title="تحديث"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={runNow}
+              disabled={running}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
+            >
+              {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              {running ? 'جارٍ التدقيق...' : 'تشغيل التدقيق الآن'}
+            </button>
+          </>}
+        />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

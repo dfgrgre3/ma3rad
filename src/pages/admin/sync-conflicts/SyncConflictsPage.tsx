@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   ChevronDown, ChevronUp, RefreshCw,
   Sparkles, History, GitMerge, Clock, AlertCircle, X,
@@ -330,18 +331,12 @@ export const SyncConflictsPage: React.FC = () => {
   return (
     <div className="h-full overflow-auto bg-slate-50 p-4 text-slate-900 sm:p-6">
       {/* ── Page Header ── */}
-      <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-200/50">
-            <ArrowRightLeft className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900">إدارة تعارضات المزامنة</h1>
-            <p className="text-xs text-slate-500 mt-0.5">مقارنة التعديلات المتزامنة بين الفروع وحسمها بدقة وأمان.</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        className="mb-5"
+        icon={<ArrowRightLeft className="h-5 w-5" />}
+        title="إدارة تعارضات المزامنة"
+        description="مقارنة التعديلات المتزامنة بين الفروع وحسمها بدقة وأمان."
+        actions={<>
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
@@ -369,8 +364,8 @@ export const SyncConflictsPage: React.FC = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             تحديث
           </button>
-        </div>
-      </header>
+        </>}
+      />
 
       {/* ── Status Bar ── */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">

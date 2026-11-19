@@ -5,6 +5,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { SyncChangeApprovalsPanel } from '../../../components/sync/SyncChangeApprovalsPanel';
 import { useToast } from '../../../components/ui/Toast';
+import { PageHeader } from '../../../components/ui/PageHeader';
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string }> = {
   DISCOUNT: { label: 'خصم استثنائي', color: 'text-amber-700 bg-amber-50 border-amber-200' },
@@ -204,21 +205,17 @@ export const ApprovalsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-yellow-50 border border-yellow-200 flex items-center justify-center">
-            <CheckSquare className="w-5 h-5 text-yellow-600" />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-slate-900">صندوق الموافقات والاعتمادات</h1>
-            <p className="text-xs text-slate-500">مراجعة واعتماد طلبات الخصم، تسويات الجرد، وتجاوز الحدود الائتمانية</p>
-          </div>
-        </div>
-        {canCreate && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
-            <Plus className="w-4 h-4" /> طلب اعتماد جديد
-          </button>
-        )}
+      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+        <PageHeader
+          icon={<CheckSquare className="w-5 h-5" />}
+          title="صندوق الموافقات والاعتمادات"
+          description="مراجعة واعتماد طلبات الخصم، تسويات الجرد، وتجاوز الحدود الائتمانية"
+          actions={canCreate && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
+              <Plus className="w-4 h-4" /> طلب اعتماد جديد
+            </button>
+          )}
+        />
       </div>
 
       <div className="p-4 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-3">

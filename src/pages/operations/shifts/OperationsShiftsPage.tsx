@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertTriangle, ArrowRightLeft, CalendarClock, CheckCircle2, Clock3, Factory,
   Loader2, PauseCircle, PlayCircle, Plus, RefreshCw, Settings2, Users, Wallet,
@@ -381,23 +382,20 @@ export const OperationsShiftsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Clock3 className="w-7 h-7 text-teal-600" /> إدارة ورديات التشغيل 24/7
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            ورديات التشغيل المستقلة عن ورديات الكاشير، مع الحضور والتسليم الإلكتروني والإنتاج.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadAll}
-          className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
-        </button>
-      </div>
+      <PageHeader
+        icon={<Clock3 className="w-6 h-6" />}
+        title="إدارة ورديات التشغيل 24/7"
+        description="ورديات التشغيل المستقلة عن ورديات الكاشير، مع الحضور والتسليم الإلكتروني والإنتاج."
+        actions={
+          <button
+            type="button"
+            onClick={loadAll}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
+          </button>
+        }
+      />
 
       <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
         {([

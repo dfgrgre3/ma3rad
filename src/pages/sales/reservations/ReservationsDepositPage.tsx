@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BookmarkPlus, Loader2, Clock, Plus } from 'lucide-react';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { ReservationService, StockReservation } from '../../../services/domains/sales/ReservationService';
 import { OrderService, Order, OrderDeposit } from '../../../services/domains/sales/OrderService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -275,20 +276,11 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   return (
     <div className="p-6 space-y-6 w-full">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-sky-600/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
-              <BookmarkPlus className="w-6 h-6" />
-            </span>
-            إدارة الحجوزات والعربونات (Sales Reservations & Deposits)
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            حجز كميات البضاعة، إدارة العربونات والمقدمات للطلبات الكبيرة، ومنع بيع البضاعة المحجوزة
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon={<BookmarkPlus className="w-5 h-5" />}
+        title="إدارة الحجوزات والعربونات (Sales Reservations & Deposits)"
+        description="حجز كميات البضاعة، إدارة العربونات والمقدمات للطلبات الكبيرة، ومنع بيع البضاعة المحجوزة"
+        actions={<>
           {mode === 'inventory' && canAdjustInventory && <button
             onClick={() => {
               const result = resService.expireOverdue();
@@ -312,8 +304,8 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
             <Plus className="w-4 h-4" />
             حجز كمية بضاعة يدوياً
           </button>}
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Stats Cards */}
       <ReservationStatsCards

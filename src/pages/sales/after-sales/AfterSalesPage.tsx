@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   RotateCcw, ShieldCheck, Search, Eye,
   Printer, Loader2, X, RefreshCw,
@@ -124,20 +125,11 @@ export const AfterSalesPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6 w-full">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-rose-600/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
-              <RotateCcw className="w-6 h-6" />
-            </span>
-            خدمة ما بعد البيع والضمانات (After-Sales & Warranty)
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            إدارة المرتجعات، الإشعارات الدائنة، متابعة جودة المنتجات والضمان، وتحليل أسباب شكاوى واستبدال السيراميك
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon={<RotateCcw className="w-5 h-5" />}
+        title="خدمة ما بعد البيع والضمانات (After-Sales & Warranty)"
+        description="إدارة المرتجعات، الإشعارات الدائنة، متابعة جودة المنتجات والضمان، وتحليل أسباب شكاوى واستبدال السيراميك"
+        actions={
           <button
             onClick={loadData}
             className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
@@ -145,8 +137,8 @@ export const AfterSalesPage: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             تحديث
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
