@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Building2, Download, Plus, Upload } from 'lucide-react';
 import { platformAdminService, PLATFORM_TENANT_STATUS_LABELS } from '../../services/domains/platform/PlatformAdminService';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -19,6 +20,7 @@ import { useTenantBulk } from './PlatformTenantsPage/useTenantBulk';
 import { useCsvImport } from './PlatformTenantsPage/useCsvImport';
 import { useRemoteControl } from './PlatformTenantsPage/useRemoteControl';
 import { TenantListSection } from './PlatformTenantsPage/TenantListSection';
+import { TenantStatsSection } from './PlatformTenantsPage/TenantStatsSection';
 import { TenantFormModal } from './PlatformTenantsPage/TenantFormModal';
 import { TenantDetailModal } from './PlatformTenantsPage/TenantDetailModal';
 import { AccountModal } from './PlatformTenantsPage/AccountModal';
@@ -83,6 +85,21 @@ export const PlatformTenantsPage: React.FC = () => {
   React.useEffect(() => { load(); }, [load]);
 
   const canManageTenants = canPlatform('tenants', 'platform.tenants.update');
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  React.useEffect(() => {
+    const presetStatus = searchParams.get('status');
+    if (presetStatus) setStatus(presetStatus);
+    if (searchParams.get('new') === '1' && canManageTenants) {
+      setEditing(null);
+      setForm({ ...emptyForm, planId: plans.find((plan) => plan.isDefault)?.id ?? plans[0]?.id ?? '' });
+      setFormOpen(true);
+    }
+    if (presetStatus || searchParams.get('new') === '1') {
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canManageTenants, plans]);
 
   const detail = useTenantDetail({ plans, centralActive, canManageTenants, load });
   const bulk = useTenantBulk({ tenants, centralActive, detailId: detail.detailId, loadProfile: detail.loadProfile, load });
@@ -229,6 +246,8 @@ export const PlatformTenantsPage: React.FC = () => {
             )}    </div>
         }
       />
+
+      <TenantStatsSection tenants={tenants} activeStatus={status} onSelectStatus={setStatus} />
 
       <TenantListSection
         search={search}

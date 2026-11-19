@@ -9,6 +9,8 @@ import {
   BUSINESS_UNITS,
   getProfileFeatures,
   getProfileNavigation,
+  getProfilePermissionSuggestions,
+  getProfilePricingRules,
   type BusinessConfiguration,
 } from '../../../../config/businessProfiles';
 import { getModuleDefinition } from '../../../../config/moduleRegistry';
@@ -92,6 +94,27 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
         غيّر نوع النشاط والوحدات الظاهرة في القائمة في أي وقت. إخفاء الوحدة لا يحذف بياناتها.
       </p>
     </div>
+    {getProfilePermissionSuggestions(businessProfile.type)?.roles?.length ? (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
+        <span className="font-bold text-slate-500">أدوار مقترحة للنشاط: </span>
+        {getProfilePermissionSuggestions(businessProfile.type)!.roles.map((r) => (
+          <span key={r.role} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700" title={r.permissions.join('، ')}>
+            {r.name || r.role} <span className="text-slate-400">({r.permissions.length})</span>
+          </span>
+        ))}
+        <span className="mt-1 block text-[10px] text-slate-400">تُنشأ تلقائيًا كأدوار جاهزة عند حفظ الإعداد.</span>
+      </div>
+    ) : null}
+    {getProfilePricingRules(businessProfile.type)?.tiers?.length ? (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
+        <span className="font-bold text-slate-500">شرائح تسعير النشاط: </span>
+        {getProfilePricingRules(businessProfile.type)!.tiers.map((tier) => (
+          <span key={tier.id} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">
+            {tier.name} {Math.round(tier.factor * 100)}%
+          </span>
+        ))}
+      </div>
+    ) : null}
     {getProfileNavigation(businessProfile.type)?.groups?.length ? (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
         <span className="font-bold text-slate-500">navigation النشاط: </span>

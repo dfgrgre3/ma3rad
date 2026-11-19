@@ -203,7 +203,7 @@ export class BusinessProfileService {
           tx.run(
             `INSERT INTO roles (id, code, name, description, is_system)
              VALUES (?, ?, ?, ?, 0)`,
-            [`role_${uuidv4().substring(0, 8)}`, roleCode, roleCode, `Suggested by business profile ${profile.id}`]
+            [`role_${uuidv4().substring(0, 8)}`, roleCode, suggestion.name?.trim() || roleCode, `Suggested by business profile ${profile.id}`]
           );
           rolesCreated += 1;
         }

@@ -63,7 +63,7 @@ export interface BusinessProfilePrintTemplate {
 }
 
 export interface BusinessProfilePermissionSuggestion {
-  roles: Array<{ role: string; permissions: string[] }>;
+  roles: Array<{ role: string; name?: string; permissions: string[] }>;
 }
 
 export interface BusinessProfilePricingTier {

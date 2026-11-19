@@ -255,5 +255,118 @@
     "مقاسات",
     "مواسم",
     "فروع متعددة"
-  ]
+  ],
+  "pricingRules": {
+    "tiers": [
+      {
+        "id": "wholesale",
+        "name": "سعر الجملة",
+        "factor": 0.9
+      },
+      {
+        "id": "min_price",
+        "name": "أقل سعر مسموح",
+        "factor": 0.85
+      },
+      {
+        "id": "distributor",
+        "name": "سعر الموزع",
+        "factor": 0.8
+      },
+      {
+        "id": "vip",
+        "name": "سعر كبار العملاء",
+        "factor": 0.9
+      }
+    ]
+  },
+  "permissions": {
+    "roles": [
+      {
+        "role": "CASHIER",
+        "name": "كاشير",
+        "permissions": [
+          "sales.pos.view",
+          "sales.pos.hold",
+          "sales.pos.resume",
+          "sales.pos.print",
+          "sales.pos.discount",
+          "sales.pos.void",
+          "sales.create",
+          "sales.invoice.print",
+          "customers.view",
+          "customers.create",
+          "cashier.view",
+          "cashier.shift",
+          "cashier.shift.open",
+          "cashier.shift.close",
+          "cashier.expense"
+        ]
+      },
+      {
+        "role": "SALES_REP",
+        "name": "مندوب مبيعات",
+        "permissions": [
+          "sales.view",
+          "sales.create",
+          "sales.update",
+          "sales.invoice.print",
+          "orders.view",
+          "orders.create",
+          "orders.update",
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "crm.leads.view",
+          "crm.leads.create",
+          "crm.activities.view",
+          "crm.activities.create",
+          "quotations.view",
+          "quotations.create"
+        ]
+      },
+      {
+        "role": "WAREHOUSE_KEEPER",
+        "name": "أمين مخزن",
+        "permissions": [
+          "inventory.view",
+          "inventory.transfer",
+          "inventory.count",
+          "inventory.adjust",
+          "inventory.warehouse_stock.view",
+          "inventory.showroom_stock.view",
+          "products.view",
+          "products.stock.view",
+          "products.barcodes.print",
+          "warehouses.view"
+        ]
+      },
+      {
+        "role": "SUPERVISOR",
+        "name": "مشرف",
+        "permissions": [
+          "sales.view",
+          "sales.create",
+          "sales.update",
+          "sales.approve",
+          "sales.discount",
+          "sales.refund",
+          "returns.view",
+          "returns.create",
+          "orders.view",
+          "orders.approve",
+          "orders.update",
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "products.view",
+          "inventory.view",
+          "reports.view",
+          "reports.sales.view",
+          "finance.view",
+          "finance.receivables.view"
+        ]
+      }
+    ]
+  }
 }

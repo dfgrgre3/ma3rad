@@ -11,6 +11,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
 
@@ -320,6 +321,7 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export const CrmDashboardPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('crm');
   const refreshToken = useDashboardRefresh()?.refreshToken;
   const initialRef = useRef(true);
   const service = useMemo(() => new CrmService(), []);
@@ -355,8 +357,8 @@ export const CrmDashboardPage: React.FC = () => {
       <div className="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<Target className="w-5 h-5" />}
-          title="لوحة تحكم CRM"
-          description="مسار المبيعات وإدارة علاقات العملاء"
+          title={pageCopy?.title || 'لوحة تحكم CRM'}
+          description={pageCopy?.description || 'مسار المبيعات وإدارة علاقات العملاء'}
           actions={<>
             <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-pink-600 hover:bg-pink-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" /> العملاء المحتملون

@@ -212,7 +212,12 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
   ],
 
   // ── Fallback for any custom / unmapped activity ─────────────────────
-  custom: [],
+  custom: [
+    f('customers', 'GOVERNORATE', 'المحافظة', 'TEXT'),
+    f('customers', 'ADDRESS', 'العنوان', 'TEXT'),
+    f('orders', 'REQUIRED_BY_DATE', 'موعد التسليم المطلوب', 'DATE'),
+    f('orders', 'DELIVERY_ADDRESS', 'عنوان التسليم', 'TEXT'),
+  ],
 };
 
 export function getActivityFieldPresets(activityId: string): ActivityFieldPreset[] {

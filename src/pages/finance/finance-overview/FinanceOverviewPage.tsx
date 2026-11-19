@@ -12,6 +12,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { queryFinanceOverviewMetrics } from '../../../services/domains/dashboard/DashboardQueryScopeService';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface Metrics {
   totalRevenue: number;
@@ -24,6 +25,7 @@ interface Metrics {
 }
 
 export const FinanceOverviewPage: React.FC = () => {
+  const pageCopy = useActivityPageCopy('finance');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<Metrics>({
@@ -93,8 +95,8 @@ export const FinanceOverviewPage: React.FC = () => {
     <div className="erp-page">
       <PageHeader
         icon={<BarChart3 className="h-5 w-5" />}
-        title="المؤشرات المالية"
-        description="إيرادات ومصروفات وأرباح وسيولة وذمم. إدارة شجرة الحسابات والقيود في الصفحات المتخصصة."
+        title={pageCopy?.title || 'المؤشرات المالية'}
+        description={pageCopy?.description || 'إيرادات ومصروفات وأرباح وسيولة وذمم. إدارة شجرة الحسابات والقيود في الصفحات المتخصصة.'}
         actions={
           <button
             onClick={loadData}

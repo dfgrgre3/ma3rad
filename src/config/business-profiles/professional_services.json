@@ -150,5 +150,90 @@
   "features": [
     "ملفات عملاء",
     "مواعيد تسليم"
-  ]
+  ],
+  "pricingRules": {
+    "tiers": [
+      {
+        "id": "wholesale",
+        "name": "سعر الجملة",
+        "factor": 0.95
+      },
+      {
+        "id": "min_price",
+        "name": "أقل سعر مسموح",
+        "factor": 0.9
+      },
+      {
+        "id": "distributor",
+        "name": "سعر الموزع",
+        "factor": 0.88
+      },
+      {
+        "id": "vip",
+        "name": "سعر كبار العملاء",
+        "factor": 0.95
+      }
+    ]
+  },
+  "permissions": {
+    "roles": [
+      {
+        "role": "PROFESSIONAL_STAFF",
+        "name": "موظف مكتب مهني",
+        "permissions": [
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "contracts.view",
+          "contracts.create",
+          "contracts.update",
+          "quotations.view",
+          "quotations.create",
+          "sales.view",
+          "finance.receivables.view"
+        ]
+      },
+      {
+        "role": "ACCOUNTANT",
+        "name": "محاسب",
+        "permissions": [
+          "finance.view",
+          "finance.receivables.view",
+          "finance.receivables.collect",
+          "finance.expenses.view",
+          "finance.expenses.create",
+          "finance.journal.view",
+          "reports.view",
+          "reports.financial.view",
+          "reports.sales.view"
+        ]
+      },
+      {
+        "role": "SUPERVISOR",
+        "name": "مشرف",
+        "permissions": [
+          "sales.view",
+          "sales.create",
+          "sales.update",
+          "sales.approve",
+          "sales.discount",
+          "sales.refund",
+          "returns.view",
+          "returns.create",
+          "orders.view",
+          "orders.approve",
+          "orders.update",
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "products.view",
+          "inventory.view",
+          "reports.view",
+          "reports.sales.view",
+          "finance.view",
+          "finance.receivables.view"
+        ]
+      }
+    ]
+  }
 }

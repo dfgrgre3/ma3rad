@@ -23,6 +23,7 @@ import { TodayPurchasesPage as PurchasesPage } from '../today-purchases/TodayPur
 import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
+import { getActivityNavLabel } from '../../../config/activityNavLabels';
 
 
 const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: string }> = ({ label, value, hint, tone }) => (
@@ -228,7 +229,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
   ];
   const exportOptions: Record<DailyKind, Parameters<typeof exportToExcel>[0]> = {
     sales: {
-      title: 'مبيعات اليوم',
+      title: getActivityNavLabel('/daily/sales') || 'مبيعات اليوم',
       subtitle: date,
       columns: invoiceColumns,
       rows: data.rows.map((row: any) => ({
@@ -240,7 +241,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
       permission: 'sales.export',
     },
     purchases: {
-      title: 'مشتريات اليوم',
+      title: getActivityNavLabel('/daily/purchases') || 'مشتريات اليوم',
       subtitle: date,
       columns: invoiceColumns.map((column) => column.key === 'customerName'
         ? { ...column, key: 'supplierName', label: 'المورد' }
@@ -295,7 +296,12 @@ const payBadge = (status?: string | null, darkTheme = false) => {
 };
 
 const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
-  const meta = META[kind];
+  const activityTitle = kind === 'sales'
+    ? getActivityNavLabel('/daily/sales')
+    : kind === 'purchases'
+      ? getActivityNavLabel('/daily/purchases')
+      : undefined;
+  const meta = { ...META[kind], title: activityTitle || META[kind].title };
   const Icon = meta.icon;
   const toast = useToast();
   const navigate = useNavigate();
@@ -425,7 +431,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               icon={<Receipt className="h-5 w-5" />}
               title={
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  مبيعات اليوم
+                  {meta.title}
                   <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {date === todayDate ? 'اليوم' : formatDate(date)}
                   </span>

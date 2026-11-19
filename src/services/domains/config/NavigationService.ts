@@ -12,6 +12,7 @@ import { CentralLicenseService } from '../licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../licensing/CentralFeaturePermissionService';
 import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
 import { getActivityHiddenPaths } from '../../../config/activityPageVisibility';
+import { getActivityNavLabel } from '../../../config/activityNavLabels';
 import { Folder } from 'lucide-react';
 
 export interface NavOverrides {
@@ -297,6 +298,13 @@ export class NavigationService {
       language: 'ar',
       overrides: termOverrides,
     });
+    const itemLabel = (item: NavGroupDef['items'][number]) =>
+      labels[item.to]
+      || AppConfigService.getPage(item.to).label
+      || getActivityNavLabel(item.to, businessType)
+      || (NavigationService.pathTerms[item.to]
+        ? term(NavigationService.pathTerms[item.to]!)
+        : item.label);
 
     const assignedItems = NAV_GROUPS.flatMap((defaultGroup) =>
       defaultGroup.items.map((item) => ({
@@ -318,9 +326,7 @@ export class NavigationService {
           const page = AppConfigService.getPage(item.to);
           return {
             ...item,
-            label: labels[item.to] || page.label || (NavigationService.pathTerms[item.to]
-              ? term(NavigationService.pathTerms[item.to]!)
-              : item.label),
+            label: itemLabel(item),
             __enabled: page.enabled,
             __order: page.order,
           };
@@ -360,9 +366,7 @@ export class NavigationService {
           const page = AppConfigService.getPage(item.to);
           return {
             ...item,
-            label: labels[item.to] || page.label || (NavigationService.pathTerms[item.to]
-              ? term(NavigationService.pathTerms[item.to]!)
-              : item.label),
+            label: itemLabel(item),
             __enabled: page.enabled,
             __order: page.order,
           };

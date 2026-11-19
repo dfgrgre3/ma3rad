@@ -53,10 +53,41 @@ export function getOverviewWithPeriod(ctx: AnalyticsServiceContext, period: Plat
        COUNT(*) AS total,
        SUM(CASE WHEN status = 'PAID' THEN 1 ELSE 0 END) AS paid,
        SUM(CASE WHEN status IN ('SENT','PARTIAL','OVERDUE') THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END) AS draft,
        SUM(CASE WHEN status = 'VOID' THEN 1 ELSE 0 END) AS voided,
-       COALESCE(SUM(CASE WHEN status = 'PAID' THEN total ELSE 0 END) / 100.0, 0) AS revenue
+       COALESCE(SUM(CASE WHEN status = 'PAID' THEN total ELSE 0 END) / 100.0, 0) AS revenue,
+       COALESCE(SUM(CASE WHEN status <> 'VOID' THEN total ELSE 0 END) / 100.0, 0) AS invoicedTotal,
+       COALESCE(SUM(CASE WHEN status IN ('SENT','PARTIAL','OVERDUE') THEN total - paid_amount ELSE 0 END) / 100.0, 0) AS outstanding,
+       SUM(CASE WHEN status IN ('SENT','PARTIAL','OVERDUE') AND due_date IS NOT NULL AND date(due_date) < date('now') THEN 1 ELSE 0 END) AS overdue
      FROM platform_invoices`
   )[0] ?? {};
+
+  const revenueThisMonth = ctx.db.query<any>(
+    `SELECT COALESCE(SUM(amount) / 100.0, 0) AS total
+     FROM platform_payments
+     WHERE paid_at >= strftime('%Y-%m-01', 'now')`
+  )[0]?.total ?? 0;
+
+  const mrr = ctx.db.query<any>(
+    `SELECT COALESCE(SUM(CASE s.billing_cycle
+       WHEN 'MONTHLY' THEN s.price
+       WHEN 'QUARTERLY' THEN s.price / 3.0
+       WHEN 'YEARLY' THEN s.price / 12.0
+       ELSE 0 END) / 100.0, 0) AS total
+     FROM platform_subscriptions s
+     WHERE s.status = 'ACTIVE'`
+  )[0]?.total ?? 0;
+
+  const revenueByPlan = ctx.db.query<any>(
+    `SELECT p.name AS planName,
+            COALESCE(SUM(s.price) / 100.0, 0) AS revenue,
+            COUNT(*) AS tenants
+     FROM platform_subscriptions s
+     LEFT JOIN platform_plans p ON p.id = s.plan_id
+     WHERE s.status = 'ACTIVE'
+     GROUP BY p.name
+     ORDER BY revenue DESC`
+  );
 
   const moduleUsage = ctx.db.query<any>(
     `SELECT json_each.value AS module, COUNT(DISTINCT l.tenant_id) AS tenantCount, COUNT(*) AS licenseCount
@@ -135,14 +166,14 @@ export function getOverviewWithPeriod(ctx: AnalyticsServiceContext, period: Plat
     },
     billing: {
       revenueTotal: toNumber(invoiceStats.revenue, 0),
-      revenueThisMonth: 0,
-      invoicedTotal: toNumber(invoiceStats.total, 0),
-      outstanding: 0,
-      overdueInvoices: 0,
-      mrr: 0,
+      revenueThisMonth: toNumber(revenueThisMonth, 0),
+      invoicedTotal: toNumber(invoiceStats.invoicedTotal, 0),
+      outstanding: toNumber(invoiceStats.outstanding, 0),
+      overdueInvoices: toNumber(invoiceStats.overdue, 0),
+      mrr: toNumber(mrr, 0),
       invoicesTotal: toNumber(invoiceStats.total, 0),
       paidInvoices: toNumber(invoiceStats.paid, 0),
-      draftInvoices: toNumber(invoiceStats.voided, 0),
+      draftInvoices: toNumber(invoiceStats.draft, 0),
     },
     devices: {
       boundLicenses: toNumber(deviceStats.boundLicenses, 0),
@@ -178,7 +209,11 @@ export function getOverviewWithPeriod(ctx: AnalyticsServiceContext, period: Plat
       licenseCount: toNumber(m.licenseCount, 0),
       tenantCount: toNumber(m.tenantCount, 0),
     })),
-    revenueByPlan: [],
+    revenueByPlan: revenueByPlan.map((r: any) => ({
+      planName: String(r.planName ?? '—'),
+      revenue: toNumber(r.revenue, 0),
+      tenants: toNumber(r.tenants, 0),
+    })),
     alerts: alerts,
     recentTenants: recentTenants.map((t: any) => ({
       id: String(t.id),
@@ -289,5 +324,14 @@ export function getOverviewWithPeriod(ctx: AnalyticsServiceContext, period: Plat
       invoices: 0,
       customers: 0,
     },
+
+    // ─── Extended analytics sections consumed by the super-admin dashboard ────
+    businessPerformance: business,
+    customerMetrics: customers,
+    subscriptionMetrics: subscriptions,
+    licenseMetrics: licenses,
+    operationsMetrics: operations,
+    alertDetails: alerts,
+    reportFilters: { period, planId },
   };
 }

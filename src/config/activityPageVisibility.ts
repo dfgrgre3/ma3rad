@@ -116,6 +116,9 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
 const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
   food: [],
   ecommerce: [],
+  // Hotels run rooms & services — the restaurant floor (tables, kitchen
+  // display) only applies to the restaurant activity.
+  hospitality: ['/restaurant'],
   // Pure logistics/warehousing: no import-document tracking page.
   logistics: ['/customers/imported-products'],
   // Import/export keeps that page — it is core to their workflow.

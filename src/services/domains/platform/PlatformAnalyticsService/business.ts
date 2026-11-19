@@ -16,7 +16,7 @@ export function getBusinessPerformance(ctx: AnalyticsServiceContext, period: Pla
     `SELECT COALESCE(SUM(i.total) / 100.0, 0) AS total
      FROM platform_invoices i
      JOIN platform_tenants t ON t.id = i.tenant_id
-     JOIN platform_plans p ON p.id = t.plan_id
+     LEFT JOIN platform_plans p ON p.id = t.plan_id
      WHERE i.status = 'PAID' AND i.paid_at BETWEEN ? AND ? ${planFilter}`,
     [from, to, ...planParams]
   )[0]?.total ?? 0;
@@ -26,25 +26,33 @@ export function getBusinessPerformance(ctx: AnalyticsServiceContext, period: Pla
     `SELECT COALESCE(SUM(i.total) / 100.0, 0) AS total
      FROM platform_invoices i
      JOIN platform_tenants t ON t.id = i.tenant_id
-     JOIN platform_plans p ON p.id = t.plan_id
+     LEFT JOIN platform_plans p ON p.id = t.plan_id
      WHERE i.status = 'PAID' AND i.paid_at BETWEEN ? AND ? ${planFilter}`,
     [prevFrom, prevTo, ...planParams]
   )[0]?.total ?? 0;
 
-  // MRR
+  // MRR (normalized to a monthly amount per billing cycle)
   const mrr = ctx.db.query<any>(
-    `SELECT COALESCE(SUM(s.price) / 100.0, 0) AS total
+    `SELECT COALESCE(SUM(CASE s.billing_cycle
+       WHEN 'MONTHLY' THEN s.price
+       WHEN 'QUARTERLY' THEN s.price / 3.0
+       WHEN 'YEARLY' THEN s.price / 12.0
+       ELSE 0 END) / 100.0, 0) AS total
      FROM platform_subscriptions s
-     JOIN platform_plans p ON p.id = s.plan_id
+     LEFT JOIN platform_plans p ON p.id = s.plan_id
      WHERE s.status = 'ACTIVE' ${planFilter}`,
     [...planParams]
   )[0]?.total ?? 0;
 
   // Previous MRR (approximate)
   const prevMrr = ctx.db.query<any>(
-    `SELECT COALESCE(SUM(s.price) / 100.0, 0) AS total
+    `SELECT COALESCE(SUM(CASE s.billing_cycle
+       WHEN 'MONTHLY' THEN s.price
+       WHEN 'QUARTERLY' THEN s.price / 3.0
+       WHEN 'YEARLY' THEN s.price / 12.0
+       ELSE 0 END) / 100.0, 0) AS total
      FROM platform_subscriptions s
-     JOIN platform_plans p ON p.id = s.plan_id
+     LEFT JOIN platform_plans p ON p.id = s.plan_id
      WHERE s.status = 'ACTIVE' AND s.created_at <= ? ${planFilter}`,
     [prevTo, ...planParams]
   )[0]?.total ?? 0;
@@ -73,7 +81,12 @@ export function getBusinessPerformance(ctx: AnalyticsServiceContext, period: Pla
   ).map(r => createTimeSeriesPoint(r.month, toNumber(r.total, 0)));
 
   const mrrSeries = ctx.db.query<any>(
-    `SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(price) / 100.0, 0) AS total
+    `SELECT strftime('%Y-%m', created_at) AS month,
+            COALESCE(SUM(CASE billing_cycle
+              WHEN 'MONTHLY' THEN price
+              WHEN 'QUARTERLY' THEN price / 3.0
+              WHEN 'YEARLY' THEN price / 12.0
+              ELSE 0 END) / 100.0, 0) AS total
      FROM platform_subscriptions
      WHERE status = 'ACTIVE' AND created_at BETWEEN ? AND ?
      GROUP BY month

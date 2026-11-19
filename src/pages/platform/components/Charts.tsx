@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import type { PlatformTimeSeriesPoint, PlatformMetricComparison } from '../../../services/domains/platform/platformTypes';
 
 interface ChartProps {
@@ -47,7 +48,7 @@ export const LineChart: React.FC<ChartProps> = ({
 }) => {
   if (data.length === 0) {
     return (
-      <div className={`w-full h-${height}px flex items-center justify-center rounded-lg bg-slate-50 ${className}`} role="img" aria-label={ariaLabel}>
+      <div className={`w-full flex items-center justify-center rounded-lg bg-slate-50 ${className}`} style={{ height }} role="img" aria-label={ariaLabel}>
         <p className="text-slate-400 text-sm">لا توجد بيانات للعرض</p>
       </div>
     );
@@ -78,7 +79,7 @@ export const LineChart: React.FC<ChartProps> = ({
   const yTickValues = Array.from({ length: yTicks + 1 }, (_, i) => max - (i * (max - min)) / yTicks);
 
   return (
-    <div className={`relative w-full h-${height}px ${className}`} role="img" aria-label={ariaLabel}>
+    <div className={`relative w-full ${className}`} style={{ height }} role="img" aria-label={ariaLabel}>
       <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {/* Y-axis grid lines and labels */}
         <g stroke="#e2e8f0" stroke-width="0.5" font-size="8" fill="#94a3b8" text-anchor="end">
@@ -211,13 +212,20 @@ export const MetricCard: React.FC<{
   );
 };
 
+const GRID_COLUMNS: Record<1 | 2 | 3 | 4, string> = {
+  1: 'xl:grid-cols-1',
+  2: 'xl:grid-cols-2',
+  3: 'xl:grid-cols-3',
+  4: 'xl:grid-cols-4',
+};
+
 export const StatGrid: React.FC<{
   children: React.ReactNode;
   columns?: 1 | 2 | 3 | 4;
   className?: string;
 }> = ({ children, columns = 4, className = '' }) => (
   <div
-    className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-${columns} ${className}`}
+    className={`grid gap-3 sm:grid-cols-2 ${GRID_COLUMNS[columns]} ${className}`}
     role="list"
   >
     {children}
@@ -289,8 +297,8 @@ export const DrillDownLink: React.FC<{
   count?: number;
   className?: string;
 }> = ({ label, href, icon, count, className = '' }) => (
-  <a
-    href={href}
+  <Link
+    to={href}
     className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 transition ${className}`}
   >
     {icon}
@@ -300,7 +308,7 @@ export const DrillDownLink: React.FC<{
         {count}
       </span>
     )}
-  </a>
+  </Link>
 );
 
 export const AlertCard: React.FC<{
@@ -324,7 +332,7 @@ export const AlertCard: React.FC<{
     success: { wrap: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', title: 'text-emerald-900', text: 'text-emerald-800', action: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
   };
 
-  const style = severityStyles[alert.severity];
+  const style = severityStyles[alert.severity] ?? severityStyles.info;
   const AlertIcon = alert.severity === 'danger' ? (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
   ) : alert.severity === 'warning' ? (
@@ -363,10 +371,10 @@ export const AlertCard: React.FC<{
           </div>
         )}
         {alert.link && !onAction && (
-          <a href={alert.link} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+          <Link to={alert.link} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
             عرض التفاصيل
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-          </a>
+          </Link>
         )}
       </div>
     </div>

@@ -9,54 +9,47 @@ export function getCustomerMetrics(ctx: AnalyticsServiceContext, planId?: string
   const planFilter = planId ? 'AND p.id = ?' : '';
   const planParams = planId ? [planId] : [];
 
-  // Total customers
-  const total = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE 1=1 ${planFilter}`,
-    [...planParams]
-  )[0]?.c ?? 0;
-
   // By status
   const byStatus = ctx.db.query<any>(
-    `SELECT status, COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE 1=1 ${planFilter} GROUP BY status`,
+    `SELECT status, COUNT(*) AS c FROM platform_tenants t LEFT JOIN platform_plans p ON p.id = t.plan_id WHERE 1=1 ${planFilter} GROUP BY status`,
     [...planParams]
   );
 
   const active = byStatus.find((r: any) => r.status === 'ACTIVE')?.c ?? 0;
   const trial = byStatus.find((r: any) => r.status === 'TRIAL')?.c ?? 0;
-  const cancelled = byStatus.find((r: any) => r.status === 'CANCELLED')?.c ?? 0;
 
   // New customers (last 30 days)
   const newCustomers = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE t.created_at > date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_tenants t LEFT JOIN platform_plans p ON p.id = t.plan_id WHERE t.created_at > date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
   // Previous period new customers
   const prevNewCustomers = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE t.created_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_tenants t LEFT JOIN platform_plans p ON p.id = t.plan_id WHERE t.created_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
   // Cancelled customers (last 30 days)
   const cancelledInPeriod = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE t.status = 'CANCELLED' AND t.updated_at > date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_tenants t LEFT JOIN platform_plans p ON p.id = t.plan_id WHERE t.status = 'CANCELLED' AND t.updated_at > date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
   // Previous period cancelled
   const prevCancelledInPeriod = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_tenants t JOIN platform_plans p ON p.id = t.plan_id WHERE t.status = 'CANCELLED' AND t.updated_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_tenants t LEFT JOIN platform_plans p ON p.id = t.plan_id WHERE t.status = 'CANCELLED' AND t.updated_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
   // Trial to paid conversion (simplified)
   const trialConversions = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' AND s.created_at > date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_subscriptions s LEFT JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' AND s.created_at > date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
   const prevTrialConversions = ctx.db.query<any>(
-    `SELECT COUNT(*) AS c FROM platform_subscriptions s JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' AND s.created_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
+    `SELECT COUNT(*) AS c FROM platform_subscriptions s LEFT JOIN platform_plans p ON p.id = s.plan_id WHERE s.status = 'ACTIVE' AND s.created_at BETWEEN date('now', '-60 days') AND date('now', '-30 days') ${planFilter}`,
     [...planParams]
   )[0]?.c ?? 0;
 
@@ -66,7 +59,7 @@ export function getCustomerMetrics(ctx: AnalyticsServiceContext, planId?: string
        SELECT t.id, COALESCE(SUM(i.total) / 100.0, 0) AS tenant_revenue
        FROM platform_tenants t
        LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
-       JOIN platform_plans p ON p.id = t.plan_id
+       LEFT JOIN platform_plans p ON p.id = t.plan_id
        WHERE 1=1 ${planFilter}
        GROUP BY t.id
      )`,
@@ -78,7 +71,7 @@ export function getCustomerMetrics(ctx: AnalyticsServiceContext, planId?: string
        SELECT t.id, COALESCE(SUM(i.total) / 100.0, 0) AS tenant_revenue
        FROM platform_tenants t
        LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
-       JOIN platform_plans p ON p.id = t.plan_id
+       LEFT JOIN platform_plans p ON p.id = t.plan_id
        WHERE 1=1 ${planFilter} AND t.created_at <= date('now', '-30 days')
        GROUP BY t.id
      )`,
@@ -123,7 +116,7 @@ export function getCustomerMetrics(ctx: AnalyticsServiceContext, planId?: string
     `SELECT t.id, t.code, t.name, COALESCE(SUM(i.total) / 100.0, 0) AS revenue, COUNT(i.id) AS invoicesCount, t.status
      FROM platform_tenants t
      LEFT JOIN platform_invoices i ON i.tenant_id = t.id AND i.status = 'PAID'
-     JOIN platform_plans p ON p.id = t.plan_id
+     LEFT JOIN platform_plans p ON p.id = t.plan_id
      WHERE 1=1 ${planFilter}
      GROUP BY t.id
      ORDER BY revenue DESC

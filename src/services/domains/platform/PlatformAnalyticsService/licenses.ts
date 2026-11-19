@@ -1,20 +1,10 @@
 import type { PlatformLicenseMetrics } from '../platformTypes';
 import { toNumber } from '../platformUtils';
 import type { AnalyticsServiceContext } from './context';
-import { createMetricComparison } from './periods';
+import { createMetricComparison, createTimeSeriesPoint } from './periods';
 
 export function getLicenseMetrics(ctx: AnalyticsServiceContext): PlatformLicenseMetrics {
   ctx.requirePlatformAccess('analytics', 'platform.analytics.licenses');
-
-  // Total licenses
-  const total = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_licenses')[0]?.c ?? 0;
-
-  // By status
-  const byStatus = ctx.db.query<any>('SELECT status, COUNT(*) AS c FROM platform_licenses GROUP BY status');
-  const statusCounts: Record<string, number> = {};
-  for (const row of byStatus) {
-    statusCounts[row.status] = toNumber(row.c, 0);
-  }
 
   // Devices
   const devices = ctx.db.query<any>(
@@ -30,7 +20,7 @@ export function getLicenseMetrics(ctx: AnalyticsServiceContext): PlatformLicense
   const pendingLicenses = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_licenses WHERE status = \'ISSUED\'')[0]?.c ?? 0;
 
   // Failed activations
-  const failedActivations = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_license_activations WHERE is_online = 0 AND created_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
+  const failedActivations = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_license_activations WHERE status = \'FAILED\' AND created_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
 
   // Expiring soon
   const expiringSoon = ctx.db.query<any>(
@@ -39,21 +29,51 @@ export function getLicenseMetrics(ctx: AnalyticsServiceContext): PlatformLicense
        AND date(expires_at) BETWEEN date('now') AND date('now', '+30 day')`
   )[0]?.c ?? 0;
 
-  // Activations in period
-  const activations = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_license_activations WHERE activated_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
+  // Activation success rate (attempts in the last 30 days)
+  const activationStats = ctx.db.query<any>(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS success
+     FROM platform_license_activations
+     WHERE created_at > date('now', '-30 days')`
+  )[0] ?? {};
+  const totalActivations = toNumber(activationStats.total, 0);
+  const successActivations = toNumber(activationStats.success, 0);
+  const successRate = totalActivations > 0 ? (successActivations / totalActivations) * 100 : 100;
 
-  // Deactivations in period
-  const deactivations = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_devices WHERE status IN (\'SUSPENDED\',\'RELEASED\',\'REVOKED\') AND updated_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
+  // Pending licenses list (joined for tenant / plan names)
+  const pendingLicensesList = ctx.db.query<any>(
+    `SELECT l.*, t.name AS tenant_name, p.name AS plan_name
+     FROM platform_licenses l
+     LEFT JOIN platform_tenants t ON t.id = l.tenant_id
+     LEFT JOIN platform_plans p ON p.id = l.plan_id
+     WHERE l.status = 'ISSUED' LIMIT 20`
+  );
 
-  // Activation success rate
-  const totalActivations = ctx.db.query<any>('SELECT COUNT(*) AS c FROM platform_license_activations WHERE activated_at > date(\'now\', \'-30 days\')')[0]?.c ?? 0;
-  const successRate = totalActivations > 0 ? ((totalActivations - failedActivations) / totalActivations) * 100 : 100;
+  // Failed activations list (joined for license key / tenant name)
+  const failedActivationsList = ctx.db.query<any>(
+    `SELECT a.*, l.license_key, t.name AS tenant_name
+     FROM platform_license_activations a
+     LEFT JOIN platform_licenses l ON l.id = a.license_id
+     LEFT JOIN platform_tenants t ON t.id = a.tenant_id
+     WHERE a.status = 'FAILED' AND a.created_at > date('now', '-30 days')
+     ORDER BY a.created_at DESC
+     LIMIT 20`
+  );
 
-  // Pending licenses list
-  const pendingLicensesList = ctx.db.query<any>('SELECT * FROM platform_licenses WHERE status = \'ISSUED\' LIMIT 20');
+  // Activations / failures time series (daily, last 30 days)
+  const activationsSeries = ctx.db.query<any>(
+    `SELECT date(activated_at) AS period, COUNT(*) AS count
+     FROM platform_license_activations
+     WHERE activated_at IS NOT NULL AND activated_at > date('now', '-30 days')
+     GROUP BY period ORDER BY period`
+  ).map(r => createTimeSeriesPoint(r.period, toNumber(r.count, 0)));
 
-  // Failed activations list
-  const failedActivationsList = ctx.db.query<any>('SELECT * FROM platform_license_activations WHERE is_online = 0 AND created_at > date(\'now\', \'-30 days\') LIMIT 20');
+  const failedSeries = ctx.db.query<any>(
+    `SELECT date(created_at) AS period, COUNT(*) AS count
+     FROM platform_license_activations
+     WHERE status = 'FAILED' AND created_at > date('now', '-30 days')
+     GROUP BY period ORDER BY period`
+  ).map(r => createTimeSeriesPoint(r.period, toNumber(r.count, 0)));
 
   return {
     activatedDevices: createMetricComparison(toNumber(devices.active, 0), 0),
@@ -66,31 +86,33 @@ export function getLicenseMetrics(ctx: AnalyticsServiceContext): PlatformLicense
     activationSuccessRate: createMetricComparison(Math.round(successRate * 100) / 100, 0),
     expiringSoon: createMetricComparison(toNumber(expiringSoon, 0), 0),
     timeSeries: {
-      activations: [],
+      activations: activationsSeries,
       deactivations: [],
-      failedActivations: [],
+      failedActivations: failedSeries,
       utilization: [],
     },
     failedActivationsList: failedActivationsList.map((a: any) => ({
       id: String(a.id),
       licenseId: String(a.license_id),
       tenantId: String(a.tenant_id ?? ''),
-      tenantName: a.tenantName ?? '',
+      tenantName: a.tenant_name ?? '',
       licenseKey: a.license_key ?? '',
       deviceId: a.device_id ?? null,
       activationCode: a.activation_code ?? null,
-      mode: a.is_online ? 'ONLINE' : 'OFFLINE',
-      action: 'ACTIVATE',
-      status: a.is_online ? 'SUCCESS' : 'FAILED',
+      mode: a.mode === 'OFFLINE' ? 'OFFLINE' : 'ONLINE',
+      action: a.action ?? 'ACTIVATE',
+      status: a.status === 'FAILED' ? 'FAILED' : a.status === 'PENDING' ? 'PENDING' : 'SUCCESS',
       ipAddress: a.ip_address ?? null,
-      notes: a.error_detail ?? null,
+      notes: a.notes ?? null,
       createdAt: String(a.created_at),
     })),
     pendingLicensesList: pendingLicensesList.map((l: any) => ({
       id: String(l.id),
       tenantId: String(l.tenant_id),
-      subscriptionId: String(l.subscription_id),
-      planId: String(l.plan_id),
+      tenantName: l.tenant_name ?? null,
+      subscriptionId: l.subscription_id != null ? String(l.subscription_id) : null,
+      planId: l.plan_id != null ? String(l.plan_id) : null,
+      planName: l.plan_name ?? null,
       licenseKey: String(l.license_key),
       status: l.status as any,
       issuedAt: String(l.issued_at),

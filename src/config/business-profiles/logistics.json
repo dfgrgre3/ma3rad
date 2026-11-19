@@ -143,5 +143,124 @@
     "تتبع شحنات",
     "سائقون",
     "مركبات"
-  ]
+  ],
+  "pricingRules": {
+    "tiers": [
+      {
+        "id": "wholesale",
+        "name": "سعر الجملة",
+        "factor": 0.88
+      },
+      {
+        "id": "min_price",
+        "name": "أقل سعر مسموح",
+        "factor": 0.82
+      },
+      {
+        "id": "distributor",
+        "name": "سعر الموزع",
+        "factor": 0.75
+      },
+      {
+        "id": "vip",
+        "name": "سعر كبار العملاء",
+        "factor": 0.88
+      }
+    ]
+  },
+  "permissions": {
+    "roles": [
+      {
+        "role": "WAREHOUSE_KEEPER",
+        "name": "أمين مخزن",
+        "permissions": [
+          "inventory.view",
+          "inventory.transfer",
+          "inventory.count",
+          "inventory.adjust",
+          "inventory.warehouse_stock.view",
+          "inventory.showroom_stock.view",
+          "products.view",
+          "products.stock.view",
+          "products.barcodes.print",
+          "warehouses.view"
+        ]
+      },
+      {
+        "role": "PURCHASER",
+        "name": "مسؤول مشتريات",
+        "permissions": [
+          "purchases.view",
+          "purchases.create",
+          "purchases.orders.view",
+          "purchases.orders.create",
+          "purchases.requests.view",
+          "purchases.requests.create",
+          "suppliers.view",
+          "suppliers.create",
+          "suppliers.update"
+        ]
+      },
+      {
+        "role": "DELIVERY_DRIVER",
+        "name": "مندوب توصيل",
+        "permissions": [
+          "deliveries.view",
+          "deliveries.create",
+          "deliveries.update",
+          "operations.fleet.view",
+          "customers.view",
+          "orders.view"
+        ]
+      },
+      {
+        "role": "SALES_REP",
+        "name": "مندوب مبيعات",
+        "permissions": [
+          "sales.view",
+          "sales.create",
+          "sales.update",
+          "sales.invoice.print",
+          "orders.view",
+          "orders.create",
+          "orders.update",
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "crm.leads.view",
+          "crm.leads.create",
+          "crm.activities.view",
+          "crm.activities.create",
+          "quotations.view",
+          "quotations.create"
+        ]
+      },
+      {
+        "role": "SUPERVISOR",
+        "name": "مشرف",
+        "permissions": [
+          "sales.view",
+          "sales.create",
+          "sales.update",
+          "sales.approve",
+          "sales.discount",
+          "sales.refund",
+          "returns.view",
+          "returns.create",
+          "orders.view",
+          "orders.approve",
+          "orders.update",
+          "customers.view",
+          "customers.create",
+          "customers.update",
+          "products.view",
+          "inventory.view",
+          "reports.view",
+          "reports.sales.view",
+          "finance.view",
+          "finance.receivables.view"
+        ]
+      }
+    ]
+  }
 }
