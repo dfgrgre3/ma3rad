@@ -275,6 +275,18 @@ export class PlatformModuleFeatureService {
     this.audit(enabled ? 'تفعيل علم ميزة' : 'تعطيل علم ميزة', 'FEATURE_FLAG', id, {});
   }
 
+  public deleteFeatureFlag(id: string): void {
+    PlatformModuleFeatureService.requirePlatformAccess('features', 'platform.features.delete');
+
+    const row = this.db.query<any>('SELECT * FROM platform_feature_flags WHERE id = ?', [id])[0];
+    if (!row) throw new Error('علم الميزة غير موجود.');
+
+    this.db.run('DELETE FROM platform_feature_overrides WHERE feature_id = ?', [id]);
+    this.db.run('DELETE FROM platform_feature_flags WHERE id = ?', [id]);
+
+    this.audit('حذف علم ميزة', 'FEATURE_FLAG', id, { code: row.code });
+  }
+
   // ─── Release Management ───────────────────────────────────────────────────────
 
   private releaseTargetsSummary(releaseId: string): Record<string, number> {

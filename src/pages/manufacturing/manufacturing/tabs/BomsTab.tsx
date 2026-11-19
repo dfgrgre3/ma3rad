@@ -41,7 +41,26 @@ export const BomsTab: React.FC<TabProps> = ({ service, data, reload, canManage, 
   };
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
+    <div className="space-y-3">
+      {(data.bomStockAlerts || []).length > 0 && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+          <h3 className="mb-2 text-sm font-black text-rose-800">
+            مكوّنات حرجة في قوائم نشطة ({data.bomStockAlerts.length})
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {data.bomStockAlerts.map((alert) => (
+              <span
+                key={alert.componentProductId}
+                className={`rounded-full px-3 py-1 text-xs font-bold ${alert.severity === 'OUT' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}
+                title={alert.usedBy.map((entry: any) => `${entry.bomName} → ${entry.productName}`).join('، ')}
+              >
+                {alert.componentName}: متاح {alert.availableQty}{alert.reorderPoint > 0 ? ` / حد ${alert.reorderPoint}` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="grid gap-3 lg:grid-cols-3">
       <DataTable
         ariaLabel="قوائم المواد"
         rows={data.boms}
@@ -51,6 +70,7 @@ export const BomsTab: React.FC<TabProps> = ({ service, data, reload, canManage, 
           { key: 'name', header: 'الاسم', render: (bom) => bom.name },
           { key: 'version', header: 'الإصدار', render: (bom) => bom.version },
           { key: 'status', header: 'الحالة', render: (bom) => bom.status },
+          { key: 'cost', header: 'التكلفة التقديرية', render: (bom) => bom.estimatedCost != null ? <b>{bom.estimatedCost.toLocaleString()}</b> : '—' },
           {
             key: 'items', header: 'المكوّنات',
             render: (bom) => <span className="text-xs text-slate-500">{(bom.items || []).map((item: any) => `${item.componentName || item.componentProductId} × ${item.quantity}`).join('، ')}</span>,
@@ -116,6 +136,7 @@ export const BomsTab: React.FC<TabProps> = ({ service, data, reload, canManage, 
           </button>
         </form>
       )}
+      </div>
     </div>
   );
 };

@@ -6,6 +6,8 @@ import type { PlatformPlan } from '../platformTypes';
 
 export interface DirectoryApi {
   listPlans(this: PlatformAdminApiCore): Promise<PlatformPlan[]>;
+  createPlan(this: PlatformAdminApiCore, input: Record<string, any>): Promise<PlatformPlan>;
+  updatePlan(this: PlatformAdminApiCore, id: string, input: Record<string, any>): Promise<PlatformPlan>;
   listStaff(this: PlatformAdminApiCore): Promise<any[]>;
   createStaff(this: PlatformAdminApiCore, input: any): Promise<any>;
   listRoles(this: PlatformAdminApiCore): Promise<PlatformRoleSummary[]>;
@@ -51,6 +53,14 @@ export function createDirectoryApi(): DirectoryApi {
     // Plans
     async listPlans(this: PlatformAdminApiCore) {
       return this.request<PlatformPlan[]>({ path: '/api/v1/admin/plans', method: 'GET' });
+    },
+
+    async createPlan(this: PlatformAdminApiCore, input: Record<string, any>) {
+      return this.request<PlatformPlan>({ path: '/api/v1/admin/plans', method: 'POST', body: input });
+    },
+
+    async updatePlan(this: PlatformAdminApiCore, id: string, input: Record<string, any>) {
+      return this.request<PlatformPlan>({ path: `/api/v1/admin/plans/${encodeURIComponent(id)}`, method: 'PUT', body: input });
     },
 
     // Staff

@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 173 allowlisted endpoint pattern(s).
+ * 174 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -223,7 +223,14 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/plans",
     "methods": [
-      "GET"
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id",
+    "methods": [
+      "PUT"
     ]
   },
   {
@@ -672,7 +679,8 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/feature-flags/:id",
     "methods": [
-      "PUT"
+      "PUT",
+      "DELETE"
     ]
   },
   {

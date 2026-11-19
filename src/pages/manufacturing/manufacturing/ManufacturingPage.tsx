@@ -13,6 +13,7 @@ import { OverviewTab } from './tabs/OverviewTab';
 import { WorkCentersTab } from './tabs/WorkCentersTab';
 import { BomsTab } from './tabs/BomsTab';
 import { OrdersTab } from './tabs/OrdersTab';
+import { FloorTab } from './tabs/FloorTab';
 import { SalesCandidatesTab } from './tabs/SalesCandidatesTab';
 import { QualityTab } from './tabs/QualityTab';
 import { MaintenanceTab } from './tabs/MaintenanceTab';
@@ -32,6 +33,11 @@ export interface ManufacturingData {
   capacityPlan: any[];
   salesCandidates: any[];
   analytics: { workCenterEfficiency: any[]; orderVariance: any[]; monthlyOutput: any[] };
+  maintenanceAlerts: { overdue: any[]; dueSoon: any[] };
+  materialShortages: any[];
+  purchaseSuggestions: any[];
+  productionFloor: any[];
+  bomStockAlerts: any[];
 }
 
 const EMPTY_DATA: ManufacturingData = {
@@ -41,11 +47,17 @@ const EMPTY_DATA: ManufacturingData = {
   costReport: { orders: [], totalMaterialCost: 0, totalLaborCost: 0, totalCost: 0, totalQuantity: 0 },
   capacityPlan: [], salesCandidates: [],
   analytics: { workCenterEfficiency: [], orderVariance: [], monthlyOutput: [] },
+  maintenanceAlerts: { overdue: [], dueSoon: [] },
+  materialShortages: [],
+  purchaseSuggestions: [],
+  productionFloor: [],
+  bomStockAlerts: [],
 };
 
 const TABS = [
   { key: 'overview', label: 'نظرة عامة' },
   { key: 'orders', label: 'أوامر الإنتاج' },
+  { key: 'floor', label: 'أرضية الإنتاج' },
   { key: 'sales', label: 'من أوامر البيع' },
   { key: 'workCenters', label: 'مراكز العمل' },
   { key: 'boms', label: 'قوائم المواد' },
@@ -83,6 +95,11 @@ export const ManufacturingPage: React.FC = () => {
         capacityPlan: service.getCapacityPlan(),
         salesCandidates: service.getSalesOrderProductionCandidates(),
         analytics: service.getManufacturingAnalytics(),
+        maintenanceAlerts: service.getMaintenanceAlerts(),
+        materialShortages: service.getMaterialShortages(),
+        purchaseSuggestions: service.getPurchaseSuggestions(),
+        productionFloor: service.getProductionFloor(),
+        bomStockAlerts: service.getBomStockAlerts(),
       });
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل بيانات التصنيع.');
@@ -139,6 +156,7 @@ export const ManufacturingPage: React.FC = () => {
         <>
           {tab === 'overview' && <OverviewTab {...shared} />}
           {tab === 'orders' && <OrdersTab {...shared} />}
+          {tab === 'floor' && <FloorTab {...shared} />}
           {tab === 'sales' && <SalesCandidatesTab {...shared} />}
           {tab === 'workCenters' && <WorkCentersTab {...shared} />}
           {tab === 'boms' && <BomsTab {...shared} />}

@@ -556,4 +556,45 @@ export class ExecutiveCommandAggregates {
       [today, today, ...sales.branch.params, ...sales.company.params, MAX_DRILLDOWN_ROWS],
     );
   }
+
+  /** Production-order counts and WIP material valuation for the command centre. */
+  public getManufacturingSummary(from: string, to: string) {
+    const scope = this.scopes.manufacturingScope();
+    const statusRows = this.db.query<{ status: string; count: number; qty: number }>(
+      `SELECT po.status, COUNT(*) AS count, COALESCE(SUM(po.quantity), 0) AS qty
+       FROM production_orders po
+       WHERE ${scope.clause}
+       GROUP BY po.status`,
+      scope.params
+    );
+    const byStatus = new Map(statusRows.map((row) => [row.status, row]));
+    const completedPeriod = this.db.query<{ count: number; qty: number }>(
+      `SELECT COUNT(*) AS count, COALESCE(SUM(po.quantity), 0) AS qty
+       FROM production_orders po
+       WHERE po.status = 'COMPLETED' AND date(po.completed_at) BETWEEN ? AND ?
+         AND ${scope.clause}`,
+      [from, to, ...scope.params]
+    )[0] ?? { count: 0, qty: 0 };
+    const wip = this.db.query<{ orders: number; cost: number }>(
+      `SELECT COUNT(DISTINCT o.id) AS orders,
+              COALESCE(SUM(m.planned_qty * p.cost_price / 100.0), 0) AS cost
+       FROM production_orders o
+       JOIN production_order_materials m ON m.order_id = o.id
+       JOIN products p ON p.id = m.product_id
+       WHERE o.status IN ('RELEASED', 'IN_PROGRESS') AND ${scope.clause}`,
+      scope.params
+    )[0] ?? { orders: 0, cost: 0 };
+    const active = ['PLANNED', 'RELEASED', 'IN_PROGRESS']
+      .reduce((sum, status) => sum + Number(byStatus.get(status)?.count || 0), 0);
+    return {
+      activeOrders: active,
+      inProgressOrders: Number(byStatus.get('IN_PROGRESS')?.count || 0),
+      completedInPeriod: Number(completedPeriod.count || 0),
+      completedQuantity: Number(completedPeriod.qty || 0),
+      wipOrders: Number(wip.orders || 0),
+      wipMaterialCost: round2(Number(wip.cost || 0)),
+      materialShortages: 0,
+      bomStockAlerts: 0,
+    };
+  }
 }

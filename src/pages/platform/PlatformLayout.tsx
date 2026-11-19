@@ -70,6 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'بناء وإدارة النظام',
     items: [
       { to: '/platform/plans', label: 'خطط الاشتراك', icon: Layers3 },
+      { to: '/platform/plan-catalog', label: 'منشئ الخطط والصفحات', icon: Boxes },
       { to: '/platform/product', label: 'المنتج والصفحات والمزايا', icon: Boxes },
       { to: '/platform/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
       { to: '/platform/user-platform-permissions', label: 'صفحات وصلاحيات المستخدمين', icon: ShieldCheck },
@@ -114,6 +115,7 @@ const TITLES: Record<string, string> = {
   '/platform/roles': 'مصفوفة الأدوار والصلاحيات',
   '/platform/releases': 'حزم الإصدارات والتحديثات',
   '/platform/product': 'التحكم في المنتج',
+  '/platform/plan-catalog': 'منشئ الخطط والصفحات والمميزات',
   '/platform/audit': 'سجل عمليات المنصة',
   '/platform/user-platform-permissions': 'صفحات وصلاحيات المستخدمين',
   '/platform/settings': 'إعدادات المنصة',

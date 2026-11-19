@@ -37,6 +37,7 @@ export interface BillOfMaterials {
   status: BomStatus;
   notes: string | null;
   items: BomItem[];
+  estimatedCost?: number;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -147,6 +148,52 @@ export interface SalesOrderProductionCandidate {
   bomName: string;
 }
 
+export interface MaterialShortage {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: ProductionOrderStatus;
+  componentProductId: string;
+  componentName: string;
+  warehouseId: string;
+  requiredQty: number;
+  availableQty: number;
+  deficitQty: number;
+}
+
+export interface BomStockAlert {
+  componentProductId: string;
+  componentName: string;
+  reorderPoint: number;
+  availableQty: number;
+  severity: 'OUT' | 'LOW';
+  usedBy: Array<{ bomId: string; bomName: string; productName: string }>;
+}
+
+export interface BomCostEstimate {
+  bomId: string;
+  totalCost: number;
+  items: Array<{
+    componentProductId: string;
+    componentName: string;
+    quantity: number;
+    unitCost: number;
+    lineCost: number;
+  }>;
+}
+
+export interface PurchaseSuggestion {
+  componentProductId: string;
+  componentName: string;
+  warehouseId: string;
+  totalRequiredQty: number;
+  availableQty: number;
+  suggestedQty: number;
+  unitCost: number;
+  estimatedValue: number;
+  affectedOrders: number;
+  orderNumbers: string[];
+}
+
 export interface QualityCheck {
   id: string;
   productionOrderId: string;
@@ -215,6 +262,35 @@ export interface UpdateMaintenanceDTO {
   notes?: string | null;
   maintenanceType?: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE';
 }
+export interface ProductionFloorRow {
+  orderId: string;
+  orderNumber: string;
+  productName?: string;
+  quantity: number;
+  status: ProductionOrderStatus;
+  priority: ProductionPriority;
+  dueDate: string | null;
+  branchName?: string | null;
+  warehouseName?: string | null;
+  salesOrderNumber?: string | null;
+  customerName?: string | null;
+  operationShiftId: string | null;
+  opsTotal: number;
+  opsCompleted: number;
+  opsInProgress: number;
+  currentOperation: {
+    workCenterName?: string;
+    sequence: number;
+    plannedMinutes: number;
+    status: string;
+  } | null;
+  materialsTotal: number;
+  materialsPlannedQty: number;
+  materialsConsumedQty: number;
+  materialsShort: number;
+  progressPercent: number;
+}
+
 export interface WipOrder {
   orderId: string;
   orderNumber: string;

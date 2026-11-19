@@ -54,9 +54,17 @@ export const MaintenanceTab: React.FC<TabProps> = ({ service, data, reload, canM
   };
 
   const workCenterName = (id: string | null) => data.workCenters.find((wc) => wc.id === id)?.name || '—';
+  const alerts = data.maintenanceAlerts;
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
+    <div className="space-y-3">
+      {(alerts.overdue.length > 0 || alerts.dueSoon.length > 0) && (
+        <div className={`rounded-xl border p-3 text-xs ${alerts.overdue.length > 0 ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {alerts.overdue.length > 0 && <div className="font-bold">{alerts.overdue.length} صيانة وقائية متأخرة: {alerts.overdue.map((r) => r.equipmentName).join('، ')}</div>}
+          {alerts.dueSoon.length > 0 && <div className={alerts.overdue.length > 0 ? 'mt-1' : 'font-bold'}>{alerts.dueSoon.length} صيانة وقائية خلال 7 أيام: {alerts.dueSoon.map((r) => `${r.equipmentName} (${r.scheduledDate})`).join('، ')}</div>}
+        </div>
+      )}
+      <div className="grid gap-3 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <div className="mb-2 flex items-center gap-2">
           <Wrench className="h-4 w-4 text-sky-600" />
@@ -125,6 +133,7 @@ export const MaintenanceTab: React.FC<TabProps> = ({ service, data, reload, canM
           </button>
         </form>
       )}
+      </div>
     </div>
   );
 };

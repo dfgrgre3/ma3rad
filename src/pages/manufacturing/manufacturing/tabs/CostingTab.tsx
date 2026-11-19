@@ -1,11 +1,50 @@
 import React from 'react';
 import { DataTable } from '../../../../components/ui/DataTable';
-import { Coins } from 'lucide-react';
+import { exportToExcel } from '../../../../utils/export/export';
+import { Coins, Download } from 'lucide-react';
 import type { TabProps } from './OverviewTab';
 import { statusBadge } from './OverviewTab';
 
+const STATUS_LABEL: Record<string, string> = {
+  PLANNED: 'مخطط', RELEASED: 'صادر', IN_PROGRESS: 'قيد التنفيذ', COMPLETED: 'مكتمل', CANCELLED: 'ملغى',
+};
+
 export const CostingTab: React.FC<TabProps> = ({ data }) => {
   const report = data.costReport;
+
+  const exportReport = () => {
+    exportToExcel({
+      title: 'تقرير تكاليف الإنتاج',
+      columns: [
+        { key: 'orderNumber', label: 'رقم الأمر' },
+        { key: 'productName', label: 'المنتج' },
+        { key: 'quantity', label: 'الكمية' },
+        { key: 'status', label: 'الحالة' },
+        { key: 'materialCost', label: 'تكلفة المواد' },
+        { key: 'laborCost', label: 'تكلفة العمالة' },
+        { key: 'totalCost', label: 'الإجمالي' },
+        { key: 'costPerUnit', label: 'تكلفة الوحدة' },
+      ],
+      rows: report.orders.map((row) => ({
+        orderNumber: row.orderNumber,
+        productName: row.productName,
+        quantity: row.quantity,
+        status: STATUS_LABEL[row.status] || row.status,
+        materialCost: row.materialCost,
+        laborCost: row.laborCost,
+        totalCost: row.totalCost,
+        costPerUnit: row.costPerUnit,
+      })),
+      fileName: 'manufacturing-cost-report',
+      kpis: [
+        { label: 'إجمالي المواد', value: report.totalMaterialCost },
+        { label: 'إجمالي العمالة', value: report.totalLaborCost },
+        { label: 'الإجمالي', value: report.totalCost },
+        { label: 'الكمية', value: report.totalQuantity },
+      ],
+      permission: 'manufacturing.export',
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -24,9 +63,14 @@ export const CostingTab: React.FC<TabProps> = ({ data }) => {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Coins className="h-4 w-4 text-sky-600" />
-          <h3 className="text-sm font-black text-slate-900">تكلفة أوامر الإنتاج</h3>
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Coins className="h-4 w-4 text-sky-600" />
+            <h3 className="text-sm font-black text-slate-900">تكلفة أوامر الإنتاج</h3>
+          </div>
+          <button onClick={exportReport} className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700" title="تصدير Excel">
+            <Download className="h-3.5 w-3.5" /> تصدير
+          </button>
         </div>
         <DataTable
           ariaLabel="تكلفة أوامر الإنتاج"

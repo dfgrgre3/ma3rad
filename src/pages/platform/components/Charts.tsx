@@ -143,6 +143,88 @@ export const LineChart: React.FC<ChartProps> = ({
   );
 };
 
+export interface DonutSegment {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export const DonutChart: React.FC<{
+  data: DonutSegment[];
+  size?: number;
+  thickness?: number;
+  centerLabel?: string;
+  centerValue?: string;
+  className?: string;
+  'aria-label'?: string;
+}> = ({
+  data,
+  size = 180,
+  thickness = 22,
+  centerLabel,
+  centerValue,
+  className = '',
+  'aria-label': ariaLabel = 'مخطط دائري',
+}) => {
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const total = data.reduce((acc, d) => acc + Math.max(0, d.value), 0);
+
+  if (total <= 0) {
+    return (
+      <div
+        className={`flex items-center justify-center rounded-lg bg-slate-50 ${className}`}
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <p className="text-slate-400 text-xs">لا توجد بيانات</p>
+      </div>
+    );
+  }
+
+  let offset = 0;
+  const segments = data
+    .filter((d) => d.value > 0)
+    .map((d) => {
+      const fraction = d.value / total;
+      const dash = fraction * circumference;
+      const segment = { ...d, dash, offset };
+      offset += dash;
+      return segment;
+    });
+
+  return (
+    <div className={`relative inline-flex items-center justify-center ${className}`} style={{ width: size, height: size }} role="img" aria-label={ariaLabel}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+        {segments.map((seg, i) => (
+          <circle
+            key={`${seg.label}-${i}`}
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={thickness}
+            strokeDasharray={`${seg.dash} ${circumference - seg.dash}`}
+            strokeDashoffset={-seg.offset}
+            strokeLinecap="butt"
+          >
+            <title>{`${seg.label}: ${seg.value}`}</title>
+          </circle>
+        ))}
+      </svg>
+      {(centerLabel || centerValue) && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          {centerValue && <span className="text-lg font-black text-slate-800">{centerValue}</span>}
+          {centerLabel && <span className="text-[10px] font-semibold text-slate-500">{centerLabel}</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TONE_STYLES = {
   default: { icon: 'bg-slate-100 text-slate-600', border: 'border-slate-200' },
   success: { icon: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200' },

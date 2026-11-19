@@ -121,6 +121,21 @@ export class MaintenanceModule {
     return this.getMaintenance(id);
   }
 
+  /** Preventive-maintenance alerts: overdue and due-within-N-days schedules. */
+  public getMaintenanceAlerts(withinDays = 7): { overdue: MaintenanceRecord[]; dueSoon: MaintenanceRecord[] } {
+    this.ctx.require('manufacturing.view');
+    const records = this.getMaintenanceRecords({ status: 'SCHEDULED' })
+      .filter((record) => record.maintenanceType === 'PREVENTIVE' && record.scheduledDate);
+    const today = localDateString();
+    const horizon = new Date(`${today}T00:00:00`);
+    horizon.setDate(horizon.getDate() + withinDays);
+    const horizonString = horizon.toISOString().slice(0, 10);
+    return {
+      overdue: records.filter((record) => record.scheduledDate! < today),
+      dueSoon: records.filter((record) => record.scheduledDate! >= today && record.scheduledDate! <= horizonString),
+    };
+  }
+
   private mapMaintenance(row: any): MaintenanceRecord {
     return {
       id: row.id,

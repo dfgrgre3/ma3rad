@@ -22,6 +22,7 @@ export type DrilldownKey =
   | 'cashOutflow'
   | 'purchases'
   | 'lowStock'
+  | 'manufacturing'
   | 'comparison';
 
 export type DrilldownValueType = 'money' | 'number' | 'percent' | 'text' | 'date';
@@ -148,6 +149,17 @@ export interface PeriodSnapshot {
   purchases: number;
 }
 
+export interface ManufacturingSummary {
+  activeOrders: number;
+  inProgressOrders: number;
+  completedInPeriod: number;
+  completedQuantity: number;
+  wipOrders: number;
+  wipMaterialCost: number;
+  materialShortages: number;
+  bomStockAlerts: number;
+}
+
 export interface ExecutiveCommandOverview {
   period: CommandPeriod;
   generatedAt: string;
@@ -225,6 +237,7 @@ export interface ExecutiveCommandOverview {
     }>;
     lowStock: LowStockRow[];
   };
+  manufacturing?: ManufacturingSummary | null;
 }
 
 export const COMMAND_RANGES: Array<{ id: CommandRange; label: string; periodLabel: string }> = [

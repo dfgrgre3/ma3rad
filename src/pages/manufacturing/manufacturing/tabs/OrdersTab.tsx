@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import { ProductPicker } from '../../../../components/products/ProductPicker';
-import { Plus } from 'lucide-react';
+import { OperationsShiftService } from '../../../../services/domains/operations/OperationsShiftService';
+import { exportToExcel } from '../../../../utils/export/export';
+import { Download, Plus } from 'lucide-react';
 import { statusBadge } from './OverviewTab';
 import type { TabProps } from './OverviewTab';
 
@@ -75,6 +77,46 @@ export const OrdersTab: React.FC<TabProps> = ({ service, data, reload, canManage
     const minutes = window.prompt('الدقائق الفعلية:', String(operation.plannedMinutes || 0));
     if (minutes === null) return;
     run(() => service.completeOperation(operation.id, Number(minutes)), 'تم إكمال العملية.');
+  };
+
+  const openShiftFor = (branchId: string) => {
+    try { return new OperationsShiftService().getOpenShiftForBranch(branchId); }
+    catch { return null; }
+  };
+
+  const exportOrders = () => {
+    exportToExcel({
+      title: 'تقرير أوامر الإنتاج',
+      columns: [
+        { key: 'orderNumber', label: 'رقم الأمر' },
+        { key: 'productName', label: 'المنتج' },
+        { key: 'quantity', label: 'الكمية' },
+        { key: 'priority', label: 'الأولوية' },
+        { key: 'status', label: 'الحالة' },
+        { key: 'salesOrderNumber', label: 'أمر البيع' },
+        { key: 'customerName', label: 'العميل' },
+        { key: 'startDate', label: 'البدء' },
+        { key: 'dueDate', label: 'الاستحقاق' },
+      ],
+      rows: orders.map((order) => ({
+        orderNumber: order.orderNumber,
+        productName: order.productName,
+        quantity: order.quantity,
+        priority: PRIORITY_OPTIONS.find((p) => p.value === order.priority)?.label || order.priority,
+        status: ({ PLANNED: 'مخطط', RELEASED: 'صادر', IN_PROGRESS: 'قيد التنفيذ', COMPLETED: 'مكتمل', CANCELLED: 'ملغى' } as Record<string, string>)[order.status] || order.status,
+        salesOrderNumber: order.salesOrderNumber || '',
+        customerName: order.customerName || '',
+        startDate: order.startDate || '',
+        dueDate: order.dueDate || '',
+      })),
+      fileName: 'production-orders',
+      kpis: [
+        { label: 'إجمالي الأوامر', value: orders.length },
+        { label: 'قيد التنفيذ', value: orders.filter((o) => o.status === 'IN_PROGRESS').length },
+        { label: 'مكتملة', value: orders.filter((o) => o.status === 'COMPLETED').length },
+      ],
+      permission: 'manufacturing.export',
+    });
   };
 
   const salesProgress = (salesOrderId: string | null) => {
@@ -152,6 +194,25 @@ export const OrdersTab: React.FC<TabProps> = ({ service, data, reload, canManage
               {progress.allCompleted && ' — كل العناصر المنتجة'}
             </div>
           )}
+          {canManage && ['PLANNED', 'RELEASED'].includes(order.status) && (() => {
+            const openShift = openShiftFor(order.branchId);
+            if (!openShift) {
+              return order.operationShiftId
+                ? <div className="mt-2 text-xs text-slate-500">مرتبط بورديات التشغيل: {order.operationShiftId}</div>
+                : null;
+            }
+            return (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-500">وردية مفتوحة: {openShift.definitionName || openShift.shiftNumber}</span>
+                {order.status === 'RELEASED' && !order.operationShiftId && (
+                  <button className="rounded bg-sky-50 px-2 py-0.5 text-sky-700" onClick={() => run(() => service.assignOrderToShift(order.id, openShift.id), 'تم ربط الأمر بالوردية.')}>ربط بالوردية</button>
+                )}
+                {order.status === 'RELEASED' && (
+                  <button className="rounded bg-amber-50 px-2 py-0.5 text-amber-700" onClick={() => run(() => service.startOrder(order.id, openShift.id), 'تم بدء الأمر بالوردية.')}>بدء بالوردية</button>
+                )}
+              </div>
+            );
+          })()}
           {order.notes && <div className="mt-2 text-xs text-slate-500">ملاحظات: {order.notes}</div>}
         </div>
       </div>
@@ -166,6 +227,9 @@ export const OrdersTab: React.FC<TabProps> = ({ service, data, reload, canManage
           {['PLANNED', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((status) => (
             <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-full px-3 py-1 text-xs font-bold ${statusFilter === status ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{statusBadge(status)}</button>
           ))}
+          <button onClick={exportOrders} className="mr-auto flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700" title="تصدير Excel">
+            <Download className="h-3.5 w-3.5" /> تصدير
+          </button>
         </div>
         <DataTable
           ariaLabel="أوامر الإنتاج"

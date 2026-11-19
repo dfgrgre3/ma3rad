@@ -35,4 +35,9 @@ export class CommandScopes {
   public warehouseScope() {
     return this.branchAccess.warehouseBranchScope('w');
   }
+
+  public manufacturingScope() {
+    const actor = AuthService.requireAuth();
+    return this.branchAccess.sqlScope('po.branch_id', undefined, actor);
+  }
 }

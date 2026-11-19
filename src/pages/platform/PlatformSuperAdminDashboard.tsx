@@ -12,14 +12,12 @@ import {
   Cpu,
   CalendarClock,
   Activity,
-  Boxes,
   ScrollText,
   ShieldAlert,
   CheckCircle2,
   Rocket,
   BarChart2,
   PieChart,
-  Zap,
   Server,
   Bell,
   ExternalLink,
@@ -41,11 +39,12 @@ import {
   UserPlus,
   Banknote,
   CreditCard,
+  Layers,
+  FileClock,
+  MonitorSmartphone,
+  GitBranch,
 } from 'lucide-react';
-import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import type {
-  PlatformOverview,
-  PlatformPeriod,
   PlatformMetricComparison,
   PlatformPlan,
 } from '../../services/domains/platform/platformTypes';
@@ -57,17 +56,16 @@ import {
   StatusBadge,
   EmptyState,
 } from './components/PlatformUI';
-import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
-import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
-import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import {
   LineChart,
+  DonutChart,
   MetricCard,
   Panel,
   PeriodSelector,
   DrillDownLink,
   AlertCard,
 } from './components/Charts';
+import { usePlatformDashboardData } from './dashboard/usePlatformDashboardData';
 
 const CHANNEL_LABELS: Record<string, string> = {
   STABLE: 'مستقر',
@@ -99,6 +97,30 @@ const TENANT_STATUS_TONES: Record<string, string> = {
   CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 
+const SUB_STATUS_COLORS: Record<string, string> = {
+  نشط: '#10b981',
+  تجريبي: '#0ea5e9',
+  منتهي: '#94a3b8',
+  ملغي: '#f43f5e',
+  أخرى: '#a78bfa',
+};
+
+const LIC_STATUS_COLORS: Record<string, string> = {
+  نشطة: '#10b981',
+  معلقة: '#f59e0b',
+  موقوفة: '#f43f5e',
+  منتهية: '#94a3b8',
+  ملغاة: '#a78bfa',
+};
+
+const AUDIT_SEVERITY_DOT: Record<string, string> = {
+  CRITICAL: 'bg-rose-500',
+  SECURITY: 'bg-rose-500',
+  WARNING: 'bg-amber-500',
+  NOTICE: 'bg-sky-500',
+  INFO: 'bg-slate-400',
+};
+
 type Tone = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'violet';
 
 type DashMetric = {
@@ -109,55 +131,6 @@ type DashMetric = {
   comparison?: PlatformMetricComparison;
 };
 
-/** Flat analytics payloads returned by the central server endpoints. */
-interface CentralAnalytics {
-  business?: {
-    revenue?: number;
-    newTenants?: number;
-    newLicenses?: number;
-    invoices?: number;
-    invoiceTotal?: number;
-  };
-  customers?: {
-    total?: number;
-    active?: number;
-    trial?: number;
-    churned?: number;
-    churnRate?: number | string;
-  };
-  subscriptions?: {
-    total?: number;
-    active?: number;
-    cancelled?: number;
-    mrr?: number;
-  };
-  licenses?: {
-    total?: number;
-    active?: number;
-    revoked?: number;
-    expiringSoon?: number;
-  };
-  operations?: {
-    jobs?: Array<{ status: string; count: number }>;
-    backups?: Array<{ status: string; count: number }>;
-    errors?: Array<{ status: string; count: number }>;
-  };
-}
-
-const ALERT_SEVERITY_MAP: Record<string, 'danger' | 'warning' | 'info' | 'success'> = {
-  CRITICAL: 'danger',
-  HIGH: 'danger',
-  ERROR: 'danger',
-  MEDIUM: 'warning',
-  LOW: 'info',
-  danger: 'danger',
-  warning: 'warning',
-  info: 'info',
-  success: 'success',
-};
-
-const SEVERITY_ORDER = { danger: 0, warning: 1, info: 2, success: 3 } as const;
-
 const cmpText = (
   c: PlatformMetricComparison | undefined,
   fmt: (n: number) => string = formatNumber,
@@ -167,9 +140,6 @@ const cmpText = (
 const pctText = (c: PlatformMetricComparison | undefined, digits = 1): string =>
   cmpText(c, (n) => `${n.toFixed(digits)}%`);
 
-const sumStatusCounts = (rows?: Array<{ status: string; count: number }>): number =>
-  Array.isArray(rows) ? rows.reduce((acc, r) => acc + (Number(r.count) || 0), 0) : 0;
-
 const periodLabel = (period: string): string =>
   period === '7d' ? 'آخر 7 أيام'
     : period === '30d' ? 'آخر 30 يوم'
@@ -177,104 +147,58 @@ const periodLabel = (period: string): string =>
     : period === '180d' ? 'آخر 180 يوم'
     : period === '365d' ? 'آخر 365 يوم'
     : period === 'ytd' ? 'منذ بداية السنة'
+    : period === 'all' ? 'كل الفترات'
     : 'الفترة المحددة';
+
+const DonutLegend: React.FC<{ segments: Array<{ label: string; value: number; color: string }> }> = ({ segments }) => (
+  <ul className="mt-3 space-y-1.5">
+    {segments.filter((s) => s.value > 0).map((s) => (
+      <li key={s.label} className="flex items-center justify-between gap-3 text-[11px]">
+        <span className="flex items-center gap-1.5 font-semibold text-slate-600">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+          {s.label}
+        </span>
+        <span className="font-black text-slate-800">{formatNumber(s.value)}</span>
+      </li>
+    ))}
+  </ul>
+);
 
 export const PlatformSuperAdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [overview, setOverview] = React.useState<PlatformOverview | null>(null);
-  const [centralAnalytics, setCentralAnalytics] = React.useState<CentralAnalytics | null>(null);
-  const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
-  const [isCentral, setIsCentral] = React.useState(false);
   const [period, setPeriod] = React.useState<string>('30d');
   const [planFilter, setPlanFilter] = React.useState<string>('');
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-
-  const loadOverview = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const centralState = getCentralDataSourceState();
-    setIsCentral(centralState.active);
-    try {
-      if (centralState.active) {
-        const [data, plns] = await Promise.all([
-          centralPlatformClient.getOverview(),
-          centralPlatformClient.listPlans().catch(() => [] as PlatformPlan[]),
-        ]);
-        setOverview(data as PlatformOverview);
-        setPlans(Array.isArray(plns) ? plns : []);
-        setCentralAnalytics(null);
-
-        // The central overview endpoint returns empty metric shells — fetch the
-        // dedicated analytics endpoints (best-effort; they need analytics permission).
-        const [bp, cm, sm, lm, om] = await Promise.allSettled([
-          centralPlatformClient.getBusinessPerformance(period),
-          centralPlatformClient.getCustomerMetrics(period),
-          centralPlatformClient.getSubscriptionMetrics(),
-          centralPlatformClient.getLicenseMetrics(),
-          centralPlatformClient.getOperationsMetrics(),
-        ]);
-        setCentralAnalytics({
-          business: bp.status === 'fulfilled' ? bp.value : undefined,
-          customers: cm.status === 'fulfilled' ? cm.value : undefined,
-          subscriptions: sm.status === 'fulfilled' ? sm.value : undefined,
-          licenses: lm.status === 'fulfilled' ? lm.value : undefined,
-          operations: om.status === 'fulfilled' ? om.value : undefined,
-        });
-      } else {
-        const data = platformAdminService.getOverviewWithPeriod(period as PlatformPeriod, planFilter || undefined);
-        setOverview(data);
-        setPlans(platformAdminService.listPlans());
-        setCentralAnalytics(null);
-      }
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');
-    } finally {
-      setLoading(false);
-    }
-  }, [period, planFilter]);
-
-  React.useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
+  const { data, isCentral, loading, error, lastUpdated, reload } = usePlatformDashboardData(period, planFilter);
 
   // Auto-refresh every 60 seconds (skip while the tab is hidden)
   React.useEffect(() => {
     const id = window.setInterval(() => {
-      if (!document.hidden) loadOverview();
+      if (!document.hidden) reload();
     }, 60000);
     return () => window.clearInterval(id);
-  }, [loadOverview]);
+  }, [reload]);
 
   if (error) {
     return (
       <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
         {error}
-        <button onClick={loadOverview} className="ml-3 text-emerald-700 hover:underline">إعادة المحاولة</button>
+        <button onClick={reload} className="ml-3 text-emerald-700 hover:underline">إعادة المحاولة</button>
       </div>
     );
   }
 
-  if (loading || !overview) {
+  if (loading || !data?.overview) {
     return <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل بيانات المنصة...</div>;
   }
+
+  const { overview, plans, bp, cm, sm, lm, om, ca, alerts: rawAlerts, extras } = data;
+  const ex = extras;
 
   const latestReleaseRaw = overview.releases?.[0] as any;
   const latestReleaseDate = latestReleaseRaw
     ? (latestReleaseRaw.releasedAt ?? latestReleaseRaw.releaseDate ?? latestReleaseRaw.released_at ?? latestReleaseRaw.createdAt ?? latestReleaseRaw.created_at)
     : null;
   const latestReleaseChannel = latestReleaseRaw ? (CHANNEL_LABELS[latestReleaseRaw.channel] ?? latestReleaseRaw.channel) : null;
-
-  // Rich analytics are only present in local mode; the central overview endpoint
-  // returns empty shells ({}), so validate the shape before using them.
-  const bp = overview.businessPerformance?.revenue?.total ? overview.businessPerformance : undefined;
-  const cm = overview.customerMetrics?.newCustomers ? overview.customerMetrics : undefined;
-  const sm = overview.subscriptionMetrics?.upcomingRenewals ? overview.subscriptionMetrics : undefined;
-  const lm = overview.licenseMetrics?.activatedDevices ? overview.licenseMetrics : undefined;
-  const om = overview.operationsMetrics?.connectedDevices ? overview.operationsMetrics : undefined;
-  const ca = centralAnalytics;
 
   const go = (path: string) => navigate(path);
 
@@ -374,9 +298,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       ]
     : ca?.operations
       ? [
-          { label: 'مهام التشغيل', value: formatNumber(sumStatusCounts(ca.operations.jobs)), icon: <Server className="h-4 w-4" /> },
-          { label: 'النسخ الاحتياطية', value: formatNumber(sumStatusCounts(ca.operations.backups)), icon: <Boxes className="h-4 w-4" />, tone: 'info' },
-          { label: 'تقارير الأخطاء', value: formatNumber(sumStatusCounts(ca.operations.errors)), icon: <AlertTriangle className="h-4 w-4" />, tone: 'danger' },
+          { label: 'مهام التشغيل', value: formatNumber(ca.operations.jobs?.reduce((a, r) => a + (r.count || 0), 0) ?? 0), icon: <Server className="h-4 w-4" /> },
+          { label: 'النسخ الاحتياطية', value: formatNumber(ca.operations.backups?.reduce((a, r) => a + (r.count || 0), 0) ?? 0), icon: <ReceiptText /> },
+          { label: 'تقارير الأخطاء', value: formatNumber(ca.operations.errors?.reduce((a, r) => a + (r.count || 0), 0) ?? 0), icon: <AlertTriangle className="h-4 w-4" />, tone: 'danger' },
         ]
       : [];
 
@@ -401,16 +325,52 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
     <EmptyState icon={<BarChart2 className="h-5 w-5" />} title={title} />
   );
 
-  // ── Alerts normalization ─────────────────────────────────────────────────
-  const rawAlerts: any[] = Array.isArray(overview.alertDetails) && overview.alertDetails.length > 0
-    ? overview.alertDetails
-    : Array.isArray(overview.alerts) ? overview.alerts : [];
+  // ── Unified section lists (same shape for local & central) ───────────────
+  const renewalItems = ex.upcomingRenewals;
+  const strugglingItems = ex.strugglingSubscriptions;
+  const pendingLicenseItems = ex.pendingLicenses;
+  const failedActivationItems = ex.failedActivations;
+  const expiringLicenseItems = overview.expiringLicenses ?? ex.expiringLicenses;
+  const expiringSubItems = overview.expiringSubscriptions ?? ex.expiringSubscriptions;
+  const syncErrorItems = ex.recentSyncErrors;
+  const endpointHealthItems = ex.apiEndpointsHealth;
+  const topCustomerItems = ex.topCustomers;
+  const cancelledCustomerItems = ex.recentlyCancelled;
+  const auditItems = ex.auditEvents;
+  const moduleItems = ex.moduleUsage;
+  const revenueSeries = ex.revenueSeries;
+  const newCustomersSeries = ex.newCustomersSeries;
+
+  // ── Distribution donuts ──────────────────────────────────────────────────
+  const subSegs = (() => {
+    const s = overview.subscriptions ?? { total: 0, active: 0, trial: 0, expired: 0, cancelled: 0 };
+    const other = Math.max(0, (s.total ?? 0) - ((s.active ?? 0) + (s.trial ?? 0) + (s.expired ?? 0) + (s.cancelled ?? 0)));
+    return [
+      { label: 'نشط', value: s.active ?? 0, color: SUB_STATUS_COLORS['نشط'] },
+      { label: 'تجريبي', value: s.trial ?? 0, color: SUB_STATUS_COLORS['تجريبي'] },
+      { label: 'منتهي', value: s.expired ?? 0, color: SUB_STATUS_COLORS['منتهي'] },
+      { label: 'ملغي', value: s.cancelled ?? 0, color: SUB_STATUS_COLORS['ملغي'] },
+      { label: 'أخرى', value: other, color: SUB_STATUS_COLORS['أخرى'] },
+    ];
+  })();
+
+  const licSegs = (() => {
+    const l = overview.licenses ?? { total: 0, active: 0, suspended: 0, revoked: 0, expired: 0 };
+    const other = Math.max(0, (l.total ?? 0) - ((l.active ?? 0) + (l.suspended ?? 0) + (l.revoked ?? 0) + (l.expired ?? 0)));
+    return [
+      { label: 'نشطة', value: l.active ?? 0, color: LIC_STATUS_COLORS['نشطة'] },
+      { label: 'معلقة', value: other, color: LIC_STATUS_COLORS['معلقة'] },
+      { label: 'موقوفة', value: l.suspended ?? 0, color: LIC_STATUS_COLORS['موقوفة'] },
+      { label: 'منتهية', value: l.expired ?? 0, color: LIC_STATUS_COLORS['منتهية'] },
+      { label: 'ملغاة', value: l.revoked ?? 0, color: LIC_STATUS_COLORS['ملغاة'] },
+    ];
+  })();
 
   const alerts = rawAlerts
-    .map((a: any, index: number) => ({
-      id: String(a.id ?? `alert-${index}`),
-      severity: ALERT_SEVERITY_MAP[String(a.severity ?? '').toUpperCase()] ?? ALERT_SEVERITY_MAP[String(a.severity ?? '').toLowerCase()] ?? 'info',
-      title: String(a.title ?? a.message ?? 'تنبيه'),
+    .map((a) => ({
+      id: String(a.id ?? ''),
+      severity: a.severity,
+      title: String(a.title ?? 'تنبيه'),
       description: String(a.description ?? ''),
       link: a.link ?? (isCentral ? '/platform/emergency' : undefined),
       entityType: a.entityType,
@@ -418,7 +378,10 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       actionRequired: Boolean(a.actionRequired),
       suggestedActions: Array.isArray(a.suggestedActions) ? a.suggestedActions.map(String) : undefined,
     }))
-    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+    .sort((a, b) => {
+      const rank: Record<string, number> = { danger: 0, warning: 1, info: 2, success: 3 };
+      return (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9);
+    });
 
   return (
     <div className="space-y-5">
@@ -433,14 +396,20 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             <p className="mt-1 max-w-2xl text-xs leading-6 text-slate-300">
               تحكم كامل في المنتج، عملاء المنصة، التراخيص، الاشتراكات والمبيعات — مع تحليلات مفصلة وفترات زمنية قابلة للتخصيص.
             </p>
-            {latestReleaseRaw && (
-              <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-200">
-                <Rocket className="h-3.5 w-3.5 text-emerald-300" />
-                آخر إصدار: <span dir="ltr" className="font-mono">v{latestReleaseRaw.version}</span>
-                {latestReleaseChannel && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-emerald-200">{latestReleaseChannel}</span>}
-                <span className="text-slate-400">· {formatDate(latestReleaseDate)}</span>
-              </p>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${isCentral ? 'bg-sky-400/20 text-sky-200' : 'bg-emerald-400/20 text-emerald-200'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isCentral ? 'bg-sky-300' : 'bg-emerald-300'}`} />
+                {isCentral ? 'الخادم المركزي' : 'البيانات المحلية'}
+              </span>
+              {latestReleaseRaw && (
+                <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-200">
+                  <Rocket className="h-3.5 w-3.5 text-emerald-300" />
+                  آخر إصدار: <span dir="ltr" className="font-mono">v{latestReleaseRaw.version}</span>
+                  {latestReleaseChannel && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-emerald-200">{latestReleaseChannel}</span>}
+                  <span className="text-slate-400">· {formatDate(latestReleaseDate)}</span>
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <PeriodSelector value={period} onChange={setPeriod} className="w-auto min-w-[150px]" />
@@ -465,20 +434,16 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               </span>
             )}
             <button
-              onClick={loadOverview}
+              onClick={reload}
               disabled={loading}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
             >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               تحديث
             </button>
           </div>
         </div>
       </section>
-
-      {isCentral && (
-        <CentralUnsupportedNotice feature="الرسوم البيانية والقوائم التفصيلية" />
-      )}
 
       {/* Quick Stats Hero */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -522,7 +487,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           {
             label: 'عميل جديد',
@@ -551,6 +516,27 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             href: '/platform/plans',
             icon: <CreditCard className="h-5 w-5" />,
             chip: 'bg-indigo-50 text-indigo-600',
+          },
+          {
+            label: 'الأجهزة والمزامنة',
+            hint: 'الأجهزة المرتبطة والمزامنة',
+            href: '/platform/devices',
+            icon: <MonitorSmartphone className="h-5 w-5" />,
+            chip: 'bg-teal-50 text-teal-600',
+          },
+          {
+            label: 'مراقبة المزامنة',
+            hint: 'أحداث المزامنة الفاشلة',
+            href: '/platform/sync',
+            icon: <Activity className="h-5 w-5" />,
+            chip: 'bg-cyan-50 text-cyan-600',
+          },
+          {
+            label: 'سجل التدقيق',
+            hint: 'سجل الأحداث والأمان',
+            href: '/platform/audit',
+            icon: <ScrollText className="h-5 w-5" />,
+            chip: 'bg-slate-100 text-slate-600',
           },
           {
             label: 'مركز الطوارئ',
@@ -618,6 +604,39 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         </div>
       </Panel>
 
+      {/* Distribution Overview */}
+      <Panel
+        title="توزيع الحالات"
+        subtitle="الاشتراكات والتراخيص مجمّعة حسب الحالة — تمثيل مرئي"
+        icon={<PieChart className="h-4 w-4" />}
+        iconClass="bg-violet-50 text-violet-600"
+      >
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="flex flex-col items-center">
+            <DonutChart
+              data={subSegs}
+              size={190}
+              centerValue={formatNumber(overview.subscriptions?.total ?? 0)}
+              centerLabel="اشتراك"
+              aria-label="توزيع الاشتراكات حسب الحالة"
+            />
+            <p className="mt-2 text-[12px] font-bold text-slate-700">الاشتراكات حسب الحالة</p>
+            <DonutLegend segments={subSegs} />
+          </div>
+          <div className="flex flex-col items-center">
+            <DonutChart
+              data={licSegs}
+              size={190}
+              centerValue={formatNumber(overview.licenses?.total ?? 0)}
+              centerLabel="ترخيص"
+              aria-label="توزيع التراخيص حسب الحالة"
+            />
+            <p className="mt-2 text-[12px] font-bold text-slate-700">التراخيص حسب الحالة</p>
+            <DonutLegend segments={licSegs} />
+          </div>
+        </div>
+      </Panel>
+
       {/* Business Performance Section */}
       <Panel
         title="الأداء التجاري"
@@ -631,9 +650,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         {businessMetrics.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات الأداء التجاري') : (
           <>
             {renderMetricGrid(businessMetrics)}
-            {bp?.timeSeries?.revenue && bp.timeSeries.revenue.length > 0 && (
+            {revenueSeries.length > 0 && (
               <LineChart
-                data={bp.timeSeries.revenue}
+                data={revenueSeries}
                 height={280}
                 color="#10b981"
                 yAxisFormatter={(v) => formatMoney(v).replace('EGP', '').trim()}
@@ -657,41 +676,60 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           </>
         }
       >
-        {customerMetrics.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات العملاء') : (
+        {customerMetrics.length === 0 && topCustomerItems.length === 0 && cancelledCustomerItems.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات العملاء') : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6 mb-4">
-              {customerMetrics.map((m) => (
-                <MetricCard key={m.label} label={m.label} value={m.value} comparison={m.comparison} icon={m.icon} tone={m.tone} />
-              ))}
-            </div>
-            {cm?.timeSeries?.newCustomers && cm.timeSeries.newCustomers.length > 0 && (
+            {customerMetrics.length > 0 && renderMetricGrid(customerMetrics)}
+            {newCustomersSeries.length > 0 && (
               <LineChart
-                data={cm.timeSeries.newCustomers}
-                height={280}
+                data={newCustomersSeries}
+                height={240}
                 color="#0ea5e9"
                 yAxisFormatter={(v) => formatNumber(v)}
                 aria-label="مخطط العملاء الجدد عبر الزمن"
               />
             )}
-            {cm?.topCustomersByRevenue && cm.topCustomersByRevenue.length > 0 && (
-              <div className="mt-4">
-                <h4 className="mb-2 text-sm font-bold text-slate-700">أعلى العملاء إيراداً</h4>
-                <div className="overflow-x-auto">
-                  <DataTable
-                    ariaLabel="أعلى العملاء إيراداً"
-                    rows={cm.topCustomersByRevenue.slice(0, 10)}
-                    rowKey={(cust) => cust.id}
-                    onRowClick={() => go('/platform/tenants')}
-                    tableClassName="text-sm"
-                    columns={[
-                      { key: 'name', header: 'العميل', render: (cust) => <span className="text-[12px] font-semibold text-slate-700">{cust.name}</span> },
-                      { key: 'code', header: 'الكود', render: (cust) => <span className="text-[11px] text-slate-500 font-mono">{cust.code}</span> },
-                      { key: 'status', header: 'الحالة', render: (cust) => <StatusBadge value={cust.status} /> },
-                      { key: 'revenue', header: 'الإيراد', render: (cust) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(cust.revenue)}</span> },
-                      { key: 'invoices', header: 'الفواتير', render: (cust) => <span className="text-[11px] text-slate-500">{cust.invoicesCount}</span> },
-                    ]}
-                  />
-                </div>
+            {(topCustomerItems.length > 0 || cancelledCustomerItems.length > 0) && (
+              <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                {topCustomerItems.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-bold text-slate-700">أعلى العملاء إيراداً</h4>
+                    <div className="overflow-x-auto">
+                      <DataTable
+                        ariaLabel="أعلى العملاء إيراداً"
+                        rows={topCustomerItems.slice(0, 10)}
+                        rowKey={(cust) => cust.id}
+                        onRowClick={() => go('/platform/tenants')}
+                        tableClassName="text-sm"
+                        columns={[
+                          { key: 'name', header: 'العميل', render: (cust) => <span className="text-[12px] font-semibold text-slate-700">{cust.name}</span> },
+                          { key: 'code', header: 'الكود', render: (cust) => <span className="text-[11px] text-slate-500 font-mono">{cust.code}</span> },
+                          { key: 'status', header: 'الحالة', render: (cust) => <StatusBadge value={cust.status} /> },
+                          { key: 'revenue', header: 'الإيراد', render: (cust) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(cust.revenue)}</span> },
+                          { key: 'invoices', header: 'الفواتير', render: (cust) => <span className="text-[11px] text-slate-500">{cust.invoicesCount}</span> },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                )}
+                {cancelledCustomerItems.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-bold text-slate-700">عملاء ألغوا حديثاً</h4>
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {cancelledCustomerItems.slice(0, 8).map((t) => (
+                        <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
+                          <div className="min-w-0">
+                            <p className="truncate text-[12.5px] font-bold text-slate-800">{t.name}</p>
+                            <p className="text-[10.5px] text-slate-500"><span dir="ltr" className="font-mono">{t.code}</span>{t.planName ? ` · ${t.planName}` : ''}</p>
+                          </div>
+                          <div className="shrink-0 text-left">
+                            <StatusBadge value={t.status} />
+                            <p className="mt-1 text-[10px] text-slate-500">{formatDate(t.updatedAt)}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -747,16 +785,16 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           </>
         }
       >
-        {subscriptionMetrics.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات الاشتراكات') : (
+        {subscriptionMetrics.length === 0 && renewalItems.length === 0 && strugglingItems.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات الاشتراكات') : (
           <>
-            {renderMetricGrid(subscriptionMetrics)}
-            {sm && (
+            {subscriptionMetrics.length > 0 && renderMetricGrid(subscriptionMetrics)}
+            {(renewalItems.length > 0 || strugglingItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">التجديدات القادمة (30 يوم)</h4>
-                  {sm.upcomingRenewalsList && sm.upcomingRenewalsList.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {sm.upcomingRenewalsList.slice(0, 10).map((sub) => (
+                  {renewalItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {renewalItems.slice(0, 10).map((sub) => (
                         <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
                           <div className="min-w-0">
                             <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName}</p>
@@ -775,9 +813,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">الاشتراكات المتعثرة (PAST_DUE)</h4>
-                  {sm.strugglingList && sm.strugglingList.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {sm.strugglingList.slice(0, 10).map((sub) => (
+                  {strugglingItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {strugglingItems.slice(0, 10).map((sub) => (
                         <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
                           <div className="min-w-0">
                             <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName || '—'}</p>
@@ -809,20 +847,20 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         action={
           <>
             <DrillDownLink label="التراخيص" href="/platform/licenses" icon={<ExternalLink className="h-3.5 w-3.5" />} />
-            <DrillDownLink label="الأجهزة" href="/platform/devices" icon={<Zap className="h-3.5 w-3.5" />} />
+            <DrillDownLink label="الأجهزة" href="/platform/devices" icon={<MonitorSmartphone className="h-3.5 w-3.5" />} />
           </>
         }
       >
-        {licenseMetrics.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات التراخيص') : (
+        {licenseMetrics.length === 0 && failedActivationItems.length === 0 && pendingLicenseItems.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات التراخيص') : (
           <>
-            {renderMetricGrid(licenseMetrics)}
-            {lm && (
+            {licenseMetrics.length > 0 && renderMetricGrid(licenseMetrics)}
+            {(failedActivationItems.length > 0 || pendingLicenseItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">محاولات التفعيل الفاشلة (الأخيرة)</h4>
-                  {lm.failedActivationsList && lm.failedActivationsList.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {lm.failedActivationsList.slice(0, 10).map((act) => (
+                  {failedActivationItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {failedActivationItems.slice(0, 10).map((act) => (
                         <li key={act.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                           <div className="min-w-0">
                             <p className="truncate text-[12px] font-bold text-slate-800">{act.tenantName || '—'}</p>
@@ -841,9 +879,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">التراخيص المعلقة (ISSUED)</h4>
-                  {lm.pendingLicensesList && lm.pendingLicensesList.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {lm.pendingLicensesList.slice(0, 10).map((lic) => (
+                  {pendingLicenseItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {pendingLicenseItems.slice(0, 10).map((lic) => (
                         <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/licenses')}>
                           <div className="min-w-0">
                             <p className="truncate text-[12px] font-bold text-slate-800">{lic.tenantName || '—'}</p>
@@ -875,24 +913,53 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         action={
           <>
             <DrillDownLink label="الأجهزة" href="/platform/devices" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+            <DrillDownLink label="المزامنة" href="/platform/sync" icon={<Activity className="h-3.5 w-3.5" />} />
             <DrillDownLink label="السجلات" href="/platform/audit" icon={<ScrollText className="h-3.5 w-3.5" />} />
           </>
         }
       >
-        {operationsMetrics.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات التشغيل') : (
+        {/* Infrastructure capacity strip */}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="أجهزة مربوطة بتراخيص"
+            value={formatNumber(overview.devices?.boundLicenses ?? 0)}
+            icon={<MonitorSmartphone className="h-4 w-4" />}
+            tone="success"
+          />
+          <MetricCard
+            label="أجهزة غير مربوطة"
+            value={formatNumber(overview.devices?.unboundLicenses ?? 0)}
+            icon={<WifiOff className="h-4 w-4" />}
+            tone={ (overview.devices?.unboundLicenses ?? 0) > 0 ? 'warning' : 'default' }
+          />
+          <MetricCard
+            label="سعة الأجهزة"
+            value={formatNumber(overview.devices?.devicesLimit ?? 0)}
+            icon={<Cpu className="h-4 w-4" />}
+            tone="info"
+          />
+          <MetricCard
+            label="سعة الفروع"
+            value={formatNumber(overview.branches?.totalLimit ?? 0)}
+            icon={<GitBranch className="h-4 w-4" />}
+          />
+        </div>
+        {operationsMetrics.length === 0 && syncErrorItems.length === 0 && endpointHealthItems.length === 0 ? renderEmptyMetrics('لا تتوفر بيانات التشغيل') : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 mb-4">
-              {operationsMetrics.map((m) => (
-                <MetricCard key={m.label} label={m.label} value={m.value} comparison={m.comparison} icon={m.icon} tone={m.tone} />
-              ))}
-            </div>
-            {om && (
+            {operationsMetrics.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 mb-4">
+                {operationsMetrics.map((m) => (
+                  <MetricCard key={m.label} label={m.label} value={m.value} comparison={m.comparison} icon={m.icon} tone={m.tone} />
+                ))}
+              </div>
+            )}
+            {(syncErrorItems.length > 0 || endpointHealthItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">أخطاء المزامنة الأخيرة</h4>
-                  {om.recentSyncErrors && om.recentSyncErrors.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {om.recentSyncErrors.slice(0, 10).map((err) => (
+                  {syncErrorItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {syncErrorItems.slice(0, 10).map((err) => (
                         <li key={err.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                           <div className="min-w-0">
                             <p className="truncate text-[12px] font-bold text-slate-800">{err.deviceName}</p>
@@ -911,9 +978,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="mb-2 text-sm font-bold text-slate-700">صحة نقاط API</h4>
-                  {om.apiEndpointsHealth && om.apiEndpointsHealth.length > 0 ? (
-                    <ul className="divide-y divide-slate-100">
-                      {om.apiEndpointsHealth.map((ep) => (
+                  {endpointHealthItems.length > 0 ? (
+                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                      {endpointHealthItems.map((ep) => (
                         <li key={ep.endpoint} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                           <div className="min-w-0">
                             <p className="truncate text-[11px] font-mono text-slate-700">{ep.endpoint}</p>
@@ -939,12 +1006,80 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         )}
       </Panel>
 
+      {/* Expiring Soon */}
+      <Panel
+        title="تنتهي صلاحيتها قريباً"
+        subtitle="اشتراكات وتراخيص ستنتهي خلال 30 يوماً — رتّب أولويات التجديد"
+        icon={<AlertTriangle className="h-4 w-4" />}
+        iconClass="bg-amber-50 text-amber-600"
+        action={
+          <>
+            <DrillDownLink label="الاشتراكات" href="/platform/subscriptions" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+            <DrillDownLink label="التراخيص" href="/platform/licenses" icon={<KeyRound className="h-3.5 w-3.5" />} />
+          </>
+        }
+      >
+        {expiringSubItems.length === 0 && expiringLicenseItems.length === 0 ? (
+          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" /> لا توجد اشتراكات أو تراخيص على وشك الانتهاء.
+          </div>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div>
+              <h4 className="mb-2 text-sm font-bold text-slate-700">اشتراكات ({expiringSubItems.length})</h4>
+              {expiringSubItems.length > 0 ? (
+                <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                  {expiringSubItems.slice(0, 10).map((sub) => (
+                    <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/subscriptions')}>
+                      <div className="min-w-0">
+                        <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName || '—'}</p>
+                        <p className="text-[10.5px] text-slate-500">{sub.planName || '—'} · {formatMoney(sub.price)}</p>
+                      </div>
+                      <div className="shrink-0 text-left">
+                        <StatusBadge value={sub.status} />
+                        <p className="mt-1 text-[10px] font-semibold text-amber-700">ينتهي: {formatDate(sub.endDate)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState icon={<CalendarClock className="h-5 w-5" />} title="لا توجد اشتراكات قريبة الانتهاء" />
+              )}
+            </div>
+            <div>
+              <h4 className="mb-2 text-sm font-bold text-slate-700">تراخيص ({expiringLicenseItems.length})</h4>
+              {expiringLicenseItems.length > 0 ? (
+                <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                  {expiringLicenseItems.slice(0, 10).map((lic) => (
+                    <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/licenses')}>
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-bold text-slate-800">{lic.tenantName || '—'}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">{lic.licenseKey}</p>
+                      </div>
+                      <div className="shrink-0 text-left">
+                        <StatusBadge value={lic.status} />
+                        <p className="mt-1 text-[10px] font-semibold text-amber-700">ينتهي: {formatDate(lic.expiresAt)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState icon={<KeyRound className="h-5 w-5" />} title="لا توجد تراخيص قريبة الانتهاء" />
+              )}
+            </div>
+          </div>
+        )}
+      </Panel>
+
       {/* Revenue by Plan Section */}
       <Panel
         title="الإيراد حسب الخطة"
         subtitle="إجمالي الاشتراكات النشطة مجمّعة حسب خطة الاشتراك"
         icon={<Wallet className="h-4 w-4" />}
         iconClass="bg-emerald-50 text-emerald-600"
+        action={
+          <DrillDownLink label="الخطط" href="/platform/plans" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+        }
       >
         {overview.revenueByPlan && overview.revenueByPlan.length > 0 ? (
           <div className="overflow-x-auto">
@@ -979,7 +1114,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           <EmptyState icon={<CreditCard className="h-5 w-5" />} title="لا توجد باقات معرفة" />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {plans.map((plan) => (
+            {plans.map((plan: PlatformPlan) => (
               <button
                 key={plan.id}
                 type="button"
@@ -1022,6 +1157,73 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               </button>
             ))}
           </div>
+        )}
+      </Panel>
+
+      {/* Modules & Features */}
+      <Panel
+        title="الوحدات والميزات"
+        subtitle="وحدات المنتج المتاحة وتفعيلها عبر المنصة"
+        icon={<Layers className="h-4 w-4" />}
+        iconClass="bg-indigo-50 text-indigo-600"
+        action={
+          <DrillDownLink label="إدارة الوحدات" href="/platform/product" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+        }
+      >
+        {moduleItems.length === 0 ? (
+          <EmptyState icon={<Layers className="h-5 w-5" />} title="لا توجد وحدات معرفة" />
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {moduleItems.slice(0, 16).map((m) => (
+              <div key={m.code} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[11.5px] font-bold text-slate-700">{m.name}</p>
+                  <p className="truncate text-[9.5px] text-slate-400" dir="ltr">{m.code}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {(m.licenseCount ?? 0) > 0 && (
+                    <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">{formatNumber(m.licenseCount)} ترخيص</span>
+                  )}
+                  {(m.tenantCount ?? 0) > 0 && (
+                    <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">{formatNumber(m.tenantCount)} عميل</span>
+                  )}
+                  <StatusBadge value={m.enabled ? 'ACTIVE' : 'CANCELLED'} label={m.enabled ? 'مفعّلة' : 'معطّلة'} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* Recent Audit Activity */}
+      <Panel
+        title="أحدث أحداث التدقيق"
+        subtitle="آخر الإجراءات على مستوى المنصة"
+        icon={<FileClock className="h-4 w-4" />}
+        iconClass="bg-slate-100 text-slate-600"
+        action={
+          <DrillDownLink label="سجل التدقيق" href="/platform/audit" icon={<ExternalLink className="h-3.5 w-3.5" />} />
+        }
+      >
+        {auditItems.length === 0 ? (
+          <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا توجد أحداث حديثة" />
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {auditItems.slice(0, 10).map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 px-2 py-2.5 hover:bg-slate-50">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${AUDIT_SEVERITY_DOT[String(a.severity ?? 'INFO').toUpperCase()] ?? 'bg-slate-400'}`} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] font-bold text-slate-800">{a.action}</p>
+                    <p className="text-[10px] text-slate-500">
+                      {a.actorName || 'النظام'}{a.entityType ? ` · ${a.entityType}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 text-[10px] text-slate-400">{formatDateTime(a.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </Panel>
 
@@ -1100,7 +1302,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DrillDownLink
             label="التحليلات والتقارير"
-            href={`/platform/analytics`}
+            href="/platform/analytics"
             icon={<BarChart2 className="h-4 w-4" />}
           />
           <DrillDownLink

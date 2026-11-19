@@ -1,11 +1,14 @@
 import type { ManufacturingContext } from './context';
 import type { ProductionOrdersModule } from './productionOrders';
 import type {
+  MaterialShortage,
   ProductionCostReport,
   ProductionOrder,
   ProductionOrderCost,
+  PurchaseSuggestion,
   WorkCenterLoad,
 } from './types';
+import { PurchaseRequestService, type RequestPriority } from '../../purchases/PurchaseRequestService';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -56,6 +59,150 @@ export class CostingModule {
       totalCost: round2(orders.reduce((sum, row) => sum + row.totalCost, 0)),
       totalQuantity: orders.reduce((sum, row) => sum + row.quantity, 0),
     };
+  }
+
+  /**
+   * Component shortages for active production orders: remaining material need
+   * (planned − consumed) versus on-hand stock in each order's warehouse.
+   * Note: stock is shared across orders, so simultaneous orders may compete
+   * for the same balance — treat deficits as alerts, not reservations.
+   */
+  public getMaterialShortages(): MaterialShortage[] {
+    const actor = this.ctx.require('manufacturing.view');
+    const scope = this.ctx.branchAccess.sqlScope('o.branch_id', undefined, actor);
+    const rows = this.ctx.db.query<any>(
+      `SELECT o.id AS orderId, o.order_number AS orderNumber, o.status AS orderStatus,
+              o.warehouse_id AS warehouseId,
+              m.product_id AS componentProductId, p.name AS componentName,
+              (m.planned_qty - m.consumed_qty) AS requiredQty,
+              COALESCE(ws.quantity_m2, 0) AS availableQty
+       FROM production_order_materials m
+       JOIN production_orders o ON o.id = m.order_id
+       JOIN products p ON p.id = m.product_id
+       LEFT JOIN warehouse_stock ws
+         ON ws.warehouse_id = o.warehouse_id AND ws.product_id = m.product_id
+       WHERE o.status IN ('PLANNED', 'RELEASED', 'IN_PROGRESS')
+         AND (m.planned_qty - m.consumed_qty) > 0
+         AND ${scope.clause}`,
+      scope.params
+    );
+    return rows
+      .map((row) => {
+        const requiredQty = Number(row.requiredQty) || 0;
+        const availableQty = Number(row.availableQty) || 0;
+        return {
+          orderId: row.orderId,
+          orderNumber: row.orderNumber,
+          orderStatus: row.orderStatus,
+          componentProductId: row.componentProductId,
+          componentName: row.componentName,
+          warehouseId: row.warehouseId,
+          requiredQty,
+          availableQty,
+          deficitQty: Math.round((requiredQty - availableQty) * 1000) / 1000,
+        };
+      })
+      .filter((row) => row.deficitQty > 0);
+  }
+
+  /**
+   * Aggregated purchase suggestions: component deficits grouped by product and
+   * warehouse across all active production orders. Stock is counted once per
+   * product+warehouse (not per order), so simultaneous orders don't inflate it.
+   */
+  public getPurchaseSuggestions(): PurchaseSuggestion[] {
+    const shortages = this.getMaterialShortages();
+    const groups = new Map<string, {
+      componentProductId: string; componentName: string; warehouseId: string;
+      totalRequiredQty: number; availableQty: number; orderIds: Set<string>; orderNumbers: Set<string>;
+    }>();
+    for (const row of shortages) {
+      const key = `${row.componentProductId}|${row.warehouseId}`;
+      const group = groups.get(key) || {
+        componentProductId: row.componentProductId,
+        componentName: row.componentName,
+        warehouseId: row.warehouseId,
+        totalRequiredQty: 0,
+        availableQty: row.availableQty,
+        orderIds: new Set<string>(),
+        orderNumbers: new Set<string>(),
+      };
+      group.totalRequiredQty += row.requiredQty;
+      group.availableQty = Math.max(group.availableQty, row.availableQty);
+      group.orderIds.add(row.orderId);
+      group.orderNumbers.add(row.orderNumber);
+      groups.set(key, group);
+    }
+    const productIds = [...groups.values()].map((group) => group.componentProductId);
+    const placeholders = productIds.map(() => '?').join(',');
+    const costs = new Map(
+      productIds.length === 0 ? [] : this.ctx.db.query<{ id: string; costPrice: number }>(
+        `SELECT id, cost_price AS costPrice FROM products WHERE id IN (${placeholders})`,
+        productIds
+      ).map((row) => [row.id, Number(row.costPrice || 0) / 100])
+    );
+    return [...groups.values()]
+      .map((group) => {
+        const unitCost = costs.get(group.componentProductId) || 0;
+        const suggestedQty = Math.round((group.totalRequiredQty - group.availableQty) * 1000) / 1000;
+        return {
+          componentProductId: group.componentProductId,
+          componentName: group.componentName,
+          warehouseId: group.warehouseId,
+          totalRequiredQty: Math.round(group.totalRequiredQty * 1000) / 1000,
+          availableQty: group.availableQty,
+          suggestedQty,
+          unitCost,
+          estimatedValue: Math.round(suggestedQty * unitCost * 100) / 100,
+          affectedOrders: group.orderIds.size,
+          orderNumbers: [...group.orderNumbers],
+        };
+      })
+      .filter((row) => row.suggestedQty > 0)
+      .sort((a, b) => b.estimatedValue - a.estimatedValue);
+  }
+
+  /**
+   * Create purchase requests (one per warehouse) covering the aggregated
+   * production shortages. Requires `ui.purchases.requests.create`.
+   */
+  public createPurchaseRequestsFromShortages(input?: {
+    warehouseId?: string;
+    priority?: RequestPriority;
+    neededBy?: string;
+  }): Array<{ warehouseId: string; requestId: string; requestNumber: string; itemsCount: number }> {
+    this.ctx.guardWrites();
+    this.ctx.require('manufacturing.manage');
+    const suggestions = this.getPurchaseSuggestions()
+      .filter((row) => !input?.warehouseId || row.warehouseId === input.warehouseId);
+    if (suggestions.length === 0) throw new Error('لا توجد نواقص مواد لإنشاء طلب شراء.');
+
+    const byWarehouse = new Map<string, PurchaseSuggestion[]>();
+    for (const suggestion of suggestions) {
+      const list = byWarehouse.get(suggestion.warehouseId) || [];
+      list.push(suggestion);
+      byWarehouse.set(suggestion.warehouseId, list);
+    }
+
+    const purchaseRequests = new PurchaseRequestService();
+    const created: Array<{ warehouseId: string; requestId: string; requestNumber: string; itemsCount: number }> = [];
+    for (const [warehouseId, items] of byWarehouse) {
+      const request = purchaseRequests.createRequest({
+        warehouseId,
+        neededBy: input?.neededBy,
+        priority: input?.priority || 'HIGH',
+        notes: `اقتراح شراء من نواقص أوامر الإنتاج: ${items.flatMap((item) => item.orderNumbers).slice(0, 10).join('، ')}`,
+        items: items.map((item) => ({
+          productId: item.componentProductId,
+          quantityM2: item.suggestedQty,
+          estimatedUnitCost: item.unitCost,
+          notes: `عجز إنتاج: مطلوب ${item.totalRequiredQty} / متاح ${item.availableQty} — أوامر: ${item.orderNumbers.join('، ')}`,
+        })),
+      });
+      created.push({ warehouseId, requestId: request.id, requestNumber: request.requestNumber, itemsCount: items.length });
+    }
+    this.ctx.audit('إنشاء طلبات شراء من نواقص الإنتاج', 'purchase_requests', { count: created.length });
+    return created;
   }
 
   /** Per-work-center load for active production orders (capacity planning). */

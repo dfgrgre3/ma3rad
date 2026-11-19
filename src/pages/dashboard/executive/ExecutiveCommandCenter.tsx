@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeftRight, ArrowUpRight, Banknote, Boxes,
-  Building2, ChevronLeft, CircleDollarSign, Landmark, Loader2, Package, ReceiptText,
+  Building2, ChevronLeft, CircleDollarSign, Factory, Landmark, Loader2, Package, ReceiptText,
   RefreshCw, ShoppingBag, ShoppingCart, TrendingDown, TrendingUp, Users, Wallet,
 } from 'lucide-react';
 import {
@@ -336,6 +336,58 @@ export const ExecutiveCommandCenter: React.FC = () => {
           />
         </div>
       </section>
+
+      {/* Manufacturing KPIs — only when the module is enabled and visible to the actor */}
+      {data.manufacturing && (
+        <section aria-labelledby="command-manufacturing-heading">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 id="command-manufacturing-heading" className="text-[12px] font-extrabold text-[#1b1b1b] dark:text-[#f0f0f0]">التصنيع</h2>
+            <span className="text-[10px] font-semibold text-[#767676] dark:text-[#a6a6a6]">أوامر الإنتاج والنواقص</span>
+          </div>
+          <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
+            <CommandKpiCard
+              label="أوامر إنتاج نشطة"
+              value={commandFormatters.count(data.manufacturing.activeOrders)}
+              hint={`${commandFormatters.count(data.manufacturing.inProgressOrders)} قيد التنفيذ`}
+              icon={Factory}
+              tone="info"
+              onClick={open('manufacturing')}
+            />
+            <CommandKpiCard
+              label="أُنجزت في الفترة"
+              value={commandFormatters.count(data.manufacturing.completedInPeriod)}
+              hint={`${commandFormatters.numberAr(data.manufacturing.completedQuantity)} وحدة`}
+              icon={Package}
+              tone="positive"
+              onClick={open('manufacturing')}
+            />
+            <CommandKpiCard
+              label="قيمة WIP (مواد)"
+              value={shortMoney(data.manufacturing.wipMaterialCost)}
+              hint={`${commandFormatters.count(data.manufacturing.wipOrders)} أمر قيد التجهيز`}
+              icon={Boxes}
+              tone="default"
+              onClick={open('manufacturing')}
+            />
+            <CommandKpiCard
+              label="نواقص مواد الإنتاج"
+              value={commandFormatters.count(data.manufacturing.materialShortages)}
+              hint="عناصر مطلوبة غير متوفرة في المخزون"
+              icon={AlertTriangle}
+              tone={data.manufacturing.materialShortages > 0 ? 'negative' : 'positive'}
+              onClick={open('manufacturing')}
+            />
+            <CommandKpiCard
+              label="مكوّنات BOM حرجة"
+              value={commandFormatters.count(data.manufacturing.bomStockAlerts)}
+              hint="مكوّنات نشطة تحت حد الطلب"
+              icon={AlertTriangle}
+              tone={data.manufacturing.bomStockAlerts > 0 ? 'warning' : 'positive'}
+              onClick={open('manufacturing')}
+            />
+          </div>
+        </section>
+      )}
 
       {/* Trend & cash position */}
       <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-3">

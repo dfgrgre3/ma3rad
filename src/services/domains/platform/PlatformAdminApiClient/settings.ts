@@ -22,8 +22,9 @@ export interface SettingsApi {
   createModule(this: PlatformAdminApiCore, input: { code: string; name: string; description?: string; category?: string; isActive?: boolean; sortOrder?: number }): Promise<any>;
   updateModule(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; category?: string; isActive?: boolean; sortOrder?: number }): Promise<any>;
   listFeatureFlags(this: PlatformAdminApiCore): Promise<any[]>;
-  createFeatureFlag(this: PlatformAdminApiCore, input: { key: string; name: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }): Promise<any>;
-  updateFeatureFlag(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[] }): Promise<any>;
+  createFeatureFlag(this: PlatformAdminApiCore, input: { key: string; name: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[]; pagePaths?: string[] }): Promise<any>;
+  updateFeatureFlag(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[]; pagePaths?: string[] }): Promise<any>;
+  deleteFeatureFlag(this: PlatformAdminApiCore, id: string): Promise<any>;
   getBusinessPerformance(this: PlatformAdminApiCore, period?: string): Promise<any>;
   getCustomerMetrics(this: PlatformAdminApiCore, period?: string): Promise<any>;
   getLicenseMetrics(this: PlatformAdminApiCore): Promise<any>;
@@ -158,6 +159,15 @@ export function createSettingsApi(): SettingsApi {
 
     async updateFeatureFlag(this: PlatformAdminApiCore, id: string, input: { name?: string; description?: string; isEnabled?: boolean; rolloutPercentage?: number; targetTenants?: string[]; pagePaths?: string[] }) {
       const envelope = await this.requestEnvelope<any>({ path: `/api/v1/admin/feature-flags/${encodeURIComponent(id)}`, method: 'PUT', body: input });
+      if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+      return envelope.data;
+    },
+
+    async deleteFeatureFlag(this: PlatformAdminApiCore, id: string) {
+      const envelope = await this.requestEnvelope<any>({
+        path: `/api/v1/admin/feature-flags/${encodeURIComponent(id)}`,
+        method: 'DELETE',
+      });
       if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
       return envelope.data;
     },

@@ -50,6 +50,7 @@ export interface ModulesLicensesApi {
     pagePaths?: string[];
   }): PlatformFeatureFlag;
   setFeatureEnabled(id: string, enabled: boolean): void;
+  deleteFeatureFlag(id: string): void;
   listReleases(): PlatformRelease[];
   listReleaseTargets(releaseId: string): PlatformReleaseTarget[];
   setReleaseTargets(releaseId: string, tenantIds: string[]): PlatformReleaseTarget[];
@@ -181,6 +182,10 @@ export function createModulesLicensesApi(): ModulesLicensesApi {
 
     setFeatureEnabled(id: string, enabled: boolean) {
       platformModuleFeatureService.setFeatureEnabled(id, enabled);
+    },
+
+    deleteFeatureFlag(id: string) {
+      platformModuleFeatureService.deleteFeatureFlag(id);
     },
 
     listReleases() {

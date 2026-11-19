@@ -36,6 +36,7 @@ const PlatformNotificationsHubPage = React.lazy(() => import('./PlatformNotifica
 const PlatformPoliciesPage = React.lazy(() => import('./PlatformPoliciesPage').then(m => ({ default: m.PlatformPoliciesPage })));
 const PlatformEmergencyCenterPage = React.lazy(() => import('./PlatformEmergencyCenterPage').then(m => ({ default: m.PlatformEmergencyCenterPage })));
 const PlatformCustomerPortalSimulatorPage = React.lazy(() => import('./PlatformCustomerPortalSimulatorPage').then(m => ({ default: m.PlatformCustomerPortalSimulatorPage })));
+const PlatformPlanWizardPage = React.lazy(() => import('./PlatformPlanWizardPage').then(m => ({ default: m.PlatformPlanWizardPage })));
 import { PlatformSuperAdminDashboard, PlatformUserPlatformPermissionsPage } from '../../router/lazyPages';
 import { PlatformAuthorizationService } from '../../services/domains/platform/PlatformAuthorizationService';
 import { PlatformStaffAuthService } from '../../services/domains/platform/PlatformStaffAuthService';
@@ -333,6 +334,14 @@ export const PlatformRoutes: React.FC<PlatformRoutesProps> = ({ currentUser, onL
           element={
             <PlatformRouteGuard currentUser={currentUser} targetModule="customer-portal">
               <PlatformCustomerPortalSimulatorPage />
+            </PlatformRouteGuard>
+          }
+        />
+        <Route
+          path="plan-catalog"
+          element={
+            <PlatformRouteGuard currentUser={currentUser} targetModule="product">
+              <PlatformPlanWizardPage />
             </PlatformRouteGuard>
           }
         />

@@ -5,11 +5,14 @@ import type {
   CommandPeriod,
   CommandRange,
   DrilldownKey,
+  ManufacturingSummary,
   DrilldownResult,
   ExecutiveCommandOverview,
   PeriodSnapshot,
 } from '../../../types/dashboard/executiveCommand';
 import { ExecutiveCommandAggregates } from './ExecutiveCommandService/aggregates';
+import { ManufacturingService } from '../manufacturing/ManufacturingService';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { ExecutiveCommandDrilldowns } from './ExecutiveCommandService/drilldowns';
 import { resolvePeriod } from './ExecutiveCommandService/period';
 import { count, money, numberAr, round2, toNumber } from './ExecutiveCommandService/formatters';
@@ -35,7 +38,7 @@ export class ExecutiveCommandService {
   // ───────────────────────────────────────────────────────────────────────────
 
   public getOverview(range: CommandRange): ExecutiveCommandOverview {
-    this.requireCoreAccess();
+    const actor = this.requireCoreAccess();
     const period = resolvePeriod(range);
     const today = localDateString();
 
@@ -66,6 +69,7 @@ export class ExecutiveCommandService {
     const overdueRows = this.aggregates.getOverdueInvoiceRows(today);
 
     const trend = this.aggregates.getTrend(period);
+    const manufacturing = this.getManufacturingSummary(actor, period.from, period.to);
 
     const current: PeriodSnapshot = {
       sales: sales.net,
@@ -141,6 +145,7 @@ export class ExecutiveCommandService {
         })),
         lowStock: lowStockRows.slice(0, 5),
       },
+      manufacturing,
     };
   }
 
@@ -189,6 +194,8 @@ export class ExecutiveCommandService {
         return this.drilldowns.purchasesDrilldown(period.from, period.to);
       case 'lowStock':
         return this.drilldowns.lowStockDrilldown();
+      case 'manufacturing':
+        return this.drilldowns.manufacturingDrilldown();
       case 'comparison':
         return this.comparisonDrilldown(period);
       default:
@@ -207,6 +214,36 @@ export class ExecutiveCommandService {
     PermissionService.require(actor, 'finance.view', '/finance');
     PermissionService.require(actor, 'inventory.view', '/inventory');
     return actor;
+  }
+
+  /** Manufacturing KPIs, only when the actor may view manufacturing and the module is enabled. */
+  private getManufacturingSummary(
+    actor: ReturnType<typeof AuthService.requireAuth>,
+    from: string,
+    to: string,
+  ): ManufacturingSummary | null {
+    if (!PermissionService.can(actor, 'manufacturing.view')) return null;
+    if (!ModuleRegistryService.isModuleEnabled('manufacturing')) return null;
+    try {
+      const summary = this.aggregates.getManufacturingSummary(from, to);
+      const service = new ManufacturingService();
+      const wip = service.getWipValuation();
+      const shortages = service.getMaterialShortages();
+      const bomAlerts = service.getBomStockAlerts();
+      return {
+        activeOrders: summary.activeOrders,
+        inProgressOrders: summary.inProgressOrders,
+        completedInPeriod: summary.completedInPeriod,
+        completedQuantity: summary.completedQuantity,
+        wipOrders: wip.orders.length,
+        wipMaterialCost: wip.totalMaterialCost,
+        materialShortages: shortages.length,
+        bomStockAlerts: bomAlerts.length,
+      };
+    } catch (error) {
+      console.error('[executive] manufacturing summary failed', error);
+      return null;
+    }
   }
 
   private comparisonDrilldown(period: CommandPeriod): DrilldownResult {

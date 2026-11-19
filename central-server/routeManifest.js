@@ -120,8 +120,12 @@ const ROUTE_MANIFEST = [
   }),
 
   // ── Plans ─────────────────────────────────────────────────────────────────
-  route('/api/v1/admin/plans', ['GET'], {
+  route('/api/v1/admin/plans', ['GET', 'POST'], {
     GET: ['platform.plans.view', 'platform.plans.manage'],
+    POST: ['platform.plans.create', 'platform.plans.manage', 'platform.plans.update'],
+  }),
+  route('/api/v1/admin/plans/:id', ['PUT'], {
+    PUT: ['platform.plans.update', 'platform.plans.manage'],
   }),
 
   // ── Subscriptions ──────────────────────────────────────────────────────────
@@ -385,8 +389,9 @@ const ROUTE_MANIFEST = [
     GET: ['platform.product.view', 'platform.product.manage'],
     POST: ['platform.product.create', 'platform.product.manage'],
   }),
-  route('/api/v1/admin/feature-flags/:id', ['PUT'], {
+  route('/api/v1/admin/feature-flags/:id', ['PUT', 'DELETE'], {
     PUT: ['platform.product.update', 'platform.product.manage'],
+    DELETE: ['platform.product.delete', 'platform.product.manage'],
   }),
   route('/api/v1/admin/staff/sessions', ['GET'], {
     GET: ['platform.staff.view', 'platform.staff.manage_sessions'],

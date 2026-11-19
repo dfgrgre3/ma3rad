@@ -528,4 +528,58 @@ export class ExecutiveCommandDrilldowns {
       ],
     };
   }
+
+  public manufacturingDrilldown(): DrilldownResult {
+    const actor = AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('po.branch_id', undefined, actor);
+    const rows = this.db.query<any>(
+      `SELECT po.order_number AS orderNumber, p.name AS product, po.quantity, po.status,
+              po.priority, po.due_date AS dueDate, br.name AS branch,
+              so.order_number AS salesOrder, c.name AS customer
+       FROM production_orders po
+       JOIN products p ON p.id = po.product_id
+       LEFT JOIN branches br ON br.id = po.branch_id
+       LEFT JOIN orders so ON so.id = po.sales_order_id
+       LEFT JOIN customers c ON c.id = po.customer_id
+       WHERE po.status IN ('PLANNED', 'RELEASED', 'IN_PROGRESS') AND ${scope.clause}
+       ORDER BY po.due_date IS NULL, po.due_date, po.created_at
+       LIMIT ?`,
+      [...scope.params, MAX_DRILLDOWN_ROWS]
+    );
+    const statusLabels: Record<string, string> = {
+      PLANNED: 'مخطط', RELEASED: 'صادر', IN_PROGRESS: 'قيد التنفيذ',
+      COMPLETED: 'مكتمل', CANCELLED: 'ملغى',
+    };
+    const priorityLabels: Record<string, string> = {
+      LOW: 'منخفضة', MEDIUM: 'متوسطة', HIGH: 'عالية', URGENT: 'عاجلة',
+    };
+    return {
+      key: 'manufacturing',
+      title: 'أوامر الإنتاج النشطة',
+      subtitle: 'الأوامر المخططة والصادرة وقيد التنفيذ',
+      columns: [
+        { key: 'orderNumber', label: 'رقم الأمر' },
+        { key: 'product', label: 'المنتج' },
+        { key: 'quantity', label: 'الكمية', type: 'number' },
+        { key: 'status', label: 'الحالة' },
+        { key: 'priority', label: 'الأولوية' },
+        { key: 'dueDate', label: 'الاستحقاق', type: 'date' },
+        { key: 'branch', label: 'الفرع' },
+        { key: 'salesOrder', label: 'أمر البيع' },
+        { key: 'customer', label: 'العميل' },
+      ],
+      rows: rows.map((row) => ({
+        orderNumber: row.orderNumber,
+        product: row.product,
+        quantity: toNumber(row.quantity),
+        status: statusLabels[row.status] || row.status,
+        priority: priorityLabels[row.priority] || row.priority,
+        dueDate: row.dueDate,
+        branch: row.branch || '—',
+        salesOrder: row.salesOrder || '—',
+        customer: row.customer || '—',
+      })),
+      totals: [{ label: 'عدد الأوامر', value: rows.length, type: 'number' }],
+    };
+  }
 }

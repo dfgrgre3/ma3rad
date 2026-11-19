@@ -27,7 +27,7 @@ export const statusBadge = (status: string) => {
 
 const PRIORITY_LABEL: Record<string, string> = { LOW: 'منخفضة', MEDIUM: 'متوسطة', HIGH: 'عالية', URGENT: 'عاجلة' };
 
-export const OverviewTab: React.FC<TabProps> = ({ data }) => {
+export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canManage, toast }) => {
   const orders = data.orders;
   const active = orders.filter((o) => ['RELEASED', 'IN_PROGRESS'].includes(o.status));
   const planned = orders.filter((o) => o.status === 'PLANNED');
@@ -43,11 +43,12 @@ export const OverviewTab: React.FC<TabProps> = ({ data }) => {
     { label: 'إجمالي المكتملة', value: completed.length, tone: 'text-emerald-600' },
     { label: 'تكلفة WIP (مواد)', value: data.wip.totalMaterialCost.toLocaleString(), tone: 'text-amber-600' },
     { label: 'مراكز فوق الطاقة', value: overloaded.length, tone: overloaded.length ? 'text-rose-600' : 'text-emerald-600' },
+    { label: 'صيانة وقائية متأخرة', value: data.maintenanceAlerts.overdue.length, tone: data.maintenanceAlerts.overdue.length ? 'text-rose-600' : 'text-emerald-600' },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-[11px] font-bold text-slate-500">{kpi.label}</div>
@@ -96,6 +97,57 @@ export const OverviewTab: React.FC<TabProps> = ({ data }) => {
               },
             ]}
             emptyTitle="لا توجد مراكز عمل."
+          />
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-3 lg:col-span-2">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-900">
+              نواقص المواد
+              {data.materialShortages.length > 0 && (
+                <span className="mr-2 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700">{data.materialShortages.length}</span>
+              )}
+            </h3>
+            {canManage && data.purchaseSuggestions.length > 0 && (
+              <button
+                className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white"
+                onClick={() => {
+                  try {
+                    const created = service.createPurchaseRequestsFromShortages();
+                    toast.success(`تم إنشاء ${created.length} طلب شراء: ${created.map((row) => row.requestNumber).join('، ')}`);
+                    reload();
+                  } catch (error: any) {
+                    toast.error(error?.message || 'تعذر إنشاء طلبات الشراء.');
+                  }
+                }}
+              >
+                إنشاء طلبات شراء ({data.purchaseSuggestions.length})
+              </button>
+            )}
+          </div>
+          {data.purchaseSuggestions.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {data.purchaseSuggestions.slice(0, 6).map((row) => (
+                <span key={`${row.componentProductId}-${row.warehouseId}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600" title={row.orderNumbers.join('، ')}>
+                  {row.componentName}: يُقترح شراء {row.suggestedQty} (≈ {row.estimatedValue.toLocaleString()})
+                </span>
+              ))}
+            </div>
+          )}
+          <DataTable
+            ariaLabel="نواقص مواد أوامر الإنتاج"
+            rows={data.materialShortages.slice(0, 10)}
+            rowKey={(row) => `${row.orderId}-${row.componentProductId}`}
+            dense
+            columns={[
+              { key: 'order', header: 'أمر الإنتاج', render: (row) => <span className="font-mono text-xs">{row.orderNumber}</span> },
+              { key: 'component', header: 'المكوّن', render: (row) => row.componentName },
+              { key: 'required', header: 'المطلوب', render: (row) => row.requiredQty },
+              { key: 'available', header: 'المتاح', render: (row) => row.availableQty },
+              { key: 'deficit', header: 'العجز', render: (row) => <b className="text-rose-600">{row.deficitQty}</b> },
+              { key: 'status', header: 'حالة الأمر', render: (row) => statusBadge(row.orderStatus) },
+            ]}
+            emptyTitle="لا توجد نواقص — كل المواد متوفرة."
           />
         </div>
       </div>

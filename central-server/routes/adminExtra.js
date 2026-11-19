@@ -343,6 +343,31 @@ router.put(
   }
 );
 
+router.delete(
+  '/admin/feature-flags/:id',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.product.delete', 'platform.product.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const flag = await db.get('SELECT * FROM platform_feature_flags WHERE id = ?', [req.params.id]);
+      if (!flag) return res.status(404).json({ error: 'Feature flag not found' });
+      await db.run('DELETE FROM platform_feature_flags WHERE id = ?', [req.params.id]);
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        action: 'FEATURE_FLAG_DELETED',
+        resourceType: 'platform_feature_flags',
+        resourceId: req.params.id,
+        beforeData: { key: flag.key, name: flag.name },
+        ipAddress: req.ip,
+      });
+      res.json({ data: { deleted: true }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ── Staff Sessions, Devices & Invites ──────────────────────────────────────
 router.get(
   '/admin/staff/sessions',

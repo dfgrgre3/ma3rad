@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { ProductService } from '../src/services/domains/products/ProductService.ts';
 import { ManufacturingService } from '../src/services/domains/manufacturing/ManufacturingService.ts';
 import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -375,4 +376,271 @@ test('manufacturing analytics report efficiency, variance and monthly output', a
   assert.ok(monthly, 'completed order should appear in monthly output');
   assert.ok(monthly.orders >= 1);
   assert.ok(monthly.quantity >= 2);
+});
+
+test('maintenance alerts separate overdue from upcoming preventive schedules', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const today = localDateString();
+  const iso = (offsetDays: number) => {
+    const d = new Date(`${today}T00:00:00`);
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
+  };
+
+  service.createMaintenance({ equipmentName: 'Overdue press', maintenanceType: 'PREVENTIVE', scheduledDate: iso(-2) });
+  service.createMaintenance({ equipmentName: 'Upcoming kiln', maintenanceType: 'PREVENTIVE', scheduledDate: iso(3) });
+  service.createMaintenance({ equipmentName: 'Far future mixer', maintenanceType: 'PREVENTIVE', scheduledDate: iso(30) });
+  service.createMaintenance({ equipmentName: 'Corrective job', maintenanceType: 'CORRECTIVE', scheduledDate: iso(-5) });
+
+  const alerts = service.getMaintenanceAlerts(7);
+  assert.ok(alerts.overdue.some((row) => row.equipmentName === 'Overdue press'));
+  assert.ok(!alerts.overdue.some((row) => row.equipmentName === 'Corrective job'), 'corrective jobs are not preventive alerts');
+  assert.ok(alerts.dueSoon.some((row) => row.equipmentName === 'Upcoming kiln'));
+  assert.ok(!alerts.dueSoon.some((row) => row.equipmentName === 'Far future mixer'));
+  assert.ok(!alerts.dueSoon.some((row) => row.equipmentName === 'Overdue press'));
+});
+
+test('BOM estimated cost rolls up component prices', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Estimated good');
+  const componentA = createProduct('Estimate component A');
+  const componentB = createProduct('Estimate component B');
+  setCostPrice(componentA, 10);
+  setCostPrice(componentB, 5);
+
+  const bom = service.createBom({
+    productId: product,
+    name: 'Estimated BOM',
+    items: [
+      { componentProductId: componentA, quantity: 2 },
+      { componentProductId: componentB, quantity: 4 },
+    ],
+  });
+
+  const listed = service.getBoms().find((row) => row.id === bom.id);
+  assert.ok(listed);
+  assert.equal(listed.estimatedCost, 40); // 2×10 + 4×5
+
+  const detail = service.getBomCostEstimate(bom.id);
+  assert.equal(detail.totalCost, 40);
+  assert.equal(detail.items.length, 2);
+  assert.equal(detail.items.find((item) => item.componentProductId === componentA)?.lineCost, 20);
+});
+
+test('material shortages report remaining need vs available stock', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Shortage good');
+  const component = createProduct('Shortage component');
+  const bom = service.createBom({
+    productId: product,
+    name: 'Shortage BOM',
+    items: [{ componentProductId: component, quantity: 3 }],
+  });
+  service.activateBom(bom.id);
+
+  // Order for 4 units → needs 12 components; no stock yet.
+  const order = service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 4 });
+  let shortages = service.getMaterialShortages();
+  let row = shortages.find((entry) => entry.orderId === order.id);
+  assert.ok(row, 'uncovered material need should appear as shortage');
+  assert.equal(row.requiredQty, 12);
+  assert.equal(row.availableQty, 0);
+  assert.equal(row.deficitQty, 12);
+
+  // Partial stock reduces but does not clear the deficit.
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_mfgshort_component', 'wh_main', ?, 5)`,
+    [component]
+  );
+  shortages = service.getMaterialShortages();
+  row = shortages.find((entry) => entry.orderId === order.id);
+  assert.equal(row?.availableQty, 5);
+  assert.equal(row?.deficitQty, 7);
+
+  // Consuming materials shrinks the remaining requirement.
+  service.releaseOrder(order.id);
+  service.startOrder(order.id);
+  service.consumeMaterial(order.materials[0].id, 4);
+  shortages = service.getMaterialShortages();
+  row = shortages.find((entry) => entry.orderId === order.id);
+  assert.equal(row?.requiredQty, 8);
+  assert.equal(row?.deficitQty, 3);
+
+  // Completing the order removes it from the shortage list entirely.
+  db.run(
+    `UPDATE warehouse_stock SET quantity_m2 = 20 WHERE warehouse_id = 'wh_main' AND product_id = ?`,
+    [component]
+  );
+  service.completeOrder(order.id);
+  assert.ok(!service.getMaterialShortages().some((entry) => entry.orderId === order.id));
+});
+
+test('production floor reports live order progress', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Floor good');
+  const component = createProduct('Floor component');
+  const wc = service.createWorkCenter({ code: 'WC-FLOOR', name: 'Floor WC', capacityPerDay: 8 });
+  const bom = service.createBom({
+    productId: product,
+    name: 'Floor BOM',
+    items: [{ componentProductId: component, quantity: 1 }],
+  });
+  service.activateBom(bom.id);
+
+  const order = service.createProductionOrder({
+    productId: product,
+    bomId: bom.id,
+    quantity: 5,
+    operations: [{ workCenterId: wc.id, plannedMinutes: 60 }],
+  });
+  assert.equal(service.getProductionFloor().some((row) => row.orderId === order.id), false);
+
+  service.releaseOrder(order.id);
+  let floor = service.getProductionFloor().find((row) => row.orderId === order.id);
+  assert.ok(floor);
+  assert.equal(floor.status, 'RELEASED');
+  assert.equal(floor.opsTotal, 1);
+  assert.equal(floor.opsCompleted, 0);
+
+  service.startOrder(order.id);
+  floor = service.getProductionFloor().find((row) => row.orderId === order.id);
+  assert.ok(floor);
+  assert.equal(floor.status, 'IN_PROGRESS');
+  assert.equal(floor.currentOperation?.workCenterName, 'Floor WC');
+  assert.equal(floor.opsInProgress, 1);
+});
+
+test('BOM stock alerts flag critical components of active BOMs', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Alert good');
+  const critical = createProduct('Alert critical');
+  const healthy = createProduct('Alert healthy');
+  db.run(`UPDATE products SET reorder_point = 10 WHERE id = ?`, [critical]);
+
+  const bom = service.createBom({
+    productId: product,
+    name: 'Alert BOM',
+    items: [
+      { componentProductId: critical, quantity: 1 },
+      { componentProductId: healthy, quantity: 1 },
+    ],
+  });
+  service.activateBom(bom.id);
+
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_alert_critical', 'wh_main', ?, 3),
+            ('ws_alert_healthy', 'wh_main', ?, 50)`,
+    [critical, healthy]
+  );
+
+  let alerts = service.getBomStockAlerts();
+  let alert = alerts.find((row) => row.componentProductId === critical);
+  assert.ok(alert, 'component below reorder point should alert');
+  assert.equal(alert.severity, 'LOW');
+  assert.equal(alert.availableQty, 3);
+  assert.equal(alert.reorderPoint, 10);
+  assert.equal(alert.usedBy[0].bomId, bom.id);
+  assert.ok(!alerts.some((row) => row.componentProductId === healthy), 'healthy stock should not alert');
+
+  // Depleting stock escalates to OUT.
+  db.run(`UPDATE warehouse_stock SET quantity_m2 = 0 WHERE product_id = ?`, [critical]);
+  alerts = service.getBomStockAlerts();
+  alert = alerts.find((row) => row.componentProductId === critical);
+  assert.equal(alert?.severity, 'OUT');
+});
+
+test('purchase suggestions aggregate shortages and create purchase requests', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('PR good');
+  const component = createProduct('PR component');
+  setCostPrice(component, 7);
+  const bom = service.createBom({
+    productId: product,
+    name: 'PR BOM',
+    items: [{ componentProductId: component, quantity: 2 }],
+  });
+  service.activateBom(bom.id);
+
+  // Two orders → total need 2×(3+3)=12, stock 4 → deficit 8.
+  service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 3 });
+  service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 3 });
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_mfgpr_component', 'wh_main', ?, 4)`,
+    [component]
+  );
+
+  const suggestions = service.getPurchaseSuggestions();
+  const suggestion = suggestions.find((row) => row.componentProductId === component && row.warehouseId === 'wh_main');
+  assert.ok(suggestion, 'aggregated shortage should produce a purchase suggestion');
+  assert.equal(suggestion.totalRequiredQty, 12);
+  assert.equal(suggestion.availableQty, 4);
+  assert.equal(suggestion.suggestedQty, 8);
+  assert.equal(suggestion.unitCost, 7);
+  assert.equal(suggestion.estimatedValue, 56);
+  assert.equal(suggestion.affectedOrders, 2);
+
+  const created = service.createPurchaseRequestsFromShortages();
+  assert.ok(created.length >= 1);
+
+  // The request for our component exists with the aggregated deficit quantity.
+  const item = db.query<{ requestId: string; quantityM2: number; productId: string }>(
+    `SELECT pri.request_id AS requestId, pri.quantity_m2 AS quantityM2, pri.product_id AS productId
+     FROM purchase_request_items pri
+     JOIN purchase_requests pr ON pr.id = pri.request_id
+     WHERE pri.product_id = ?`,
+    [component]
+  )[0];
+  assert.ok(item, 'purchase request item should exist for the shortage component');
+  assert.equal(Number(item.quantityM2), 8);
+  const request = db.query<{ id: string; status: string; warehouseId: string }>(
+    `SELECT id, status, warehouse_id AS warehouseId FROM purchase_requests WHERE id = ?`,
+    [item.requestId]
+  )[0];
+  assert.ok(request);
+  assert.equal(request.status, 'PENDING');
+  assert.equal(request.warehouseId, 'wh_main');
+});
+
+test('executive command centre exposes manufacturing KPIs and drilldown', async () => {
+  await boot();
+  const service = new ManufacturingService();
+  const { executiveCommandService } = await import('../src/services/domains/dashboard/ExecutiveCommandService.ts');
+
+  const product = createProduct('Exec good');
+  const bom = service.createBom({
+    productId: product,
+    name: 'Exec BOM',
+    items: [{ componentProductId: createProduct('Exec component'), quantity: 1 }],
+  });
+  service.activateBom(bom.id);
+  const order = service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 2 });
+  service.releaseOrder(order.id);
+  service.startOrder(order.id);
+
+  const overview = executiveCommandService.getOverview('month');
+  assert.ok(overview.manufacturing, 'manufacturing summary should be present for authorized users');
+  assert.ok(overview.manufacturing!.activeOrders >= 1);
+  assert.ok(overview.manufacturing!.inProgressOrders >= 1);
+
+  const drilldown = executiveCommandService.getDrilldown('manufacturing', 'month');
+  assert.equal(drilldown.key, 'manufacturing');
+  assert.ok(drilldown.rows.some((row) => row.orderNumber === order.orderNumber));
 });

@@ -78,6 +78,16 @@ export class ManufacturingService {
     return this.boms.activateBom(id);
   }
 
+  /** Estimated material cost per BOM unit plus line breakdown. */
+  public getBomCostEstimate(bomId: string) {
+    return this.boms.getBomCostEstimate(bomId);
+  }
+
+  /** Critical components of active BOMs at/below stock thresholds. */
+  public getBomStockAlerts() {
+    return this.boms.getBomStockAlerts();
+  }
+
   public archiveBom(id: string): BillOfMaterials {
     return this.boms.archiveBom(id);
   }
@@ -119,6 +129,11 @@ export class ManufacturingService {
 
   public completeOrder(id: string): ProductionOrder {
     return this.orders.completeOrder(id);
+  }
+
+  /** Live production-floor snapshot for released/in-progress orders. */
+  public getProductionFloor() {
+    return this.orders.getProductionFloor();
   }
 
   public getWipValuation(): { orders: WipOrder[]; totalMaterialCost: number; totalQuantity: number } {
@@ -171,6 +186,25 @@ export class ManufacturingService {
     return this.costing.getManufacturingAnalytics();
   }
 
+  /** Component shortages across active production orders. */
+  public getMaterialShortages() {
+    return this.costing.getMaterialShortages();
+  }
+
+  /** Aggregated purchase suggestions from production shortages. */
+  public getPurchaseSuggestions() {
+    return this.costing.getPurchaseSuggestions();
+  }
+
+  /** Create purchase requests covering production shortages (one per warehouse). */
+  public createPurchaseRequestsFromShortages(input?: {
+    warehouseId?: string;
+    priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+    neededBy?: string;
+  }) {
+    return this.costing.createPurchaseRequestsFromShortages(input);
+  }
+
   // ── Quality checks ────────────────────────────────────────────────────────
 
   public createQualityCheck(input: CreateQualityCheckDTO): QualityCheck {
@@ -209,5 +243,10 @@ export class ManufacturingService {
 
   public updateMaintenance(id: string, input: UpdateMaintenanceDTO): MaintenanceRecord {
     return this.maintenance.updateMaintenance(id, input);
+  }
+
+  /** Overdue and upcoming preventive-maintenance schedules. */
+  public getMaintenanceAlerts(withinDays = 7): { overdue: MaintenanceRecord[]; dueSoon: MaintenanceRecord[] } {
+    return this.maintenance.getMaintenanceAlerts(withinDays);
   }
 }

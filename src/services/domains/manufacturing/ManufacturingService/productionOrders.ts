@@ -8,6 +8,7 @@ import type {
   CreateProductionOrderDTO,
   CreateProductionOrderFromSalesItemDTO,
   ProductionMaterialStatus,
+  ProductionFloorRow,
   ProductionOrder,
   ProductionOrderMaterial,
   ProductionOrderOperation,
@@ -96,6 +97,73 @@ export class ProductionOrdersModule {
       order.materials = this.loadOrderMaterials(order.id);
       order.operations = this.loadOrderOperations(order.id);
       return order;
+    });
+  }
+
+  /** Live production-floor snapshot for released/in-progress orders. */
+  public getProductionFloor(): ProductionFloorRow[] {
+    const actor = this.ctx.require('manufacturing.view');
+    const scope = this.ctx.branchAccess.sqlScope('po.branch_id', undefined, actor);
+    const orders = this.ctx.db.query<ProductionOrder>(
+      `SELECT po.*, po.operation_shift_id AS operationShiftId, p.name AS product_name, b.name AS bom_name,
+              br.name AS branch_name, w.name AS warehouseName, po.warehouse_id AS warehouseId,
+              so.order_number AS salesOrderNumber, c.name AS customerName
+       FROM production_orders po
+       JOIN products p ON p.id = po.product_id
+       JOIN bills_of_materials b ON b.id = po.bom_id
+       LEFT JOIN branches br ON br.id = po.branch_id
+       LEFT JOIN warehouses w ON w.id = po.warehouse_id
+       LEFT JOIN orders so ON so.id = po.sales_order_id
+       LEFT JOIN customers c ON c.id = po.customer_id
+       WHERE po.status IN ('RELEASED', 'IN_PROGRESS') AND ${scope.clause}
+       ORDER BY po.due_date IS NULL, po.due_date, po.created_at`,
+      scope.params
+    );
+    return orders.map((order) => {
+      const operations = this.loadOrderOperations(order.id);
+      const materials = this.loadOrderMaterials(order.id);
+      const opsCompleted = operations.filter((op) => op.status === 'COMPLETED').length;
+      const opsInProgress = operations.filter((op) => op.status === 'IN_PROGRESS').length;
+      const currentOp = operations.find((op) => op.status === 'IN_PROGRESS')
+        || operations.find((op) => op.status === 'PENDING')
+        || null;
+      const materialsPlannedQty = materials.reduce((sum, row) => sum + Number(row.plannedQty || 0), 0);
+      const materialsConsumedQty = materials.reduce((sum, row) => sum + Number(row.consumedQty || 0), 0);
+      const progressPercent = operations.length > 0
+        ? Math.round((opsCompleted / operations.length) * 100)
+        : materialsPlannedQty > 0
+          ? Math.round(Math.min(1, materialsConsumedQty / materialsPlannedQty) * 100)
+          : 0;
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        productName: order.productName,
+        quantity: order.quantity,
+        status: order.status,
+        priority: order.priority,
+        dueDate: order.dueDate,
+        branchName: order.branchName,
+        warehouseName: order.warehouseName,
+        salesOrderNumber: order.salesOrderNumber,
+        customerName: order.customerName,
+        operationShiftId: (order as any).operationShiftId || null,
+        opsTotal: operations.length,
+        opsCompleted,
+        opsInProgress,
+        currentOperation: currentOp
+          ? {
+              workCenterName: currentOp.workCenterName,
+              sequence: currentOp.sequence,
+              plannedMinutes: currentOp.plannedMinutes,
+              status: currentOp.status,
+            }
+          : null,
+        materialsTotal: materials.length,
+        materialsPlannedQty,
+        materialsConsumedQty,
+        materialsShort: materials.filter((row) => row.status === 'SHORTAGE').length,
+        progressPercent,
+      };
     });
   }
 
