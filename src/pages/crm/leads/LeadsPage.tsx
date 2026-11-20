@@ -11,6 +11,7 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const STATUS_LABELS: Record<LeadStage, { label: string; color: string }> = {
   NEW: { label: 'عميل محتمل جديد', color: 'bg-surface-sunken text-ink-secondary border-line-strong' },
   CONTACTED: { label: 'تم التواصل', color: 'bg-accent-soft text-primary border-accent-border' },
@@ -45,6 +46,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const LeadsPage: React.FC = () => {
   const toast = useToast();
+  const newLeadLabel = useBusinessTerm('actions.newLead');
   const service = new CrmService();
   const fieldService = new OperationalFieldService();
   const user = AuthService.getCurrentUser();
@@ -160,7 +162,7 @@ export const LeadsPage: React.FC = () => {
               onClick={() => setModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto"
             >
-              <Plus className="w-4 h-4" /> إضافة عميل محتمل
+              <Plus className="w-4 h-4" /> إضافة {newLeadLabel}
             </button>
           )}
         />
@@ -304,7 +306,7 @@ export const LeadsPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">إضافة عميل محتمل جديد</h3>
+              <h3 className="text-base font-extrabold text-ink">{newLeadLabel}</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">

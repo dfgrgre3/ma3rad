@@ -151,6 +151,62 @@ export const BUSINESS_TERMINOLOGY = {
     label: 'مطالبة مورد جديدة',
     description: 'نص زر تسجيل مطالبة على مورد جديد.',
   },
+  'actions.newLead': {
+    label: 'عميل محتمل جديد',
+    description: 'نص زر إضافة عميل محتمل أو جهة جديدة في CRM.',
+  },
+  'actions.newCampaign': {
+    label: 'حملة جديدة',
+    description: 'نص زر إنشاء حملة تسويقية جديدة.',
+  },
+  'actions.newCrmActivity': {
+    label: 'نشاط متابعة جديد',
+    description: 'نص زر جدولة نشاط أو متابعة عميل جديدة في CRM.',
+  },
+  'actions.newInstallmentPlan': {
+    label: 'خطة تقسيط جديدة',
+    description: 'نص زر إنشاء خطة تقسيط جديدة لعميل.',
+  },
+  'actions.newReceivable': {
+    label: 'مستحق جديد',
+    description: 'نص زر تسجيل مطالبة أو مستحق جديد على عميل.',
+  },
+  'actions.newExpense': {
+    label: 'مصروف جديد',
+    description: 'نص زر تسجيل مصروف تشغيلي جديد.',
+  },
+  'actions.newJournalEntry': {
+    label: 'قيد يومية جديد',
+    description: 'نص زر إنشاء قيد محاسبي جديد.',
+  },
+  'actions.newCheque': {
+    label: 'شيك جديد',
+    description: 'نص زر تسجيل شيك وارد أو صادر جديد.',
+  },
+  'actions.newFixedAsset': {
+    label: 'أصل ثابت جديد',
+    description: 'نص زر إضافة أصل ثابت جديد.',
+  },
+  'actions.newBankAccount': {
+    label: 'حساب بنكي جديد',
+    description: 'نص زر إضافة حساب بنكي أو خزينة جديدة.',
+  },
+  'actions.newPaymentGateway': {
+    label: 'بوابة دفع جديدة',
+    description: 'نص زر إضافة بوابة أو ماكينة دفع إلكتروني.',
+  },
+  'actions.newCostCenter': {
+    label: 'مركز تكلفة جديد',
+    description: 'نص زر إضافة مركز تكلفة جديد.',
+  },
+  'actions.newBudget': {
+    label: 'موازنة تقديرية جديدة',
+    description: 'نص زر إنشاء موازنة تقديرية جديدة.',
+  },
+  'actions.newAccount': {
+    label: 'حساب جديد',
+    description: 'نص زر إضافة حساب في شجرة الحسابات.',
+  },
 } as const;
 
 export type BusinessTermKey = keyof typeof BUSINESS_TERMINOLOGY;

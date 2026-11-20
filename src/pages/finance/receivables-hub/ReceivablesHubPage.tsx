@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
+import { getHubTabOrder, resolveHubTabLabel } from '../../../config/activityHubTabs';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
@@ -29,9 +30,19 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
   const allowedTabs = useMemo(() => {
     const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path));
     const followUpAllowed = permitted.some((item) => item.id === 'debts' || item.id === 'installments');
-    return tabs.filter((item) =>
-      item.id === 'follow-up' ? followUpAllowed : permitted.includes(item),
-    );
+    const allowed = tabs
+      .filter((item) =>
+        item.id === 'follow-up' ? followUpAllowed : permitted.includes(item),
+      )
+      .map((item) => ({ ...item, label: resolveHubTabLabel('receivables', item.id, item.label) }));
+    const order = getHubTabOrder('receivables');
+    if (!order?.length) return allowed;
+    const rank = new Map(order.map((id, index) => [id, index]));
+    return [...allowed].sort((a, b) => {
+      const ra = rank.get(a.id) ?? order.length;
+      const rb = rank.get(b.id) ?? order.length;
+      return ra === rb ? 0 : ra - rb;
+    });
   }, [canAccess]);
   const requested = params.get('tab') as TabId | null;
   const requestedTab = requested ?? initialTab ?? null;

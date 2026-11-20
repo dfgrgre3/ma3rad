@@ -16,8 +16,11 @@ import { FinanceExtrasService } from '../../../services/domains/finance/FinanceE
 import type { CostCenter, Budget, FiscalYear } from '../../../types/finance';
 import { useToast } from '../../../components/ui/Toast';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 export const BudgetsCostCentersPage: React.FC = () => {
+  const newCostCenterLabel = useBusinessTerm('actions.newCostCenter');
+  const newBudgetLabel = useBusinessTerm('actions.newBudget');
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const extrasService = useMemo(() => new FinanceExtrasService(), []);
   const toast = useToast();
@@ -176,7 +179,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <FolderTree className="w-4 h-4" />
-                  <span>مركز تكلفة جديد</span>
+                  <span>{newCostCenterLabel}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -191,7 +194,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>موازنة تقديرية جديدة</span>
+                  <span>{newBudgetLabel}</span>
                 </button>
               </>
             )}

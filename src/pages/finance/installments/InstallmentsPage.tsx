@@ -12,6 +12,7 @@ import { Customer } from '../../../types';
 import { localDateString } from '../../../utils/shared/date';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 interface InstallmentRow {
   id: string;
   planId: string;
@@ -53,6 +54,7 @@ interface InstallmentInvoiceOption {
 
 export const InstallmentsPage: React.FC = () => {
   const toast = useToast();
+  const newPlanLabel = useBusinessTerm('actions.newInstallmentPlan');
   const [installments, setInstallments] = useState<InstallmentRow[]>([]);
   const [plans, setPlans] = useState<InstallmentPlanRecord[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -253,7 +255,7 @@ export const InstallmentsPage: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-warning to-warning hover:from-warning hover:to-warning text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-warning/20 active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              إنشاء خطة تقسيط جديدة
+              {newPlanLabel}
             </button>
           }
         />
@@ -402,7 +404,7 @@ export const InstallmentsPage: React.FC = () => {
             <div className="px-6 py-4 border-b border-line flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <CalendarDays className="w-5 h-5 text-warning" />
-                <h3 className="text-base font-black text-ink">إنشاء خطة تقسيط جديدة لعميل</h3>
+                <h3 className="text-base font-black text-ink">{newPlanLabel} لعميل</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}

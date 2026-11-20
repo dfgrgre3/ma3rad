@@ -8,12 +8,14 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { localDateString } from '../../../utils/shared/date';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 type DraftLine = { accountId: string; debit: string; credit: string; description: string };
 const emptyLine = (): DraftLine => ({ accountId: '', debit: '', credit: '', description: '' });
 
 export const JournalEntriesPage: React.FC = () => {
   const toast = useToast();
+  const newEntryLabel = useBusinessTerm('actions.newJournalEntry');
   const service = useMemo(() => new FinanceExtrasService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.journal.approve');
   const [tab, setTab] = useState<'entries' | 'trial'>('entries');
@@ -95,7 +97,7 @@ export const JournalEntriesPage: React.FC = () => {
           title="القيود اليومية وميزان المراجعة"
           description="تسجيل القيود المحاسبية المزدوجة ومتابعة أرصدة الحسابات"
           actions={canManage && <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-bold transition shrink-0">
-            <Plus className="w-4 h-4" /> قيد جديد
+            <Plus className="w-4 h-4" /> {newEntryLabel}
           </button>}
         />
       </div>

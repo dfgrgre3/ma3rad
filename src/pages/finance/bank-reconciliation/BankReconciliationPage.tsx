@@ -11,9 +11,11 @@ import { FinanceEnterpriseService } from '../../../services/domains/finance/Fina
 import type { BankAccount, BankReconciliation } from '../../../types/finance';
 import { localDateString } from '../../../utils/shared/date';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const BankReconciliationPage: React.FC = () => {
+  const newBankAccountLabel = useBusinessTerm('actions.newBankAccount');
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
   const can = usePermission();
@@ -188,7 +190,7 @@ export const BankReconciliationPage: React.FC = () => {
                 className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold transition"
               >
                 <Plus className="w-4 h-4" />
-                <span>حساب بنكي جديد</span>
+                <span>{newBankAccountLabel}</span>
               </button>
             )}
           </>}

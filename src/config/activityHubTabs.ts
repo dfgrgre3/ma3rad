@@ -10,7 +10,7 @@ import { isActivityPathHidden } from './activityPageVisibility';
  * so e.g. a restaurant never sees a "showroom stock" tab.
  */
 
-export type ActivityHubId = 'sales' | 'inventory' | 'purchasing';
+export type ActivityHubId = 'sales' | 'inventory' | 'purchasing' | 'crm' | 'receivables';
 
 export interface HubTabLike {
   id: string;
@@ -335,6 +335,75 @@ const ACTIVITY_TAB_LABELS: Record<ActivityHubId, Record<string, Record<string, s
       general: 'كشف حساب المورد', custom: 'كشف حساب المورد',
     },
   },
+  crm: {
+    dashboard: {
+      ceramics: 'لوحة العملاء', restaurant: 'لوحة الضيوف', hospitality: 'لوحة النزلاء',
+      education: 'لوحة أولياء الأمور', healthcare_admin: 'لوحة المرضى', workshop: 'لوحة السيارات',
+      construction: 'لوحة أصحاب المشاريع', professional_services: 'لوحة العملاء', services: 'لوحة العملاء',
+      general: 'لوحة CRM', custom: 'لوحة CRM',
+    },
+    customers: {
+      ceramics: 'العملاء والمهندسون', sanitary: 'العملاء', furniture: 'العملاء',
+      home_appliances: 'العملاء', electronics: 'العملاء', clothing: 'العملاء',
+      food: 'العملاء', cosmetics: 'العملاء', automotive: 'السيارات والعملاء',
+      building_materials: 'العملاء والمقاولون', lighting: 'العملاء', ecommerce: 'عملاء المتجر',
+      general: 'العملاء', restaurant: 'الضيوف', hospitality: 'النزلاء',
+      education: 'الطلاب وأولياء الأمور', workshop: 'السيارات والعملاء', manufacturing: 'العملاء',
+      construction: 'أصحاب المشاريع', import_export: 'العملاء والموزعون', logistics: 'العملاء',
+      healthcare_admin: 'المرضى', services: 'العملاء', professional_services: 'العملاء',
+      custom: 'العملاء',
+    },
+    leads: {
+      ceramics: 'مهندسون محتملون', restaurant: 'ضيوف جدد', hospitality: 'نزلاء محتملون',
+      education: 'طلاب محتملون', healthcare_admin: 'مرضى جدد', workshop: 'سيارات جديدة',
+      construction: 'مشاريع محتملة', professional_services: 'عملاء محتملون', services: 'عملاء محتملون',
+      general: 'العملاء المحتملون', custom: 'العملاء المحتملون',
+    },
+    pipeline: {
+      ceramics: 'مسار البيع', restaurant: 'مسار الطلبات', hospitality: 'مسار الحجوزات',
+      education: 'مسار التسجيل', healthcare_admin: 'مسار المواعيد', workshop: 'مسار أوامر الشغل',
+      construction: 'مسار المشاريع', professional_services: 'مسار الملفات', services: 'مسار الخدمات',
+      general: 'مسار المبيعات', custom: 'مسار المبيعات',
+    },
+    activities: {
+      ceramics: 'متابعة العملاء', restaurant: 'متابعة الضيوف', hospitality: 'متابعة النزلاء',
+      education: 'متابعة أولياء الأمور', healthcare_admin: 'متابعة المرضى', workshop: 'متابعة السيارات',
+      construction: 'متابعة المشاريع', professional_services: 'متابعة العملاء', services: 'متابعة العملاء',
+      general: 'الأنشطة والمتابعة', custom: 'الأنشطة والمتابعة',
+    },
+    campaigns: {
+      ceramics: 'حملات التسويق', restaurant: 'عروض ومناسبات', hospitality: 'عروض موسمية',
+      education: 'حملات التسجيل', healthcare_admin: 'حملات الفحوصات', workshop: 'عروض الصيانة',
+      construction: 'حملات المشاريع', professional_services: 'حملات المكتب', services: 'حملات الخدمات',
+      general: 'الحملات', custom: 'الحملات',
+    },
+  },
+  receivables: {
+    debts: {
+      ceramics: 'ديون العملاء', restaurant: 'ديون الصالة', hospitality: 'ديون النزلاء',
+      education: 'ديون أولياء الأمور', healthcare_admin: 'ديون المرضى والتأمين', workshop: 'ديون العملاء',
+      construction: 'مستخلصات مدينة', professional_services: 'أتعاب مدينة', services: 'مستحقات الخدمات',
+      general: 'ديون العملاء والموردين', custom: 'الذمم',
+    },
+    other: {
+      ceramics: 'مطالبات أخرى', restaurant: 'مطالبات الصالة', hospitality: 'مطالبات النزلاء',
+      education: 'مطالبات الرسوم', healthcare_admin: 'مطالبات التأمين', workshop: 'مطالبات الورشة',
+      construction: 'مطالبات المشاريع', professional_services: 'مطالبات الأتعاب', services: 'مطالبات الخدمات',
+      general: 'المطالبات الأخرى', custom: 'المطالبات الأخرى',
+    },
+    installments: {
+      ceramics: 'أقساط العملاء', restaurant: 'أقساط المناسبات', hospitality: 'أقساط النزلاء',
+      education: 'أقساط الطلاب', healthcare_admin: 'تقسيط الرسوم', workshop: 'أقساط العملاء',
+      construction: 'دفعات المشاريع', professional_services: 'أتعاب بالتقسيط', services: 'أقساط الخدمات',
+      general: 'الأقساط', custom: 'الأقساط',
+    },
+    'follow-up': {
+      ceramics: 'تحصيل العملاء', restaurant: 'تحصيل الصالة', hospitality: 'تحصيل النزلاء',
+      education: 'تحصيل الرسوم', healthcare_admin: 'تحصيل المرضى', workshop: 'تحصيل الورشة',
+      construction: 'تحصيل المستخلصات', professional_services: 'تحصيل الأتعاب', services: 'تحصيل الخدمات',
+      general: 'التحصيل والمتابعة', custom: 'التحصيل والمتابعة',
+    },
+  },
 };
 
 /** Family-level fallbacks for retail subtypes sharing showroom wording. */
@@ -377,6 +446,20 @@ const FAMILY_TAB_LABELS: Record<ActivityHubId, Record<string, Record<string, str
     returns: { retail: 'مرتجعات المشتريات', distribution: 'مرتجعات التوريد', manufacturing: 'الخامات المرفوضة', construction: 'مرتجعات المواقع', transport: 'مرتجعات التشغيل', hospitality: 'مرتجعات المستلزمات', healthcare: 'مرتجعات المشتريات', education: 'مرتجعات المشتريات', professional_services: 'مرتجعات المكتب' },
     claims: { retail: 'مطالبات الموردين', distribution: 'مطالبات الشحن', manufacturing: 'مطالبات الجودة', construction: 'مطالبات المواقع', transport: 'مطالبات التشغيل', hospitality: 'مطالبات المستلزمات', healthcare: 'مطالبات الموردين', education: 'مطالبات الموردين', professional_services: 'مطالبات المكتب' },
     statement: { retail: 'كشف حساب المورد', distribution: 'كشف حساب المورد', manufacturing: 'كشف حساب المورد', construction: 'كشف حساب المورد', transport: 'كشف حساب المورد', hospitality: 'كشف حساب المورد', healthcare: 'كشف حساب المورد', education: 'كشف حساب المورد', professional_services: 'كشف حساب المورد' },
+  },
+  crm: {
+    dashboard: { retail: 'لوحة العملاء', distribution: 'لوحة العملاء', manufacturing: 'لوحة العملاء', construction: 'لوحة المشاريع', transport: 'لوحة العملاء', hospitality: 'لوحة النزلاء', healthcare: 'لوحة المرضى', education: 'لوحة أولياء الأمور', professional_services: 'لوحة العملاء' },
+    customers: { retail: 'العملاء', distribution: 'العملاء والموزعون', manufacturing: 'العملاء', construction: 'أصحاب المشاريع', transport: 'السيارات والعملاء', hospitality: 'النزلاء', healthcare: 'المرضى', education: 'الطلاب وأولياء الأمور', professional_services: 'العملاء' },
+    leads: { retail: 'عملاء محتملون', distribution: 'عملاء محتملون', manufacturing: 'عملاء محتملون', construction: 'مشاريع محتملة', transport: 'سيارات جديدة', hospitality: 'نزلاء محتملون', healthcare: 'مرضى جدد', education: 'طلاب محتملون', professional_services: 'عملاء محتملون' },
+    pipeline: { retail: 'مسار المبيعات', distribution: 'مسار التوزيع', manufacturing: 'مسار البيع', construction: 'مسار المشاريع', transport: 'مسار الصيانة', hospitality: 'مسار الحجوزات', healthcare: 'مسار المواعيد', education: 'مسار التسجيل', professional_services: 'مسار الملفات' },
+    activities: { retail: 'الأنشطة والمتابعة', distribution: 'الأنشطة والمتابعة', manufacturing: 'الأنشطة والمتابعة', construction: 'متابعة المشاريع', transport: 'متابعة السيارات', hospitality: 'متابعة النزلاء', healthcare: 'متابعة المرضى', education: 'متابعة أولياء الأمور', professional_services: 'متابعة العملاء' },
+    campaigns: { retail: 'الحملات', distribution: 'الحملات', manufacturing: 'الحملات', construction: 'الحملات', transport: 'العروض', hospitality: 'العروض الموسمية', healthcare: 'حملات الفحوصات', education: 'حملات التسجيل', professional_services: 'الحملات' },
+  },
+  receivables: {
+    debts: { retail: 'ديون العملاء', distribution: 'ديون الموزعين', manufacturing: 'ديون العملاء', construction: 'مستخلصات مدينة', transport: 'ديون العملاء', hospitality: 'ديون النزلاء', healthcare: 'ديون المرضى والتأمين', education: 'ديون أولياء الأمور', professional_services: 'أتعاب مدينة' },
+    other: { retail: 'المطالبات الأخرى', distribution: 'المطالبات الأخرى', manufacturing: 'المطالبات الأخرى', construction: 'مطالبات المشاريع', transport: 'المطالبات الأخرى', hospitality: 'مطالبات النزلاء', healthcare: 'مطالبات التأمين', education: 'مطالبات الرسوم', professional_services: 'مطالبات الأتعاب' },
+    installments: { retail: 'الأقساط', distribution: 'الأقساط', manufacturing: 'الأقساط', construction: 'دفعات المشاريع', transport: 'الأقساط', hospitality: 'أقساط النزلاء', healthcare: 'تقسيط الرسوم', education: 'أقساط الطلاب', professional_services: 'أتعاب بالتقسيط' },
+    'follow-up': { retail: 'التحصيل والمتابعة', distribution: 'التحصيل والمتابعة', manufacturing: 'التحصيل والمتابعة', construction: 'تحصيل المستخلصات', transport: 'التحصيل والمتابعة', hospitality: 'تحصيل النزلاء', healthcare: 'تحصيل المرضى', education: 'تحصيل الرسوم', professional_services: 'تحصيل الأتعاب' },
   },
 };
 
@@ -432,7 +515,48 @@ const ACTIVITY_TAB_ORDER: Partial<Record<ActivityHubId, Record<string, string[]>
     professional_services: ['orders', 'invoices', 'receipts', 'incoming', 'statement', 'returns', 'requests', 'quotations', 'claims'],
     services: ['orders', 'invoices', 'receipts', 'incoming', 'statement', 'returns', 'requests', 'quotations', 'claims'],
   },
+  crm: {
+    restaurant: ['customers', 'activities', 'leads', 'pipeline', 'campaigns', 'dashboard'],
+    hospitality: ['customers', 'activities', 'leads', 'pipeline', 'campaigns', 'dashboard'],
+    education: ['customers', 'leads', 'pipeline', 'activities', 'campaigns', 'dashboard'],
+    healthcare_admin: ['customers', 'leads', 'pipeline', 'activities', 'campaigns', 'dashboard'],
+    workshop: ['customers', 'pipeline', 'activities', 'leads', 'campaigns', 'dashboard'],
+    construction: ['customers', 'pipeline', 'leads', 'activities', 'campaigns', 'dashboard'],
+    ecommerce: ['customers', 'campaigns', 'leads', 'pipeline', 'activities', 'dashboard'],
+    professional_services: ['customers', 'pipeline', 'activities', 'leads', 'campaigns', 'dashboard'],
+    services: ['customers', 'pipeline', 'activities', 'leads', 'campaigns', 'dashboard'],
+  },
+  receivables: {
+    education: ['installments', 'debts', 'other', 'follow-up'],
+    construction: ['debts', 'other', 'follow-up', 'installments'],
+    hospitality: ['debts', 'other', 'follow-up', 'installments'],
+    healthcare_admin: ['debts', 'other', 'follow-up', 'installments'],
+    restaurant: ['debts', 'other', 'follow-up', 'installments'],
+    professional_services: ['debts', 'other', 'follow-up', 'installments'],
+    services: ['debts', 'other', 'follow-up', 'installments'],
+    ecommerce: ['installments', 'debts', 'other', 'follow-up'],
+  },
 };
+
+/** Activity-aware label for a single hub tab (falls back to the passed label). */
+export function resolveHubTabLabel(
+  hub: ActivityHubId,
+  tabId: string,
+  fallback: string,
+  businessType: string = getEffectiveBusinessType(),
+): string {
+  const familyId = getBusinessProfile(businessType).familyId;
+  return (
+    ACTIVITY_TAB_LABELS[hub]?.[tabId]?.[businessType]
+    ?? (familyId ? FAMILY_TAB_LABELS[hub]?.[tabId]?.[familyId] : undefined)
+    ?? fallback
+  );
+}
+
+/** Activity-specific tab order for a hub (undefined = keep declared order). */
+export function getHubTabOrder(hub: ActivityHubId, businessType: string = getEffectiveBusinessType()): string[] | undefined {
+  return ACTIVITY_TAB_ORDER[hub]?.[businessType];
+}
 
 /** Tabs that only make sense for activities whose family keeps them visible. */
 export function resolveHubTabs<T extends HubTabLike>(
@@ -440,14 +564,11 @@ export function resolveHubTabs<T extends HubTabLike>(
   tabs: T[],
   businessType: string = getEffectiveBusinessType(),
 ): T[] {
-  const familyId = getBusinessProfile(businessType).familyId;
   const visible = tabs
     .filter((tab) => !isActivityPathHidden(tab.path, businessType))
     .map((tab) => {
-      const label =
-        ACTIVITY_TAB_LABELS[hub][tab.id]?.[businessType]
-        ?? (familyId ? FAMILY_TAB_LABELS[hub][tab.id]?.[familyId] : undefined);
-      return label ? { ...tab, label } : tab;
+      const label = resolveHubTabLabel(hub, tab.id, tab.label, businessType);
+      return label === tab.label ? tab : { ...tab, label };
     });
   const order = ACTIVITY_TAB_ORDER[hub]?.[businessType];
   if (!order?.length) return visible;

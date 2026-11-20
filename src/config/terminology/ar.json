@@ -35,5 +35,19 @@
   "actions.newGoodsReceipt": "إذن استلام جديد",
   "actions.newPurchaseRequest": "طلب توريد جديد",
   "actions.newRfq": "طلب عروض أسعار",
-  "actions.newSupplierClaim": "مطالبة مورد جديدة"
+  "actions.newSupplierClaim": "مطالبة مورد جديدة",
+  "actions.newLead": "عميل محتمل جديد",
+  "actions.newCampaign": "حملة جديدة",
+  "actions.newCrmActivity": "نشاط متابعة جديد",
+  "actions.newInstallmentPlan": "خطة تقسيط جديدة",
+  "actions.newReceivable": "مستحق جديد",
+  "actions.newExpense": "مصروف جديد",
+  "actions.newJournalEntry": "قيد يومية جديد",
+  "actions.newCheque": "شيك جديد",
+  "actions.newFixedAsset": "أصل ثابت جديد",
+  "actions.newBankAccount": "حساب بنكي جديد",
+  "actions.newPaymentGateway": "بوابة دفع جديدة",
+  "actions.newCostCenter": "مركز تكلفة جديد",
+  "actions.newBudget": "موازنة تقديرية جديدة",
+  "actions.newAccount": "حساب جديد"
 }

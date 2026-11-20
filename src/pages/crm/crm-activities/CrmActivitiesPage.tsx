@@ -8,9 +8,11 @@ import { TYPE_CONFIG } from './crmActivityConfig';
 import { CrmActivityModal } from './CrmActivityModal';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 export const CrmActivitiesPage: React.FC = () => {
   const toast = useToast();
+  const newActivityLabel = useBusinessTerm('actions.newCrmActivity');
   const service = new CrmService();
   const user = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(user, 'ui.crm.activities.create');
@@ -78,7 +80,7 @@ export const CrmActivitiesPage: React.FC = () => {
           description="سجل وتخطيط الفعاليات والمتابعات مع العملاء"
           actions={canCreate && (
             <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto">
-              <Plus className="w-4 h-4" /> جدولة نشاط جديد
+              <Plus className="w-4 h-4" /> {newActivityLabel}
             </button>
           )}
         />

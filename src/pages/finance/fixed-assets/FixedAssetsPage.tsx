@@ -13,6 +13,7 @@ import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { fmt, CATEGORY_LABELS } from './fixedAssetsHelpers';
 import { FixedAssetEditorModal } from './FixedAssetEditorModal';
 import { FixedAssetWorkflows } from './FixedAssetWorkflows';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 type ViewMode = 'register' | 'depreciation';
 type StatusFilter = 'ALL' | FixedAsset['status'];
@@ -56,6 +57,7 @@ const depreciationProgressOf = (asset: FixedAsset) => {
 };
 
 export const FixedAssetsPage: React.FC = () => {
+  const newAssetLabel = useBusinessTerm('actions.newFixedAsset');
   const service = useMemo(() => new FinanceExtrasService(), []);
   const user = AuthService.getCurrentUser();
   const canManage = PermissionService.can(user, 'ui.finance.assets.approve');
@@ -277,7 +279,7 @@ export const FixedAssetsPage: React.FC = () => {
                 onClick={openNew}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                <Plus aria-hidden="true" className="h-4 w-4" /> إضافة أصل جديد
+                <Plus aria-hidden="true" className="h-4 w-4" /> {newAssetLabel}
               </button>
             )}
             {workflowsOpen && (
@@ -488,7 +490,7 @@ export const FixedAssetsPage: React.FC = () => {
                 </button>
               ) : canManage && (
                 <button type="button" onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
-                  <Plus aria-hidden="true" className="h-4 w-4" /> إضافة أول أصل
+                  <Plus aria-hidden="true" className="h-4 w-4" /> {newAssetLabel}
                 </button>
               )}
             </div>

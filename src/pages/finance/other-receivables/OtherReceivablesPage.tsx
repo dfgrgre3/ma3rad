@@ -5,6 +5,7 @@ import { AuthService } from "../../../services/domains/auth/AuthService";
 import { PermissionService } from "../../../services/domains/auth/PermissionService";
 import { BranchAccessService } from "../../../services/domains/auth/BranchAccessService";
 import { useToast } from "../../../components/ui/Toast";
+import { useBusinessTerm } from "../../../hooks/domains/config/useBusinessTerm";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { v4 as uuidv4 } from "uuid";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";
@@ -55,6 +56,7 @@ const blank = {
 export const OtherReceivablesPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
   const toast = useToast();
+  const newReceivableLabel = useBusinessTerm('actions.newReceivable');
   const branches = useMemo(() => new BranchAccessService(), []);
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState("");
@@ -408,7 +410,7 @@ export const OtherReceivablesPage: React.FC = () => {
                 }}
                 className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold inline-flex gap-2"
               >
-                <Plus className="w-4 h-4" /> مستحق جديد
+                <Plus className="w-4 h-4" /> {newReceivableLabel}
               </button>
             )}
           </div>}

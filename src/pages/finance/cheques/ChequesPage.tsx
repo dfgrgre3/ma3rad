@@ -20,6 +20,7 @@ import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import type { ExtendedChequeStatus, ChequeStatusHistory, BankAccount } from '../../../types/finance';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const TYPE_LABELS: Record<ChequeType, string> = { RECEIVED: 'شيك وارد (لنا)', ISSUED: 'شيك صادر (علينا)' };
 const STATUS_LABELS: Record<ExtendedChequeStatus, string> = {
   PENDING: 'معلق بالخزينة',
@@ -42,6 +43,7 @@ const today = () => localDateString();
 
 export const ChequesPage: React.FC = () => {
   const toast = useToast();
+  const newChequeLabel = useBusinessTerm('actions.newCheque');
   const service = useMemo(() => new FinanceExtrasService(), []);
   const enterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
   const canManageCheques = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.cheques.approve');
@@ -224,7 +226,7 @@ export const ChequesPage: React.FC = () => {
             onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold transition shrink-0"
           >
-            <Plus className="w-4 h-4" /> تسجيل شيك
+            <Plus className="w-4 h-4" /> {newChequeLabel}
           </button>}
         />
       </div>
@@ -514,7 +516,7 @@ export const ChequesPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold">{editing ? 'تعديل شيك' : 'تسجيل شيك جديد'}</h3>
+              <h3 className="text-base font-extrabold">{editing ? 'تعديل شيك' : `${newChequeLabel}`}</h3>
               <button onClick={() => setModal(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken">
                 <X className="w-4 h-4" />
               </button>

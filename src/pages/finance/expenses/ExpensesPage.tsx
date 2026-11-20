@@ -8,6 +8,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { ExpenseModal } from '../../../components/daily/ExpenseModal';
 import { exportToExcel } from '../../../utils/export/export';
 import type { Expense } from '../../../types';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 const PAYMENT_LABELS: Record<string, string> = {
   CASH: 'نقدي', CARD: 'بطاقة', BANK: 'تحويل بنكي', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك',
@@ -19,6 +20,7 @@ const localToday = () => {
 };
 
 const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMode }) => {
+  const newExpenseLabel = useBusinessTerm('actions.newExpense');
   const service = useMemo(() => new CashierService(), []);
   const user = AuthService.getCurrentUser();
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -88,7 +90,7 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
           description={dateMode === 'today' ? 'مصروفات اليوم' : 'مصروفات الفروع ضمن الفترة المحددة'}
           actions={<>
             {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-line text-ink rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
-            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل مصروف جديد</button>}
+            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل {newExpenseLabel}</button>}
           </>}
         />
       </div>

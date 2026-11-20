@@ -13,9 +13,11 @@ import { FinanceEnterpriseService } from '../../../services/domains/finance/Fina
 import type { PaymentGateway, PaymentGatewaySettlement, BankAccount } from '../../../types/finance';
 import { localDateString } from '../../../utils/shared/date';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const EPaymentSettlementPage: React.FC = () => {
+  const newGatewayLabel = useBusinessTerm('actions.newPaymentGateway');
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
   const canManage = usePermission()('finance.epayments.settle');
@@ -173,7 +175,7 @@ export const EPaymentSettlementPage: React.FC = () => {
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>بوابة / ماكينة جديدة</span>
+                  <span>{newGatewayLabel}</span>
                 </button>
                 <button
                   onClick={() => setShowSettlementModal(true)}

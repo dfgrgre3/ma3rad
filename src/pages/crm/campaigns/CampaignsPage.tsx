@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 type CampaignStatus = 'PLANNED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 type Channel = 'WHATSAPP' | 'SMS' | 'EMAIL' | 'PHONE' | 'SOCIAL' | 'WALK_IN' | 'REFERRAL' | 'OTHER';
 
@@ -39,6 +40,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 
 export const CampaignsPage: React.FC = () => {
   const toast = useToast();
+  const newCampaignLabel = useBusinessTerm('actions.newCampaign');
   const db = useMemo(() => DatabaseManager.getInstance(), []);
   const [rows, setRows] = useState<Campaign[]>([]);
   const [search, setSearch] = useState('');
@@ -134,7 +136,7 @@ export const CampaignsPage: React.FC = () => {
           description="تخطيط الحملات ومتابعة الميزانية والعملاء المحتملين الناتجين عنها"
           actions={
             <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-bold transition shrink-0">
-              <Plus className="w-4 h-4" /> حملة جديدة
+              <Plus className="w-4 h-4" /> {newCampaignLabel}
             </button>
           }
         />

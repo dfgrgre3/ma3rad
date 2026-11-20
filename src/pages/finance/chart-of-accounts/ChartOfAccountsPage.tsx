@@ -10,6 +10,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const TYPE_LABELS: Record<AccountType, string> = {
   ASSET: 'أصول',
   LIABILITY: 'التزامات',
@@ -82,6 +83,7 @@ const buildAccountTree = (accounts: Account[]): AccountTree => {
 
 export const ChartOfAccountsPage: React.FC = () => {
   const toast = useToast();
+  const newAccountLabel = useBusinessTerm('actions.newAccount');
   const service = useMemo(() => new FinanceExtrasService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.accounts.approve');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -240,7 +242,7 @@ export const ChartOfAccountsPage: React.FC = () => {
             <span className="text-xs font-semibold text-muted">{accounts.length} حساب</span>
             {canManage && (
               <button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                <Plus className="h-4 w-4" /> إضافة حساب رئيسي
+                <Plus className="h-4 w-4" /> {newAccountLabel}
               </button>
             )}
           </>}
