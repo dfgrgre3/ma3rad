@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { formatDate, inputClass } from '../components/PlatformUI';
 import type { PlatformFeatureFlag, PlatformFeatureOverride, PlatformTenant } from '../../../services/domains/platform/platformTypes';
+import { CentralUnsupportedNotice } from '../components/CentralUnsupportedNotice';
 
 interface FeatureOverridesModalProps {
   feature: PlatformFeatureFlag | null;
@@ -15,6 +16,7 @@ interface FeatureOverridesModalProps {
   newOverrideEnabled: boolean;
   setNewOverrideEnabled: (v: boolean) => void;
   canManageProduct: boolean;
+  centralActive?: boolean;
   onAddOverride: () => void;
   onRemoveOverride: (overrideId: string) => void;
 }
@@ -29,6 +31,7 @@ export const FeatureOverridesModal: React.FC<FeatureOverridesModalProps> = ({
   newOverrideEnabled,
   setNewOverrideEnabled,
   canManageProduct,
+  centralActive = false,
   onAddOverride,
   onRemoveOverride,
 }) => (
@@ -39,6 +42,7 @@ export const FeatureOverridesModal: React.FC<FeatureOverridesModalProps> = ({
     size="lg"
   >
     <div className="space-y-4">
+      {centralActive && <CentralUnsupportedNotice feature="التخصيص لكل عميل (Feature Overrides)" />}
       <div className="rounded-lg bg-accent-soft p-3 text-[11px] text-primary">
         يمكنك هنا فرض تفعيل أو حجب الميزة لعملاء محددين بغض النظر عن نسبة الإتاحة العامة للنظام.
       </div>
@@ -48,7 +52,7 @@ export const FeatureOverridesModal: React.FC<FeatureOverridesModalProps> = ({
         <p className="text-[11.5px] font-bold text-ink mb-2">إضافة تخصيص لعميل جديد:</p>
         <div className="grid gap-2.5 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <select className={inputClass} value={newOverrideTenantId} onChange={(e) => setNewOverrideTenantId(e.target.value)}>
+            <select className={inputClass} value={newOverrideTenantId} disabled={centralActive} onChange={(e) => setNewOverrideTenantId(e.target.value)}>
               <option value="">اختر العميل المستهدف...</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -61,6 +65,7 @@ export const FeatureOverridesModal: React.FC<FeatureOverridesModalProps> = ({
             <select
               className={inputClass}
               value={newOverrideEnabled ? '1' : '0'}
+              disabled={centralActive}
               onChange={(e) => setNewOverrideEnabled(e.target.value === '1')}
             >
               <option value="1">تفعيل إجباري</option>
@@ -100,7 +105,7 @@ export const FeatureOverridesModal: React.FC<FeatureOverridesModalProps> = ({
               {
                 key: 'action', header: 'إجراء',
                 render: (ov) => (
-                  <button type="button" onClick={() => onRemoveOverride(ov.id)} className="rounded px-2 py-1 text-danger hover:bg-danger-soft font-semibold">
+                  <button type="button" onClick={() => onRemoveOverride(ov.id)} disabled={centralActive || !canManageProduct} className="rounded px-2 py-1 text-danger hover:bg-danger-soft font-semibold disabled:opacity-40">
                     حذف
                   </button>
                 ),

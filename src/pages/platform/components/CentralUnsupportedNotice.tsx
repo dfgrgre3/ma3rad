@@ -8,7 +8,20 @@ import { getCentralDataSourceState } from '../../../hooks/platform/useCentralDat
  * على أنها بيانات المنصة المركزية.
  */
 export const CentralUnsupportedNotice: React.FC<{ feature?: string }> = ({ feature }) => {
-  const state = getCentralDataSourceState();
+  // getCentralDataSourceState() reads the platform.dataSource setting which
+  // has no change event — re-check on mount and periodically so the banner
+  // appears/disappears without a full page reload.
+  const [state, setState] = React.useState(() => getCentralDataSourceState());
+  React.useEffect(() => {
+    const refresh = () => setState(getCentralDataSourceState());
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   if (!state.active) return null;
   return (
     <div className="flex items-start gap-2 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm font-semibold text-warning">

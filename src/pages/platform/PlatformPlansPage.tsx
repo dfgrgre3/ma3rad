@@ -33,6 +33,21 @@ const CYCLES: Array<{ value: PlatformBillingCycle; label: string }> = [
 
 const CYCLE_LABELS = Object.fromEntries(CYCLES.map((item) => [item.value, item.label])) as Record<PlatformBillingCycle, string>;
 
+/** Central module rows may use snake_case; normalize to the local PlatformModule shape. */
+const normalizeCentralModule = (row: any): PlatformModule => ({
+  id: String(row?.id ?? row?.code ?? ''),
+  code: String(row?.code ?? row?.id ?? ''),
+  name: String(row?.name ?? row?.code ?? ''),
+  description: row?.description ?? null,
+  category: row?.category ?? null,
+  isEnabled: Boolean(row?.isEnabled ?? row?.is_enabled ?? row?.isActive ?? row?.is_active ?? true),
+  minPlanCode: row?.minPlanCode ?? row?.min_plan_code ?? null,
+  sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0) || 0,
+  isActive: Boolean(row?.isActive ?? row?.is_active ?? true),
+  createdAt: String(row?.createdAt ?? row?.created_at ?? ''),
+  updatedAt: String(row?.updatedAt ?? row?.updated_at ?? ''),
+});
+
 const emptyPlan: PlatformPlanInput = {
   code: '',
   name: '',
@@ -72,12 +87,20 @@ export const PlatformPlansPage: React.FC = () => {
     setLoading(true);
     try {
       const centralState = getCentralDataSourceState();
+      if (centralState.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
       if (centralState.active) {
-        setPlans(await centralPlatformClient.listPlans());
+        const [planRows, moduleRows] = await Promise.all([
+          centralPlatformClient.listPlans(),
+          centralPlatformClient.listModules(),
+        ]);
+        setPlans(planRows);
+        setModules((Array.isArray(moduleRows) ? moduleRows : []).map(normalizeCentralModule));
       } else {
         setPlans(platformAdminService.listPlans());
+        setModules(platformAdminService.listModules());
       }
-      setModules(platformAdminService.listModules());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل الخطط.');
@@ -95,29 +118,31 @@ export const PlatformPlansPage: React.FC = () => {
     setFormOpen(true);
   };
 
+  const toPlanInput = (plan: PlatformPlan): PlatformPlanInput => ({
+    code: plan.code,
+    name: plan.name,
+    description: plan.description ?? '',
+    billingCycle: plan.billingCycle,
+    price: plan.price,
+    monthlyPrice: plan.monthlyPrice,
+    yearlyPrice: plan.yearlyPrice,
+    currency: plan.currency,
+    seatsLimit: plan.seatsLimit,
+    branchesLimit: plan.branchesLimit,
+    devicesLimit: plan.devicesLimit,
+    storageLimitMb: plan.storageLimitMb,
+    maxProducts: plan.maxProducts,
+    maxWarehouses: plan.maxWarehouses,
+    trialDays: plan.trialDays,
+    includedModules: plan.includedModules,
+    features: plan.features,
+    permissions: plan.permissions,
+    isActive: plan.isActive,
+  });
+
   const openEdit = (plan: PlatformPlan) => {
     setEditing(plan);
-    setForm({
-      code: plan.code,
-      name: plan.name,
-      description: plan.description ?? '',
-      billingCycle: plan.billingCycle,
-      price: plan.price,
-      monthlyPrice: plan.monthlyPrice,
-      yearlyPrice: plan.yearlyPrice,
-      currency: plan.currency,
-      seatsLimit: plan.seatsLimit,
-      branchesLimit: plan.branchesLimit,
-      devicesLimit: plan.devicesLimit,
-      storageLimitMb: plan.storageLimitMb,
-      maxProducts: plan.maxProducts,
-      maxWarehouses: plan.maxWarehouses,
-      trialDays: plan.trialDays,
-      includedModules: plan.includedModules,
-      features: plan.features,
-      permissions: plan.permissions,
-      isActive: plan.isActive,
-    });
+    setForm(toPlanInput(plan));
     setFeaturesText(plan.features.join(', '));
     setFormOpen(true);
   };
@@ -137,12 +162,37 @@ export const PlatformPlansPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة الخطط');
       return;
     }
+    if (!form.name.trim() || !form.code.trim()) {
+      toast.error('اسم الخطة ورمزها مطلوبان');
+      return;
+    }
     setSaving(true);
+    const payload: PlatformPlanInput = {
+      ...form,
+      features: featuresText.split(',').map((item) => item.trim()).filter(Boolean),
+    };
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      setSaving(false);
+      return;
+    }
+    if (central.active) {
+      // Central mode: never fall through to local writes.
+      const request = editing
+        ? centralPlatformClient.updatePlan(editing.id, payload as Record<string, any>)
+        : centralPlatformClient.createPlan(payload as Record<string, any>);
+      request
+        .then(() => {
+          toast.success(editing ? 'تم تحديث الخطة' : 'تم إنشاء الخطة');
+          setFormOpen(false);
+          load();
+        })
+        .catch((err) => toast.error('تعذر حفظ الخطة', err instanceof Error ? err.message : undefined))
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
-      const payload: PlatformPlanInput = {
-        ...form,
-        features: featuresText.split(',').map((item) => item.trim()).filter(Boolean),
-      };
       if (editing) {
         platformAdminService.updatePlan(editing.id, payload);
         toast.success('تم تحديث الخطة');
@@ -162,6 +212,22 @@ export const PlatformPlansPage: React.FC = () => {
   const toggleActive = (plan: PlatformPlan) => {
     if (!canManagePlans) {
       toast.error('لا تملك صلاحية إدارة الخطط');
+      return;
+    }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
+    if (central.active) {
+      // No dedicated activate/deactivate endpoint — send the full plan payload.
+      const payload: PlatformPlanInput = { ...toPlanInput(plan), isActive: !plan.isActive };
+      centralPlatformClient.updatePlan(plan.id, payload as Record<string, any>)
+        .then(() => {
+          toast.success(plan.isActive ? 'تم تعطيل الخطة' : 'تم تفعيل الخطة');
+          load();
+        })
+        .catch((err) => toast.error('تعذر تحديث الخطة', err instanceof Error ? err.message : undefined));
       return;
     }
     try {

@@ -56,10 +56,20 @@ const jsonArray = (value: any): string[] => {
   }
 };
 
-/** Prices are stored in minor units locally and major units centrally — normalize for display. */
-const money = (value: any): number => {
-  const n = Number(value) || 0;
-  return Math.abs(n) >= 100000 ? n / 100 : n;
+/** Central plan prices arrive in minor units (cents); local plans are already major units. */
+const fromMinor = (value: any): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n / 100 : 0;
+};
+const major = (value: any): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** NaN-safe numeric parsing clamped to a minimum. */
+const numericInput = (value: string | number | null | undefined, min = 0): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(min, n) : min;
 };
 
 interface CatalogPlan {
@@ -80,13 +90,13 @@ interface CatalogPlan {
   raw: any;
 }
 
-const normalizePlan = (row: any): CatalogPlan => ({
+const normalizePlan = (row: any, minorUnits = false): CatalogPlan => ({
   id: String(pick(row, 'id') ?? ''),
   code: String(pick(row, 'code') ?? ''),
   name: String(pick(row, 'name') ?? pick(row, 'code') ?? ''),
   description: pick(row, 'description') ?? null,
   billingCycle: (pick(row, 'billingCycle', 'billing_cycle') ?? 'MONTHLY') as PlatformBillingCycle,
-  price: money(pick(row, 'price')),
+  price: minorUnits ? fromMinor(pick(row, 'price')) : major(pick(row, 'price')),
   currency: String(pick(row, 'currency') ?? 'EGP'),
   seatsLimit: Number(pick(row, 'seatsLimit', 'seats_limit') ?? 1) || 1,
   trialDays: Number(pick(row, 'trialDays', 'trial_days') ?? 14) || 14,
@@ -421,19 +431,25 @@ export const PlatformPlanWizardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const central = getCentralDataSourceState().active;
+      const centralState = getCentralDataSourceState();
+      if (centralState.misconfigured) {
+        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      }
+      const central = centralState.active;
       setCentralActive(central);
       if (central) {
+        // Let failures surface in the error state — an empty catalog is not a
+        // successful load.
         const [pl, md, fl] = await Promise.all([
-          centralPlatformClient.listPlans().catch(() => [] as any[]),
-          centralPlatformClient.listModules().catch(() => [] as any[]),
-          centralPlatformClient.listFeatureFlags().catch(() => [] as any[]),
+          centralPlatformClient.listPlans(),
+          centralPlatformClient.listModules(),
+          centralPlatformClient.listFeatureFlags(),
         ]);
-        setPlans((Array.isArray(pl) ? pl : []).map(normalizePlan));
+        setPlans((Array.isArray(pl) ? pl : []).map((row) => normalizePlan(row, true)));
         setModules((Array.isArray(md) ? md : []).map(normalizeModule));
         setFeatures((Array.isArray(fl) ? fl : []).map(normalizeFeature));
       } else {
-        setPlans(platformAdminService.listPlans().map(normalizePlan));
+        setPlans(platformAdminService.listPlans().map((row) => normalizePlan(row, false)));
         setModules(platformAdminService.listModules().map(normalizeModule));
         setFeatures(platformAdminService.listFeatureFlags().map(normalizeFeature));
       }
@@ -473,13 +489,17 @@ export const PlatformPlanWizardPage: React.FC = () => {
     [centralActive]
   );
 
+  // Guards against a slower earlier selection overwriting a newer one.
+  const selectSeqRef = React.useRef(0);
   const selectPlan = React.useCallback(
     async (plan: CatalogPlan) => {
+      const seq = ++selectSeqRef.current;
       setSelectedPlanId(plan.id);
       setModuleDraft(new Set(plan.includedModules));
       setFeatureDraft(new Set(plan.features));
       setDraftLoaded(false);
       const hidden = await loadPlanHiddenPages(plan.id);
+      if (seq !== selectSeqRef.current) return; // superseded by a newer selection
       setHiddenDraft(hidden);
       setDraftLoaded(true);
     },
@@ -508,11 +528,31 @@ export const PlatformPlanWizardPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة الخطط');
       return;
     }
+    const name = planForm.name.trim();
+    const code = planForm.code.trim();
+    if (!name || !code) {
+      toast.error('اسم الخطة ورمزها مطلوبان');
+      return;
+    }
+    if (!/^[A-Z0-9_]+$/.test(code)) {
+      toast.error('رمز الخطة يجب أن يحتوي على أحرف إنجليزية كبيرة وأرقام و_ فقط');
+      return;
+    }
     setPlanSaving(true);
     try {
+      const input: PlatformPlanInput = {
+        ...planForm,
+        name,
+        code,
+        price: numericInput(planForm.price),
+        monthlyPrice: planForm.monthlyPrice == null ? undefined : numericInput(planForm.monthlyPrice),
+        yearlyPrice: planForm.yearlyPrice == null ? undefined : numericInput(planForm.yearlyPrice),
+        trialDays: planForm.trialDays == null ? undefined : numericInput(planForm.trialDays),
+        seatsLimit: numericInput(planForm.seatsLimit, 1),
+      };
       const created = centralActive
-        ? normalizePlan(await centralPlatformClient.createPlan({ ...planForm }))
-        : normalizePlan(platformAdminService.createPlan(planForm));
+        ? normalizePlan(await centralPlatformClient.createPlan({ ...input }), true)
+        : normalizePlan(platformAdminService.createPlan(input), false);
       toast.success('تم إنشاء الخطة', created.name);
       setPlanFormOpen(false);
       setPlanForm(emptyPlanForm);
@@ -554,6 +594,8 @@ export const PlatformPlanWizardPage: React.FC = () => {
     }
     setFeatureSaving(true);
     try {
+      const rollout = Number(featureForm.rolloutPercent);
+      const safeRollout = Number.isFinite(rollout) ? Math.min(100, Math.max(0, Math.round(rollout))) : 100;
       const payload = {
         id: featureForm.id,
         code: featureForm.code.trim(),
@@ -561,7 +603,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
         description: featureForm.description || undefined,
         category: featureForm.category || undefined,
         isEnabled: featureForm.isEnabled,
-        rolloutPercent: Number(featureForm.rolloutPercent),
+        rolloutPercent: safeRollout,
         isStagingOnly: featureForm.isStagingOnly,
         minPlanTier: featureForm.minPlanTier || null,
         pagePaths: featureForm.pagePaths,
@@ -620,15 +662,24 @@ export const PlatformPlanWizardPage: React.FC = () => {
         await centralPlatformClient.deleteFeatureFlag(deleteTarget.id);
       } else {
         platformAdminService.deleteFeatureFlag(deleteTarget.id);
-        // Strip the deleted code from every plan's feature list.
+        // Strip the deleted code from every plan's feature list, reporting any
+        // plan that could not be updated instead of failing silently.
+        let stripFailures = 0;
         for (const plan of plans) {
           if (plan.features.includes(deleteTarget.code)) {
-            platformAdminService.updatePlan(plan.id, {
-              name: plan.name,
-              code: plan.code,
-              features: plan.features.filter((code) => code !== deleteTarget.code),
-            });
+            try {
+              platformAdminService.updatePlan(plan.id, {
+                name: plan.name,
+                code: plan.code,
+                features: plan.features.filter((code) => code !== deleteTarget.code),
+              });
+            } catch {
+              stripFailures += 1;
+            }
           }
+        }
+        if (stripFailures > 0) {
+          toast.warning('حُذفت الميزة لكن تعذر تحديث بعض الخطط', `${stripFailures} خطة ما زالت تشير إليها — راجع صفحة الخطط.`);
         }
       }
       if (selectedPlanId && featureDraft.has(deleteTarget.code)) {
@@ -673,9 +724,9 @@ export const PlatformPlanWizardPage: React.FC = () => {
 
       const hiddenPaths = [...hiddenDraft];
       if (centralActive) {
-        const current = await centralPlatformClient
-          .getFeaturePermissions({ tenantId: null, planId: selectedPlan.id })
-          .catch(() => ({ hiddenMenus: [], disabledPermissions: [], featurePermissions: [] }));
+        // Fetch current permissions first — a failure must abort the apply so we
+        // never overwrite disabledPermissions/featurePermissions with empty lists.
+        const current = await centralPlatformClient.getFeaturePermissions({ tenantId: null, planId: selectedPlan.id });
         await centralPlatformClient.setFeaturePermissions({
           planId: selectedPlan.id,
           hiddenMenus: hiddenPaths,
@@ -1181,19 +1232,19 @@ export const PlatformPlanWizardPage: React.FC = () => {
             </select>
           </Field>
           <Field label="السعر">
-            <input type="number" min={0} className={inputClass} value={planForm.price ?? 0} onChange={(event) => setPlanForm({ ...planForm, price: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={planForm.price ?? 0} onChange={(event) => setPlanForm({ ...planForm, price: numericInput(event.target.value) })} />
           </Field>
           <Field label="السعر شهري">
-            <input type="number" min={0} className={inputClass} value={planForm.monthlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, monthlyPrice: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={planForm.monthlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, monthlyPrice: numericInput(event.target.value) })} />
           </Field>
           <Field label="السعر سنوي">
-            <input type="number" min={0} className={inputClass} value={planForm.yearlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, yearlyPrice: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={planForm.yearlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, yearlyPrice: numericInput(event.target.value) })} />
           </Field>
           <Field label="أيام التجربة">
-            <input type="number" min={0} className={inputClass} value={planForm.trialDays ?? 14} onChange={(event) => setPlanForm({ ...planForm, trialDays: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={planForm.trialDays ?? 14} onChange={(event) => setPlanForm({ ...planForm, trialDays: numericInput(event.target.value) })} />
           </Field>
           <Field label="حد المستخدمين">
-            <input type="number" min={1} className={inputClass} value={planForm.seatsLimit ?? 3} onChange={(event) => setPlanForm({ ...planForm, seatsLimit: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={planForm.seatsLimit ?? 3} onChange={(event) => setPlanForm({ ...planForm, seatsLimit: numericInput(event.target.value, 1) })} />
           </Field>
           <Field label="العملة">
             <select className={inputClass} value={planForm.currency} onChange={(event) => setPlanForm({ ...planForm, currency: event.target.value })}>
@@ -1238,7 +1289,17 @@ export const PlatformPlanWizardPage: React.FC = () => {
             <input className={inputClass} value={featureForm.category} onChange={(event) => setFeatureForm({ ...featureForm, category: event.target.value })} placeholder="مثال: مبيعات، تقارير" />
           </Field>
           <Field label="نسبة الإتاحة (%)">
-            <input type="number" min={0} max={100} className={inputClass} value={featureForm.rolloutPercent} onChange={(event) => setFeatureForm({ ...featureForm, rolloutPercent: Number(event.target.value) })} />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className={inputClass}
+              value={featureForm.rolloutPercent}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                setFeatureForm({ ...featureForm, rolloutPercent: Number.isFinite(next) ? Math.min(100, Math.max(0, next)) : 0 });
+              }}
+            />
           </Field>
           <Field label="الحد الأدنى لدرجة الخطة">
             <input className={inputClass} value={featureForm.minPlanTier} onChange={(event) => setFeatureForm({ ...featureForm, minPlanTier: event.target.value })} placeholder="PRO" />

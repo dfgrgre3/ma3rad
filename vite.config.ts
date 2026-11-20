@@ -125,7 +125,10 @@ export default defineConfig(({ command }) => {
   if (modulePackages && deployment.enabled.length !== MODULE_IDS.length) {
     throw new Error('CERAMISYS_MODULE_PACKAGES=1 needs a full build; do not combine it with CERAMISYS_FEATURE_MODULES.');
   }
-  const plugins: Plugin[] = [react(), appCspPlugin(), featureModulesPlugin(deployment.enabled)];
+  // featureModulesPlugin must run before plugin-react's pre-enforced Babel
+  // transform, which merges statements onto the moduleLazy declaration line and
+  // would break stripExcludedModuleImports' single-line contract.
+  const plugins: Plugin[] = [featureModulesPlugin(deployment.enabled), react(), appCspPlugin()];
   if (modulePackages && command === 'build') plugins.push(moduleChunkManifestPlugin());
 
   if (command === 'build') {

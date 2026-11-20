@@ -48,7 +48,7 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
         <select
           value={details.ticket.status}
           disabled={!canManageSupport}
-          onChange={(e) => onStatusChange(e.target.value as any)}
+          onChange={(e) => onStatusChange(e.target.value as PlatformSupportTicket['status'])}
           className={`${inputClass} text-xs py-1 h-8 max-w-[130px] font-bold`}
         >
           <option value="OPEN">مفتوحة</option>
@@ -61,7 +61,7 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
         <select
           value={details.ticket.priority}
           disabled={!canManageSupport}
-          onChange={(e) => onPriorityChange(e.target.value as any)}
+          onChange={(e) => onPriorityChange(e.target.value as PlatformSupportTicket['priority'])}
           className={`${inputClass} text-xs py-1 h-8 max-w-[110px]`}
         >
           <option value="LOW">منخفض</option>

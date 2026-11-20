@@ -60,6 +60,11 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/device/backups/:id/restore-result',
     '/api/v1/modules/catalog',
     '/api/v1/modules/:moduleId/:version/files/:name',
+    // Device licensing endpoints authenticate via the activation-issued
+    // credential in the request body — no platform staff session.
+    '/api/v1/licensing/activate',
+    '/api/v1/licensing/validate',
+    '/api/v1/licensing/heartbeat',
   ]);
 
   for (const entry of ROUTE_MANIFEST) {

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   Play,
+  RefreshCw,
   RotateCcw,
   HardDrive,
   AlertTriangle,
@@ -18,6 +19,7 @@ import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformCentralBackup } from '../../services/domains/platform/platformTypes';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import {
   EmptyState,
   formatDateTime,
@@ -82,22 +84,32 @@ export const PlatformBackupsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const centralActive = getCentralDataSourceState().active;
 
-  const loadData = useCallback(() => {
-    setLoading(true);
+  // Confirmation modal for destructive/sensitive operations
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const requestConfirm = (title: string, description: string, onConfirm: () => void | Promise<void>) =>
+    setConfirmState({ open: true, title, description, onConfirm });
+
+  const loadData = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     if (centralActive) {
       Promise.all([
         centralPlatformClient.listBackups({ tenantId: centralTenantFilter || undefined }),
         centralPlatformClient.listAppBackups({ tenantId: centralTenantFilter || undefined }),
-        centralPlatformClient.listTenants('', '', ''),
+        centralPlatformClient.listTenants(),
       ])
         .then(([rows, appRows, tenants]) => {
           setCentralBackups(rows as CentralBackupRow[]);
           setCentralAppBackups(appRows as CentralAppBackupRow[]);
-          setCentralTenants((tenants as any[]).map((t) => ({ id: t.id, name: t.name ?? t.code ?? t.id })));
+          setCentralTenants(tenants.map((t) => ({ id: t.id, name: t.name ?? t.code ?? t.id })));
           setError(null);
         })
-        .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل النسخ الاحتياطية.'))
-        .finally(() => setLoading(false));
+        .catch((err) => { if (!silent) setError(err instanceof Error ? err.message : 'تعذر تحميل النسخ الاحتياطية.'); })
+        .finally(() => { if (!silent) setLoading(false); });
       return;
     }
     try {
@@ -105,14 +117,22 @@ export const PlatformBackupsPage: React.FC = () => {
       setBackups(list);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل النسخ الاحتياطية.');
+      if (!silent) setError(err instanceof Error ? err.message : 'تعذر تحميل النسخ الاحتياطية.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [centralActive, centralTenantFilter]);
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Poll silently so REQUESTED backups surface their COMPLETED/FAILED status.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!document.hidden) loadData(true);
+    }, 15000);
+    return () => clearInterval(timer);
   }, [loadData]);
 
   const canManageBackups = canPlatform('backups');
@@ -123,38 +143,48 @@ export const PlatformBackupsPage: React.FC = () => {
       return;
     }
     if (centralActive) {
-      if (!confirm('طلب نسخة احتياطية احتياطية جديدة من الخادم المركزي؟')) return;
-      setRunning(true);
-      try {
-        await centralPlatformClient.createBackup({
-          tenantId: centralTenantFilter || null,
-          type: centralType,
-          triggerSource: 'MANUAL',
-        });
-        toast.success('تم تسجيل طلب النسخة الاحتياطية — ستظهر حالتها محدثة عند اكتمال المهمة.');
-        loadData();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'فشل طلب النسخة الاحتياطية.');
-      } finally {
-        setRunning(false);
-      }
+      requestConfirm(
+        'طلب نسخة احتياطية جديدة',
+        `سيتم تسجيل طلب نسخة ${centralType === 'FULL' ? 'كاملة' : 'تزايدية'} من الخادم المركزي${centralTenantFilter ? ' للمنشأة المحددة' : ' (المنصة كاملة)'}. ستظهر حالتها محدثة عند اكتمال المهمة.`,
+        async () => {
+          setRunning(true);
+          try {
+            await centralPlatformClient.createBackup({
+              tenantId: centralTenantFilter || null,
+              type: centralType,
+              triggerSource: 'MANUAL',
+            });
+            toast.success('تم تسجيل طلب النسخة الاحتياطية — ستظهر حالتها محدثة عند اكتمال المهمة.');
+            loadData();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'فشل طلب النسخة الاحتياطية.');
+          } finally {
+            setRunning(false);
+          }
+        }
+      );
       return;
     }
-    if (!confirm('هل ترغب في أخذ نسخة احتياطية مشفرة فورية لقاعدة بيانات المنصة؟')) return;
-    setRunning(true);
-    try {
-      const created = await platformAdminService.triggerCentralBackup();
-      toast.warning(
-        created.integrityCheckPassed
-          ? `تم إنشاء النسخة الاحتياطية والتحقق منها: ${created.filename}`
-          : `تم إنشاء نسخة احتياطية محلية مشفرة: ${created.filename}\nلم يتم التحقق من نسخة خارج الموقع، لذا لا تصنف كنسخة موثقة (VERIFIED).`
-      );
-      loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'فشل أخذ النسخة الاحتياطية.');
-    } finally {
-      setRunning(false);
-    }
+    requestConfirm(
+      'أخذ نسخة احتياطية فورية',
+      'هل ترغب في أخذ نسخة احتياطية مشفرة فورية لقاعدة بيانات المنصة؟',
+      async () => {
+        setRunning(true);
+        try {
+          const created = await platformAdminService.triggerCentralBackup();
+          toast.warning(
+            created.integrityCheckPassed
+              ? `تم إنشاء النسخة الاحتياطية والتحقق منها: ${created.filename}`
+              : `تم إنشاء نسخة احتياطية محلية مشفرة: ${created.filename}\nلم يتم التحقق من نسخة خارج الموقع، لذا لا تصنف كنسخة موثقة (VERIFIED).`
+          );
+          loadData();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'فشل أخذ النسخة الاحتياطية.');
+        } finally {
+          setRunning(false);
+        }
+      }
+    );
   };
 
   const handleRestore = async (backup: CentralBackupRow) => {
@@ -166,14 +196,19 @@ export const PlatformBackupsPage: React.FC = () => {
       toast.warning('الاستعادة لكل منشأة فقط — اختر نسخة مرتبطة بعميل.');
       return;
     }
-    if (!confirm(`استعادة النسخة "${backup.name || backup.id}" للعميل "${backup.tenantName || backup.tenantId}"؟\nلن تتأثر بيانات المنشآت الأخرى.`)) return;
-    try {
-      await centralPlatformClient.restoreBackup(backup.id);
-      toast.success('تم تسجيل طلب الاستعادة — ستظهر نتيجتها في سجل عمليات التشغيل.');
-      loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
-    }
+    requestConfirm(
+      'استعادة نسخة احتياطية',
+      `استعادة النسخة "${backup.name || backup.id}" للعميل "${backup.tenantName || backup.tenantId}"؟\nلن تتأثر بيانات المنشآت الأخرى.`,
+      async () => {
+        try {
+          await centralPlatformClient.restoreBackup(backup.id);
+          toast.success('تم تسجيل طلب الاستعادة — ستظهر نتيجتها في سجل عمليات التشغيل.');
+          loadData();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
+        }
+      }
+    );
   };
 
   const handleAppBackupRestore = async (backup: CentralAppBackupRow) => {
@@ -189,14 +224,19 @@ export const PlatformBackupsPage: React.FC = () => {
       toast.warning('توجد استعادة قيد التنفيذ لهذه النسخة بالفعل.');
       return;
     }
-    if (!confirm(`طلب استعادة نسخة بيانات التطبيق "${backup.name || backup.id}" على جهاز المنشأة "${backup.tenantName || backup.tenantId}"؟\nسيقوم الجهاز بتنزيل النسخة المشفرة والتحقق منها وتطبيقها تلقائيًا.`)) return;
-    try {
-      await centralPlatformClient.requestAppBackupRestore(backup.id);
-      toast.success('تم تسجيل طلب الاستعادة — سيطبّقها الجهاز عند اتصاله التالي بالمنصة.');
-      loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
-    }
+    requestConfirm(
+      'طلب استعادة نسخة بيانات التطبيق',
+      `طلب استعادة نسخة بيانات التطبيق "${backup.name || backup.id}" على جهاز المنشأة "${backup.tenantName || backup.tenantId}"؟\nسيقوم الجهاز بتنزيل النسخة المشفرة والتحقق منها وتطبيقها تلقائيًا.`,
+      async () => {
+        try {
+          await centralPlatformClient.requestAppBackupRestore(backup.id);
+          toast.success('تم تسجيل طلب الاستعادة — سيطبّقها الجهاز عند اتصاله التالي بالمنصة.');
+          loadData();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'فشل طلب الاستعادة.');
+        }
+      }
+    );
   };
 
   const handleAppBackupRestoreCancel = async (backup: CentralAppBackupRow) => {
@@ -204,16 +244,25 @@ export const PlatformBackupsPage: React.FC = () => {
       toast.warning('لا تملك صلاحية استعادة النسخ.');
       return;
     }
-    if (!confirm(`إلغاء طلب الاستعادة المعلق للنسخة "${backup.name || backup.id}"؟`)) return;
-    try {
-      await centralPlatformClient.cancelAppBackupRestore(backup.id);
-      loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'فشل إلغاء الاستعادة.');
-    }
+    requestConfirm(
+      'إلغاء طلب الاستعادة',
+      `إلغاء طلب الاستعادة المعلق للنسخة "${backup.name || backup.id}"؟`,
+      async () => {
+        try {
+          await centralPlatformClient.cancelAppBackupRestore(backup.id);
+          loadData();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'فشل إلغاء الاستعادة.');
+        }
+      }
+    );
   };
 
   const handleDownload = async (backup: CentralBackupRow) => {
+    if (!canManageBackups) {
+      toast.warning('لا تملك صلاحية تنزيل النسخ الاحتياطية.');
+      return;
+    }
     try {
       const artifact = await centralPlatformClient.downloadBackupArtifact(backup.id);
       const blob = new Blob([JSON.stringify(artifact, null, 2)], { type: 'application/json' });
@@ -230,6 +279,32 @@ export const PlatformBackupsPage: React.FC = () => {
     }
   };
 
+  const confirmDialog = (
+    <Modal
+      open={confirmState?.open ?? false}
+      onClose={() => setConfirmState(null)}
+      title={confirmState?.title ?? ''}
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmState(null)}>إلغاء</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const fn = confirmState?.onConfirm;
+              setConfirmState(null);
+              if (fn) void fn();
+            }}
+          >
+            تأكيد
+          </Button>
+        </div>
+      }
+    >
+      <p className="text-xs text-ink-secondary whitespace-pre-line">{confirmState?.description}</p>
+    </Modal>
+  );
+
   const STATUS_LABELS: Record<string, string> = {
     REQUESTED: 'مطلوبة', IN_PROGRESS: 'قيد التنفيذ', COMPLETED: 'مكتملة', FAILED: 'فاشلة', EXPIRED: 'منتهية',
   };
@@ -239,6 +314,9 @@ export const PlatformBackupsPage: React.FC = () => {
   };
 
   if (centralActive) {
+    const hasPendingWork =
+      centralBackups.some((b) => ['REQUESTED', 'IN_PROGRESS'].includes(b.status)) ||
+      centralAppBackups.some((b) => ['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus));
     return (
       <div className="space-y-4 text-right">
         <PageHeader
@@ -263,6 +341,9 @@ export const PlatformBackupsPage: React.FC = () => {
                 <option value="FULL">كاملة</option>
                 <option value="INCREMENTAL">تزايدية</option>
               </select>
+              <Button size="sm" variant="secondary" onClick={() => loadData()} leadingIcon={<RefreshCw className="h-4 w-4" />}>
+                تحديث
+              </Button>
               <Button size="sm" onClick={handleTriggerBackup} disabled={running || !canManageBackups} leadingIcon={<Play className="h-4 w-4" />}>
                 {running ? 'جارٍ الطلب...' : 'طلب نسخة احتياطية'}
               </Button>
@@ -270,6 +351,11 @@ export const PlatformBackupsPage: React.FC = () => {
           }
         />
         {error && <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">{error}</div>}
+        {hasPendingWork && (
+          <div className="p-2.5 bg-warning/10 border border-warning/30 rounded-lg text-[11px] font-semibold text-warning">
+            توجد نسخ أو عمليات استعادة قيد التنفيذ — تُحدَّث القائمة تلقائياً كل 15 ثانية.
+          </div>
+        )}
         <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70">
           {loading ? (
             <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل النسخ الاحتياطية...</div>
@@ -302,10 +388,10 @@ export const PlatformBackupsPage: React.FC = () => {
                                 render: (b) => (
                                   <div className="flex items-center gap-1.5">
                                     {b.status === 'COMPLETED' && (
-                                      <Button size="sm" variant="ghost" onClick={() => handleDownload(b)} title="تنزيل ملف النسخة">تنزيل</Button>
+                                      <Button size="sm" variant="ghost" onClick={() => handleDownload(b)} disabled={!canManageBackups} title="تنزيل ملف النسخة">تنزيل</Button>
                                     )}
                                     {b.status === 'COMPLETED' && b.tenantId ? (
-                                      <Button size="sm" variant="secondary" onClick={() => handleRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>استعادة</Button>
+                                      <Button size="sm" variant="secondary" onClick={() => handleRestore(b)} disabled={!canManageBackups} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>استعادة</Button>
                                     ) : null}
                                   </div>
                                 ),
@@ -357,10 +443,10 @@ export const PlatformBackupsPage: React.FC = () => {
                                     render: (b) => (
                                       <div className="flex items-center gap-1.5">
                                         {b.status === 'COMPLETED' && !['REQUESTED', 'IN_PROGRESS'].includes(b.restoreStatus) ? (
-                                          <Button size="sm" variant="secondary" onClick={() => handleAppBackupRestore(b)} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>طلب استعادة على الجهاز</Button>
+                                          <Button size="sm" variant="secondary" onClick={() => handleAppBackupRestore(b)} disabled={!canManageBackups} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>طلب استعادة على الجهاز</Button>
                                         ) : null}
                                         {b.restoreStatus === 'REQUESTED' ? (
-                                          <Button size="sm" variant="ghost" onClick={() => handleAppBackupRestoreCancel(b)}>إلغاء</Button>
+                                          <Button size="sm" variant="ghost" onClick={() => handleAppBackupRestoreCancel(b)} disabled={!canManageBackups}>إلغاء</Button>
                                         ) : null}
                                       </div>
                                     ),
@@ -371,6 +457,7 @@ export const PlatformBackupsPage: React.FC = () => {
             )}
           </div>
         </div>
+        {confirmDialog}
       </div>
     );
   }
@@ -462,6 +549,7 @@ export const PlatformBackupsPage: React.FC = () => {
 
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 };

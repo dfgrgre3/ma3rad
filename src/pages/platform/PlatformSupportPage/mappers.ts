@@ -1,4 +1,4 @@
-import type { PlatformSupportTicket } from '../../../services/domains/platform/platformTypes';
+import type { PlatformSupportTicket, PlatformSupportMessage } from '../../../services/domains/platform/platformTypes';
 
 export interface CentralTicketRow {
   id: string;
@@ -16,9 +16,32 @@ export interface CentralTicketRow {
   assigneeName?: string | null;
   messageCount?: number;
   lastMessageAt?: string | null;
+  remoteAccessRequested?: boolean;
+  remoteAccessApproved?: boolean;
+  remoteAccessRequestedAt?: string | null;
+  remoteAccessApprovedAt?: string | null;
+  remoteAccessDurationMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
-  messages?: any[];
+  messages?: CentralMessageRow[];
+}
+
+/** Raw central message row — snake_case as returned by mapMessageRow. */
+export interface CentralMessageRow {
+  id: string;
+  ticket_id?: string;
+  ticketId?: string;
+  author_type?: string;
+  authorType?: string;
+  author_id?: string | null;
+  authorId?: string | null;
+  author_name?: string | null;
+  authorName?: string | null;
+  body: string;
+  internal?: boolean;
+  isInternal?: boolean;
+  created_at?: string;
+  createdAt?: string;
 }
 
 export function mapPriorityToCentral(p: string): string {
@@ -38,23 +61,25 @@ export function mapCentralTicket(row: CentralTicketRow): PlatformSupportTicket {
     priority: mapPriorityFromCentral(row.priority),
     status: row.status as PlatformSupportTicket['status'],
     assignedTo: row.assigneeName ?? null,
-    remoteAccessRequested: false,
-    remoteAccessApproved: false,
+    remoteAccessRequested: Boolean(row.remoteAccessRequested),
+    remoteAccessApproved: Boolean(row.remoteAccessApproved),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
 }
 
-export function mapCentralMessage(row: any) {
+export function mapCentralMessage(row: CentralMessageRow): PlatformSupportMessage {
+  const authorType = String(row.authorType ?? row.author_type ?? 'TENANT').toUpperCase();
+  const isStaff = authorType === 'STAFF' || authorType === 'SUPPORT' || authorType === 'AGENT';
   return {
     id: row.id,
-    ticketId: row.ticketId,
-    authorId: row.authorId ?? '',
-    authorType: (row.authorType === 'STAFF' ? 'STAFF' : 'TENANT') as 'STAFF' | 'TENANT',
-    authorName: row.authorName ?? '—',
-    authorRole: (row.authorType === 'STAFF' ? 'SUPPORT' : 'CUSTOMER') as 'CUSTOMER' | 'SUPPORT' | 'SYSTEM',
+    ticketId: String(row.ticketId ?? row.ticket_id ?? ''),
+    authorId: String(row.authorId ?? row.author_id ?? ''),
+    authorType: isStaff ? 'STAFF' : 'TENANT',
+    authorName: String(row.authorName ?? row.author_name ?? '—'),
+    authorRole: isStaff ? 'SUPPORT' : 'CUSTOMER',
     body: row.body,
-    isInternal: row.internal,
-    createdAt: row.createdAt,
-  };
+    isInternal: Boolean(row.isInternal ?? row.internal),
+    createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  } as PlatformSupportMessage;
 }

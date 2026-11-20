@@ -2,6 +2,19 @@ import React from 'react';
 import type { PlatformTenantProfile } from '../../../services/domains/platform/platformTypes';
 import { formatDateTime } from '../components/PlatformUI';
 
+/** Tenant branch row as returned by the central branches API (no shared DTO yet). */
+export interface TenantBranch {
+  id: string;
+  code?: string;
+  name?: string;
+  city?: string | null;
+  phone?: string | null;
+  seatsLimit?: number;
+  devicesLimit?: number;
+  isMain?: boolean;
+  status?: string;
+}
+
 export const InfoItem: React.FC<{ label: string; value: React.ReactNode; ltr?: boolean }> = ({ label, value, ltr }) => (
   <div className="rounded-lg border border-line bg-surface px-3 py-2">
     <dt className="text-[10.5px] font-semibold text-muted">{label}</dt>

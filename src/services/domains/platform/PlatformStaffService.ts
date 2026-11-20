@@ -22,7 +22,7 @@ import type {
   PlatformSigningKey,
   PlatformCentralSecurityOverview,
 } from './platformTypes';
-import type { StaffServiceContext, StaffAuditOptions } from './PlatformStaffService/context';
+import type { StaffServiceContext, StaffAuditOptions, PlatformStaffMfaCompliance } from './PlatformStaffService/context';
 import * as staffManagement from './PlatformStaffService/staffManagement';
 import * as invites from './PlatformStaffService/invites';
 import * as passwords from './PlatformStaffService/passwords';
@@ -235,12 +235,7 @@ export class PlatformStaffService {
     return mfa.setStaffMfaEnforcement(this.ctx, policy);
   }
 
-  public getStaffMfaCompliance(): {
-    total: number;
-    enabled: number;
-    requiredButDisabled: number;
-    byRole: Record<string, { total: number; enabled: number }>;
-  } {
+  public getStaffMfaCompliance(): PlatformStaffMfaCompliance {
     return mfa.getStaffMfaCompliance(this.ctx);
   }
 

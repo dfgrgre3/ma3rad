@@ -58,6 +58,15 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedRolloutId, setSelectedRolloutId] = useState<string>('');
+  const successTimerRef = React.useRef<number | null>(null);
+  const rolloutTimerRef = React.useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
+    if (rolloutTimerRef.current) window.clearTimeout(rolloutTimerRef.current);
+  }, []);
 
   // Active Tenant Config State
   const [currentConfig, setCurrentConfig] = useState<PlatformTenantConfig | null>(null);
@@ -91,8 +100,9 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       setTemplates(tmplList);
       setRolloutTemplateId((prev) => (tmplList.some((t) => t.id === prev) ? prev : tmplList[0]?.id ?? ''));
       setRollouts(rList);
+      setLoadError(null);
     } catch (e) {
-      console.error('Failed to load bootstrap config:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل قوالب وإصدارات التكوين.');
     }
   }, [selectedTenantId]);
 
@@ -101,16 +111,21 @@ export const PlatformAppConfigurationPage: React.FC = () => {
     if (!tenantId) return;
     setLoading(true);
     setJsonError(null);
+    // Clear stale data so a failed switch never shows the previous tenant's config.
+    setCurrentConfig(null);
+    setJsonText('{}');
+    setVersions([]);
+    setAcks([]);
     const centralState = getCentralDataSourceState();
     try {
-      let cfg: any;
-      let vList: any[] = [];
-      let ackList: any[] = [];
+      let cfg: PlatformTenantConfig | null = null;
+      let vList: PlatformTenantConfigVersion[] = [];
+      let ackList: PlatformConfigAck[] = [];
 
       if (centralState.active) {
-        cfg = await centralPlatformClient.getTenantConfig(tenantId);
-        vList = await centralPlatformClient.listTenantConfigVersions(tenantId);
-        // Acks are per-rollout, not per-tenant in central model
+        cfg = (await centralPlatformClient.getTenantConfig(tenantId)) as PlatformTenantConfig | null;
+        vList = (await centralPlatformClient.listTenantConfigVersions(tenantId)) as PlatformTenantConfigVersion[];
+        // Acks are per-rollout in the central model — fetched via the rollout selector.
         ackList = [];
       } else {
         cfg = platformAdminService.getTenantConfig(tenantId);
@@ -119,7 +134,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       }
 
       setCurrentConfig(cfg);
-      setJsonText(JSON.stringify(cfg.configPayload || cfg.values || {}, null, 2));
+      setJsonText(JSON.stringify(cfg?.configPayload ?? {}, null, 2));
       setVersions(vList);
       if (vList.length >= 2) {
         setDiffVersionA(vList[0].version);
@@ -129,12 +144,33 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         setDiffVersionB(vList[0].version);
       }
       setAcks(ackList);
+      setLoadError(null);
     } catch (e) {
-      console.error('Failed to load tenant config:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل تكوين العميل.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Central ACKs are scoped to a rollout — load them when one is selected.
+  const loadCentralAcks = useCallback(async (rolloutId: string) => {
+    if (!rolloutId || !getCentralDataSourceState().active) {
+      setAcks([]);
+      return;
+    }
+    try {
+      const rows = (await centralPlatformClient.listConfigAcks(rolloutId)) as PlatformConfigAck[];
+      setAcks(Array.isArray(rows) ? rows : []);
+    } catch {
+      setAcks([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedRolloutId && getCentralDataSourceState().active) {
+      loadCentralAcks(selectedRolloutId);
+    }
+  }, [selectedRolloutId, loadCentralAcks]);
 
   useEffect(() => {
     loadBootstrap();
@@ -157,18 +193,24 @@ export const PlatformAppConfigurationPage: React.FC = () => {
     try {
       let parsedPayload: Record<string, unknown>;
       try {
-        parsedPayload = JSON.parse(jsonText);
+        const raw = JSON.parse(jsonText) as unknown;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+          setJsonError('يجب أن يكون التكوين كائن JSON صالحاً (وليس مصفوفة أو قيمة أولية).');
+          setSaving(false);
+          return;
+        }
+        parsedPayload = raw as Record<string, unknown>;
       } catch (pe) {
         setJsonError(`خطأ في صياغة JSON: ${(pe as Error).message}`);
         setSaving(false);
         return;
       }
 
-      let updated: any;
+      let updated: PlatformTenantConfig;
       if (centralState.active) {
-        updated = await centralPlatformClient.saveTenantConfig(selectedTenantId, {
+        updated = (await centralPlatformClient.saveTenantConfig(selectedTenantId, {
           configPayload: parsedPayload,
-        });
+        })) as PlatformTenantConfig;
       } else {
         updated = platformAdminService.saveTenantConfig({
           tenantId: selectedTenantId,
@@ -179,7 +221,8 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
       setCurrentConfig(updated);
       setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
+      successTimerRef.current = window.setTimeout(() => setSavedSuccess(false), 3000);
       loadTenantConfig(selectedTenantId);
     } catch (err) {
       toast.error((err as Error).message);
@@ -218,15 +261,18 @@ export const PlatformAppConfigurationPage: React.FC = () => {
   const handleCreateRollout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageAppConfig) { toast.warning('لا تملك صلاحية إدارة إعدادات التطبيق'); return; }
-    if (!rolloutTitle || !rolloutTemplateId) return;
     const centralState = getCentralDataSourceState();
+    // The central API has no campaign-title field — only the template is required there.
+    if (!rolloutTemplateId || (!centralState.active && !rolloutTitle)) return;
     try {
-      let created: any;
+      let created: PlatformConfigRollout;
       if (centralState.active) {
-        created = await centralPlatformClient.createConfigRollout({
+        // Central API only accepts { templateId, targetTenants? } — name,
+        // targetType and rolloutPercentage have no server-side fields.
+        created = (await centralPlatformClient.createConfigRollout({
           templateId: rolloutTemplateId,
           targetTenants: rolloutTargetType === 'SPECIFIC_TENANTS' ? [selectedTenantId] : [],
-        });
+        })) as PlatformConfigRollout;
         await centralPlatformClient.startConfigRollout(created.id);
       } else {
         created = platformAdminService.createConfigRollout({
@@ -239,7 +285,8 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       }
 
       setRolloutSuccess(true);
-      setTimeout(() => setRolloutSuccess(false), 4000);
+      if (rolloutTimerRef.current) window.clearTimeout(rolloutTimerRef.current);
+      rolloutTimerRef.current = window.setTimeout(() => setRolloutSuccess(false), 4000);
       setRolloutTitle('');
       loadBootstrap();
       if (selectedTenantId) loadTenantConfig(selectedTenantId);
@@ -271,8 +318,15 @@ export const PlatformAppConfigurationPage: React.FC = () => {
     });
   }, [versions, diffVersionA, diffVersionB]);
 
+  const centralActive = getCentralDataSourceState().active;
+
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
+          {loadError}
+        </div>
+      )}
       {/* Page Header */}
       <PageHeader
         title="محرك التكوين الديناميكي والنشر المركزي (App Configuration)"
@@ -484,16 +538,23 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               </div>
             )}
 
+            {centralActive && (
+              <div className="rounded-lg border border-accent-border bg-accent-soft/50 px-3 py-2 text-[11px] font-semibold text-ink-secondary">
+                في الوضع المركزي لا يدعم الخادم حقول العنوان ونوع الاستهداف ونسبة النشر — تُنشأ الحملة للقالب المحدد على كامل نطاقها المدعوم.
+              </div>
+            )}
+
             <form onSubmit={handleCreateRollout} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-muted mb-1">عنوان الحملة / ملاحظات الإصدار</label>
+                <label className="block text-xs font-medium text-muted mb-1">عنوان الحملة / ملاحظات الإصدار{centralActive ? '' : ''}</label>
                 <input
                   type="text"
-                  required
-                  placeholder="مثال: ترقية إعدادات الفاتورة الإلكترونية - دفعة 1"
+                  required={!centralActive}
+                  disabled={centralActive}
+                  placeholder={centralActive ? 'غير مدعوم في الوضع المركزي' : 'مثال: ترقية إعدادات الفاتورة الإلكترونية - دفعة 1'}
                   value={rolloutTitle}
                   onChange={(e) => setRolloutTitle(e.target.value)}
-                  className={`w-full ${inputClass}`}
+                  className={`w-full ${inputClass} disabled:opacity-60`}
                 />
               </div>
 
@@ -519,7 +580,8 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                   <select
                     value={rolloutTargetType}
                     onChange={(e) => setRolloutTargetType(e.target.value as RolloutTargetType)}
-                    className={`w-full ${inputClass}`}
+                    disabled={centralActive}
+                    className={`w-full ${inputClass} disabled:opacity-60`}
                   >
                     <option value="ALL">كافة عملاء المنصة (100% Rollout)</option>
                     <option value="CANARY_PERCENT">نسبة تدريجية (Canary Testing %)</option>
@@ -535,9 +597,10 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                       type="number"
                       min={1}
                       max={100}
+                      disabled={centralActive}
                       value={rolloutCanaryPercent}
-                      onChange={(e) => setRolloutCanaryPercent(Number(e.target.value))}
-                      className={`w-full ${inputClass}`}
+                      onChange={(e) => setRolloutCanaryPercent(Math.min(100, Math.max(1, Number(e.target.value) || 1)))}
+                      className={`w-full ${inputClass} disabled:opacity-60`}
                     />
                   </div>
                 )}
@@ -683,8 +746,27 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {activeTab === 'telemetry' && (
         <div className="space-y-4">
           <div className="text-xs text-muted">
-            تأكيدات الاستلام والتطبيق الحية الواردة من أجهزة هذا العميل:
+            تأكيدات الاستلام والتطبيق الواردة من الأجهزة:
           </div>
+
+          {centralActive && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-muted/60 px-3 py-2">
+              <label className="text-xs font-semibold text-ink-secondary">حملة النشر:</label>
+              <select
+                value={selectedRolloutId}
+                onChange={(e) => setSelectedRolloutId(e.target.value)}
+                className={`${inputClass} max-w-[320px]`}
+              >
+                <option value="">— اختر حملة لعرض تأكيداتها —</option>
+                {rollouts.map((ro) => (
+                  <option key={ro.id} value={ro.id}>{ro.title || ro.id} ({formatDateTime(ro.createdAt)})</option>
+                ))}
+              </select>
+              {!selectedRolloutId && (
+                <span className="text-[11px] text-muted">تأكيدات الأجهزة تُربط بحملات النشر في الوضع المركزي.</span>
+              )}
+            </div>
+          )}
 
           <DataTable
                       ariaLabel="تأكيدات الأجهزة"

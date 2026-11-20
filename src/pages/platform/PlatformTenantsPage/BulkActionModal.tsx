@@ -9,7 +9,7 @@ import { STATUSES } from './constants';
 interface BulkActionModalProps {
   open: boolean;
   onClose: () => void;
-  bulkActionType: 'status' | 'plan' | 'activation' | 'export' | 'import';
+  bulkActionType: 'status' | 'plan' | 'activation' | 'export';
   selectedCount: number;
   bulkWorking: boolean;
   executeBulkAction: () => void;

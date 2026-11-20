@@ -45,12 +45,27 @@ const CYCLE_LABELS: Record<string, string> = {
   LIFETIME: 'مدى الحياة',
 };
 
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  TRIAL: 'تجريبي',
+  ACTIVE: 'نشط',
+  PAST_DUE: 'متأخر الدفع',
+  SUSPENDED: 'موقوف',
+  CANCELLED: 'ملغي',
+  EXPIRED: 'منتهي',
+};
+
 export const PlatformSubscriptionsPage: React.FC = () => {
   const toast = useToast();
   const [subscriptions, setSubscriptions] = useState<PlatformSubscription[]>([]);
   const canManageSubscriptions = canPlatform('subscriptions');
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [search, setSearch] = useState('');
+  // Raw input is debounced ~300ms before it hits `search` (and therefore the API).
+  const [searchInput, setSearchInput] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [statusFilter, setStatusFilter] = useState('');
   const [planFilter, setPlanFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -61,6 +76,23 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   const [actionType, setActionType] = useState<'RENEW' | 'CHANGE_PLAN'>('RENEW');
   const [renewMonths, setRenewMonths] = useState(12);
   const [newPlanId, setNewPlanId] = useState('');
+  const [executing, setExecuting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<PlatformSubscription | null>(null);
+
+  // Plans are reference data for the filters/modal — load once, not per filter change.
+  const loadPlans = useCallback(async () => {
+    try {
+      const central = getCentralDataSourceState();
+      if (central.misconfigured) return;
+      setPlans(central.active ? await centralPlatformClient.listPlans() : platformAdminService.listPlans());
+    } catch {
+      /* plan list is best-effort; subscriptions still render without it */
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlans();
+  }, [loadPlans]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -70,25 +102,19 @@ export const PlatformSubscriptionsPage: React.FC = () => {
         throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
       }
       if (central.active) {
-        const [subs, plns] = await Promise.all([
-          centralPlatformClient.listSubscriptions({
-            status: statusFilter || undefined,
-            planId: planFilter || undefined,
-            search: search || undefined,
-          }),
-          centralPlatformClient.listPlans(),
-        ]);
+        const subs = await centralPlatformClient.listSubscriptions({
+          status: statusFilter || undefined,
+          planId: planFilter || undefined,
+          search: search || undefined,
+        });
         setSubscriptions(subs);
-        setPlans(plns);
       } else {
         const subs = platformAdminService.listSubscriptions({
           status: statusFilter,
           planId: planFilter,
           search,
         });
-        const plns = platformAdminService.listPlans();
         setSubscriptions(subs);
-        setPlans(plns);
       }
       setError(null);
     } catch (err) {
@@ -116,13 +142,14 @@ export const PlatformSubscriptionsPage: React.FC = () => {
   };
 
   const handleExecuteModal = async () => {
-    if (!activeSub) return;
+    if (!activeSub || executing) return;
     if (!canManageSubscriptions) { toast.warning('لا تملك صلاحية إدارة الاشتراكات.'); return; }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
       toast.warning('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
       return;
     }
+    setExecuting(true);
     try {
       if (actionType === 'RENEW') {
         if (central.active) {
@@ -154,26 +181,37 @@ export const PlatformSubscriptionsPage: React.FC = () => {
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
+    } finally {
+      setExecuting(false);
     }
   };
 
-  const handleCancelSub = async (sub: PlatformSubscription) => {
+  const handleCancelSub = (sub: PlatformSubscription) => {
     if (!canManageSubscriptions) { toast.warning('لا تملك صلاحية إدارة الاشتراكات.'); return; }
-    if (!confirm(`هل أنت متأكد من إلغاء اشتراك "${sub.tenantName || sub.tenantId}"؟ سيتم إبطال التراخيص والحساب المرتبط.`)) return;
+    setCancelTarget(sub);
+  };
+
+  const confirmCancelSub = async () => {
+    const sub = cancelTarget;
+    if (!sub || executing) return;
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
       toast.warning('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
       return;
     }
+    setExecuting(true);
     try {
       if (central.active) {
         await centralPlatformClient.cancelSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
       } else {
         platformAdminService.cancelTenantSubscription(sub.tenantId, 'إلغاء يدوي من لوحة إدارة الاشتراكات المركزية');
       }
+      setCancelTarget(null);
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر إلغاء الاشتراك.');
+    } finally {
+      setExecuting(false);
     }
   };
 
@@ -185,7 +223,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
         s.id,
         s.tenantName || s.tenantId,
         s.planName || s.planId,
-        s.status,
+        SUBSCRIPTION_STATUS_LABELS[s.status] ?? s.status,
         s.startDate,
         s.endDate || '—',
         s.price,
@@ -256,8 +294,8 @@ export const PlatformSubscriptionsPage: React.FC = () => {
           <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="البحث باسم العميل أو كود المستأجر..."
             className={`${inputClass} pr-9`}
           />
@@ -308,10 +346,10 @@ export const PlatformSubscriptionsPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <DataTable
+            <DataTable<PlatformSubscription>
               ariaLabel="الاشتراكات"
               rows={subscriptions}
-              rowKey={(sub: any) => String(sub.id)}
+              rowKey={(sub) => String(sub.id)}
               minWidth={950}
               dense
               tableClassName="text-xs"
@@ -319,44 +357,44 @@ export const PlatformSubscriptionsPage: React.FC = () => {
               columns={[
                 {
                   key: 'tenant', header: 'العميل / المستأجر',
-                  render: (sub: any) => (
+                  render: (sub) => (
                     <span className="block">
                       <span className="block font-bold text-muted">{sub.tenantName || 'عميل غير مسمى'}</span>
                       <span className="block font-mono text-[10px] text-muted">{sub.tenantId}</span>
                     </span>
                   ),
                 },
-                { key: 'plan', header: 'الباقة', render: (sub: any) => <span className="font-semibold text-muted">{sub.planName || 'باقة محذوفة'}</span> },
+                { key: 'plan', header: 'الباقة', render: (sub) => <span className="font-semibold text-muted">{sub.planName || 'باقة محذوفة'}</span> },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (sub: any) => (
-                    <span className={`inline-flex items-center gap-1 font-bold ${sub.status === 'ACTIVE' ? 'text-success' : sub.status === 'TRIAL' ? 'text-primary' : 'text-danger'}`}>
-                      {sub.status === 'ACTIVE' ? 'نشط' : sub.status === 'TRIAL' ? 'تجريبي' : sub.status}
+                  render: (sub) => (
+                    <span className={`inline-flex items-center gap-1 font-bold ${sub.status === 'ACTIVE' ? 'text-success' : sub.status === 'TRIAL' ? 'text-primary' : sub.status === 'PAST_DUE' ? 'text-warning' : 'text-danger'}`}>
+                      {SUBSCRIPTION_STATUS_LABELS[sub.status] ?? sub.status}
                     </span>
                   ),
                 },
                 {
                   key: 'price', header: 'القيمة والفوترة',
-                  render: (sub: any) => (
+                  render: (sub) => (
                     <span className="block">
-                      <span className="block font-bold text-muted">{formatMoney(sub.price)}</span>
-                      <span className="block text-[10px] text-muted">{CYCLE_LABELS[sub.billingCycle as keyof typeof CYCLE_LABELS] || sub.billingCycle}</span>
+                      <span className="block font-bold text-muted">{formatMoney(sub.price, sub.lockedCurrency ?? plans.find((p) => p.id === sub.planId)?.currency)}</span>
+                      <span className="block text-[10px] text-muted">{CYCLE_LABELS[sub.billingCycle] || sub.billingCycle}</span>
                     </span>
                   ),
                 },
-                { key: 'start', header: 'البداية', render: (sub: any) => <span className="text-muted">{formatDate(sub.startDate)}</span> },
+                { key: 'start', header: 'البداية', render: (sub) => <span className="text-muted">{formatDate(sub.startDate)}</span> },
                 {
                   key: 'end', header: 'نهاية الصلاحية',
-                  render: (sub: any) => (
+                  render: (sub) => (
                     <span className={`font-semibold ${sub.endDate && new Date(sub.endDate) < new Date() ? 'font-bold text-danger' : 'text-muted'}`}>
                       {sub.endDate ? formatDate(sub.endDate) : 'مفتوح (مدى الحياة)'}
                     </span>
                   ),
                 },
-                { key: 'renew', header: 'التجديد التلقائي', render: (sub: any) => <span className={sub.autoRenew ? 'text-success' : 'text-muted'}>{sub.autoRenew ? 'مفعل' : 'معطل'}</span> },
+                { key: 'renew', header: 'التجديد التلقائي', render: (sub) => <span className={sub.autoRenew ? 'text-success' : 'text-muted'}>{sub.autoRenew ? 'مفعل' : 'معطل'}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
-                  render: (sub: any) => (
+                  render: (sub) => (
                     <span className="flex items-center justify-center gap-2">
                       {canManageSubscriptions && (
                         <>
@@ -369,7 +407,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
                             تغيير الباقة
                           </button>
                           {sub.status !== 'CANCELLED' && (
-                            <button onClick={() => void handleCancelSub(sub)} className="text-xs text-danger hover:text-danger" title="إلغاء الاشتراك فوراً">
+                            <button onClick={() => handleCancelSub(sub)} className="text-xs text-danger hover:text-danger" title="إلغاء الاشتراك فوراً">
                               إلغاء
                             </button>
                           )}
@@ -405,7 +443,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
               >
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — {formatMoney(p.price)}
+                    {p.name} — {formatMoney(p.price, p.currency)}
                   </option>
                 ))}
               </select>
@@ -433,11 +471,33 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={() => setActiveSub(null)}>
               إلغاء
             </Button>
-            <Button size="sm" onClick={() => void handleExecuteModal()} disabled={!canManageSubscriptions}>
+            <Button size="sm" onClick={() => void handleExecuteModal()} loading={executing} disabled={!canManageSubscriptions || executing}>
               تأكيد العملية
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Cancel subscription confirmation */}
+      <Modal
+        open={Boolean(cancelTarget)}
+        onClose={() => { if (!executing) setCancelTarget(null); }}
+        title="إلغاء الاشتراك"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setCancelTarget(null)} disabled={executing}>
+              تراجع
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => void confirmCancelSub()} loading={executing} disabled={!canManageSubscriptions || executing}>
+              تأكيد الإلغاء
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[12px] leading-6 text-ink-secondary">
+          هل أنت متأكد من إلغاء اشتراك «{cancelTarget?.tenantName || cancelTarget?.tenantId}»؟ سيتم إبطال التراخيص والحساب المرتبط، ولا يمكن التراجع عن هذا الإجراء.
+        </p>
       </Modal>
     </div>
   );

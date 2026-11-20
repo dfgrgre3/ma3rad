@@ -17,11 +17,16 @@ import {
 import { DataTable } from '../../../components/ui/DataTable';
 import type { PlatformStaff, PlatformStaffRoleDefinition } from '../../../services/domains/platform/platformTypes';
 import { EmptyState, formatDateTime, inputClass } from '../components/PlatformUI';
+import { CentralUnsupportedNotice } from '../components/CentralUnsupportedNotice';
 import { RoleBadge } from './RoleBadge';
 
 interface AccountsTabProps {
   roles: PlatformStaffRoleDefinition[];
   staffList: PlatformStaff[];
+  /** Unfiltered staff list — drives the per-role count cards. */
+  allStaffList: PlatformStaff[];
+  /** Central data source active — some staff actions have no central endpoint. */
+  centralActive: boolean;
   search: string;
   onSearchChange: (v: string) => void;
   roleFilter: string;
@@ -47,6 +52,8 @@ interface AccountsTabProps {
 export const AccountsTab: React.FC<AccountsTabProps> = ({
   roles,
   staffList,
+  allStaffList,
+  centralActive,
   search,
   onSearchChange,
   roleFilter,
@@ -72,7 +79,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
     {/* Roles overview */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
       {roles.map((role) => {
-        const count = staffList.filter((s) => s.role === role.role).length;
+        const count = allStaffList.filter((s) => s.role === role.role).length;
         return (
           <button
             key={role.role}
@@ -115,6 +122,9 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
       <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-muted">{staffList.length} موظف</span>
     </div>
 
+    {centralActive && (
+      <CentralUnsupportedNotice feature="بعض إجراءات الحسابات (إعادة تعيين كلمة المرور، فرض التغيير، نقل الصلاحيات، نطاق البيانات، MFA)" />
+    )}
     {error && (
       <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">{error}</div>
     )}
@@ -149,7 +159,9 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
             { key: 'role', header: 'الدور', render: (staff) => <RoleBadge role={staff.role} /> },
             {
               key: 'mfa', header: 'MFA',
-              render: (staff) => mfaMissingIds.has(staff.id) ? (
+              render: (staff) => centralActive ? (
+                <span className="text-[10.5px] text-muted">—</span>
+              ) : mfaMissingIds.has(staff.id) ? (
                 <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-warning"><ShieldOff className="h-3 w-3" /> غير مفعّلة</span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-success"><ShieldCheck className="h-3 w-3" /> مفعّلة</span>
@@ -174,16 +186,16 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 const isSuperAdmin = staff.role === 'SUPER_ADMIN';
                 return (
                   <div className="flex items-center justify-center gap-1.5">
-                    {canUpdate && (
+                    {canUpdate && (!isSuperAdmin || isSuperAdminUser) && (
                       <button onClick={() => onEdit(staff)} className="text-primary hover:text-primary p-1" title="تعديل البيانات"><Edit2 className="h-3.5 w-3.5" /></button>
                     )}
-                    {canResetPassword && (!isSuperAdmin || isSuperAdminUser) && (
+                    {!centralActive && canResetPassword && (!isSuperAdmin || isSuperAdminUser) && (
                       <button onClick={() => onRequestResetPassword(staff)} className="text-primary hover:text-primary p-1" title="إعادة تعيين كلمة المرور"><KeyRound className="h-3.5 w-3.5" /></button>
                     )}
-                    {canResetPassword && (!isSuperAdmin || isSuperAdminUser) && (
+                    {!centralActive && canResetPassword && (!isSuperAdmin || isSuperAdminUser) && (
                       <button onClick={() => onForcePasswordChange(staff)} className={`p-1 ${staff.mustChangePassword ? 'text-warning hover:text-warning' : 'text-muted hover:text-muted'}`} title={staff.mustChangePassword ? 'إلغاء فرض تغيير كلمة المرور' : 'فرض تغيير كلمة المرور'}><Lock className="h-3.5 w-3.5" /></button>
                     )}
-                    {canManagePermissions && !isSuperAdmin && (
+                    {!centralActive && canManagePermissions && !isSuperAdmin && (
                       <>
                         <button onClick={() => onRequestTransfer(staff)} className="text-success hover:text-success p-1" title="نقل الصلاحيات إلى موظف آخر"><ArrowLeftRight className="h-3.5 w-3.5" /></button>
                         <button onClick={() => onOpenScope(staff)} className="text-warning hover:text-warning p-1" title="نطاق البيانات (العملاء المرئيون)"><Shield className="h-3.5 w-3.5" /></button>

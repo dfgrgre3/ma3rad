@@ -8,6 +8,8 @@ import { formatDateTime } from '../components/PlatformUI';
 interface KeysTabProps {
   signingKeys: PlatformSigningKey[];
   apiKeys: PlatformApiKey[];
+  /** Central mode: API-key rotation has no central endpoint — hide it. */
+  isCentral?: boolean;
   canManageSecurity: boolean;
   onRotateKey: (keyAlias: string) => void;
   onRotateApiKey: (id: string) => void;
@@ -18,6 +20,7 @@ interface KeysTabProps {
 export const KeysTab: React.FC<KeysTabProps> = ({
   signingKeys,
   apiKeys,
+  isCentral = false,
   canManageSecurity,
   onRotateKey,
   onRotateApiKey,
@@ -114,16 +117,20 @@ export const KeysTab: React.FC<KeysTabProps> = ({
               key: 'actions', header: 'إجراءات', align: 'center',
               render: (key) => key.isActive ? (
                 <div className="flex items-center justify-center gap-2">
-                  <button
-                    disabled={!canManageSecurity}
-                    onClick={() => onRotateApiKey(key.id)}
-                    className="text-primary hover:underline text-xs flex items-center gap-1"
-                    title="تدوير المفتاح"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    تدوير
-                  </button>
-                  <span className="text-ink-secondary">|</span>
+                  {!isCentral && (
+                    <>
+                      <button
+                        disabled={!canManageSecurity}
+                        onClick={() => onRotateApiKey(key.id)}
+                        className="text-primary hover:underline text-xs flex items-center gap-1"
+                        title="تدوير المفتاح"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        تدوير
+                      </button>
+                      <span className="text-ink-secondary">|</span>
+                    </>
+                  )}
                   <button
                     disabled={!canManageSecurity}
                     onClick={() => onRevokeApiKey(key.id)}

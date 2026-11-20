@@ -518,7 +518,7 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = 'ab6521ba7b28572e94cf75b34d3343058f8e01f0d0ae917e8d3f5c75f6dfcb8e';
+const PRELOAD_INTEGRITY_SHA256 = '903b1a40d786b6e48c80bc533de4fe9e8eef1b6ac17e32801f5a34061ab98dc8';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = '0010fb4c0e6c72bc45ab67fd8a9e10254720794afcd624643608757bdd795f0b';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
@@ -768,6 +768,32 @@ ipcMain.handle('central:get-status', async (event) => {
   return { configured: Boolean(CENTRAL_API_URL), activated: Boolean(await loadCentralCredential()) };
 });
 
+// API key collected by the installer's custom page. The installer writes
+// pending-activation.json next to the executable; the renderer reads it once
+// to prefill first-run activation and clears it after a successful activate.
+const PENDING_ACTIVATION_FILE = path.join(path.dirname(process.execPath), 'pending-activation.json');
+
+ipcMain.handle('activation:pending-read', async (event) => {
+  validateIpcSender(event);
+  try {
+    const parsed = JSON.parse(await fs.readFile(PENDING_ACTIVATION_FILE, 'utf8'));
+    const apiKey = typeof parsed?.apiKey === 'string' ? parsed.apiKey.trim() : '';
+    return apiKey ? { apiKey } : null;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('activation:pending-clear', async (event) => {
+  validateIpcSender(event);
+  try {
+    await fs.unlink(PENDING_ACTIVATION_FILE);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  return { ok: true };
+});
+
 ipcMain.handle('central:migrate-credential', async (event, credential) => {
   validateIpcSender(event);
   if (await loadCentralCredential()) return { ok: true, alreadyStored: true };
@@ -841,13 +867,17 @@ ipcMain.handle('central:request', async (event, request) => {
       catch { throw new Error('Central API returned a malformed JSON response.'); }
     }
     if (targetPathname === '/api/v1/licensing/activate' && response.ok) {
-      if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.deviceCredential !== 'string') {
+      // The central server wraps /api/v1 payloads in the unified envelope
+      // { success, data, ... }; tolerate bare payloads from older deployments.
+      const payload = body && typeof body === 'object' && !Array.isArray(body)
+        && body.success === true && Object.hasOwn(body, 'data') ? body.data : body;
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) || typeof payload.deviceCredential !== 'string') {
         throw new Error('Central API activation response did not contain a device credential.');
       }
-      await saveCentralCredential(body.deviceCredential);
-      const publicBody = { ...body };
-      delete publicBody.deviceCredential;
-      body = { ...publicBody, credentialStored: true };
+      await saveCentralCredential(payload.deviceCredential);
+      const publicPayload = { ...payload };
+      delete publicPayload.deviceCredential;
+      body = { ...publicPayload, credentialStored: true };
     }
     return { ok: response.ok, status: response.status, body };
   } finally {

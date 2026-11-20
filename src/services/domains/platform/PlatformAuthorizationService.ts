@@ -114,6 +114,7 @@ export const PLATFORM_ROUTE_MODULE_MAP: Record<string, string> = {
   '/platform/emergency': 'emergency',
   '/platform/customer-portal': 'customer-portal',
   '/platform/super-admin': 'super-admin',
+  '/platform/user-platform-permissions': 'super-admin',
 };
 
 /**
@@ -155,6 +156,7 @@ export const PLATFORM_ROUTE_PERMISSION_MAP: Record<string, string> = {
   '/platform/emergency': 'platform.emergency.view',
   '/platform/customer-portal': 'platform.customer-portal.view',
   '/platform/super-admin': 'platform.super-admin.view',
+  '/platform/user-platform-permissions': 'platform.super-admin.view',
 };
 
 export const PLATFORM_PERMISSION_SECTIONS_FOR_UI = PLATFORM_PERMISSION_SECTIONS;

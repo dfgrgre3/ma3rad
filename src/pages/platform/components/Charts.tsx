@@ -78,29 +78,20 @@ export const LineChart: React.FC<ChartProps> = ({
   const yTicks = 4;
   const yTickValues = Array.from({ length: yTicks + 1 }, (_, i) => max - (i * (max - min)) / yTicks);
 
+  // preserveAspectRatio="none" stretches the SVG to fill the container, which
+  // would distort any <text> inside it — so axis labels are rendered as an
+  // HTML overlay positioned by percentage instead.
   return (
     <div className={`relative w-full ${className}`} style={{ height }} role="img" aria-label={ariaLabel}>
       <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        {/* Y-axis grid lines and labels */}
-        <g stroke="#e2e8f0" stroke-width="0.5" font-size="8" fill="#94a3b8" text-anchor="end">
+        {/* Y-axis grid lines */}
+        <g stroke="#e2e8f0" stroke-width="0.5">
           {yTickValues.map((val, i) => {
             const y = getYPosition(val, min, max, height, 24);
             return (
-              <g key={i}>
-                <line x1="6" y1={y} x2={width - 2} y2={y} strokeDasharray="2 2" />
-                <text x="5" y={y + 2}>{yAxisFormatter(val)}</text>
-              </g>
+              <line key={i} x1="6" y1={y} x2={width - 2} y2={y} strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
             );
           })}
-        </g>
-
-        {/* X-axis labels */}
-        <g font-size="7" fill="#94a3b8" text-anchor="middle">
-          {points.map((p, i) => (
-            <text key={i} x={p.x} y={height - 8} transform={`rotate(-30 ${p.x} ${height - 8})`}>
-              {p.label}
-            </text>
-          ))}
         </g>
 
         {/* Area */}
@@ -121,6 +112,7 @@ export const LineChart: React.FC<ChartProps> = ({
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
         />
 
         {/* Points */}
@@ -134,11 +126,41 @@ export const LineChart: React.FC<ChartProps> = ({
               fill={color}
               stroke="white"
               strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
             />
           ))}
       </svg>
 
-      {/* Tooltip would go here in a more complete implementation */}
+      {/* Y-axis labels (HTML overlay — undistorted) */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {yTickValues.map((val, i) => {
+          const y = getYPosition(val, min, max, height, 24);
+          return (
+            <span
+              key={i}
+              className="absolute text-[9px] font-medium text-muted"
+              style={{ top: `${(y / height) * 100}%`, insetInlineStart: 2, transform: 'translateY(-50%)' }}
+            >
+              {yAxisFormatter(val)}
+            </span>
+          );
+        })}
+        {/* X-axis labels */}
+        {points.map((p, i) => (
+          <span
+            key={i}
+            className="absolute text-[9px] font-medium text-muted whitespace-nowrap"
+            style={{
+              top: `${((height - 8) / height) * 100}%`,
+              insetInlineStart: `${(p.x / width) * 100}%`,
+              transform: 'translateX(-50%) rotate(-30deg)',
+              transformOrigin: 'top center',
+            }}
+          >
+            {p.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 };
@@ -256,7 +278,12 @@ export const MetricCard: React.FC<{
       onClick={onClick}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
-      onKeyDown={(e) => isClickable && (e.key === 'Enter' || e.key === ' ') && onClick()}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault(); // Space would otherwise scroll the page.
+          onClick?.();
+        }
+      }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

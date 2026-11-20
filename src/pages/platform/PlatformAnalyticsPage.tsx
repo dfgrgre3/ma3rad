@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart3,
   Users,
@@ -11,7 +11,6 @@ import {
   Filter,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
-import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import type {
@@ -25,10 +24,10 @@ import type {
 } from '../../services/domains/platform/platformTypes';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { PeriodSelector } from './components/Charts';
 import {
   formatMoney,
   formatNumber,
-  formatDateTime,
   inputClass,
   downloadCsv,
 } from './components/PlatformUI';
@@ -46,10 +45,15 @@ export const PlatformAnalyticsPage: React.FC = () => {
   const [subMetrics, setSubMetrics] = useState<PlatformSubscriptionMetrics | null>(null);
   const [licenseMetrics, setLicenseMetrics] = useState<PlatformLicenseMetrics | null>(null);
   const [opsMetrics, setOpsMetrics] = useState<PlatformOperationsMetrics | null>(null);
+  const [isCentral, setIsCentral] = useState(false);
+  // Guards against stale responses when filters change quickly.
+  const requestSeq = useRef(0);
 
   const loadData = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     const centralState = getCentralDataSourceState();
+    setIsCentral(centralState.active);
     try {
       if (centralState.active) {
         const [plns, bp, cm, sm, lm, om] = await Promise.all([
@@ -60,6 +64,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
           centralPlatformClient.getLicenseMetrics(),
           centralPlatformClient.getOperationsMetrics(),
         ]);
+        if (seq !== requestSeq.current) return;
         setPlans(plns);
         setBusinessPerf(bp);
         setCustomerMetrics(cm);
@@ -67,6 +72,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
         setLicenseMetrics(lm);
         setOpsMetrics(om);
       } else {
+        if (seq !== requestSeq.current) return;
         const plns = platformAdminService.listPlans();
         setPlans(plns);
         const bp = platformAdminService.getBusinessPerformance(period, planId || undefined);
@@ -80,11 +86,13 @@ export const PlatformAnalyticsPage: React.FC = () => {
         setLicenseMetrics(lm);
         setOpsMetrics(om);
       }
+      if (seq !== requestSeq.current) return; // a newer request superseded this one
       setError(null);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setError(err instanceof Error ? err.message : 'تعذر تحميل التحليلات والتقارير.');
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }, [period, planId]);
 
@@ -92,13 +100,15 @@ export const PlatformAnalyticsPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const renderDelta = (percent?: number) => {
+  // `invert` is for metrics where a DECREASE is good (churn, error counts).
+  const renderDelta = (percent?: number, invert = false) => {
     if (percent === undefined || percent === null) return null;
     const isPositive = percent >= 0;
+    const isGood = invert ? !isPositive : isPositive;
     return (
       <span
         className={`inline-flex items-center gap-0.5 text-[11px] font-bold ${
-          isPositive ? 'text-success' : 'text-danger'
+          isGood ? 'text-success' : 'text-danger'
         }`}
         dir="ltr"
       >
@@ -110,6 +120,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
 
   const exportReport = () => {
     if (!businessPerf || !customerMetrics || !subMetrics) return;
+    // Raw numeric values (no locale formatting) so the CSV stays machine-readable.
     downloadCsv(`platform-analytics-${period}.csv`, [
       ['المؤشر', 'القيمة الحالية', 'الفترة السابقة', 'نسبة التغير %'],
       ['الإيرادات المحصلة', businessPerf.revenue.total.current, businessPerf.revenue.total.previous, businessPerf.revenue.total.changePercent],
@@ -119,13 +130,14 @@ export const PlatformAnalyticsPage: React.FC = () => {
       ['عملاء جدد', customerMetrics.newCustomers.current, customerMetrics.newCustomers.previous, customerMetrics.newCustomers.changePercent],
       ['متوسط قيمة العميل ARPU', customerMetrics.averageRevenuePerCustomer.current, customerMetrics.averageRevenuePerCustomer.previous, customerMetrics.averageRevenuePerCustomer.changePercent],
       ['تجديدات قادمة', subMetrics.upcomingRenewals.current, subMetrics.upcomingRenewals.previous, subMetrics.upcomingRenewals.changePercent],
-      ['معدل فقدان العملاء Churn Rate', `${customerMetrics.churnRate.current}%`, `${customerMetrics.churnRate.previous}%`, customerMetrics.churnRate.changePercent],
+      ['معدل فقدان العملاء Churn Rate', customerMetrics.churnRate.current, customerMetrics.churnRate.previous, customerMetrics.churnRate.changePercent],
     ]);
   };
 
+  const hasMetrics = Boolean(businessPerf || customerMetrics || subMetrics || licenseMetrics || opsMetrics);
+
   return (
     <div className="space-y-4 text-right">
-      <CentralUnsupportedNotice feature="التحليلات والتقارير المتقدمة" />
       <PageHeader
         title="التقارير والتحليلات المركزية (Platform Analytics & BI)"
         description="تحليلات الإيرادات (MRR/ARR)، معدلات النمو، سلوك العملاء، التراخيص، ومؤشرات الأداء التشغيلي."
@@ -156,28 +168,17 @@ export const PlatformAnalyticsPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted" />
           <span className="text-xs font-bold text-muted">الفترة الزمنية:</span>
-          <div className="flex rounded-lg bg-primary p-1 border border-line-strong text-xs">
-            {(
-              [
-                { id: '7d', label: '7 أيام' },
-                { id: '30d', label: '30 يوماً' },
-                { id: '90d', label: 'ربع سنوي' },
-                { id: '365d', label: 'سنة كاملة' },
-              ] as const
-            ).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setPeriod(p.id)}
-                className={`px-3 py-1 rounded font-bold transition-colors ${
-                  period === p.id
-                    ? 'bg-primary text-white shadow'
-                    : 'text-muted hover:text-muted'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <PeriodSelector
+            value={period}
+            onChange={(v) => setPeriod(v as PlatformPeriod)}
+            options={[
+              { value: '7d', label: '7 أيام' },
+              { value: '30d', label: '30 يوماً' },
+              { value: '90d', label: 'ربع سنوي' },
+              { value: '365d', label: 'سنة كاملة' },
+            ]}
+            className="w-auto"
+          />
         </div>
 
         <div className="flex items-center gap-2">
@@ -185,7 +186,9 @@ export const PlatformAnalyticsPage: React.FC = () => {
           <select
             value={planId}
             onChange={(e) => setPlanId(e.target.value)}
-            className={`${inputClass} max-w-[200px]`}
+            disabled={isCentral}
+            title={isCentral ? 'تصفية الباقات غير مدعومة في الوضع المركزي' : undefined}
+            className={`${inputClass} max-w-[200px] disabled:opacity-50`}
           >
             <option value="">جميع الباقات</option>
             {plans.map((p) => (
@@ -194,17 +197,35 @@ export const PlatformAnalyticsPage: React.FC = () => {
               </option>
             ))}
           </select>
+          {isCentral && (
+            <span className="text-[10px] text-muted">غير مدعومة في الوضع المركزي</span>
+          )}
         </div>
       </div>
 
+      {/* Honest scope note: not every metric honours period/plan filters. */}
+      <p className="text-[10.5px] text-muted">
+        مؤشرات الأداء والأعمال والعملاء تحترم الفترة المحددة{isCentral ? '' : ' وفلتر الباقة'}؛
+        مؤشرات الاشتراكات والتراخيص والتشغيل تُحسب على كل الفترات
+        {isCentral ? ' ولا تدعم فلتر الباقة.' : ' جزئياً فقط.'}
+      </p>
+
       {error && (
-        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
-          {error}
+        <div className="flex items-center justify-between gap-2 p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
+          <span>{error}</span>
+          <button onClick={loadData} className="text-success hover:underline">إعادة المحاولة</button>
         </div>
       )}
 
-      {loading ? (
+      {loading && !hasMetrics ? (
         <div className="py-20 text-center text-sm font-semibold text-muted">جارٍ تجميع بيانات التحليلات...</div>
+      ) : !hasMetrics && error ? (
+        <div className="py-16 text-center">
+          <p className="text-sm font-semibold text-danger">تعذر تحميل بيانات التحليلات.</p>
+          <button onClick={loadData} className="mt-2 text-xs font-bold text-success hover:underline">إعادة المحاولة</button>
+        </div>
+      ) : !hasMetrics ? (
+        <div className="py-16 text-center text-sm font-semibold text-muted">لا تتوفر بيانات تحليلات حالياً.</div>
       ) : (
         <>
           {/* Revenue & Financial KPIs */}
@@ -292,7 +313,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                   <p className="text-lg font-black text-danger mt-0.5">
                     {customerMetrics?.churnRate.current || 0}%
                   </p>
-                  {renderDelta(customerMetrics?.churnRate.changePercent)}
+                  {renderDelta(customerMetrics?.churnRate.changePercent, true)}
                 </div>
               </div>
             </div>
@@ -360,7 +381,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
                 <p className="text-lg font-black text-warning mt-1">
                   {formatNumber(opsMetrics?.syncErrors.current || 0)}
                 </p>
-                {renderDelta(opsMetrics?.syncErrors.changePercent)}
+                {renderDelta(opsMetrics?.syncErrors.changePercent, true)}
               </div>
 
               <div className="p-3 bg-primary/60 rounded-lg border border-line-strong">

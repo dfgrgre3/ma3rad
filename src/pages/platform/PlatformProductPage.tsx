@@ -16,6 +16,7 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToast } from '../../components/ui/Toast';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import {
   TABS,
   emptyFeature,
@@ -34,9 +35,137 @@ import { ReleaseModal } from './PlatformProductPage/ReleaseModal';
 import { ReleaseTargetsModal } from './PlatformProductPage/ReleaseTargetsModal';
 import { RollbackModal } from './PlatformProductPage/RollbackModal';
 
+// ─── Central row → local model mappers ──────────────────────────────────────
+// Central endpoints return raw snake_case DB rows; the UI works with the local
+// camelCase models, so map explicitly instead of `as any`.
+
+interface CentralModuleRow {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  is_active?: number | boolean;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CentralFeatureFlagRow {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  is_enabled?: number | boolean;
+  rollout_percentage?: number;
+  target_tenants?: string | Array<string> | null;
+  page_paths?: string | Array<string> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CentralReleaseRow {
+  id: string;
+  version: string;
+  channel: string;
+  status: string;
+  rolloutStrategy?: string;
+  rolloutPercent?: number;
+  targetTenantIds?: string[];
+  downloadUrl?: string | null;
+  checksum?: string | null;
+  releaseNotes?: string | null;
+  minRequiredVersion?: string | null;
+  isMandatory?: boolean;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const parseJsonArray = (v: unknown): string[] => {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === 'string' && v) {
+    try {
+      const parsed = JSON.parse(v);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const mapCentralModule = (r: CentralModuleRow): PlatformModule => {
+  const active = Boolean(r.is_active);
+  return {
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    description: r.description ?? null,
+    category: r.category ?? null,
+    isEnabled: active,
+    minPlanCode: null,
+    sortOrder: Number(r.sort_order ?? 0) || 0,
+    isActive: active,
+    createdAt: String(r.created_at ?? ''),
+    updatedAt: String(r.updated_at ?? ''),
+  };
+};
+
+const mapCentralFeatureFlag = (r: CentralFeatureFlagRow): PlatformFeatureFlag => ({
+  id: r.id,
+  code: r.key,
+  name: r.name,
+  description: r.description ?? null,
+  category: null,
+  isEnabled: Boolean(r.is_enabled),
+  rolloutPercent: Number(r.rollout_percentage ?? 0) || 0,
+  isStagingOnly: false,
+  minPlanTier: null,
+  pagePaths: parseJsonArray(r.page_paths),
+  overridesCount: 0,
+  createdAt: String(r.created_at ?? ''),
+  updatedAt: String(r.updated_at ?? ''),
+});
+
+const mapCentralReleaseRow = (r: CentralReleaseRow): PlatformRelease & { _central?: CentralReleaseRow } => {
+  const targets = Array.isArray(r.targetTenantIds) ? r.targetTenantIds : [];
+  return {
+    id: r.id,
+    version: r.version,
+    channel: (['STABLE', 'BETA', 'ALPHA', 'HOTFIX'].includes(r.channel) ? r.channel : 'STABLE') as PlatformRelease['channel'],
+    status: (r.status === 'PUBLISHED' ? 'PUBLISHED' : r.status === 'DRAFT' ? 'DRAFT' : 'DEPRECATED') as PlatformRelease['status'],
+    isMandatory: Boolean(r.isMandatory),
+    minVersion: r.minRequiredVersion || '',
+    rolloutGroup: targets.length ? `TARGETED ${targets.length}` : r.rolloutStrategy === 'PHASED' ? `PHASED ${r.rolloutPercent ?? 0}%` : 'ALL',
+    notes: r.releaseNotes || '',
+    fileUrl: r.downloadUrl || '',
+    fileName: '',
+    checksumSha256: r.checksum || '',
+    changelog: r.releaseNotes || '',
+    createdAt: r.publishedAt || r.createdAt || '',
+    updatedAt: r.updatedAt || '',
+    _central: r,
+  };
+};
+
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
 export const PlatformProductPage: React.FC = () => {
   const toast = useToast();
   const canManageProduct = canPlatform('product', 'platform.product.update');
+  // Reactive central-source flag (polled — lives in platform settings).
+  const [centralActive, setCentralActive] = React.useState<boolean>(() => getCentralDataSourceState().active);
+  React.useEffect(() => {
+    const refresh = () => setCentralActive(getCentralDataSourceState().active);
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const [tab, setTab] = React.useState<TabId>('matrix');
   const [modules, setModules] = React.useState<PlatformModule[]>([]);
   const [features, setFeatures] = React.useState<PlatformFeatureFlag[]>([]);
@@ -53,7 +182,6 @@ export const PlatformProductPage: React.FC = () => {
   const [featureOverrides, setFeatureOverrides] = React.useState<PlatformFeatureOverride[]>([]);
   const [newOverrideTenantId, setNewOverrideTenantId] = React.useState('');
   const [newOverrideEnabled, setNewOverrideEnabled] = React.useState(true);
-  const [newOverrideCustomRollout, setNewOverrideCustomRollout] = React.useState<number | ''>('');
 
   // Release Modals & State
   const [releaseOpen, setReleaseOpen] = React.useState(false);
@@ -73,8 +201,7 @@ export const PlatformProductPage: React.FC = () => {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const centralState = getCentralDataSourceState();
-      if (centralState.active) {
+      if (centralActive) {
         const [releases, tenants, modules, features, plans] = await Promise.all([
           centralPlatformClient.listReleases(),
           centralPlatformClient.listTenants(),
@@ -82,10 +209,10 @@ export const PlatformProductPage: React.FC = () => {
           centralPlatformClient.listFeatureFlags(),
           centralPlatformClient.listPlans().catch(() => [] as PlatformPlan[]),
         ]);
-        setReleases(releases);
+        setReleases((releases as CentralReleaseRow[]).map(mapCentralReleaseRow));
         setTenants(tenants);
-        setModules(modules as any);
-        setFeatures(features as any);
+        setModules((modules as CentralModuleRow[]).map(mapCentralModule));
+        setFeatures((features as CentralFeatureFlagRow[]).map(mapCentralFeatureFlag));
         setPlans(plans);
       } else {
         setReleases(platformAdminService.listReleases());
@@ -100,7 +227,7 @@ export const PlatformProductPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [centralActive]);
 
   React.useEffect(() => {
     load();
@@ -109,8 +236,7 @@ export const PlatformProductPage: React.FC = () => {
   // ─── Plan × Catalog matrix ─────────────────────────────────────────────
 
   const togglePlanCatalogItem = (plan: PlatformPlan, section: 'modules' | 'features', code: string, checked: boolean) => {
-    const centralState = getCentralDataSourceState();
-    if (centralState.active) {
+    if (centralActive) {
       toast.error('غير مدعوم', 'تعديل خطط الاشتراك غير متاح في الوضع المركزي بعد.');
       return;
     }
@@ -138,6 +264,16 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const toggleModule = (module: PlatformModule) => {
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
+    if (centralActive) {
+      centralPlatformClient.updateModule(module.id, { isActive: !module.isEnabled })
+        .then(() => { toast.success(module.isEnabled ? 'تم تعطيل الوحدة' : 'تم تفعيل الوحدة'); load(); })
+        .catch((err) => toast.error('تعذر تحديث الوحدة', err instanceof Error ? err.message : undefined));
+      return;
+    }
     try {
       platformAdminService.setModuleEnabled(module.id, !module.isEnabled);
       toast.success(module.isEnabled ? 'تم تعطيل الوحدة' : 'تم تفعيل الوحدة');
@@ -170,7 +306,36 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const saveFeature = () => {
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
+    if (!featureForm.name.trim() || !featureForm.code.trim()) {
+      toast.warning('اسم الميزة ورمزها مطلوبان.');
+      return;
+    }
     setSaving(true);
+    if (centralActive) {
+      // Central flag API supports: key/name/description/isEnabled/
+      // rolloutPercentage/targetTenants/pagePaths — category, minPlanTier and
+      // isStagingOnly have no central equivalent and are disabled in the modal.
+      const payload = {
+        key: featureForm.code.trim(),
+        name: featureForm.name.trim(),
+        description: featureForm.description || undefined,
+        isEnabled: Boolean(featureForm.isEnabled),
+        rolloutPercentage: Math.min(100, Math.max(0, Number(featureForm.rolloutPercent) || 0)),
+        pagePaths: featureForm.pagePathsText.split(/[\n,]+/).map((p) => p.trim()).filter(Boolean),
+      };
+      const request = featureForm.id
+        ? centralPlatformClient.updateFeatureFlag(featureForm.id, payload)
+        : centralPlatformClient.createFeatureFlag(payload);
+      Promise.resolve(request)
+        .then(() => { toast.success(featureForm.id ? 'تم تحديث الميزة' : 'تم إنشاء الميزة'); setFeatureOpen(false); load(); })
+        .catch((err) => toast.error('تعذر حفظ الميزة', err instanceof Error ? err.message : undefined))
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
       platformAdminService.upsertFeatureFlag({
         ...featureForm,
@@ -192,6 +357,16 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const toggleFeature = (flag: PlatformFeatureFlag) => {
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
+    if (centralActive) {
+      centralPlatformClient.updateFeatureFlag(flag.id, { isEnabled: !flag.isEnabled })
+        .then(() => { toast.success(flag.isEnabled ? 'تم تعطيل الميزة' : 'تم تفعيل الميزة'); load(); })
+        .catch((err) => toast.error('تعذر تحديث الميزة', err instanceof Error ? err.message : undefined));
+      return;
+    }
     try {
       platformAdminService.setFeatureEnabled(flag.id, !flag.isEnabled);
       toast.success(flag.isEnabled ? 'تم تعطيل الميزة' : 'تم تفعيل الميزة');
@@ -203,18 +378,28 @@ export const PlatformProductPage: React.FC = () => {
 
   const openOverridesModal = (flag: PlatformFeatureFlag) => {
     setSelectedFeatureForOverrides(flag);
+    if (centralActive) {
+      // No central per-tenant feature-override endpoints exist.
+      setFeatureOverrides([]);
+      setNewOverrideTenantId('');
+      setNewOverrideEnabled(true);
+      return;
+    }
     try {
       const ovs = platformAdminService.listFeatureOverrides(flag.id);
       setFeatureOverrides(ovs);
       setNewOverrideTenantId('');
       setNewOverrideEnabled(true);
-      setNewOverrideCustomRollout('');
     } catch (err) {
       toast.error('تعذر تحميل تخصيصات الميزة', err instanceof Error ? err.message : undefined);
     }
   };
 
   const addOverride = () => {
+    if (centralActive) {
+      toast.error('غير مدعوم', 'التخصيص لكل عميل غير متاح في الوضع المركزي بعد.');
+      return;
+    }
     if (!selectedFeatureForOverrides || !newOverrideTenantId) return;
     try {
       platformAdminService.setFeatureOverride({
@@ -222,7 +407,7 @@ export const PlatformProductPage: React.FC = () => {
         targetType: 'TENANT',
         targetId: newOverrideTenantId,
         isEnabled: newOverrideEnabled,
-        customRolloutPercent: newOverrideCustomRollout !== '' ? Number(newOverrideCustomRollout) : null,
+        customRolloutPercent: null,
       });
       toast.success('تمت إضافة التخصيص بنجاح');
       const ovs = platformAdminService.listFeatureOverrides(selectedFeatureForOverrides.id);
@@ -235,6 +420,10 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const removeOverride = (overrideId: string) => {
+    if (centralActive) {
+      toast.error('غير مدعوم', 'التخصيص لكل عميل غير متاح في الوضع المركزي بعد.');
+      return;
+    }
     if (!selectedFeatureForOverrides) return;
     try {
       platformAdminService.removeFeatureOverride(overrideId);
@@ -278,7 +467,37 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const saveRelease = () => {
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
+    if (!releaseForm.version.trim() || !SEMVER_RE.test(releaseForm.version.trim())) {
+      toast.error('صيغة رقم الإصدار غير صحيحة — استخدم SemVer مثل 2.5.0.');
+      return;
+    }
     setSaving(true);
+    if (centralActive) {
+      const payload = {
+        version: releaseForm.version.trim(),
+        channel: releaseForm.channel === 'HOTFIX' ? 'STABLE' : releaseForm.channel,
+        releaseNotes: releaseForm.changelog || releaseForm.notes || '',
+        downloadUrl: releaseForm.fileUrl || '',
+        checksum: releaseForm.checksumSha256 || '',
+        minRequiredVersion: releaseForm.minVersion || '',
+        isMandatory: Boolean(releaseForm.isMandatory),
+        rolloutStrategy: 'FULL',
+        rolloutPercent: 100,
+        targetTenantIds: [],
+      };
+      const request = releaseForm.id
+        ? centralPlatformClient.updateRelease(releaseForm.id, payload)
+        : centralPlatformClient.createRelease(payload);
+      Promise.resolve(request)
+        .then(() => { toast.success(releaseForm.id ? 'تم تحديث الإصدار' : 'تم إنشاء الإصدار كمسودة'); setReleaseOpen(false); load(); })
+        .catch((err) => toast.error('تعذر حفظ الإصدار', err instanceof Error ? err.message : undefined))
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
       platformAdminService.upsertRelease({
         ...releaseForm,
@@ -297,11 +516,18 @@ export const PlatformProductPage: React.FC = () => {
 
   const openTargetsModal = (release: PlatformRelease) => {
     setSelectedReleaseForTargets(release);
+    setTargetSearchTerm('');
+    if (centralActive) {
+      // Central releases carry targetTenantIds on the release row itself.
+      const central = (release as PlatformRelease & { _central?: CentralReleaseRow })._central;
+      setSelectedTenantIdsForRelease(Array.isArray(central?.targetTenantIds) ? central.targetTenantIds : []);
+      setReleaseTargets([]);
+      return;
+    }
     try {
       const targets = platformAdminService.listReleaseTargets(release.id);
       setReleaseTargets(targets);
       setSelectedTenantIdsForRelease(targets.map((t) => t.tenantId));
-      setTargetSearchTerm('');
     } catch (err) {
       toast.error('تعذر استرجاع مستهدفي الإصدار', err instanceof Error ? err.message : undefined);
     }
@@ -309,7 +535,22 @@ export const PlatformProductPage: React.FC = () => {
 
   const saveTargets = () => {
     if (!selectedReleaseForTargets) return;
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
     setSaving(true);
+    if (centralActive) {
+      centralPlatformClient.updateRelease(selectedReleaseForTargets.id, {
+        targetTenantIds: selectedTenantIdsForRelease,
+        rolloutStrategy: selectedTenantIdsForRelease.length ? 'PHASED' : 'FULL',
+        rolloutPercent: 100,
+      })
+        .then(() => { toast.success(`تم إسناد الإصدار إلى ${selectedTenantIdsForRelease.length} عميل.`); setSelectedReleaseForTargets(null); load(); })
+        .catch((err) => toast.error('تعذر تحديث مستهدفي الإصدار', err instanceof Error ? err.message : undefined))
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
       const updated = platformAdminService.setReleaseTargets(selectedReleaseForTargets.id, selectedTenantIdsForRelease);
       setReleaseTargets(updated);
@@ -323,6 +564,11 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const markTargetStatus = (targetId: string, status: PlatformReleaseTarget['status']) => {
+    if (centralActive) {
+      // Per-target rollout status tracking has no central endpoint.
+      toast.error('غير مدعوم', 'متابعة حالة كل عميل على حدة غير متاحة في الوضع المركزي بعد.');
+      return;
+    }
     if (!selectedReleaseForTargets) return;
     try {
       const target = releaseTargets.find((t) => t.id === targetId);
@@ -343,8 +589,25 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const confirmRollback = () => {
-    if (!rollbackReleaseItem || !safeRollbackVersion.trim()) return;
+    if (!rollbackReleaseItem) return;
+    if (!canManageProduct) {
+      toast.warning('لا تملك صلاحية إدارة المنتج.');
+      return;
+    }
+    if (!safeRollbackVersion.trim() || !SEMVER_RE.test(safeRollbackVersion.trim())) {
+      toast.error('صيغة رقم الإصدار الآمن غير صحيحة — استخدم SemVer مثل 2.4.9.');
+      return;
+    }
     setSaving(true);
+    if (centralActive) {
+      // Central rollback reverts the release to its previous published state;
+      // the safe-version input is informational only (no central param exists).
+      centralPlatformClient.rollbackRelease(rollbackReleaseItem.id)
+        .then(() => { toast.success(`تم التراجع عن الإصدار v${rollbackReleaseItem.version}`); setRollbackOpen(false); load(); })
+        .catch((err) => toast.error('تعذر التراجع عن الإصدار', err instanceof Error ? err.message : undefined))
+        .finally(() => setSaving(false));
+      return;
+    }
     try {
       platformAdminService.rollbackRelease(rollbackReleaseItem.id, safeRollbackVersion.trim());
       toast.success(`تم التراجع عن الإصدار v${rollbackReleaseItem.version} وتوجيه العملاء للإصدار v${safeRollbackVersion}`);
@@ -414,7 +677,7 @@ export const PlatformProductPage: React.FC = () => {
           plans={plans}
           modules={modules}
           features={features}
-          centralActive={getCentralDataSourceState().active}
+          centralActive={centralActive}
           canManageProduct={canManageProduct}
           saving={saving}
           onToggle={togglePlanCatalogItem}
@@ -446,6 +709,7 @@ export const PlatformProductPage: React.FC = () => {
         setForm={setFeatureForm}
         saving={saving}
         canManageProduct={canManageProduct}
+        centralActive={centralActive}
         onSave={saveFeature}
       />
 
@@ -460,6 +724,7 @@ export const PlatformProductPage: React.FC = () => {
         newOverrideEnabled={newOverrideEnabled}
         setNewOverrideEnabled={setNewOverrideEnabled}
         canManageProduct={canManageProduct}
+        centralActive={centralActive}
         onAddOverride={addOverride}
         onRemoveOverride={removeOverride}
       />
@@ -472,6 +737,7 @@ export const PlatformProductPage: React.FC = () => {
         setForm={setReleaseForm}
         saving={saving}
         canManageProduct={canManageProduct}
+        centralActive={centralActive}
         onSave={saveRelease}
       />
 
@@ -488,7 +754,7 @@ export const PlatformProductPage: React.FC = () => {
         saving={saving}
         canManageProduct={canManageProduct}
         onSaveTargets={saveTargets}
-        onMarkTargetStatus={markTargetStatus}
+        onMarkTargetStatus={centralActive ? undefined : markTargetStatus}
       />
 
       {/* ─── Rollback Modal ─── */}

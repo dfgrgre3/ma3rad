@@ -57,6 +57,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
         <div>
           <label className="block text-xs font-semibold text-muted mb-1">كلمة المرور الأولية *</label>
           <input type="password" value={formData.password || ''} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="8 أحرف على الأقل — سيُطلب تغييرها عند أول دخول" className={inputClass} autoComplete="new-password" />
+          <p className="text-[10px] text-muted mt-1">يجب أن تحتوي على 8 أحرف على الأقل تتضمن حرفًا ورقمًا.</p>
         </div>
       )}
       <label className="flex items-center gap-2 cursor-pointer text-xs text-muted">

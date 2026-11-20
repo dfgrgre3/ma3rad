@@ -22,13 +22,18 @@ import {
 } from 'lucide-react';
 import { PLATFORM_TENANT_STATUS_LABELS } from '../../../services/domains/platform/PlatformAdminService';
 import type {
+  PlatformDevice,
   PlatformPlan,
+  PlatformSubscription,
   PlatformTenant,
+  PlatformTenantAccount,
   PlatformTenantOverride,
   PlatformTenantOverrideInput,
   PlatformTenantProfile,
   PlatformTenantStatus,
+  PlatformTenantUser,
 } from '../../../services/domains/platform/platformTypes';
+import type { TenantBranch } from './shared';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { StatusBadge, formatDate } from '../components/PlatformUI';
@@ -57,8 +62,8 @@ interface TenantDetailModalProps {
   onClose: () => void;
   tenant: PlatformTenant | null;
   profile: PlatformTenantProfile | null;
-  account: any;
-  subscription: any;
+  account: PlatformTenantAccount | null;
+  subscription: PlatformSubscription | null;
   healthChecks: Array<{ label: string; ok: boolean }>;
   healthScore: number;
   working: boolean;
@@ -77,7 +82,7 @@ interface TenantDetailModalProps {
   archive: (tenant: PlatformTenant) => void;
   copyToClipboard: (text: string, label: string) => Promise<void>;
   setAccountOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  branches: any[];
+  branches: TenantBranch[];
   setBranchOpen: React.Dispatch<React.SetStateAction<boolean>>;
   closeBranch: (branchId: string) => void;
   overrides: PlatformTenantOverride[];
@@ -92,11 +97,11 @@ interface TenantDetailModalProps {
   planForm: { planId: string; months: number; seats: number };
   setPlanForm: React.Dispatch<React.SetStateAction<{ planId: string; months: number; seats: number }>>;
   changePlan: () => void;
-  users: any[];
+  users: PlatformTenantUser[];
   openUserCreate: () => void;
-  openUserEdit: (user: any) => void;
-  toggleUser: (user: any, active: boolean) => void;
-  deleteUser: (user: any) => void;
+  openUserEdit: (user: PlatformTenantUser) => void;
+  toggleUser: (user: PlatformTenantUser, active: boolean) => void;
+  deleteUser: (user: PlatformTenantUser) => void;
   remoteControlData: {
     tenant: any;
     appliedConfig: any;
@@ -108,10 +113,10 @@ interface TenantDetailModalProps {
   configSending: boolean;
   forceSync: () => void;
   forceSyncWorking: boolean;
-  remoteDevices: any[];
+  remoteDevices: PlatformDevice[];
   selectedDeviceIds: string[];
   setSelectedDeviceIds: React.Dispatch<React.SetStateAction<string[]>>;
-  toggleDeviceStatus: (device: any) => void;
+  toggleDeviceStatus: (device: PlatformDevice) => void;
   configForm: { key: string; value: string; scope: string; targetDeviceIds: string[] };
   setConfigForm: React.Dispatch<React.SetStateAction<{ key: string; value: string; scope: string; targetDeviceIds: string[] }>>;
   pushConfig: () => void;
@@ -380,6 +385,7 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
                 forceSync={forceSync}
                 forceSyncWorking={forceSyncWorking}
                 canManageTenants={canManageTenants}
+                centralActive={centralActive}
                 remoteDevices={remoteDevices}
                 selectedDeviceIds={selectedDeviceIds}
                 setSelectedDeviceIds={setSelectedDeviceIds}

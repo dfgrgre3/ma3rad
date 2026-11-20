@@ -44,9 +44,8 @@ const STATUS_LABELS: Record<NotificationStatus, string> = {
 };
 
 export const PlatformNotificationsHubPage: React.FC = () => {
-  const canManageNotifications = canPlatform('notifications');
+  const canManageNotifications = canPlatform('notifications', 'platform.notifications.update');
   const [logs, setLogs] = useState<NotificationLog[]>([]);
-  const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +64,6 @@ export const PlatformNotificationsHubPage: React.FC = () => {
     setError(null);
     try {
       const notificationsResult = await centralPlatformClient.listNotifications({ limit: 100 });
-      const templateList = await centralPlatformClient.listNotificationTemplates().catch(() => [] as any[]);
       const mapped: NotificationLog[] = notificationsResult.notifications.map((notification) => ({
         id: notification.id,
         notificationId: notification.id,
@@ -78,8 +76,6 @@ export const PlatformNotificationsHubPage: React.FC = () => {
         sentAt: notification.createdAt,
       }));
       setLogs(mapped);
-      setTemplates(templateList);
-      setTemplates(templateList);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'تعذر تحميل سجل الإشعارات من السيرفر المركزي.');
     } finally {
@@ -188,7 +184,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
           <DataTable
               ariaLabel="سجل الإشعارات"
               rows={filteredLogs}
-              rowKey={(log: any) => String(log.id)}
+              rowKey={(log: NotificationLog) => String(log.id)}
               minWidth={850}
               dense
               tableClassName="text-xs"
@@ -196,16 +192,16 @@ export const PlatformNotificationsHubPage: React.FC = () => {
               columns={[
                 {
                   key: 'channel', header: 'القناة / المستلم',
-                  render: (log: any) => (
+                  render: (log: NotificationLog) => (
                     <span className="block">
-                      <span className="block font-bold text-muted">{STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                      <span className="block font-bold text-muted">{STATUS_LABELS[log.status] || log.status}</span>
                       <span className="block font-mono text-[11px] text-muted">{log.channel}</span>
                     </span>
                   ),
                 },
                 {
                   key: 'template', header: 'القالب والموضوع',
-                  render: (log: any) => (
+                  render: (log: NotificationLog) => (
                     <span className="block">
                       <span className="block font-semibold text-muted">{log.subject}</span>
                       <span className="block font-mono text-[10px] text-muted">{log.template}</span>
@@ -214,15 +210,15 @@ export const PlatformNotificationsHubPage: React.FC = () => {
                 },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (log: any) => log.status === 'SENT' || log.status === 'DELIVERED' ? (
+                  render: (log: NotificationLog) => log.status === 'SENT' || log.status === 'DELIVERED' ? (
                     <span className="flex items-center gap-1 font-bold text-success"><CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم</span>
                   ) : log.status === 'FAILED' ? (
                     <span className="flex items-center gap-1 font-bold text-danger"><XCircle className="h-3.5 w-3.5" /> فشل التسليم</span>
                   ) : (
-                    <span className="flex items-center gap-1 font-bold text-warning"><Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                    <span className="flex items-center gap-1 font-bold text-warning"><Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status] || log.status}</span>
                   ),
                 },
-                { key: 'sent', header: 'وقت التسليم', render: (log: any) => <span className="text-muted">{formatDateTime(log.sentAt)}</span> },
+                { key: 'sent', header: 'وقت التسليم', render: (log: NotificationLog) => <span className="text-muted">{formatDateTime(log.sentAt)}</span> },
               ]}
             />
           {!loading && filteredLogs.length === 0 ? (

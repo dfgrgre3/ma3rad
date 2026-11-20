@@ -23,11 +23,16 @@ import {
   CheckCircle2,
   Rocket,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
-import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
-import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
-import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
-import type { PlatformOverview } from '../../services/domains/platform/platformTypes';
+import type { PlatformPayment } from '../../services/domains/platform/platformTypes';
+import { usePlatformDashboardData } from './dashboard/usePlatformDashboardData';
+import { PeriodSelector } from './components/Charts';
+import {
+  CHANNEL_LABELS,
+  ENTITY_LABELS,
+  PLATFORM_STATUS_LABELS,
+} from './platformLabels';
 import {
   EmptyState,
   StatusBadge,
@@ -36,45 +41,6 @@ import {
   formatMoney,
   formatNumber,
 } from './components/PlatformUI';
-
-const StatusLabel: Record<string, string> = {
-  TRIAL: 'تجريبي',
-  ACTIVE: 'نشط',
-  SUSPENDED: 'موقوف',
-  EXPIRED: 'منتهي',
-  CANCELLED: 'ملغي',
-  ISSUED: 'صادر',
-  REVOKED: 'ملغي',
-  PAID: 'مدفوعة',
-  PARTIAL: 'جزئية',
-  SENT: 'مرسلة',
-  OVERDUE: 'متأخرة',
-  DRAFT: 'مسودة',
-  VOID: 'ملغاة',
-  PUBLISHED: 'منشور',
-  DEPRECATED: 'متوقف',
-  STABLE: 'مستقر',
-  BETA: 'تجريبي',
-  NIGHTLY: 'ليلي',
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  STABLE: 'مستقر',
-  BETA: 'تجريبي',
-  NIGHTLY: 'ليلي',
-};
-
-const ENTITY_LABELS: Record<string, string> = {
-  TENANT: 'عميل',
-  PLAN: 'خطة',
-  LICENSE: 'ترخيص',
-  INVOICE: 'فاتورة',
-  PAYMENT: 'دفعة',
-  MODULE: 'وحدة',
-  FEATURE: 'ميزة',
-  RELEASE: 'إصدار',
-  SETTINGS: 'إعدادات',
-};
 
 const TONES = {
   default: { icon: 'bg-surface-sunken text-ink-secondary', bar: 'bg-line-strong' },
@@ -142,30 +108,23 @@ const ALERT_TONES = {
 } as const;
 
 export const PlatformDashboardPage: React.FC = () => {
-  const [overview, setOverview] = React.useState<PlatformOverview | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [period, setPeriod] = React.useState<string>('30d');
+  const { data, isCentral, loading, error, lastUpdated, reload } = usePlatformDashboardData(period, '');
+  const overview = data?.overview ?? null;
 
-  const load = React.useCallback(async () => {
-    try {
-      const centralState = getCentralDataSourceState();
-      if (centralState.active) {
-        const data = await centralPlatformClient.getOverview();
-        setOverview(data as any);
-      } else {
-        setOverview(platformAdminService.getOverview());
-      }
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');
-    }
-  }, []);
+  // Auto-refresh every 60 seconds (skip while the tab is hidden)
+  React.useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!document.hidden) reload();
+    }, 60000);
+    return () => window.clearInterval(id);
+  }, [reload]);
 
-  React.useEffect(() => { load(); }, [load]);
-
-  if (error) {
+  if (error && !overview) {
     return (
       <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
         {error}
+        <button onClick={reload} className="ml-3 text-success hover:underline">إعادة المحاولة</button>
       </div>
     );
   }
@@ -176,8 +135,8 @@ export const PlatformDashboardPage: React.FC = () => {
 
   const latestRelease = overview.releases[0] ?? null;
   const maxModuleAdoption = Math.max(1, ...overview.moduleUsage.map((item) => item.licenseCount));
-  const severityOrder = { danger: 0, warning: 1, info: 2, success: 3 } as const;
-  const alerts = [...overview.alerts].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  const severityOrder: Record<string, number> = { danger: 0, warning: 1, info: 2, success: 3 };
+  const alerts = [...overview.alerts].sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9));
 
   return (
     <div className="space-y-5">
@@ -196,7 +155,7 @@ export const PlatformDashboardPage: React.FC = () => {
               <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg bg-surface/10 px-2.5 py-1 text-[10.5px] font-semibold text-muted">
                 <Rocket className="h-3.5 w-3.5 text-success" />
                 آخر إصدار: <span dir="ltr" className="font-mono">v{latestRelease.version}</span>
-                <span className="rounded-full bg-success/20 px-2 py-0.5 text-success">{CHANNEL_LABELS[latestRelease.channel]}</span>
+                <span className="rounded-full bg-success/20 px-2 py-0.5 text-success">{CHANNEL_LABELS[latestRelease.channel] ?? latestRelease.channel}</span>
                 <span className="text-muted">· {formatDate(latestRelease.releasedAt || latestRelease.createdAt)}</span>
               </p>
             )}
@@ -217,6 +176,33 @@ export const PlatformDashboardPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Period + refresh controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <PeriodSelector value={period} onChange={setPeriod} className="w-auto min-w-[150px]" />
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${isCentral ? 'bg-accent-soft text-primary' : 'bg-success-soft text-success'}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${isCentral ? 'bg-accent-border' : 'bg-success'}`} />
+            {isCentral ? 'الخادم المركزي' : 'البيانات المحلية'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+              {loading && <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />}
+              آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
+            </span>
+          )}
+          <button
+            onClick={reload}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft transition disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            تحديث
+          </button>
+        </div>
+      </div>
 
       {/* Customers & revenue */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -413,7 +399,7 @@ export const PlatformDashboardPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="shrink-0 text-left">
-                    <StatusBadge value={subscription.status} label={StatusLabel[subscription.status]} />
+                    <StatusBadge value={subscription.status} label={PLATFORM_STATUS_LABELS[subscription.status]} />
                     <p className="mt-1 text-[10px] text-muted">{formatDate(subscription.endDate)}</p>
                   </div>
                 </li>
@@ -477,12 +463,12 @@ export const PlatformDashboardPage: React.FC = () => {
                     <p className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
                       <span dir="ltr" className="font-mono">v{release.version}</span>
                       <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-[9px] font-bold text-ink-secondary">
-                        {CHANNEL_LABELS[release.channel]}
+                        {CHANNEL_LABELS[release.channel] ?? release.channel}
                       </span>
                     </p>
                     <p className="text-[10px] text-muted">{formatDate(release.releasedAt || release.createdAt)}</p>
                   </div>
-                  <StatusBadge value={release.status ?? ''} label={StatusLabel[release.status ?? ''] || release.status || ''} />
+                  <StatusBadge value={release.status ?? ''} label={PLATFORM_STATUS_LABELS[release.status ?? ''] || release.status || ''} />
                 </li>
               ))}
             </ul>
@@ -519,7 +505,7 @@ export const PlatformDashboardPage: React.FC = () => {
                       {tenant.code} · {tenant.planName || 'بدون خطة'} · {formatDate(tenant.createdAt)}
                     </p>
                   </div>
-                  <StatusBadge value={tenant.status} label={StatusLabel[tenant.status]} />
+                  <StatusBadge value={tenant.status} label={PLATFORM_STATUS_LABELS[tenant.status]} />
                 </li>
               ))}
             </ul>
@@ -544,13 +530,13 @@ export const PlatformDashboardPage: React.FC = () => {
               <DataTable
                 ariaLabel="أحدث المدفوعات"
                 rows={overview.recentPayments}
-                rowKey={(payment: any) => String(payment.id)}
+                rowKey={(payment: PlatformPayment) => String(payment.id)}
                 dense
                 columns={[
-                  { key: 'tenant', header: 'العميل', render: (payment: any) => <span className="text-[12px] font-semibold text-ink">{payment.tenantName}</span> },
-                  { key: 'invoice', header: 'الفاتورة', render: (payment: any) => <span className="text-[11px] text-muted" dir="ltr">{payment.invoiceNumber || '—'}</span> },
-                  { key: 'amount', header: 'المبلغ', render: (payment: any) => <span className="text-[12px] font-bold text-success">{formatMoney(payment.amount)}</span> },
-                  { key: 'date', header: 'التاريخ', render: (payment: any) => <span className="text-[11px] text-muted">{formatDate(payment.paidAt)}</span> },
+                  { key: 'tenant', header: 'العميل', render: (payment: PlatformPayment) => <span className="text-[12px] font-semibold text-ink">{payment.tenantName}</span> },
+                  { key: 'invoice', header: 'الفاتورة', render: (payment: PlatformPayment) => <span className="text-[11px] text-muted" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                  { key: 'amount', header: 'المبلغ', render: (payment: PlatformPayment) => <span className="text-[12px] font-bold text-success">{formatMoney(payment.amount)}</span> },
+                  { key: 'date', header: 'التاريخ', render: (payment: PlatformPayment) => <span className="text-[11px] text-muted">{formatDate(payment.paidAt)}</span> },
                 ]}
               />
             </div>

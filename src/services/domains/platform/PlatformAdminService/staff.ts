@@ -1,6 +1,8 @@
 // Staff management delegations → PlatformStaffService (staff CRUD, invites,
 // MFA, sessions, security incidents and signing keys).
 import { platformStaffService } from '../PlatformStaffService';
+import type { PlatformApiKeyRecord, PlatformApiKeySecretResult } from '../PlatformStaffService/apiKeys';
+import type { PlatformStaffMfaCompliance } from '../PlatformStaffService/context';
 import type {
   PlatformStaff,
   PlatformStaffInput,
@@ -21,11 +23,11 @@ import type {
 
 export interface StaffApi {
   // Staff Management - Delegate to PlatformStaffService
-  listApiKeys(tenantId?: string): any[];
-  createApiKey(input: { tenantId: string; name: string; scopes?: string[]; expiresAt?: string }): any;
+  listApiKeys(tenantId?: string): PlatformApiKeyRecord[];
+  createApiKey(input: { tenantId: string; name: string; scopes?: string[]; expiresAt?: string }): PlatformApiKeySecretResult;
   revokeApiKey(id: string): void;
-  rotateApiKey(id: string): any;
-  validateApiKey(plainTextKey: string): any;
+  rotateApiKey(id: string): PlatformApiKeySecretResult;
+  validateApiKey(plainTextKey: string): { tenantId: string; scopes: string[] } | null;
   listPlatformStaffRoles(): PlatformStaffRoleDefinition[];
   listPlatformStaff(search?: string, role?: string, includeDeleted?: boolean): PlatformStaff[];
   getPlatformStaff(id: string): PlatformStaff | null;
@@ -48,8 +50,8 @@ export interface StaffApi {
   trustCurrentStaffDevice(deviceName?: string): void;
   getStaffMfaEnforcement(): 'off' | 'optional' | 'required';
   setStaffMfaEnforcement(policy: 'off' | 'optional' | 'required'): void;
-  getStaffMfaCompliance(): any;
-  startMfaEnrollmentForStaffSelf(): Promise<any>;
+  getStaffMfaCompliance(): PlatformStaffMfaCompliance;
+  startMfaEnrollmentForStaffSelf(): Promise<{ secret: string; uri: string; backupCodes: string[] }>;
   confirmMfaForStaffSelf(code: string): Promise<void>;
   disableMfaForStaffSelf(code: string): Promise<void>;
   resetStaffMfa(id: string): void;

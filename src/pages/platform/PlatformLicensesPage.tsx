@@ -58,6 +58,12 @@ const COUPLING_LABELS: Record<PlatformCouplingMode, string> = {
 
 const STATUSES: PlatformLicenseStatus[] = ['ACTIVE', 'ISSUED', 'SUSPENDED', 'EXPIRED', 'REVOKED'];
 
+/** Clamp a numeric input: finite, integer, minimum `min` (NaN-safe). */
+const clampInt = (raw: string, min: number): number => {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(min, Math.floor(n)) : min;
+};
+
 export const PlatformLicensesPage: React.FC = () => {
   const toast = useToast();
   const canManageLicenses = canPlatform('licenses');
@@ -65,6 +71,12 @@ export const PlatformLicensesPage: React.FC = () => {
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
   const [search, setSearch] = React.useState('');
+  // Raw input is debounced ~300ms before it hits `search` (and therefore the API).
+  const [searchInput, setSearchInput] = React.useState('');
+  React.useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [status, setStatus] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -248,6 +260,10 @@ export const PlatformLicensesPage: React.FC = () => {
       return;
     }
     const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
       if (central.active) {
         await centralPlatformClient.renewLicense(renewTarget.id, renewMonths);
@@ -275,7 +291,7 @@ export const PlatformLicensesPage: React.FC = () => {
     try {
       if (central.active) {
         const result = await centralPlatformClient.detectCloneDevices();
-        setCloneAlerts(result.alerts);
+        setCloneAlerts(Array.from(new Set(result.alerts)));
         if (result.alerts.length > 0) {
           toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
         } else {
@@ -283,7 +299,7 @@ export const PlatformLicensesPage: React.FC = () => {
         }
       } else {
         const result = platformAdminService.detectCloneDevices();
-        setCloneAlerts(result.alerts.map((a) => a.message));
+        setCloneAlerts(Array.from(new Set(result.alerts.map((a) => a.message))));
         if (result.alerts.length > 0) {
           toast.warning(`تم اكتشاف ${result.alerts.length} تنبيه استنساخ`);
         } else {
@@ -472,8 +488,8 @@ export const PlatformLicensesPage: React.FC = () => {
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             placeholder="ابحث بالمفتاح أو العميل أو معرف الجهاز..."
             className={`${inputClass} pr-8`}
           />
@@ -502,10 +518,10 @@ export const PlatformLicensesPage: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <DataTable
+            <DataTable<PlatformLicense>
               ariaLabel="التراخيص"
               rows={licenses}
-              rowKey={(license: any) => String(license.id)}
+              rowKey={(license) => String(license.id)}
               minWidth={1000}
               dense
               tableClassName="text-[11px]"
@@ -513,25 +529,25 @@ export const PlatformLicensesPage: React.FC = () => {
               columns={[
                 {
                   key: 'key', header: 'المفتاح',
-                  render: (license: any) => (
+                  render: (license) => (
                     <span className="block">
                       <span className="block font-mono text-[11px] font-bold text-ink" dir="ltr">{license.licenseKey}</span>
                       <span className="text-[10px] text-muted">{formatDate(license.issuedAt)}</span>
                     </span>
                   ),
                 },
-                { key: 'tenant', header: 'العميل', render: (license: any) => <span className="text-[12px] font-semibold text-ink">{license.tenantName || '—'}</span> },
-                { key: 'plan', header: 'الخطة', render: (license: any) => <span className="text-[11.5px] text-ink-secondary">{license.planName || '—'}</span> },
-                { key: 'status', header: 'الحالة', render: (license: any) => <StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status as keyof typeof LICENSE_STATUS_LABELS]} /> },
-                { key: 'start', header: 'يبدأ من', render: (license: any) => <span className="text-[11px] text-ink-secondary">{formatDate(license.startsAt)}</span> },
-                { key: 'end', header: 'ينتهي في', render: (license: any) => <span className="text-[11px] text-ink-secondary">{formatDate(license.expiresAt)}</span> },
-                { key: 'seats', header: 'المستخدمون', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.seats}</span> },
-                { key: 'devices', header: 'الأجهزة', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.deviceLimit}</span> },
-                { key: 'branches', header: 'الفروع', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.branchesLimit}</span> },
-                { key: 'coupling', header: 'الربط', render: (license: any) => <span className="text-[10px] text-muted">{COUPLING_LABELS[(license.couplingMode ?? 'FULL') as keyof typeof COUPLING_LABELS]}</span> },
+                { key: 'tenant', header: 'العميل', render: (license) => <span className="text-[12px] font-semibold text-ink">{license.tenantName || '—'}</span> },
+                { key: 'plan', header: 'الخطة', render: (license) => <span className="text-[11.5px] text-ink-secondary">{license.planName || '—'}</span> },
+                { key: 'status', header: 'الحالة', render: (license) => <StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status]} /> },
+                { key: 'start', header: 'يبدأ من', render: (license) => <span className="text-[11px] text-ink-secondary">{formatDate(license.startsAt)}</span> },
+                { key: 'end', header: 'ينتهي في', render: (license) => <span className="text-[11px] text-ink-secondary">{formatDate(license.expiresAt)}</span> },
+                { key: 'seats', header: 'المستخدمون', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.seats}</span> },
+                { key: 'devices', header: 'الأجهزة', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.deviceLimit}</span> },
+                { key: 'branches', header: 'الفروع', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.branchesLimit}</span> },
+                { key: 'coupling', header: 'الربط', render: (license) => <span className="text-[10px] text-muted">{COUPLING_LABELS[(license.couplingMode ?? 'FULL') as PlatformCouplingMode]}</span> },
                 {
                   key: 'actions', header: 'إجراءات',
-                  render: (license: any) => (
+                  render: (license) => (
                     <span className="flex items-center gap-1">
                       {canManageLicenses && (
                         <>
@@ -559,32 +575,36 @@ export const PlatformLicensesPage: React.FC = () => {
                           <button type="button" onClick={() => void changeStatus(license, 'REVOKED')} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="إلغاء">
                             <ShieldX className="h-3.5 w-3.5" />
                           </button>
-                          {license.hardwareId && (!centralMode || deviceIdForLicense(license)) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const deviceId = deviceIdForLicense(license);
-                                if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
-                              }}
-                              className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary"
-                              title="تحرير الجهاز"
-                            >
-                              <Link className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          {license.status === 'ACTIVE' && (!centralMode || deviceIdForLicense(license)) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const deviceId = deviceIdForLicense(license);
-                                if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
-                              }}
-                              className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning"
-                              title="إيقاف الجهاز"
-                            >
-                              <ShieldAlert className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                          {license.hardwareId && (() => {
+                            const deviceId = deviceIdForLicense(license);
+                            const unsupported = centralMode && !deviceId;
+                            return (
+                              <button
+                                type="button"
+                                disabled={unsupported}
+                                onClick={() => { if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status }); }}
+                                className={`rounded p-1.5 ${unsupported ? 'cursor-not-allowed text-muted/40' : 'text-muted hover:bg-accent-soft hover:text-primary'}`}
+                                title={unsupported ? 'لا يوجد جهاز مرتبط قابل للإدارة في الوضع المركزي' : 'تحرير الجهاز'}
+                              >
+                                <Link className="h-3.5 w-3.5" />
+                              </button>
+                            );
+                          })()}
+                          {license.status === 'ACTIVE' && (() => {
+                            const deviceId = deviceIdForLicense(license);
+                            const unsupported = centralMode && !deviceId;
+                            return (
+                              <button
+                                type="button"
+                                disabled={unsupported}
+                                onClick={() => { if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status }); }}
+                                className={`rounded p-1.5 ${unsupported ? 'cursor-not-allowed text-muted/40' : 'text-muted hover:bg-warning-soft hover:text-warning'}`}
+                                title={unsupported ? 'لا يوجد جهاز مرتبط قابل للإدارة في الوضع المركزي' : 'إيقاف الجهاز'}
+                              >
+                                <ShieldAlert className="h-3.5 w-3.5" />
+                              </button>
+                            );
+                          })()}
                         </>
                       )}
                     </span>
@@ -636,16 +656,16 @@ export const PlatformLicensesPage: React.FC = () => {
             </select>
           </Field>
           <Field label="المدة (أشهر)">
-            <input type="number" min={1} className={inputClass} value={issueForm.months} onChange={(event) => setIssueForm({ ...issueForm, months: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={issueForm.months} onChange={(event) => setIssueForm({ ...issueForm, months: clampInt(event.target.value, 1) })} />
           </Field>
           <Field label="عدد المستخدمين">
-            <input type="number" min={1} className={inputClass} value={issueForm.seats} onChange={(event) => setIssueForm({ ...issueForm, seats: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={issueForm.seats} onChange={(event) => setIssueForm({ ...issueForm, seats: clampInt(event.target.value, 1) })} />
           </Field>
           <Field label="الفروع المسموح بها">
-            <input type="number" min={1} className={inputClass} value={issueForm.branchesLimit} onChange={(event) => setIssueForm({ ...issueForm, branchesLimit: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={issueForm.branchesLimit} onChange={(event) => setIssueForm({ ...issueForm, branchesLimit: clampInt(event.target.value, 1) })} />
           </Field>
           <Field label="فترة السماح أوفلاين (أيام)">
-            <input type="number" min={0} className={inputClass} value={issueForm.offlineGracePeriodDays} onChange={(event) => setIssueForm({ ...issueForm, offlineGracePeriodDays: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={issueForm.offlineGracePeriodDays} onChange={(event) => setIssueForm({ ...issueForm, offlineGracePeriodDays: clampInt(event.target.value, 0) })} />
           </Field>
           <Field label="نوع الربط بالاشتراك">
             <select className={inputClass} value={issueForm.couplingMode} onChange={(event) => setIssueForm({ ...issueForm, couplingMode: event.target.value as PlatformCouplingMode })}>
@@ -675,7 +695,7 @@ export const PlatformLicensesPage: React.FC = () => {
         }
       >
         <Field label="المدة (أشهر)">
-          <input type="number" min={1} className={inputClass} value={renewMonths} onChange={(event) => setRenewMonths(Number(event.target.value))} />
+          <input type="number" min={1} className={inputClass} value={renewMonths} onChange={(event) => setRenewMonths(clampInt(event.target.value, 1))} />
         </Field>
         {renewTarget && (
           <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-[11px] text-ink-secondary">
@@ -716,8 +736,8 @@ export const PlatformLicensesPage: React.FC = () => {
         <section className="rounded-lg border border-warning-border bg-warning-soft p-4">
           <h3 className="text-sm font-bold text-warning mb-2">تنبيهات الاستنساخ المكتشفة</h3>
           <ul className="text-[11px] text-warning space-y-1 list-disc list-inside">
-            {cloneAlerts.map((alert, i) => (
-              <li key={i}>{alert}</li>
+            {cloneAlerts.map((alert) => (
+              <li key={alert}>{alert}</li>
             ))}
           </ul>
         </section>

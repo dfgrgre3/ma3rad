@@ -182,6 +182,9 @@ export const PLATFORM_PERMISSION_SECTIONS: PlatformPermissionSection[] = [
       std('support', 'delete', 'حذف تذكرة'),
       std('support', 'approve', 'إغلاق / اعتماد الحل'),
       std('support', 'export', 'تصدير التذاكر'),
+      special('support', 'remote', 'إدارة جلسات الوصول عن بعد'),
+      special('support', 'message', 'مراسلة العملاء داخل التذكرة'),
+      special('support', 'canned', 'إدارة الردود الجاهزة'),
     ],
   },
   {
@@ -203,6 +206,7 @@ export const PLATFORM_PERMISSION_SECTIONS: PlatformPermissionSection[] = [
       std('security', 'update', 'تعديل سياسات الأمان'),
       std('security', 'approve', 'اعتماد إجراءات الاستجابة'),
       std('security', 'export', 'تصدير تقارير الأمان'),
+      special('security', 'keys', 'تدوير مفاتيح تشفير المنصة'),
     ],
   },
   {
@@ -510,6 +514,7 @@ export const PLATFORM_PAGE_CATALOG: PlatformPageDefinition[] = [
   page('/platform/roles', 'staff', 'مصفوفة الأدوار والصلاحيات', 'platform.staff.manage_permissions'),
   page('/platform/releases', 'releases', 'حزم الإصدارات والتحديثات', 'platform.releases.view'),
   page('/platform/product', 'product', 'التحكم في المنتج', 'platform.product.view'),
+  page('/platform/plan-catalog', 'product', 'منشئ الخطط والصفحات والمميزات', 'platform.product.view'),
   page('/platform/audit', 'audit', 'سجل عمليات المنصة', 'platform.audit.view'),
   page('/platform/settings', 'settings', 'إعدادات المنصة', 'platform.settings.view'),
   page('/platform/activity', 'activity', 'إعدادات النشاط', 'platform.activity.view'),
@@ -532,4 +537,5 @@ export const PLATFORM_PAGE_CATALOG: PlatformPageDefinition[] = [
   page('/platform/emergency', 'emergency', 'مركز إجراءات الطوارئ والحماية', 'platform.emergency.view'),
   page('/platform/customer-portal', 'customer-portal', 'بوابة العملاء المركزية', 'platform.customer-portal.view'),
   page('/platform/super-admin', 'super-admin', 'منطقة المالك الحساسة', 'platform.super-admin.view'),
+  page('/platform/user-platform-permissions', 'super-admin', 'صفحات وصلاحيات المستخدمين', 'platform.super-admin.view'),
 ];

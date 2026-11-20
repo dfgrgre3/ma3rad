@@ -55,6 +55,12 @@ const PAYMENT_METHOD_LABELS = Object.fromEntries(PAYMENT_METHODS.map((item) => [
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** NaN-safe non-negative number for money/qty inputs. */
+const nonNegative = (raw: string): number => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
 const emptyInvoice: PlatformInvoiceInput = {
   tenantId: '',
   issueDate: today(),
@@ -160,6 +166,9 @@ export const PlatformBillingPage: React.FC = () => {
   const applyPlan = (planId: string) => {
     const plan = plans.find((item) => item.id === planId);
     if (!plan) return;
+    // Warn before discarding manually-entered line items.
+    const hasCustomItems = invoiceForm.items.some((item) => item.description.trim());
+    if (hasCustomItems && !window.confirm('سيتم استبدال بنود الفاتورة الحالية ببند اشتراك الخطة. متابعة؟')) return;
     const cycleLabel = plan.billingCycle === 'MONTHLY' ? 'شهري'
       : plan.billingCycle === 'QUARTERLY' ? 'ربع سنوي'
       : plan.billingCycle === 'LIFETIME' ? 'مدى الحياة' : 'سنوي';
@@ -192,9 +201,22 @@ export const PlatformBillingPage: React.FC = () => {
       toast.error('اختر العميل أولاً');
       return;
     }
-    const items = invoiceForm.items.filter((item) => item.description.trim());
+    if (!invoiceForm.issueDate) {
+      toast.error('تاريخ الإصدار مطلوب');
+      return;
+    }
+    // Drop empty rows and reject non-finite / non-positive quantities.
+    const items = invoiceForm.items
+      .filter((item) => item.description.trim())
+      .map((item) => ({
+        ...item,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+      }))
+      .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0
+        && Number.isFinite(item.unitPrice) && item.unitPrice >= 0);
     if (items.length === 0) {
-      toast.error('أضف بنداً واحداً على الأقل');
+      toast.error('أضف بنداً واحداً على الأقل بكمية وسعر صالحين');
       return;
     }
     setSavingInvoice(true);
@@ -220,8 +242,13 @@ export const PlatformBillingPage: React.FC = () => {
 
   const sendInvoice = async (invoice: PlatformInvoice) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
+    const centralState = getCentralDataSourceState();
+    if (centralState.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (getCentralDataSourceState().active) {
+      if (centralState.active) {
         await centralPlatformClient.setInvoiceStatus(invoice.id, 'SENT');
       } else {
         platformAdminService.setInvoiceStatus(invoice.id, 'SENT');
@@ -236,8 +263,13 @@ export const PlatformBillingPage: React.FC = () => {
   const voidInvoice = async (invoice: PlatformInvoice) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm(`إلغاء الفاتورة ${invoice.number}؟ لن يمكن التراجع.`)) return;
+    const centralState = getCentralDataSourceState();
+    if (centralState.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (getCentralDataSourceState().active) {
+      if (centralState.active) {
         await centralPlatformClient.voidInvoice(invoice.id);
       } else {
         platformAdminService.voidInvoice(invoice.id);
@@ -251,8 +283,13 @@ export const PlatformBillingPage: React.FC = () => {
   };
 
   const openDetail = async (invoice: PlatformInvoice) => {
+    const centralState = getCentralDataSourceState();
+    if (centralState.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (getCentralDataSourceState().active) {
+      if (centralState.active) {
         setDetail(await centralPlatformClient.getInvoice(invoice.id));
       } else {
         setDetail(platformAdminService.getInvoice(invoice.id));
@@ -285,6 +322,19 @@ export const PlatformBillingPage: React.FC = () => {
       toast.error('قيمة الدفعة يجب أن تكون أكبر من صفر');
       return;
     }
+    // Validate invoice/tenant consistency before submitting.
+    if (payForm.invoiceId) {
+      const linked = invoices.find((item) => item.id === payForm.invoiceId);
+      if (linked && linked.tenantId !== payForm.tenantId) {
+        toast.error('الفاتورة المحددة لا تتبع العميل المختار — راجع الاختيار');
+        return;
+      }
+    }
+    const centralState = getCentralDataSourceState();
+    if (centralState.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
       const payload = {
         tenantId: payForm.tenantId,
@@ -295,7 +345,7 @@ export const PlatformBillingPage: React.FC = () => {
         paidAt: payForm.paidAt,
         notes: payForm.notes,
       };
-      if (getCentralDataSourceState().active) {
+      if (centralState.active) {
         await centralPlatformClient.addPayment(payload);
       } else {
         platformAdminService.addPayment(payload);
@@ -312,8 +362,13 @@ export const PlatformBillingPage: React.FC = () => {
   const voidPayment = async (payment: PlatformPayment) => {
     if (!canManageBilling) { toast.error('لا تملك صلاحية إدارة الفوترة'); return; }
     if (!window.confirm('إلغاء هذه الدفعة؟ سيُعاد احتساب الفاتورة المرتبطة.')) return;
+    const centralState = getCentralDataSourceState();
+    if (centralState.misconfigured) {
+      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
     try {
-      if (getCentralDataSourceState().active) {
+      if (centralState.active) {
         await centralPlatformClient.voidPayment(payment.id);
       } else {
         platformAdminService.voidPayment(payment.id);
@@ -341,11 +396,9 @@ export const PlatformBillingPage: React.FC = () => {
     ]);
   };
 
-  const invoiceRows = invoices.filter((invoice) => {
-    if (!search.trim()) return true;
-    const term = search.trim().toLowerCase();
-    return invoice.number.toLowerCase().includes(term) || (invoice.tenantName ?? '').toLowerCase().includes(term);
-  });
+  // Server-side search/status filters already ran in `load()` — do not re-filter
+  // client-side or server matches on other fields would be hidden.
+  const invoiceRows = invoices;
 
   return (
     <div className="space-y-4">
@@ -548,10 +601,10 @@ export const PlatformBillingPage: React.FC = () => {
                   <input className={inputClass} value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} />
                 </Field>
                 <Field label={index === 0 ? 'الكمية' : ''}>
-                  <input type="number" min={1} className={inputClass} value={item.quantity} onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })} />
+                  <input type="number" min={1} className={inputClass} value={item.quantity} onChange={(event) => updateItem(index, { quantity: Math.max(1, Math.floor(nonNegative(event.target.value) || 1)) })} />
                 </Field>
                 <Field label={index === 0 ? 'السعر' : ''}>
-                  <input type="number" min={0} className={inputClass} value={item.unitPrice} onChange={(event) => updateItem(index, { unitPrice: Number(event.target.value) })} />
+                  <input type="number" min={0} className={inputClass} value={item.unitPrice} onChange={(event) => updateItem(index, { unitPrice: nonNegative(event.target.value) })} />
                 </Field>
                 <div className="pb-2 text-left text-[11px] font-bold text-ink">
                   {formatMoney((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
@@ -572,10 +625,10 @@ export const PlatformBillingPage: React.FC = () => {
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label="خصم">
-            <input type="number" min={0} className={inputClass} value={invoiceForm.discount ?? 0} onChange={(event) => setInvoiceForm({ ...invoiceForm, discount: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={invoiceForm.discount ?? 0} onChange={(event) => setInvoiceForm({ ...invoiceForm, discount: nonNegative(event.target.value) })} />
           </Field>
           <Field label="ضريبة">
-            <input type="number" min={0} className={inputClass} value={invoiceForm.tax ?? 0} onChange={(event) => setInvoiceForm({ ...invoiceForm, tax: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={invoiceForm.tax ?? 0} onChange={(event) => setInvoiceForm({ ...invoiceForm, tax: nonNegative(event.target.value) })} />
           </Field>
           <Field label="ملاحظات" className="sm:col-span-2">
             <textarea rows={2} className={inputClass} value={invoiceForm.notes ?? ''} onChange={(event) => setInvoiceForm({ ...invoiceForm, notes: event.target.value })} />
@@ -624,14 +677,14 @@ export const PlatformBillingPage: React.FC = () => {
             </div>
             <DataTable
                             ariaLabel="بنود الفاتورة"
-                            rows={detail.items ?? []}
-                            rowKey={(item: any) => item.id ?? String(item.description)}
+                            rows={(detail.items ?? []).map((item, index) => ({ item, index }))}
+                            rowKey={(row) => row.item.id ?? `item-${row.index}`}
                             dense
                             columns={[
-                              { key: 'desc', header: 'الوصف', render: (item: any) => item.description },
-                              { key: 'qty', header: 'الكمية', render: (item: any) => item.quantity },
-                              { key: 'price', header: 'السعر', render: (item: any) => formatMoney(item.unitPrice, detail.currency) },
-                              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-bold">{formatMoney(item.total ?? item.quantity * item.unitPrice, detail.currency)}</span> },
+                              { key: 'desc', header: 'الوصف', render: (row) => row.item.description },
+                              { key: 'qty', header: 'الكمية', render: (row) => row.item.quantity },
+                              { key: 'price', header: 'السعر', render: (row) => formatMoney(row.item.unitPrice, detail.currency) },
+                              { key: 'total', header: 'الإجمالي', render: (row) => <span className="font-bold">{formatMoney(row.item.total ?? row.item.quantity * row.item.unitPrice, detail.currency)}</span> },
                             ]}
                           />
 
@@ -659,7 +712,16 @@ export const PlatformBillingPage: React.FC = () => {
             <select
               className={inputClass}
               value={payForm.tenantId}
-              onChange={(event) => setPayForm({ ...payForm, tenantId: event.target.value, invoiceId: '' })}
+              onChange={(event) => {
+                const nextTenantId = event.target.value;
+                const linked = invoices.find((item) => item.id === payForm.invoiceId);
+                // Keep the invoice only when it belongs to the newly selected tenant.
+                const keepInvoice = linked && linked.tenantId === nextTenantId ? payForm.invoiceId : '';
+                if (payForm.invoiceId && !keepInvoice) {
+                  toast.warning('تم إلغاء ربط الفاتورة — لا تتبع العميل المحدد');
+                }
+                setPayForm({ ...payForm, tenantId: nextTenantId, invoiceId: keepInvoice });
+              }}
             >
               <option value="">اختر العميل</option>
               {tenants.map((tenant) => (
@@ -687,7 +749,7 @@ export const PlatformBillingPage: React.FC = () => {
             </select>
           </Field>
           <Field label="المبلغ" required>
-            <input type="number" min={0} className={inputClass} value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: Number(event.target.value) })} />
+            <input type="number" min={0} className={inputClass} value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: nonNegative(event.target.value) })} />
           </Field>
           <Field label="طريقة الدفع">
             <select className={inputClass} value={payForm.method} onChange={(event) => setPayForm({ ...payForm, method: event.target.value as PlatformPaymentMethod })}>

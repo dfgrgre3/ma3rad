@@ -10,7 +10,6 @@ import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { inputClass, formatDateTime } from './components/PlatformUI';
-import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 
@@ -18,7 +17,7 @@ import { useToast } from '../../components/ui/Toast';
 export const PlatformPoliciesPage: React.FC = () => {
   const toast = useToast();
   const [tab, setTab] = useState<'TERMS' | 'PRIVACY' | 'RETENTION'>('TERMS');
-  const canManagePolicies = canPlatform('policies');
+  const canManagePolicies = canPlatform('policies', 'platform.policies.update');
 
   const [terms, setTerms] = useState(
     `شروط الاستخدام واتفاقية مستوى الخدمة (Terms of Service & SLA)
@@ -46,6 +45,17 @@ export const PlatformPoliciesPage: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Editing is only allowed after real policies load — otherwise the hardcoded
+  // placeholder text would be silently saved over stored policies.
+  const [loaded, setLoaded] = useState(false);
+
+  // Retention days must be finite integers within sane bounds.
+  const clampDays = (v: string): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(36500, Math.max(0, Math.round(n))) : 0;
+  };
+  const setRetentionDays = (key: keyof typeof retention, raw: string) =>
+    setRetention((prev) => ({ ...prev, [key]: clampDays(raw) }));
 
   useEffect(() => {
     const loadPolicies = async () => {
@@ -56,19 +66,32 @@ export const PlatformPoliciesPage: React.FC = () => {
           : platformAdminService.getPlatformPolicies();
         if (saved.terms) setTerms(saved.terms);
         if (saved.privacy) setPrivacy(saved.privacy);
-        setRetention(saved.retention);
+        setRetention({
+          auditRetentionDays: clampDays(String(saved.retention?.auditRetentionDays ?? 365)),
+          backupRetentionDays: clampDays(String(saved.retention?.backupRetentionDays ?? 90)),
+          syncLogRetentionDays: clampDays(String(saved.retention?.syncLogRetentionDays ?? 30)),
+          softDeleteGraceDays: clampDays(String(saved.retention?.softDeleteGraceDays ?? 14)),
+        });
         setLastSaved(saved.updatedAt);
+        setLoaded(true);
         setError(null);
       } catch (err) {
+        setLoaded(false);
         setError(err instanceof Error ? err.message : 'تعذر تحميل سياسات المنصة.');
       }
     };
     loadPolicies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {
     if (!canManagePolicies) {
       toast.warning('لا تملك صلاحية تعديل سياسات المنصة.');
+      return;
+    }
+    if (!loaded) {
+      toast.warning('تعذر تحميل السياسات الحالية — لا يمكن الحفظ حتى يتم تحميلها بنجاح.');
+      setSaving(false);
       return;
     }
     setSaving(true);
@@ -100,7 +123,7 @@ export const PlatformPoliciesPage: React.FC = () => {
         icon={<FileText className="h-5 w-5" />}
         actions={
           canManagePolicies ? (
-            <Button size="sm" onClick={handleSave} disabled={saving} leadingIcon={<Save className="h-4 w-4" />}>
+            <Button size="sm" onClick={handleSave} disabled={saving || !loaded} leadingIcon={<Save className="h-4 w-4" />}>
               حفظ التغييرات
             </Button>
           ) : null
@@ -161,6 +184,7 @@ export const PlatformPoliciesPage: React.FC = () => {
             <textarea
               rows={12}
               value={terms}
+              disabled={!loaded}
               onChange={(e) => setTerms(e.target.value)}
               className={`${inputClass} leading-relaxed font-sans`}
             />
@@ -175,6 +199,7 @@ export const PlatformPoliciesPage: React.FC = () => {
             <textarea
               rows={12}
               value={privacy}
+              disabled={!loaded}
               onChange={(e) => setPrivacy(e.target.value)}
               className={`${inputClass} leading-relaxed font-sans`}
             />
@@ -195,7 +220,7 @@ export const PlatformPoliciesPage: React.FC = () => {
                   <input
                     type="number"
                     value={retention.auditRetentionDays}
-                    onChange={(e) => setRetention({ ...retention, auditRetentionDays: Number(e.target.value) })}
+                    onChange={(e) => setRetentionDays('auditRetentionDays', e.target.value)}
                     className={inputClass}
                   />
                   <span className="text-xs text-muted">يوماً</span>
@@ -210,7 +235,7 @@ export const PlatformPoliciesPage: React.FC = () => {
                   <input
                     type="number"
                     value={retention.backupRetentionDays}
-                    onChange={(e) => setRetention({ ...retention, backupRetentionDays: Number(e.target.value) })}
+                    onChange={(e) => setRetentionDays('backupRetentionDays', e.target.value)}
                     className={inputClass}
                   />
                   <span className="text-xs text-muted">يوماً</span>
@@ -225,7 +250,7 @@ export const PlatformPoliciesPage: React.FC = () => {
                   <input
                     type="number"
                     value={retention.syncLogRetentionDays}
-                    onChange={(e) => setRetention({ ...retention, syncLogRetentionDays: Number(e.target.value) })}
+                    onChange={(e) => setRetentionDays('syncLogRetentionDays', e.target.value)}
                     className={inputClass}
                   />
                   <span className="text-xs text-muted">يوماً</span>
@@ -240,7 +265,7 @@ export const PlatformPoliciesPage: React.FC = () => {
                   <input
                     type="number"
                     value={retention.softDeleteGraceDays}
-                    onChange={(e) => setRetention({ ...retention, softDeleteGraceDays: Number(e.target.value) })}
+                    onChange={(e) => setRetentionDays('softDeleteGraceDays', e.target.value)}
                     className={inputClass}
                   />
                   <span className="text-xs text-muted">يوماً</span>
@@ -253,7 +278,7 @@ export const PlatformPoliciesPage: React.FC = () => {
         <div className="flex justify-between items-center pt-3 border-t border-line-strong text-[11px] text-muted">
           <span>آخر تحديث واعتماد: {lastSaved ? formatDateTime(lastSaved) : 'لم تُحفظ السياسات بعد'}</span>
           {canManagePolicies && (
-            <Button size="sm" onClick={handleSave} disabled={saving} leadingIcon={<Save className="h-3.5 w-3.5" />}>
+            <Button size="sm" onClick={handleSave} disabled={saving || !loaded} leadingIcon={<Save className="h-3.5 w-3.5" />}>
               {saving ? 'جارٍ الحفظ...' : 'حفظ'}
             </Button>
           )}

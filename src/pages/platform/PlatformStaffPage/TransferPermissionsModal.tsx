@@ -32,7 +32,7 @@ export const TransferPermissionsModal: React.FC<TransferPermissionsModalProps> =
         <label className="block text-xs font-semibold text-muted mb-1">الموظف الهدف *</label>
         <select value={transferToId} onChange={(e) => setTransferToId(e.target.value)} className={inputClass}>
           <option value="">اختر موظفاً...</option>
-          {staffList.filter((s) => s.id !== from?.id).map((s) => (
+          {staffList.filter((s) => s.id !== from?.id && s.isActive && s.role !== 'SUPER_ADMIN').map((s) => (
             <option key={s.id} value={s.id}>{s.fullName} — {s.role}</option>
           ))}
         </select>

@@ -3,7 +3,8 @@ import { platformStaffTwoFactorAuth } from '../../auth/twoFactorAuth';
 import { deletePlatformStaffTwoFactorRow } from '../../auth/twoFactorAuth';
 import { PLATFORM_ROLE_CODES_SET } from './shared';
 import { nowIso } from '../platformUtils';
-import type { StaffServiceContext } from './context';
+import type { StaffServiceContext, PlatformStaffMfaCompliance } from './context';
+import { mapStaff } from './mappers';
 
 export function getOwnStaffMfaStatus(ctx: StaffServiceContext): { enabled: boolean; enforcement: 'off' | 'optional' | 'required' } {
   const user = AuthService.getCurrentUser();
@@ -37,35 +38,33 @@ export function setStaffMfaEnforcement(ctx: StaffServiceContext, policy: 'off' |
   ctx.audit('تعيين سياسة MFA', 'STAFF_MFA', null, { policy });
 }
 
-export function getStaffMfaCompliance(ctx: StaffServiceContext): {
-  total: number;
-  enabled: number;
-  requiredButDisabled: number;
-  byRole: Record<string, { total: number; enabled: number }>;
-} {
+export function getStaffMfaCompliance(ctx: StaffServiceContext): PlatformStaffMfaCompliance {
   ctx.requirePlatformAccess('staff', 'platform.staff.view');
 
   const rows = ctx.db.query<any>(
-    `SELECT role, mfa_enabled FROM platform_staff
+    `SELECT * FROM platform_staff
      WHERE (deleted_at IS NULL OR deleted_at = '')`
   );
 
   const byRole: Record<string, { total: number; enabled: number }> = {};
+  const missing: ReturnType<typeof mapStaff>[] = [];
   let total = 0, enabled = 0, requiredButDisabled = 0;
   const enforcement = ctx.getStaffMfaEnforcement();
 
   for (const row of rows) {
     total++;
-    if (row.mfa_enabled) enabled++;
+    const rowEnabled = Boolean(row.mfa_enabled);
+    if (rowEnabled) enabled++;
+    else missing.push(mapStaff(row));
 
     if (!byRole[row.role]) byRole[row.role] = { total: 0, enabled: 0 };
     byRole[row.role].total++;
-    if (row.mfa_enabled) byRole[row.role].enabled++;
+    if (rowEnabled) byRole[row.role].enabled++;
 
-    if (enforcement === 'required' && !row.mfa_enabled) requiredButDisabled++;
+    if (enforcement === 'required' && !rowEnabled) requiredButDisabled++;
   }
 
-  return { total, enabled, requiredButDisabled, byRole };
+  return { enforcement, total, enabled, compliant: enabled, requiredButDisabled, byRole, missing };
 }
 
 export async function startMfaEnrollmentForStaffSelf(ctx: StaffServiceContext): Promise<{ secret: string; uri: string; backupCodes: string[] }> {

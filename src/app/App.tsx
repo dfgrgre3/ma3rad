@@ -22,6 +22,7 @@ import { LoginPage } from '../pages/auth/login/LoginPage';
 const PlatformStaffInviteAcceptPage = React.lazy(() => import('../pages/platform/PlatformStaffInviteAcceptPage').then(m => ({ default: m.PlatformStaffInviteAcceptPage })));
 const PlatformOwnerSetupPage = React.lazy(() => import('../pages/platform/PlatformOwnerSetupPage').then(m => ({ default: m.PlatformOwnerSetupPage })));
 const SetupWizard = React.lazy(() => import('../components/setup/SetupWizard').then(m => ({ default: m.SetupWizard })));
+const CentralActivationGate = React.lazy(() => import('../components/setup/CentralActivationGate').then(m => ({ default: m.CentralActivationGate })));
 import { ForcePasswordChangeModal } from '../components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from '../contexts/ThemeProvider';
 import { ToastProvider } from '../components/ui/Toast';
@@ -46,6 +47,11 @@ export const App: React.FC = () => {
   const [activationComplete, setActivationComplete] = useState(
     BYPASS_FIRST_RUN_ACTIVATION
   );
+  // activationChecked stays false until the stored credential read settles, so
+  // the gate never flashes for an already-activated device.
+  const [activationChecked, setActivationChecked] = useState(
+    BYPASS_FIRST_RUN_ACTIVATION
+  );
   const [licenseBlocked, setLicenseBlocked] = useState(false);
   const centralActive = activationComplete && !BYPASS_FIRST_RUN_ACTIVATION;
   // تم تعطيل فحص الترخيص ليظهر التطبيق دائماً بدون ع interruption (ملفات الكود محفوظة)
@@ -61,10 +67,13 @@ export const App: React.FC = () => {
     let active = true;
     const totalSteps = 6;
     void CentralLicenseService.hasCompletedFirstRunActivation().then((complete) => {
-      if (active) setActivationComplete(complete);
+      if (active) {
+        setActivationComplete(complete);
+        setActivationChecked(true);
+      }
     }).catch((error: unknown) => {
       logger.error('Could not read the central activation state:', error instanceof Error ? error : new Error(String(error)));
-      if (active) setActivationComplete(false);
+      if (active) setActivationChecked(true);
     });
     return () => { active = false; };
   }, []);
@@ -370,6 +379,44 @@ export const App: React.FC = () => {
         <UpdateNotification />
       </main>
     );
+  }
+
+  // Central activation gate: commercial builds require the device to be
+  // activated on the platform before login and before the setup wizard. It
+  // covers the fresh install (pre-login) and any stale session on a device
+  // that lost its credential. Platform staff roles are exempt — they manage
+  // the platform itself and use their own auth flow.
+  if (!BYPASS_FIRST_RUN_ACTIVATION) {
+    if (!activationChecked) {
+      return (
+        <main className="min-h-screen bg-surface-sunken text-ink">
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="flex items-center gap-3 text-sm font-bold text-muted">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+              جارٍ التحقق من تفعيل الجهاز...
+            </div>
+          </div>
+          <UpdateNotification />
+        </main>
+      );
+    }
+    const platformStaffRoles = [
+      'SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUPPORT_AGENT', 'OPERATIONS_ENGINEER', 'BILLING_SPECIALIST', 'LICENSE_MANAGER',
+    ];
+    const staffExempt = Boolean(currentUser) && platformStaffRoles.includes(String(currentUser!.role));
+    // Pre-auth platform flows (owner bootstrap, staff invite) manage the
+    // platform itself and must not be blocked by the device gate.
+    const platformFlow = ownerSetupRequested || Boolean(staffInviteToken);
+    if (!activationComplete && !staffExempt && !platformFlow) {
+      return (
+        <>
+          <React.Suspense fallback={null}>
+            <CentralActivationGate onComplete={() => setActivationComplete(true)} />
+          </React.Suspense>
+          <UpdateNotification />
+        </>
+      );
+    }
   }
 
   // Pre-auth platform staff invitation: /#/accept-staff-invite/<token>

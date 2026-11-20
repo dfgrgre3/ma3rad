@@ -36,6 +36,12 @@ export const PlatformTenantsPage: React.FC = () => {
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
   const [search, setSearch] = React.useState('');
+  // Raw input is debounced ~300ms before it hits `search` (and therefore the API).
+  const [searchInput, setSearchInput] = React.useState('');
+  React.useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [status, setStatus] = React.useState('');
   const [planId, setPlanId] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -65,17 +71,28 @@ export const PlatformTenantsPage: React.FC = () => {
   const centralState = React.useMemo(() => getCentralDataSourceState(), []);
   const centralActive = centralState.active;
 
+  const loadSeqRef = React.useRef(0);
   const load = React.useCallback(() => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     const finish = (err?: unknown) => {
+      if (seq !== loadSeqRef.current) return; // a newer load superseded this one
       if (err) setError(err instanceof Error ? err.message : 'تعذر تحميل العملاء.');
       else setError(null);
       setPage(1);
       setLoading(false);
     };
-    if (centralActive) {
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      finish(new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.'));
+      return;
+    }
+    if (central.active) {
       Promise.all([centralPlatformClient.listTenants(search, status, planId), centralPlatformClient.listPlans()])
-        .then(([nextTenants, nextPlans]) => { setTenants(nextTenants); setPlans(nextPlans); finish(); })
+        .then(([nextTenants, nextPlans]) => {
+          if (seq !== loadSeqRef.current) return;
+          setTenants(nextTenants); setPlans(nextPlans); finish();
+        })
         .catch(finish);
       return;
     }
@@ -108,8 +125,59 @@ export const PlatformTenantsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, canManageTenants, plans]);
 
+  // ─── Advanced (client-side) filters ────────────────────────────────────────
+  // The tenant list is fully loaded client-side, so these filters are applied
+  // locally on top of the server-side search/status/plan filters.
+
+  const tenantHealthScore = React.useCallback((tenant: PlatformTenant): number => {
+    const checks = [
+      tenant.status === 'ACTIVE' || tenant.status === 'TRIAL',
+      (tenant.outstanding ?? 0) <= 0,
+      !tenant.subscriptionExpiresAt || new Date(tenant.subscriptionExpiresAt).getTime() > Date.now(),
+      (tenant.devicesUsed ?? 0) <= tenant.devicesLimit,
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, []);
+
+  const visibleTenants = React.useMemo(() => tenants.filter((tenant) => {
+    if (dateRange.from || dateRange.to) {
+      const created = tenant.createdAt ? new Date(tenant.createdAt) : null;
+      const createdTime = created ? created.getTime() : NaN;
+      if (!Number.isFinite(createdTime)) return false;
+      if (dateRange.from && createdTime < new Date(`${dateRange.from}T00:00:00`).getTime()) return false;
+      if (dateRange.to && createdTime > new Date(`${dateRange.to}T23:59:59.999`).getTime()) return false;
+    }
+    const outstanding = tenant.outstanding ?? 0;
+    const minOutstanding = outstandingRange.min === '' ? null : Number(outstandingRange.min);
+    const maxOutstanding = outstandingRange.max === '' ? null : Number(outstandingRange.max);
+    if (minOutstanding !== null && Number.isFinite(minOutstanding) && outstanding < minOutstanding) return false;
+    if (maxOutstanding !== null && Number.isFinite(maxOutstanding) && outstanding > maxOutstanding) return false;
+    if (deviceUtilizationFilter) {
+      const pct = tenant.devicesLimit > 0 ? ((tenant.devicesUsed ?? 0) / tenant.devicesLimit) * 100 : 0;
+      switch (deviceUtilizationFilter) {
+        case 'unused': if (pct !== 0) return false; break;
+        case 'low': if (!(pct > 0 && pct < 50)) return false; break;
+        case 'medium': if (!(pct >= 50 && pct <= 80)) return false; break;
+        case 'high': if (!(pct > 80 && pct < 100)) return false; break;
+        case 'full': if (pct !== 100) return false; break;
+        default: break;
+      }
+    }
+    if (healthScoreFilter) {
+      const score = tenantHealthScore(tenant);
+      switch (healthScoreFilter) {
+        case 'excellent': if (score < 90) return false; break;
+        case 'good': if (score < 70 || score >= 90) return false; break;
+        case 'fair': if (score < 50 || score >= 70) return false; break;
+        case 'poor': if (score >= 50) return false; break;
+        default: break;
+      }
+    }
+    return true;
+  }), [tenants, dateRange, outstandingRange, deviceUtilizationFilter, healthScoreFilter, tenantHealthScore]);
+
   const detail = useTenantDetail({ plans, centralActive, canManageTenants, load });
-  const bulk = useTenantBulk({ tenants, centralActive, detailId: detail.detailId, loadProfile: detail.loadProfile, load });
+  const bulk = useTenantBulk({ tenants: visibleTenants, centralActive, detailId: detail.detailId, loadProfile: detail.loadProfile, load });
   const csv = useCsvImport({ plans, centralActive, load });
   const remote = useRemoteControl({ detailId: detail.detailId, tab: detail.tab, centralActive, run: detail.run });
 
@@ -167,6 +235,11 @@ export const PlatformTenantsPage: React.FC = () => {
   };
 
   const save = () => {
+    if (saving) return; // prevent double-submit while a save is in flight
+    if (!form.name?.trim()) {
+      toast.error('اسم الشركة مطلوب');
+      return;
+    }
     setSaving(true);
     const fail = (err: unknown) => {
       toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
@@ -240,7 +313,7 @@ export const PlatformTenantsPage: React.FC = () => {
   const loadFilterPreset = (name: string) => {
     const preset = filterPresets[name];
     if (!preset) return;
-    setSearch(preset.search);
+    setSearchInput(preset.search ?? '');
     setStatus(preset.status);
     setPlanId(preset.planId);
     setDateRange(preset.dateRange);
@@ -261,7 +334,7 @@ export const PlatformTenantsPage: React.FC = () => {
   const exportRows = () => {
     downloadCsv('platform-customers.csv', [
       ['رقم العميل', 'Tenant ID', 'الشركة', 'النشاط', 'المسؤول', 'الهاتف', 'البريد', 'الدولة', 'المدينة', 'العنوان', 'تاريخ التسجيل', 'الباقة', 'الحالة', 'بداية الاشتراك', 'نهاية الاشتراك', 'الأجهزة المسموحة', 'الأجهزة المستخدمة', 'الفروع'],
-      ...tenants.map((tenant) => [
+      ...visibleTenants.map((tenant) => [
         tenant.code,
         tenant.id,
         tenant.name,
@@ -309,14 +382,14 @@ export const PlatformTenantsPage: React.FC = () => {
       <TenantStatsSection tenants={tenants} activeStatus={status} onSelectStatus={setStatus} />
 
       <TenantListSection
-        search={search}
-        setSearch={setSearch}
+        search={searchInput}
+        setSearch={setSearchInput}
         status={status}
         setStatus={setStatus}
         planId={planId}
         setPlanId={setPlanId}
         plans={plans}
-        tenants={tenants}
+        tenants={visibleTenants}
         page={page}
         setPage={setPage}
         error={error}
@@ -330,7 +403,6 @@ export const PlatformTenantsPage: React.FC = () => {
         openEdit={openEdit}
         setBulkActionType={bulk.setBulkActionType}
         setBulkActionOpen={bulk.setBulkActionOpen}
-        executeBulkAction={bulk.executeBulkAction}
         showAdvancedFilters={showAdvancedFilters}
         setShowAdvancedFilters={setShowAdvancedFilters}
         dateRange={dateRange}
@@ -344,6 +416,7 @@ export const PlatformTenantsPage: React.FC = () => {
         filterPresets={filterPresets}
         loadFilterPreset={loadFilterPreset}
         saveFilterPreset={saveFilterPreset}
+        deleteFilterPreset={deleteFilterPreset}
       />
 
       <TenantFormModal

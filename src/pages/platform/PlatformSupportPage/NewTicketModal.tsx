@@ -77,7 +77,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
           <label className="block text-xs font-semibold text-muted mb-1">الأولوية</label>
           <select
             value={priority}
-            onChange={(e) => setPriority(e.target.value as any)}
+            onChange={(e) => setPriority(e.target.value as PlatformSupportTicket['priority'])}
             className={inputClass}
           >
             <option value="LOW">منخفضة (SLA: 48h)</option>

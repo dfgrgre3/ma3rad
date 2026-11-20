@@ -23,6 +23,7 @@ import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice'
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource'; 
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
+import { listTenantPageGroups } from '../../config/tenantPageCatalog';
 import type {
   PlatformTenant,
   PlatformUiProfile,
@@ -37,23 +38,11 @@ import { EmptyState, formatDateTime, inputClass } from './components/PlatformUI'
 import { useToast } from '../../components/ui/Toast';
 type CustomizationTab = 'pages' | 'actions' | 'fields' | 'profiles' | 'history';
 
-// Common pages catalogue
-const SYSTEM_PAGES = [
-  { path: '/sales', label: 'المبيعات والفواتير', category: 'العمليات الأساسية' },
-  { path: '/pos-fast-checkout', label: 'نقطة البيع السريعة (POS)', category: 'العمليات الأساسية' },
-  { path: '/customers', label: 'العملاء والمديونيات', category: 'العمليات الأساسية' },
-  { path: '/inventory', label: 'المخزون والمستودعات', category: 'المخزون' },
-  { path: '/purchases', label: 'المشتريات والموردين', category: 'المشتريات' },
-  { path: '/finance', label: 'المالية والحسابات العامة', category: 'المالية' },
-  { path: '/installments', label: 'إدارة الأقساط والتمويل', category: 'المالية' },
-  { path: '/manufacturing', label: 'التصنيع وخطوط الإنتاج', category: 'التصنيع والمشاريع' },
-  { path: '/projects', label: 'المشاريع والمقاولات', category: 'التصنيع والمشاريع' },
-  { path: '/hr', label: 'الموارد البشرية والرواتب', category: 'الموارد البشرية' },
-  { path: '/restaurant-tables', label: 'إدارة الصالة والطاولات', category: 'المطاعم والضيافة' },
-  { path: '/kitchen-display', label: 'شاشة المطبخ (KDS)', category: 'المطاعم والضيافة' },
-  { path: '/warranty-claims', label: 'الضمانات وطلبات الصيانة', category: 'الخدمات والصيانة' },
-  { path: '/reports', label: 'مركز التقارير والتحليلات', category: 'التقارير' },
-];
+// Tenant pages catalogue — derived from the real route/registry config
+// (config/tenantPageCatalog) so it never drifts from the actual app routes.
+const SYSTEM_PAGES = listTenantPageGroups().flatMap((group) =>
+  group.pages.map((p) => ({ path: p.path, label: p.label, category: group.label }))
+);
 
 // Common action buttons catalogue
 const SYSTEM_ACTIONS = [
@@ -98,6 +87,12 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [versions, setVersions] = useState<PlatformTenantUiVersion[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const savedTimerRef = React.useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+  }, []);
 
   // Load Tenants & Profiles
   const loadBootstrap = useCallback(async () => {
@@ -112,8 +107,9 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         setSelectedTenantId(tList[0].id);
       }
       setProfiles(pList);
+      setLoadError(null);
     } catch (e) {
-      console.error('Failed to load bootstrap data:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل بيانات التخصيص.');
     }
   }, [selectedTenantId]);
 
@@ -123,26 +119,28 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
     setLoading(true);
     const centralState = getCentralDataSourceState();
     try {
-      let data: any;
-      let vList: any[] = [];
+      let data: PlatformTenantUiCustomization | Record<string, unknown> | null = null;
+      let vList: PlatformTenantUiVersion[] = [];
 
       if (centralState.active) {
-        data = await centralPlatformClient.getTenantUiCustomization(tenantId);
-        vList = await centralPlatformClient.listTenantUiVersions(tenantId);
+        data = (await centralPlatformClient.getTenantUiCustomization(tenantId)) as PlatformTenantUiCustomization | null;
+        vList = (await centralPlatformClient.listTenantUiVersions(tenantId)) as PlatformTenantUiVersion[];
       } else {
         data = platformAdminService.getTenantUiCustomization(tenantId);
         vList = platformAdminService.listTenantUiVersions(tenantId);
       }
 
-      setHiddenPages(data.hiddenPages || []);
-      setHiddenActions(data.hiddenActions || []);
-      setCustomLabels(data.customLabels || {});
-      setFormFieldRules(data.formFieldRules || {});
-      setSelectedProfileId(data.profileId || '');
-      setCurrentVersion(data.version);
+      const row = (data ?? {}) as Record<string, unknown>;
+      setHiddenPages((row.hiddenPages as string[] | undefined) ?? []);
+      setHiddenActions((row.hiddenActions as string[] | undefined) ?? []);
+      setCustomLabels((row.customLabels as Record<string, string> | undefined) ?? {});
+      setFormFieldRules((row.formFieldRules as Record<string, FormFieldRule> | undefined) ?? {});
+      setSelectedProfileId(String(row.profileId ?? ''));
+      setCurrentVersion(Number(row.version ?? 1) || 1);
       setVersions(vList);
+      setLoadError(null);
     } catch (e) {
-      console.error('Failed to load tenant UI config:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل تخصيصات واجهة العميل.');
     } finally {
       setLoading(false);
     }
@@ -209,9 +207,9 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         formFieldRules,
       };
 
-      let updated: any;
+      let updated: { version?: number };
       if (centralState.active) {
-        updated = await centralPlatformClient.saveTenantUiCustomization(selectedTenantId, uiInput);
+        updated = (await centralPlatformClient.saveTenantUiCustomization(selectedTenantId, uiInput)) as { version?: number };
       } else {
         const tenantObj = tenants.find((t) => t.id === selectedTenantId);
         updated = platformAdminService.saveTenantUiCustomization({
@@ -221,9 +219,10 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         });
       }
 
-      setCurrentVersion(updated.version);
+      setCurrentVersion(updated.version || currentVersion + 1);
       setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = window.setTimeout(() => setSavedSuccess(false), 3000);
       loadTenantUi(selectedTenantId);
     } catch (err) {
       toast.error((err as Error).message);
@@ -260,6 +259,11 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
+          {loadError}
+        </div>
+      )}
       {/* Page Header */}
       <PageHeader
         title="تخصيص الواجهة وقوالب النشاط (UI Customization)"
@@ -399,7 +403,16 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
               return (
                 <div
                   key={page.path}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isHidden}
                   onClick={() => handleTogglePage(page.path)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleTogglePage(page.path);
+                    }
+                  }}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
                     isHidden
                       ? 'bg-primary/40 border-line-strong/60 opacity-60'
@@ -452,7 +465,16 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
               return (
                 <div
                   key={action.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isHidden}
                   onClick={() => handleToggleAction(action.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleToggleAction(action.id);
+                    }
+                  }}
                   className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start justify-between ${
                     isHidden
                       ? 'bg-primary/40 border-line-strong/60 opacity-60'
@@ -495,16 +517,16 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
             <DataTable
             ariaLabel="حقول النماذج القابلة للتخصيص"
             rows={SYSTEM_FIELDS}
-            rowKey={(field: any) => String(field.id)}
+            rowKey={(field) => String(field.id)}
             tableClassName="text-sm"
             rowClassName={() => 'transition-colors hover:bg-primary/20'}
             columns={[
-              { key: 'label', header: 'اسم الحقل', render: (field: any) => <span className="font-medium text-muted">{field.label}</span> },
-              { key: 'module', header: 'القسم / النموذج', render: (field: any) => <span className="text-xs text-muted">{field.module}</span> },
+              { key: 'label', header: 'اسم الحقل', render: (field) => <span className="font-medium text-muted">{field.label}</span> },
+              { key: 'module', header: 'القسم / النموذج', render: (field) => <span className="text-xs text-muted">{field.module}</span> },
               {
                 key: 'visible', header: 'حالة الظهور',
-                render: (field: any) => {
-                  const rule = formFieldRules[field.id as keyof typeof formFieldRules] ?? { visible: true };
+                render: (field) => {
+                  const rule = formFieldRules[field.id] ?? { visible: true };
                   return rule.visible ? (
                     <span className="rounded border border-success/20 bg-success/10 px-2.5 py-0.5 text-xs text-success">مُفعل وظاهر</span>
                   ) : (
@@ -514,8 +536,8 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
               },
               {
                 key: 'action', header: 'إجراء',
-                render: (field: any) => {
-                  const rule = formFieldRules[field.id as keyof typeof formFieldRules] ?? { visible: true };
+                render: (field) => {
+                  const rule = formFieldRules[field.id] ?? { visible: true };
                   return canManageCustomization ? (
                     <Button
                       variant={rule.visible ? 'danger' : 'success'}

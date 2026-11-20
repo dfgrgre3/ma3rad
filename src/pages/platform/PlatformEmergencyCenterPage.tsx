@@ -4,13 +4,10 @@ import {
   Ban,
   ShieldAlert,
   Power,
-  RotateCcw,
-  CheckCircle2,
   AlertTriangle,
   Lock,
   KeyRound,
   Building2,
-  Server,
   Boxes,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
@@ -38,6 +35,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<PlatformApiKey[]>([]);
   const [releases, setReleases] = useState<PlatformRelease[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Confirm Modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -68,9 +66,9 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           centralPlatformClient.listApiKeys(),
           centralPlatformClient.listReleases(),
         ]);
-        setTenants(t as any);
-        setApiKeys(k as any);
-        setReleases(r as any);
+        setTenants(t);
+        setApiKeys(k as PlatformApiKey[]);
+        setReleases(r as PlatformRelease[]);
       } else {
         const t = platformAdminService.listTenants();
         const k = platformAdminService.listApiKeys();
@@ -79,6 +77,9 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
         setApiKeys(k);
         setReleases(r);
       }
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'تعذر تحميل بيانات مركز الطوارئ.');
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
     title: string,
     description: string,
     keyword: string,
-    action: () => void
+    action: () => void | Promise<void>
   ) => {
     if (!canManageEmergency) {
       toast.warning('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
@@ -105,25 +106,33 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       confirmationKeyword: keyword,
       inputVal: '',
       onExecute: () => {
-        try {
-          action();
-          setConfirmModal((prev) => ({ ...prev, open: false }));
-          loadData();
-          toast.success('تم تنفيذ الإجراء الطارئ بنجاح.');
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'فشل تنفيذ الإجراء الطارئ.');
-        }
+        void (async () => {
+          try {
+            await action();
+            setConfirmModal((prev) => ({ ...prev, open: false }));
+            await loadData();
+            toast.success('تم تنفيذ الإجراء الطارئ بنجاح.');
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'فشل تنفيذ الإجراء الطارئ.');
+          }
+        })();
       },
     });
   };
 
-  // Actions
+  // Actions — routed to the same data source that feeds this page.
   const handleEmergencySuspendTenant = (t: PlatformTenant) => {
     requestAction(
       `إيقاف طارئ للعميل: ${t.name}`,
       `سيتم فوراً قطع الاتصال، تجميد الحسابات، وإلغاء ترخيص المستأجر لحين التحقيق في الانتهاك أو الحادث الأمني.`,
       'SUSPEND-TENANT',
-      () => platformAdminService.setTenantStatus(t.id, 'SUSPENDED')
+      async () => {
+        if (getCentralDataSourceState().active) {
+          await centralPlatformClient.setTenantStatus(t.id, 'SUSPENDED');
+        } else {
+          platformAdminService.setTenantStatus(t.id, 'SUSPENDED');
+        }
+      }
     );
   };
 
@@ -132,7 +141,13 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       `إلغاء فوري لمفتاح API: ${k.name}`,
       `سيتم إبطال المفتاح (${k.keyPrefix}...) فوراً وقطع أي خدمات خارجية متصلة به.`,
       'REVOKE-KEY',
-      () => platformAdminService.revokeApiKey(k.id)
+      async () => {
+        if (getCentralDataSourceState().active) {
+          await centralPlatformClient.revokeApiKey(k.id);
+        } else {
+          platformAdminService.revokeApiKey(k.id);
+        }
+      }
     );
   };
 
@@ -141,7 +156,17 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       'إنهاء فوري لجميع جلسات موظفي المنصة (Global Killswitch)',
       'سيتم تسجيل خروج قسري لكافة موظفي الدعم والعمليات والمديرين في المنصة فوراً.',
       'KILL-ALL-SESSIONS',
-      () => platformAdminService.revokeAllOtherStaffSessions()
+      async () => {
+        if (getCentralDataSourceState().active) {
+          // No bulk endpoint server-side — revoke every active staff session.
+          const sessions = await centralPlatformClient.listStaffSessions();
+          await Promise.all(
+            sessions.map((s) => centralPlatformClient.revokeStaffSession(String((s as { id?: unknown }).id)))
+          );
+        } else {
+          platformAdminService.revokeAllOtherStaffSessions();
+        }
+      }
     );
   };
 
@@ -150,7 +175,45 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       `حظر وإيقاف الإصدار: ${rel.version}`,
       `سيتم إيقاف تداول الإصدار وتوجيه العملاء للتراجع للإصدار الآمن.`,
       'KILL-RELEASE',
-      () => platformAdminService.disableRelease(rel.id)
+      async () => {
+        if (getCentralDataSourceState().active) {
+          // Central has no "disable" — rollback is the equivalent kill switch
+          // for a published release (PUBLISHED → ROLLED_BACK).
+          await centralPlatformClient.rollbackRelease(rel.id);
+        } else {
+          platformAdminService.disableRelease(rel.id);
+        }
+      }
+    );
+  };
+
+  const handleEmergencyMaintenance = () => {
+    requestAction(
+      'تفعيل بروتوكول الصيانة الطارئة',
+      'سيتم إرسال إشعار صيانة طارئة رسمية لجميع العملاء وإدخال المنصة في وضع الاستجابة للحوادث.',
+      'MAINTENANCE-ALERT',
+      async () => {
+        if (getCentralDataSourceState().active) {
+          // Real broadcast via the central notifications endpoint.
+          await centralPlatformClient.sendNotification({
+            audience: 'ALL',
+            channel: 'IN_APP',
+            subject: 'صيانة طارئة — إشعار أمني',
+            message:
+              'تم تفعيل بروتوكول الصيانة الطارئة من مركز إجراءات الطوارئ في المنصة. قد تطرأ انقطاعات أو قيود مؤقتة على الخدمات. سنوافيكم بالتحديثات.',
+          });
+        } else {
+          const now = new Date();
+          const ends = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+          platformAdminService.createMaintenanceWindow({
+            title: 'صيانة طارئة — بروتوكول الطوارئ',
+            description: 'تم إنشاء هذه النافذة تلقائياً من مركز إجراءات الطوارئ. يمكن تعديلها أو إلغاؤها من صفحة الصيانة.',
+            startsAt: now.toISOString(),
+            endsAt: ends.toISOString(),
+            affectedServices: ['جميع الخدمات'],
+          });
+        }
+      }
     );
   };
 
@@ -171,6 +234,18 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           الإجراءات في هذه الصفحة تؤدي إلى إيقاف فوري للخدمات أو التراخيص أو الجلسات. جميع الإجراءات تتطلب إدخال كلمة تأكيد دقيقة وتوثق في سجل التدقيق الأمني بأعلى مستوى خطورة (CRITICAL).
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="p-3 bg-danger/10 border border-danger/30 rounded-xl flex items-center justify-between gap-3 text-xs font-bold text-danger">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {loadError}
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => void loadData()}>
+            إعادة المحاولة
+          </Button>
+        </div>
+      )}
 
       {/* Global Actions Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -204,13 +279,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => {
-              if (!canManageEmergency) {
-                toast.warning('لا تملك صلاحية تنفيذ إجراءات الطوارئ.');
-                return;
-              }
-              toast.success('تم إرسال إشعار الصيانة الطارئة وتحديث حالة السيرفرات.');
-            }}
+            onClick={handleEmergencyMaintenance}
             disabled={!canManageEmergency}
             leadingIcon={<AlertTriangle className="h-3.5 w-3.5" />}
           >
@@ -286,6 +355,47 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
                   )}
                 </div>
               ))
+          )}
+        </div>
+      </div>
+
+      {/* Emergency Releases Kill-switch */}
+      <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+        <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-danger" />
+          إيقاف الإصدارات الجارية (Releases Kill-switch)
+        </h3>
+        <p className="text-[11px] text-muted">
+          في الوضع المركزي يُنفَّذ الإيقاف عبر «التراجع» (Rollback) للإصدارات المنشورة فقط؛
+          الإصدارات المسودة لا يتم تداولها أصلاً.
+        </p>
+        <div className="max-h-48 overflow-y-auto divide-y divide-primary border border-line-strong rounded-lg bg-primary/40">
+          {releases.length === 0 ? (
+            <p className="p-4 text-center text-xs text-muted">لا توجد إصدارات مسجلة.</p>
+          ) : (
+            releases.map((rel) => {
+              const centralActive = getCentralDataSourceState().active;
+              const canKill = centralActive ? rel.status === 'PUBLISHED' : rel.status !== 'DEPRECATED';
+              return (
+                <div key={rel.id} className="flex items-center justify-between p-2.5 text-xs">
+                  <div>
+                    <span className="font-bold text-muted font-mono" dir="ltr">v{rel.version}</span>
+                    <span className="text-[10px] text-muted mr-2">{rel.channel}</span>
+                    <span className="text-[10px] text-muted mr-2">الحالة: {rel.status ?? '—'}</span>
+                  </div>
+                  {canManageEmergency && canKill ? (
+                    <button
+                      onClick={() => handleEmergencyDisableRelease(rel)}
+                      className="bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 px-2.5 py-1 rounded font-bold text-[11px]"
+                    >
+                      إيقاف طارئ للإصدار
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-muted">{canKill ? '' : 'غير قابل للإيقاف في هذه الحالة'}</span>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

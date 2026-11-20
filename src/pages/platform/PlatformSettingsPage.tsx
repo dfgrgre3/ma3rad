@@ -20,8 +20,9 @@ import { platformAdminService } from '../../services/domains/platform/PlatformAd
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { AuthService } from '../../services/domains/auth/AuthService';
-import { canPlatform } from '../../hooks/platform/usePlatformPermission';
+import { canPlatform, canPlatformPermission } from '../../hooks/platform/usePlatformPermission';
 import type { PlatformSettingsMap } from '../../services/domains/platform/platformTypes';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import type { User } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -33,6 +34,28 @@ interface PlatformSettingsPageProps {
 }
 
 type SettingsTab = 'identity' | 'legal' | 'communications' | 'payments' | 'network' | 'security' | 'backup' | 'password';
+
+/** Secrets are write-only: never round-trip stored values back to the server. */
+const SECRET_SETTING_KEYS = ['smtpPassword', 'smsApiKey', 'paymentApiKey'] as const;
+
+const toSettingsMap = (data: Record<string, string>): PlatformSettingsMap => {
+  const map: PlatformSettingsMap = { ...data };
+  for (const key of SECRET_SETTING_KEYS) {
+    map[key] = '';
+  }
+  return map;
+};
+
+const toStringRecord = (map: PlatformSettingsMap): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (value === undefined || value === null) continue;
+    // Write-only secrets: an empty value means "keep the stored secret".
+    if ((SECRET_SETTING_KEYS as readonly string[]).includes(key) && String(value).trim() === '') continue;
+    out[key] = String(value);
+  }
+  return out;
+};
 
 export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ currentUser }) => {
   const toast = useToast();
@@ -66,7 +89,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       const centralState = getCentralDataSourceState();
       if (centralState.active) {
         const data = await centralPlatformClient.getSettings();
-        setSettings(data as any);
+        setSettings(toSettingsMap(data || {}));
       } else {
         setSettings(platformAdminService.getSettings());
       }
@@ -82,7 +105,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
     load();
   }, [load]);
 
-  const saveSettings = () => {
+  const saveSettings = async () => {
     if (!settings) return;
     if (!canManageSettings) {
       toast.error('لا تملك صلاحية تعديل إعدادات المنصة');
@@ -90,11 +113,21 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
     }
     setSaving(true);
     try {
-      const updated = platformAdminService.updateSettings({
+      const payload = toStringRecord({
         ...settings,
         defaultTrialDays: String(Math.max(1, Number(settings.defaultTrialDays) || 14)),
       });
-      setSettings(updated);
+      if (getCentralDataSourceState().active) {
+        const res = await centralPlatformClient.updateSettings(payload);
+        setSettings(
+          res && typeof res === 'object' && !Array.isArray(res)
+            ? toSettingsMap(res as Record<string, string>)
+            : { ...settings, ...payload }
+        );
+      } else {
+        const updated = platformAdminService.updateSettings(payload);
+        setSettings(toSettingsMap(updated as Record<string, string>));
+      }
       toast.success('تم حفظ إعدادات المنصة بنجاح');
     } catch (err) {
       toast.error('تعذر حفظ الإعدادات', err instanceof Error ? err.message : undefined);
@@ -124,9 +157,17 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
     }
   };
 
+  // Encryption-key rotation requires the granular security permission that the
+  // local service enforces (platform.security.keys), not just settings access.
+  const canRotateKeys = canPlatformPermission('platform.security.keys');
+
   const handleRotateEncryptionKeys = () => {
-    if (!canManageSettings) {
-      toast.error('لا تملك صلاحية إدارة إعدادات الأمان');
+    if (!canRotateKeys || !canManageSettings) {
+      toast.error('لا تملك صلاحية إدارة مفاتيح التشفير');
+      return;
+    }
+    if (getCentralDataSourceState().active) {
+      toast.error('تدوير مفاتيح تشفير المنصة غير مدعوم في الوضع المركزي بعد — لا يوجد نقطة نهاية مطابقة في الخادم المركزي.');
       return;
     }
     if (!window.confirm('هل أنت متأكد من تدوير مفاتيح التشفير المركزية للمنصة؟ سيتم تسجيل الحدث كعملية أمنية عالية الخطورة.')) {
@@ -150,9 +191,21 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       setPasswordError('تأكيد كلمة المرور غير مطابق.');
       return;
     }
-    if (passwordForm.next.length < 8) {
-      setPasswordError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+    // Enforce the configured platform password policy, not a hardcoded minimum.
+    const minLength = Math.max(1, Number(settings?.passwordMinLength) || 8);
+    if (passwordForm.next.length < minLength) {
+      setPasswordError(`كلمة المرور الجديدة يجب أن تكون ${minLength} أحرف على الأقل.`);
       return;
+    }
+    if (settings?.passwordRequireComplex !== 'false') {
+      const strong = /[a-z]/.test(passwordForm.next)
+        && /[A-Z]/.test(passwordForm.next)
+        && /\d/.test(passwordForm.next)
+        && /[^a-zA-Z0-9]/.test(passwordForm.next);
+      if (!strong) {
+        setPasswordError('كلمة المرور يجب أن تحتوي على أحرف كبيرة وصغيرة وأرقام ورموز خاصة.');
+        return;
+      }
     }
     setChangingPassword(true);
     try {
@@ -171,13 +224,26 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
     }
   };
 
-  if (loading || !settings) {
+  if (loading) {
     return (
       <div className="py-24 text-center text-sm font-semibold text-muted">
         جارٍ تحميل إعدادات المنصة المركزية...
       </div>
     );
   }
+
+  if (!settings) {
+    return (
+      <div className="mx-auto max-w-md space-y-4 py-24 text-center">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
+          {error || 'تعذر تحميل إعدادات المنصة.'}
+        </div>
+        <Button variant="secondary" size="sm" onClick={load}>إعادة المحاولة</Button>
+      </div>
+    );
+  }
+
+  const centralActive = getCentralDataSourceState().active;
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode }> = [
     { id: 'identity', label: 'الهوية والعام', icon: <Settings className="h-4 w-4" /> },
@@ -392,7 +458,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               <Field label="نوع التشفير">
                 <select
                   value={settings.smtpEncryption || 'TLS'}
-                  onChange={(e) => setSettings({ ...settings, smtpEncryption: e.target.value as any })}
+                  onChange={(e) => setSettings({ ...settings, smtpEncryption: e.target.value })}
                   className={inputClass}
                 >
                   <option value="TLS">STARTTLS (587)</option>
@@ -477,7 +543,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               <Field label="بوابة الدفع النشطة">
                 <select
                   value={settings.paymentGateway || 'MANUAL'}
-                  onChange={(e) => setSettings({ ...settings, paymentGateway: e.target.value as any })}
+                  onChange={(e) => setSettings({ ...settings, paymentGateway: e.target.value })}
                   className={inputClass}
                 >
                   <option value="PAYMOB">Paymob (بطاقات ومحافظ)</option>
@@ -490,7 +556,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               <Field label="بيئة التشغيل (Payment Mode)">
                 <select
                   value={settings.paymentMode || 'TEST'}
-                  onChange={(e) => setSettings({ ...settings, paymentMode: e.target.value as any })}
+                  onChange={(e) => setSettings({ ...settings, paymentMode: e.target.value })}
                   className={inputClass}
                 >
                   <option value="TEST">بيئة تجريبية (Sandbox / Test)</option>
@@ -711,11 +777,20 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   size="sm"
                   leadingIcon={<RotateCw className={`h-3.5 w-3.5 ${rotatingKey ? 'animate-spin' : ''}`} />}
                   onClick={handleRotateEncryptionKeys}
-                  disabled={rotatingKey || !canManageSettings}
+                  disabled={rotatingKey || !canManageSettings || !canRotateKeys || centralActive}
                 >
                   تدوير المفاتيح الآن
                 </Button>
               </div>
+
+              {centralActive && (
+                <CentralUnsupportedNotice feature="تدوير مفاتيح تشفير المنصة" />
+              )}
+              {!canRotateKeys && !centralActive && (
+                <p className="text-[11px] font-semibold text-warning">
+                  تتطلب هذه العملية صلاحية «تدوير مفاتيح التشفير» (platform.security.keys).
+                </p>
+              )}
 
               <div className="grid grid-cols-2 text-xs pt-2 border-t border-accent-border text-ink-secondary">
                 <div>
@@ -724,7 +799,9 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 <div>
                   تاريخ آخر تدوير:{' '}
                   <strong className="text-ink font-mono">
-                    {formatDateTime(String(settings.lastEncryptionRotation || '2026-01-01'))}
+                    {settings.lastEncryptionRotation
+                      ? formatDateTime(String(settings.lastEncryptionRotation))
+                      : '—'}
                   </strong>
                 </div>
               </div>
@@ -743,7 +820,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               <Field label="دورية النسخ الاحتياطي التلقائي">
                 <select
                   value={settings.backupFrequency || 'DAILY'}
-                  onChange={(e) => setSettings({ ...settings, backupFrequency: e.target.value as any })}
+                  onChange={(e) => setSettings({ ...settings, backupFrequency: e.target.value })}
                   className={inputClass}
                 >
                   <option value="DAILY">يومياً (منتصف الليل)</option>
@@ -762,7 +839,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               <Field label="وجهة التخزين الآمن">
                 <select
                   value={settings.backupStorageTarget || 'CLOUD_ENCRYPTED'}
-                  onChange={(e) => setSettings({ ...settings, backupStorageTarget: e.target.value as any })}
+                  onChange={(e) => setSettings({ ...settings, backupStorageTarget: e.target.value })}
                   className={inputClass}
                 >
                   <option value="CLOUD_ENCRYPTED">سحابة مشفرة بتوقيع AES-256</option>

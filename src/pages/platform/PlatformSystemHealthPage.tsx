@@ -3,39 +3,54 @@ import { DataTable } from '../../components/ui/DataTable';
 import {
   Activity,
   Server,
-  Database,
   Cpu,
   HardDrive,
   Clock,
   ShieldCheck,
-  ShieldAlert,
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
   XCircle,
   Archive,
-  Download,
   Terminal,
   Zap,
-  Globe,
-  Radio,
   Check,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
-import type {
-  PlatformComprehensiveHealth,
-  PlatformCentralBackup,
-  PlatformServiceIncident,
-} from '../../services/domains/platform/platformTypes';
+import type { PlatformComprehensiveHealth } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { EmptyState, formatDateTime, formatNumber } from './components/PlatformUI';
+import { EmptyState, formatDateTime } from './components/PlatformUI';
 
 import { useToast } from '../../components/ui/Toast';
 type HealthViewMode = 'cloud_server' | 'local_client';
+
+interface CentralBackupRow {
+  id: string;
+  name: string | null;
+  type: string;
+  status: string;
+  createdAt: string;
+}
+
+interface CentralOpsJobRow {
+  id: string;
+  type: string;
+  status: string;
+  createdAt: string;
+}
+
+interface CentralErrorReportRow {
+  id: string;
+  title: string;
+  severity: string;
+  occurrences: number;
+  lastSeenAt: string;
+  tenantName: string | null;
+}
 
 export const PlatformSystemHealthPage: React.FC = () => {
   const toast = useToast();
@@ -44,13 +59,15 @@ export const PlatformSystemHealthPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<HealthViewMode>('cloud_server');
   const [health, setHealth] = useState<PlatformComprehensiveHealth | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [triggeringBackup, setTriggeringBackup] = useState<boolean>(false);
   const [backupSuccess, setBackupSuccess] = useState<boolean>(false);
+  const backupSuccessTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Central-mode state
-  const [centralBackups, setCentralBackups] = useState<any[]>([]);
-  const [centralJobs, setCentralJobs] = useState<any[]>([]);
-  const [centralErrors, setCentralErrors] = useState<any[]>([]);
+  const [centralBackups, setCentralBackups] = useState<CentralBackupRow[]>([]);
+  const [centralJobs, setCentralJobs] = useState<CentralOpsJobRow[]>([]);
+  const [centralErrors, setCentralErrors] = useState<CentralErrorReportRow[]>([]);
 
   const loadCentral = useCallback(() => {
     setLoading(true);
@@ -60,11 +77,12 @@ export const PlatformSystemHealthPage: React.FC = () => {
       centralPlatformClient.listErrorReports({ status: 'OPEN' }),
     ])
       .then(([backups, jobs, errors]) => {
-        setCentralBackups(backups);
-        setCentralJobs(jobs);
-        setCentralErrors(errors);
+        setCentralBackups(backups as CentralBackupRow[]);
+        setCentralJobs(jobs as CentralOpsJobRow[]);
+        setCentralErrors(errors as CentralErrorReportRow[]);
+        setError(null);
       })
-      .catch((e) => console.error('Failed to load central health data:', e))
+      .catch((e) => setError(e instanceof Error ? e.message : 'تعذر تحميل بيانات صحة النظام من الخادم المركزي.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -74,8 +92,9 @@ export const PlatformSystemHealthPage: React.FC = () => {
     try {
       const data = platformAdminService.getPlatformComprehensiveHealth();
       setHealth(data);
+      setError(null);
     } catch (e) {
-      console.error('Failed to load platform health:', e);
+      setError(e instanceof Error ? e.message : 'تعذر تحميل بيانات صحة النظام.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +107,8 @@ export const PlatformSystemHealthPage: React.FC = () => {
     try {
       await centralPlatformClient.createBackup({ triggerSource: 'MANUAL', type: 'FULL' });
       setBackupSuccess(true);
-      setTimeout(() => setBackupSuccess(false), 3000);
+      if (backupSuccessTimer.current) clearTimeout(backupSuccessTimer.current);
+      backupSuccessTimer.current = setTimeout(() => setBackupSuccess(false), 3000);
       loadCentral();
     } catch (e) {
       toast.error((e as Error).message);
@@ -101,7 +121,10 @@ export const PlatformSystemHealthPage: React.FC = () => {
     loadHealth();
     // Auto-refresh telemetry every 15 seconds
     const interval = setInterval(loadHealth, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (backupSuccessTimer.current) clearTimeout(backupSuccessTimer.current);
+    };
   }, [loadHealth]);
 
   const handleTriggerBackup = async () => {
@@ -112,7 +135,8 @@ export const PlatformSystemHealthPage: React.FC = () => {
     try {
       const created = await platformAdminService.triggerCentralBackup();
       setBackupSuccess(true);
-      setTimeout(() => setBackupSuccess(false), 3000);
+      if (backupSuccessTimer.current) clearTimeout(backupSuccessTimer.current);
+      backupSuccessTimer.current = setTimeout(() => setBackupSuccess(false), 3000);
       if (!created.integrityCheckPassed) {
         toast.success('تم إنشاء نسخة احتياطية محلية مشفرة، لكن لم يتم التحقق من نسخة خارج الموقع.');
       }
@@ -145,6 +169,19 @@ export const PlatformSystemHealthPage: React.FC = () => {
   const vitals = health?.serverVitals;
   const components = health?.components;
 
+  const errorBanner = error ? (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-xs font-bold text-danger">
+      <span className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        {error}
+      </span>
+      <Button variant="secondary" size="sm" onClick={loadHealth}>
+        <RefreshCw className="h-3.5 w-3.5 ml-1" />
+        إعادة المحاولة
+      </Button>
+    </div>
+  ) : null;
+
   if (centralActive) {
     const backupStatusLabel: Record<string, string> = {
       REQUESTED: 'مطلوبة', IN_PROGRESS: 'قيد التنفيذ', COMPLETED: 'مكتملة', FAILED: 'فاشلة', EXPIRED: 'منتهية',
@@ -174,6 +211,8 @@ export const PlatformSystemHealthPage: React.FC = () => {
             </div>
           }
         />
+
+        {errorBanner}
 
         {backupSuccess && (
           <div className="flex items-center gap-1.5 text-success font-semibold bg-success/40 px-3 py-1.5 rounded-lg border border-success/40 text-xs w-fit">
@@ -332,6 +371,8 @@ export const PlatformSystemHealthPage: React.FC = () => {
         }
       />
 
+      {errorBanner}
+
       {/* Scope Disclaimer / Toggle Bar */}
       <div className="bg-primary/60 p-3 rounded-xl border border-line-strong flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -382,15 +423,15 @@ export const PlatformSystemHealthPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <div className="bg-primary p-4 rounded-lg border border-line-strong/80">
               <span className="text-[11px] text-muted">محرك قاعدة البيانات المحلي</span>
-              <div className="text-sm font-bold text-muted mt-1">SQLite 3 (WASM / In-Memory & Storage)</div>
+              <div className="text-sm font-bold text-muted mt-1">SQLite (WASM / التخزين المحلي)</div>
             </div>
             <div className="bg-primary p-4 rounded-lg border border-line-strong/80">
               <span className="text-[11px] text-muted">سجل الترحيلات المطبقة محلياً</span>
-              <div className="text-sm font-bold text-success mt-1">235 ترحيل بنجاح</div>
+              <div className="text-sm font-bold text-muted mt-1">تُطبَّق تلقائياً عند بدء التشغيل</div>
             </div>
             <div className="bg-primary p-4 rounded-lg border border-line-strong/80">
               <span className="text-[11px] text-muted">مزامنة البيانات السحابية (Outbox)</span>
-              <div className="text-sm font-bold text-primary mt-1">متصلة وخالية من التعارض</div>
+              <div className="text-sm font-bold text-muted mt-1">تُوثَّق في سجل المزامنة المحلي</div>
             </div>
           </div>
         </div>
@@ -405,13 +446,36 @@ export const PlatformSystemHealthPage: React.FC = () => {
                   المؤشر الإجمالي لكفاءة خوادم المنصة
                 </span>
                 <div className="flex items-baseline gap-3 mt-1">
-                  <span className="text-5xl font-black text-white">{health?.overallScore}%</span>
-                  <span className="text-xs px-2.5 py-1 rounded bg-success/10 text-success border border-success/20 font-semibold">
-                    مستقر وطبيعي
+                  <span className="text-5xl font-black text-white">
+                    {health ? `${health.overallScore}%` : '—'}
+                  </span>
+                  <span className={`text-xs px-2.5 py-1 rounded border font-semibold ${
+                    !health
+                      ? 'bg-line-strong/20 text-muted border-line-strong/40'
+                      : health.overallScore >= 90
+                      ? 'bg-success/10 text-success border-success/20'
+                      : health.overallScore >= 70
+                      ? 'bg-warning/10 text-warning border-warning/20'
+                      : 'bg-danger/10 text-danger border-danger/20'
+                  }`}>
+                    {!health
+                      ? 'بيانات غير متاحة'
+                      : health.overallScore >= 90
+                      ? 'مستقر وطبيعي'
+                      : health.overallScore >= 70
+                      ? 'مستقر مع ملاحظات'
+                      : 'يحتاج انتباه'}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted">
-                  متوسط وقت تشغيل الخوادم بدون انقطاع: <strong className="text-muted">10 أيام متواصلة</strong>
+                  متوسط وقت تشغيل الخادم المقاس:{' '}
+                  <strong className="text-muted">
+                    {vitals?.uptimeSeconds != null
+                      ? vitals.uptimeSeconds >= 86400
+                        ? `${Math.floor(vitals.uptimeSeconds / 86400)} يوم`
+                        : `${Math.floor(vitals.uptimeSeconds / 3600)} ساعة`
+                      : '—'}
+                  </strong>
                 </p>
               </div>
 
@@ -419,19 +483,27 @@ export const PlatformSystemHealthPage: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-primary/80 p-3 rounded-xl border border-line-strong text-center">
                   <span className="text-[10px] text-muted block mb-1">قاعدة البيانات المركزية</span>
-                  <span className="text-xs font-bold text-success">متصلة وسريعة</span>
+                  <span className={`text-xs font-bold ${components?.database.status === 'HEALTHY' ? 'text-success' : components?.database.status === 'DEGRADED' ? 'text-warning' : components ? 'text-danger' : 'text-muted'}`}>
+                    {components?.database.status === 'HEALTHY' ? 'متصلة وسريعة' : components?.database.status === 'DEGRADED' ? 'متدهورة' : components?.database.status === 'DOWN' ? 'متعطلة' : '—'}
+                  </span>
                 </div>
                 <div className="bg-primary/80 p-3 rounded-xl border border-line-strong text-center">
                   <span className="text-[10px] text-muted block mb-1">الذاكرة المؤقتة (Redis)</span>
-                  <span className="text-xs font-bold text-success">متصلة (96.8%)</span>
+                  <span className={`text-xs font-bold ${components?.redisCache.status === 'CONNECTED' ? 'text-success' : components ? 'text-danger' : 'text-muted'}`}>
+                    {components?.redisCache.status === 'CONNECTED' ? `متصلة (${components.redisCache.hitRatioPercent}%)` : components?.redisCache.status === 'DISCONNECTED' ? 'منقطعة' : '—'}
+                  </span>
                 </div>
                 <div className="bg-primary/80 p-3 rounded-xl border border-line-strong text-center">
                   <span className="text-[10px] text-muted block mb-1">خدمة المزامنة السحابية</span>
-                  <span className="text-xs font-bold text-success">{components?.syncService.connectedDevices} جهاز نشط</span>
+                  <span className={`text-xs font-bold ${components?.syncService.status === 'HEALTHY' ? 'text-success' : components ? 'text-warning' : 'text-muted'}`}>
+                    {components?.syncService.status === 'HEALTHY' ? `${components.syncService.connectedDevices} جهاز نشط` : components?.syncService.status === 'WARNING' ? `${components.syncService.connectedDevices} جهاز · تحذير` : '—'}
+                  </span>
                 </div>
                 <div className="bg-primary/80 p-3 rounded-xl border border-line-strong text-center">
                   <span className="text-[10px] text-muted block mb-1">النسخ الاحتياطي المركزي</span>
-                  <span className="text-xs font-bold text-success">مُفحص ومطابق</span>
+                  <span className={`text-xs font-bold ${components?.backupSystem.status === 'VERIFIED' ? 'text-success' : components ? 'text-danger' : 'text-muted'}`}>
+                    {components?.backupSystem.status === 'VERIFIED' ? 'مُفحص ومطابق' : components?.backupSystem.status === 'FAILED' ? 'فشل الفحص' : '—'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -443,12 +515,12 @@ export const PlatformSystemHealthPage: React.FC = () => {
             <div className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-2">
               <div className="flex items-center justify-between text-xs text-muted">
                 <span className="flex items-center gap-1.5"><Cpu className="w-4 h-4 text-success" /> استهلاك المعالج (CPU)</span>
-                <span className="font-bold text-muted">{vitals?.cpuPercent}%</span>
+                <span className="font-bold text-muted">{vitals ? `${vitals.cpuPercent}%` : '—'}</span>
               </div>
               <div className="w-full bg-primary rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-success h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${vitals?.cpuPercent}%` }}
+                  style={{ width: `${vitals?.cpuPercent ?? 0}%` }}
                 />
               </div>
               <span className="text-[10px] text-muted block">ضمن المعدل الآمن (&lt; 65%)</span>
@@ -458,27 +530,29 @@ export const PlatformSystemHealthPage: React.FC = () => {
             <div className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-2">
               <div className="flex items-center justify-between text-xs text-muted">
                 <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-primary" /> استهلاك الذاكرة (RAM)</span>
-                <span className="font-bold text-muted">{vitals?.memoryPercent}%</span>
+                <span className="font-bold text-muted">{vitals ? `${vitals.memoryPercent}%` : '—'}</span>
               </div>
               <div className="w-full bg-primary rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-primary h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${vitals?.memoryPercent}%` }}
+                  style={{ width: `${vitals?.memoryPercent ?? 0}%` }}
                 />
               </div>
-              <span className="text-[10px] text-muted block">المتاح: 58% من إجمالي السعة</span>
+              <span className="text-[10px] text-muted block">
+                {vitals ? `المتاح: ${Math.max(0, Math.round(100 - vitals.memoryPercent))}% من إجمالي السعة` : 'بيانات غير متاحة'}
+              </span>
             </div>
 
             {/* Disk */}
             <div className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-2">
               <div className="flex items-center justify-between text-xs text-muted">
                 <span className="flex items-center gap-1.5"><HardDrive className="w-4 h-4 text-primary" /> مساحة التخزين (Disk)</span>
-                <span className="font-bold text-muted">{vitals?.diskPercent}%</span>
+                <span className="font-bold text-muted">{vitals ? `${vitals.diskPercent}%` : '—'}</span>
               </div>
               <div className="w-full bg-primary rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-primary h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${vitals?.diskPercent}%` }}
+                  style={{ width: `${vitals?.diskPercent ?? 0}%` }}
                 />
               </div>
               <span className="text-[10px] text-muted block">التخزين السحابي المركزي NVMe</span>
@@ -488,13 +562,15 @@ export const PlatformSystemHealthPage: React.FC = () => {
             <div className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-2">
               <div className="flex items-center justify-between text-xs text-muted">
                 <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-warning" /> زمن استجابة API</span>
-                <span className="font-bold text-muted">{vitals?.apiLatencyMs} ms</span>
+                <span className="font-bold text-muted">{vitals ? `${vitals.apiLatencyMs} ms` : '—'}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-muted pt-1">
                 <span className="text-[11px] text-muted">معدل الأخطاء:</span>
-                <span className="font-semibold text-success">{vitals?.apiErrorRatePercent}%</span>
+                <span className={`font-semibold ${vitals && vitals.apiErrorRatePercent > 0 ? 'text-warning' : 'text-success'}`}>
+                  {vitals ? `${vitals.apiErrorRatePercent}%` : '—'}
+                </span>
               </div>
-              <span className="text-[10px] text-muted block">اتصالات نشطة: {vitals?.activeConnections}</span>
+              <span className="text-[10px] text-muted block">اتصالات نشطة: {vitals ? vitals.activeConnections : '—'}</span>
             </div>
           </div>
 
@@ -544,11 +620,15 @@ export const PlatformSystemHealthPage: React.FC = () => {
                 تنبيهات وانقطاعات الخدمات المفتوحة
               </h3>
 
-              {health?.openIncidents.length === 0 ? (
+              {!health ? (
+                <div className="bg-primary/30 border border-line-strong/80 rounded-xl p-8 text-center text-xs text-muted">
+                  تعذّر تحميل بيانات الحوادث — راجع رسالة الخطأ أعلاه.
+                </div>
+              ) : health.openIncidents.length === 0 ? (
                 <div className="bg-primary/30 border border-line-strong/80 rounded-xl p-8 text-center text-xs text-muted space-y-2">
                   <ShieldCheck className="w-8 h-8 text-success mx-auto" />
-                  <div className="font-semibold text-muted">كافة الخدمات تعمل بكفاءة 100%</div>
-                  <p className="text-[11px] text-muted">لا توجد بلاغات أعطال أو حوادث غير محلولة.</p>
+                  <div className="font-semibold text-muted">لا توجد بلاغات أعطال أو حوادث غير محلولة.</div>
+                  <p className="text-[11px] text-muted">جميع الخدمات المراقبة تعمل ضمن النطاق الطبيعي.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

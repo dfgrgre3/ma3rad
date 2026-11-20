@@ -3,7 +3,38 @@ import crypto from 'node:crypto';
 import type { StaffServiceContext } from './context';
 import { nowIso, randomToken } from '../platformUtils';
 
-export function listApiKeys(ctx: StaffServiceContext, tenantId?: string): any[] {
+/** Shape returned by {@link listApiKeys} — matches the PlatformApiKey contract plus audit fields. */
+export interface PlatformApiKeyRecord {
+  id: string;
+  tenantId: string;
+  name: string;
+  keyPrefix: string;
+  scopes: string[];
+  isActive: boolean;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Result of create/rotate — `plainTextKey` is shown ONCE; only its SHA-256 hash is stored. */
+export interface PlatformApiKeySecretResult {
+  id: string;
+  tenantId: string;
+  name: string;
+  keyPrefix: string;
+  scopes: string[];
+  expiresAt: string | null;
+  plainTextKey: string;
+}
+
+function isKeyRowActive(row: any): boolean {
+  if (row.revoked_at) return false;
+  if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return false;
+  return true;
+}
+
+export function listApiKeys(ctx: StaffServiceContext, tenantId?: string): PlatformApiKeyRecord[] {
   ctx.requirePlatformAccess('apiKeys', 'platform.apiKeys.view');
 
   const where = tenantId ? 'WHERE tenant_id = ?' : '';
@@ -16,14 +47,15 @@ export function listApiKeys(ctx: StaffServiceContext, tenantId?: string): any[] 
     name: String(row.name),
     keyPrefix: String(row.key_prefix),
     scopes: row.scopes ? JSON.parse(row.scopes) : [],
+    isActive: isKeyRowActive(row),
     expiresAt: row.expires_at ?? null,
     lastUsedAt: row.last_used_at ?? null,
     createdAt: String(row.created_at),
-    revokedAt: row.revoked_at ?? null,
+    updatedAt: String(row.updated_at ?? row.created_at),
   }));
 }
 
-export function createApiKey(ctx: StaffServiceContext, input: { tenantId: string; name: string; scopes?: string[]; expiresAt?: string }): any {
+export function createApiKey(ctx: StaffServiceContext, input: { tenantId: string; name: string; scopes?: string[]; expiresAt?: string }): PlatformApiKeySecretResult {
   ctx.requirePlatformAccess('apiKeys', 'platform.apiKeys.create');
 
   const tenant = ctx.db.query<any>('SELECT * FROM platform_tenants WHERE id = ?', [input.tenantId])[0];
@@ -43,7 +75,15 @@ export function createApiKey(ctx: StaffServiceContext, input: { tenantId: string
 
   ctx.audit('إنشاء مفتاح API', 'API_KEY', id, { tenantId: input.tenantId, name: input.name });
 
-  return { id, name: input.name, key: plainKey, keyPrefix, scopes: input.scopes ?? [], expiresAt: input.expiresAt ?? null };
+  return {
+    id,
+    tenantId: input.tenantId,
+    name: input.name.trim(),
+    keyPrefix,
+    scopes: input.scopes ?? [],
+    expiresAt: input.expiresAt ?? null,
+    plainTextKey: plainKey,
+  };
 }
 
 export function revokeApiKey(ctx: StaffServiceContext, id: string): void {
@@ -58,7 +98,7 @@ export function revokeApiKey(ctx: StaffServiceContext, id: string): void {
   ctx.audit('إلغاء مفتاح API', 'API_KEY', id, {});
 }
 
-export function rotateApiKey(ctx: StaffServiceContext, id: string): any {
+export function rotateApiKey(ctx: StaffServiceContext, id: string): PlatformApiKeySecretResult {
   ctx.requirePlatformAccess('apiKeys', 'platform.apiKeys.update');
 
   const row = ctx.db.query<any>('SELECT * FROM platform_api_keys WHERE id = ?', [id])[0];
@@ -73,10 +113,18 @@ export function rotateApiKey(ctx: StaffServiceContext, id: string): any {
 
   ctx.audit('تدوير مفتاح API', 'API_KEY', id, {});
 
-  return { id, name: row.name, key: plainKey, keyPrefix, scopes: JSON.parse(row.scopes || '[]'), expiresAt: row.expires_at };
+  return {
+    id,
+    tenantId: String(row.tenant_id),
+    name: String(row.name),
+    keyPrefix,
+    scopes: row.scopes ? JSON.parse(row.scopes) : [],
+    expiresAt: row.expires_at ?? null,
+    plainTextKey: plainKey,
+  };
 }
 
-export function validateApiKey(ctx: StaffServiceContext, plainTextKey: string): any {
+export function validateApiKey(ctx: StaffServiceContext, plainTextKey: string): { tenantId: string; scopes: string[] } | null {
   const keyHash = crypto.createHash('sha256').update(plainTextKey).digest('hex');
   const row = ctx.db.query<any>('SELECT * FROM platform_api_keys WHERE key_hash = ? AND revoked_at IS NULL', [keyHash])[0];
   if (!row) return null;

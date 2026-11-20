@@ -147,6 +147,52 @@ export class CentralLicenseService {
     return this.performActivation(credentials, deviceName);
   }
 
+  /**
+   * Activation from the first-run gate. The gate may run before or after login
+   * (the installer collects the API key pre-login), so unlike
+   * `activateFirstRun` a current user is allowed — the only precondition is
+   * that this device has no stored central credential yet.
+   */
+  static async activateDeviceSetup(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
+    if (await this.hasCredential()) {
+      throw new Error('This device is already activated with the central platform.');
+    }
+    return this.performActivation(credentials, deviceName);
+  }
+
+  /** API key the NSIS installer collected on its custom page, if any. */
+  static async readPendingApiKey(): Promise<string | null> {
+    try {
+      const pending = typeof window !== 'undefined' ? window.ceramisys?.activation?.pending : undefined;
+      if (!pending) return null;
+      const result = await pending();
+      const apiKey = typeof result?.apiKey === 'string' ? result.apiKey.trim() : '';
+      return apiKey || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Remove the installer-collected API key once activation consumed it. */
+  static async clearPendingApiKey(): Promise<void> {
+    try {
+      await (typeof window !== 'undefined' ? window.ceramisys?.activation?.clear?.() : undefined);
+    } catch { /* best effort — a stale key is harmless */ }
+  }
+
+  /**
+   * The central server wraps every /api/v1 success payload in the unified
+   * envelope `{ success: true, data: <payload>, ... }`. Older deployments
+   * returned the bare payload, so unwrap opportunistically — error envelopes
+   * (`success: false`) are returned untouched so `.error`/`.message` still work.
+   */
+  private static unwrapPayload<T = any>(body: any): T {
+    return body && typeof body === 'object' && !Array.isArray(body)
+      && body.success === true && Object.prototype.hasOwnProperty.call(body, 'data')
+      ? body.data
+      : body;
+  }
+
   private static async performActivation(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
     const base = await this.getSecureServerUrl();
     if (!base) throw new Error('Central server URL not configured');
@@ -165,7 +211,7 @@ export class CentralLicenseService {
         deviceRole: 'standalone',
       }),
     });
-    const data: CentralActivationResult = await res.json();
+    const data: CentralActivationResult = this.unwrapPayload(await res.json());
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('Invalid activation response');
     }
@@ -294,7 +340,7 @@ export class CentralLicenseService {
         headers: { 'X-Device-Id': deviceId },
       });
       if (!res.ok) return null;
-      const data = await res.json();
+      const data = this.unwrapPayload(await res.json());
       return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
     } catch (error) {
       console.warn('Could not fetch central establishment configuration:', error);
@@ -346,7 +392,7 @@ export class CentralLicenseService {
         headers: status.activated ? { 'X-Device-Id': this.getDeviceId() } : {},
       });
       if (!res.ok) return [];
-      const data = await res.json();
+      const data = this.unwrapPayload(await res.json());
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.warn('Could not fetch central releases:', error);
@@ -360,8 +406,8 @@ export class CentralLicenseService {
     try {
       const res = await this.request('/api/v1/configuration/public-key');
       if (!res.ok) return null;
-      const data = await res.json();
-      return data.publicKey || null;
+      const data = this.unwrapPayload(await res.json());
+      return data?.publicKey || null;
     } catch { return null; }
   }
 
@@ -398,7 +444,7 @@ export class CentralLicenseService {
         headers: { 'X-Device-Id': this.getDeviceId() },
       });
       if (!res.ok) return null;
-      const data = await res.json();
+      const data = this.unwrapPayload(await res.json());
       if (data) {
         // Signed configuration must verify before it can replace the cached copy.
         if (!(await this.verifyConfig(data))) return this.getCachedConfig();

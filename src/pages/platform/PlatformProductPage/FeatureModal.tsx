@@ -11,6 +11,7 @@ interface FeatureModalProps {
   setForm: React.Dispatch<React.SetStateAction<FeatureFormState>>;
   saving: boolean;
   canManageProduct: boolean;
+  centralActive?: boolean;
   onSave: () => void;
 }
 
@@ -21,6 +22,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
   setForm,
   saving,
   canManageProduct,
+  centralActive = false,
   onSave,
 }) => (
   <Modal
@@ -53,8 +55,8 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
           onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase() })}
         />
       </Field>
-      <Field label="الفئة (Category)">
-        <input className={inputClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+      <Field label="الفئة (Category)" hint={centralActive ? 'غير مدعومة في الوضع المركزي' : undefined}>
+        <input className={inputClass} value={form.category} disabled={centralActive} onChange={(e) => setForm({ ...form, category: e.target.value })} />
       </Field>
       <Field label="نسبة الإتاحة العامة (%)">
         <input
@@ -66,20 +68,21 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
           onChange={(e) => setForm({ ...form, rolloutPercent: Number(e.target.value) })}
         />
       </Field>
-      <Field label="الحد الأدنى لدرجة الخطة (Tier)">
+      <Field label="الحد الأدنى لدرجة الخطة (Tier)" hint={centralActive ? 'غير مدعومة في الوضع المركزي' : undefined}>
         <input
           placeholder="مثال: PRO أو ENTERPRISE"
           className={inputClass}
           value={form.minPlanTier}
+          disabled={centralActive}
           onChange={(e) => setForm({ ...form, minPlanTier: e.target.value })}
         />
       </Field>
       <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2">
         <div>
           <p className="text-[12px] font-bold text-ink">بيئة اختبار فقط (Staging)</p>
-          <p className="text-[10px] text-muted">حصر الميزة لمجموعات الاختبار قبل الإطلاق العام.</p>
+          <p className="text-[10px] text-muted">حصر الميزة لمجموعات الاختبار قبل الإطلاق العام.{centralActive ? ' غير مدعومة في الوضع المركزي.' : ''}</p>
         </div>
-        <Toggle checked={form.isStagingOnly} onChange={(val) => setForm({ ...form, isStagingOnly: val })} label="Staging" />
+        <Toggle checked={form.isStagingOnly} onChange={(val) => setForm({ ...form, isStagingOnly: val })} disabled={centralActive} label="Staging" />
       </div>
       <Field label="مسارات الصفحات المرتبطة (سطر لكل مسار)">
         <textarea

@@ -599,9 +599,9 @@ const ROUTE_MANIFEST = [
   }),
 
   // ── Client-owned endpoints (device-authenticated, served by this server) ──
-  route('/api/v1/licensing/activate', [], null, ['POST']),
-  route('/api/v1/licensing/validate', [], null, ['POST']),
-  route('/api/v1/licensing/heartbeat', [], null, ['POST']),
+  route('/api/v1/licensing/activate', ['POST'], null),
+  route('/api/v1/licensing/validate', ['POST'], null),
+  route('/api/v1/licensing/heartbeat', ['POST'], null),
   route('/api/v1/configuration/establishment', [], null, ['GET']),
   // Device-authenticated signed tenant configuration (X-Device-Id +
   // X-Device-Credential); served by this server, no platform user required.

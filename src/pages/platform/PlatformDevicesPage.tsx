@@ -22,12 +22,13 @@ export const PlatformDevicesPage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
-  const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
+  const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | 'toggle' | 'delete' | null>(null);
   const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
   const [centralMode, setCentralMode] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
+    setCloneAlerts([]);
     try {
       const central = getCentralDataSourceState();
       setCentralMode(central.active);
@@ -87,7 +88,9 @@ export const PlatformDevicesPage: React.FC = () => {
     try {
       // Use the license page's detection by listing devices and checking for duplicates
       const hwids = new Map<string, PlatformDevice[]>();
-      for (const d of filtered) {
+      // Scan the FULL device list — clone detection must not be limited to
+      // whatever rows happen to be visible under the current search filter.
+      for (const d of devices) {
         const list = hwids.get(d.hardwareId) ?? [];
         list.push(d);
         hwids.set(d.hardwareId, list);
@@ -102,14 +105,14 @@ export const PlatformDevicesPage: React.FC = () => {
       if (duplicates.length > 0) {
         toast.warning(`تم اكتشاف ${duplicates.length} حالة اشتباه استنساخ`);
       } else {
-        toast.success('لا يوجد اشتباه استنساخ بين الأجهزة المعروضة');
+        toast.success('لا يوجد اشتباه استنساخ بين جميع الأجهزة');
       }
     } catch (err) {
       toast.error('تعذر الكشف عن الاستنساخ', err instanceof Error ? err.message : undefined);
     }
   };
 
-  const openDeviceAction = (action: 'suspend' | 'release' | 'revoke', device: { id: string; hardwareId: string; tenantId: string; status: string }) => {
+  const openDeviceAction = (action: 'suspend' | 'release' | 'revoke' | 'toggle' | 'delete', device: { id: string; hardwareId: string; tenantId: string; status: string }) => {
     setDeviceTarget(device);
     setDeviceAction(action);
   };
@@ -120,6 +123,10 @@ export const PlatformDevicesPage: React.FC = () => {
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
       toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      return;
+    }
+    if (central.active && (deviceAction === 'toggle' || deviceAction === 'delete')) {
+      toast.warning('تبديل الحالة والحذف متاحان في الوضع المحلي فقط — استخدم إيقاف/تحرير/إلغاء للأجهزة المركزية.');
       return;
     }
     try {
@@ -138,8 +145,18 @@ export const PlatformDevicesPage: React.FC = () => {
         platformAdminService.releaseDevice(deviceTarget.id, 'تحرير عبر لوحة الأجهزة');
       } else if (deviceAction === 'revoke') {
         platformAdminService.revokeDevice(deviceTarget.id, 'إلغاء عبر لوحة الأجهزة');
+      } else if (deviceAction === 'toggle') {
+        platformAdminService.setDeviceStatus(deviceTarget.id, deviceTarget.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE');
+      } else if (deviceAction === 'delete') {
+        platformAdminService.deleteDevice(deviceTarget.id);
       }
-      toast.success(`تم ${deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'} الجهاز`);
+      toast.success(
+        deviceAction === 'suspend' ? 'تم إيقاف الجهاز'
+        : deviceAction === 'release' ? 'تم تحرير الجهاز'
+        : deviceAction === 'revoke' ? 'تم إلغاء الجهاز'
+        : deviceAction === 'toggle' ? 'تم تبديل حالة الجهاز'
+        : 'تم حذف تفعيل الجهاز'
+      );
       setDeviceTarget(null);
       setDeviceAction(null);
       await load();
@@ -192,23 +209,23 @@ export const PlatformDevicesPage: React.FC = () => {
             <DataTable
               ariaLabel="أجهزة العملاء"
               rows={filtered}
-              rowKey={(device: any) => String(device.id)}
+              rowKey={(device) => String(device.id)}
               minWidth={1000}
               dense
               tableClassName="text-[11px]"
               rowClassName={() => 'transition hover:bg-surface-muted/60'}
               columns={[
-                { key: 'tenant', header: 'العميل', render: (device: any) => { const tenant = tenants.find((item: any) => item.id === device.tenantId); return <span className="text-[11.5px] font-semibold text-ink">{tenant?.name || device.tenantId}</span>; } },
-                { key: 'hw', header: 'Hardware ID', render: (device: any) => <span className="font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</span> },
-                { key: 'name', header: 'الاسم', render: (device: any) => <span className="text-[11px] text-ink-secondary">{device.name || '—'}</span> },
-                { key: 'os', header: 'نظام التشغيل', render: (device: any) => <span className="text-[11px] text-ink-secondary">{device.os || '—'}</span> },
-                { key: 'ver', header: 'الإصدار', render: (device: any) => <span className="text-[11px] text-ink-secondary">{device.appVersion || '—'}</span> },
-                { key: 'ip', header: 'IP', render: (device: any) => <span className="font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</span> },
-                { key: 'first', header: 'أول تفعيل', render: (device: any) => <span className="text-[10.5px] text-ink-secondary">{formatDateTime(device.firstActivatedAt)}</span> },
-                { key: 'seen', header: 'آخر اتصال', render: (device: any) => <span className="text-[10.5px] text-ink-secondary">{formatDateTime(device.lastSeenAt)}</span> },
+                { key: 'tenant', header: 'العميل', render: (device) => { const tenant = tenants.find((item) => item.id === device.tenantId); return <span className="text-[11.5px] font-semibold text-ink">{tenant?.name || device.tenantId}</span>; } },
+                { key: 'hw', header: 'Hardware ID', render: (device) => <span className="font-mono text-[10.5px]" dir="ltr">{device.hardwareId}</span> },
+                { key: 'name', header: 'الاسم', render: (device) => <span className="text-[11px] text-ink-secondary">{device.name || '—'}</span> },
+                { key: 'os', header: 'نظام التشغيل', render: (device) => <span className="text-[11px] text-ink-secondary">{device.os || '—'}</span> },
+                { key: 'ver', header: 'الإصدار', render: (device) => <span className="text-[11px] text-ink-secondary">{device.appVersion || '—'}</span> },
+                { key: 'ip', header: 'IP', render: (device) => <span className="font-mono text-[10.5px]" dir="ltr">{device.ipAddress || '—'}</span> },
+                { key: 'first', header: 'أول تفعيل', render: (device) => <span className="text-[10.5px] text-ink-secondary">{formatDateTime(device.firstActivatedAt)}</span> },
+                { key: 'seen', header: 'آخر اتصال', render: (device) => <span className="text-[10.5px] text-ink-secondary">{formatDateTime(device.lastSeenAt)}</span> },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (device: any) => (
+                  render: (device) => (
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${device.status === 'ACTIVE' ? 'bg-success-soft text-success' : device.status === 'SUSPENDED' ? 'bg-warning-soft text-warning' : 'bg-danger-soft text-danger'}`}>
                       {device.status}{device.cloneSuspected ? ' · استنساخ' : ''}
                     </span>
@@ -216,12 +233,12 @@ export const PlatformDevicesPage: React.FC = () => {
                 },
                 {
                   key: 'actions', header: 'إجراءات',
-                  render: (device: any) => (
+                  render: (device) => (
                     <span className="flex items-center gap-1">
                       {canManageDevices && (
                         <>
                           {!centralMode && (
-                            <button type="button" onClick={() => { platformAdminService.setDeviceStatus(device.id, device.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'); void load(); }} className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning" title="إيقاف/تفعيل">
+                            <button type="button" onClick={() => openDeviceAction('toggle', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })} className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning" title="إيقاف/تفعيل">
                               <Cpu className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -241,7 +258,7 @@ export const PlatformDevicesPage: React.FC = () => {
                             </button>
                           )}
                           {!centralMode && (
-                            <button type="button" onClick={() => { if (window.confirm('حذف تفعيل هذا الجهاز؟')) { platformAdminService.deleteDevice(device.id); void load(); } }} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="حذف التفعيل">
+                            <button type="button" onClick={() => openDeviceAction('delete', { id: device.id, hardwareId: device.hardwareId, tenantId: device.tenantId, status: device.status })} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="حذف التفعيل">
                               <Cpu className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -260,13 +277,27 @@ export const PlatformDevicesPage: React.FC = () => {
       <Modal
         open={Boolean(deviceTarget)}
         onClose={() => { setDeviceTarget(null); setDeviceAction(null); }}
-        title={deviceAction === 'suspend' ? 'إيقاف الجهاز عن بُعد' : deviceAction === 'release' ? 'تحرير الجهاز عن بُعد' : 'إلغاء الجهاز عن بُعد'}
+        title={
+          deviceAction === 'suspend' ? 'إيقاف الجهاز عن بُعد'
+          : deviceAction === 'release' ? 'تحرير الجهاز عن بُعد'
+          : deviceAction === 'revoke' ? 'إلغاء الجهاز عن بُعد'
+          : deviceAction === 'toggle' ? 'تبديل حالة الجهاز'
+          : 'حذف تفعيل الجهاز'
+        }
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
-            <Button variant="danger" onClick={() => void executeDeviceAction()} disabled={!canManageDevices}>
-              {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
+            <Button
+              variant={deviceAction === 'delete' || deviceAction === 'revoke' ? 'danger' : 'primary'}
+              onClick={() => void executeDeviceAction()}
+              disabled={!canManageDevices}
+            >
+              {deviceAction === 'suspend' ? 'تأكيد الإيقاف'
+                : deviceAction === 'release' ? 'تأكيد التحرير'
+                : deviceAction === 'revoke' ? 'تأكيد الإلغاء'
+                : deviceAction === 'toggle' ? 'تأكيد التبديل'
+                : 'تأكيد الحذف'}
             </Button>
           </div>
         }
@@ -275,9 +306,19 @@ export const PlatformDevicesPage: React.FC = () => {
           <>
             <p className="text-[11px] text-ink-secondary mb-3">
               الجهاز: <span className="font-mono text-[10px] text-ink" dir="ltr">{deviceTarget.hardwareId}</span>
+              {' · '}الحالة الحالية: <span className="font-bold text-ink">{deviceTarget.status}</span>
             </p>
-            <p className="text-[11px] text-ink-secondary mb-1">
-              الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'}
+            <p className="text-[11px] font-bold text-ink mb-1">
+              الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : deviceAction === 'revoke' ? 'إلغاء' : deviceAction === 'toggle' ? 'تبديل الحالة' : 'حذف'}
+            </p>
+            <p className="text-[11px] text-ink-secondary leading-relaxed">
+              {deviceAction === 'suspend' && 'سيتم منع هذا الجهاز من الاتصال بالمنصة فوراً حتى إعادة تفعيله.'}
+              {deviceAction === 'release' && 'سيتم فك ارتباط هذا الجهاز بالتراخيص النشطة — سيتطلب تفعيلاً جديداً برخصة صالحة.'}
+              {deviceAction === 'revoke' && 'إجراء نهائي: لن يتمكن الجهاز من العمل مع أي ترخيص على المنصة.'}
+              {deviceAction === 'toggle' && (deviceTarget.status === 'ACTIVE'
+                ? 'سيتم تعليق الجهاز (SUSPENDED) — يمكن إعادة تفعيله لاحقاً.'
+                : 'سيتم إعادة تفعيل الجهاز (ACTIVE) وسماحه بالاتصال بالمنصة.')}
+              {deviceAction === 'delete' && 'سيتم حذف سجل التفعيل نهائياً من قاعدة البيانات المحلية — لا يمكن التراجع عن هذا الإجراء.'}
             </p>
           </>
         )}

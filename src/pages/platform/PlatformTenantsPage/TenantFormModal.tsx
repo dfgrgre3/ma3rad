@@ -44,6 +44,12 @@ const ACCOUNT_STEP: WizardStep = { key: 'account', label: 'حساب الدخول
 
 const isValidEmail = (email?: string) => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+/** Clamp a numeric limit input: finite, integer, minimum 1 (NaN-safe). */
+const clampLimit = (raw: string): number => {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1;
+};
+
 const StepIndicator: React.FC<{ step: number; steps: WizardStep[]; onSelect?: (index: number) => void }> = ({ step, steps, onSelect }) => (
   <div className="mb-5">
     <ol className="flex items-center gap-1.5 sm:gap-2">
@@ -139,13 +145,13 @@ const PlanStep: React.FC<{ form: PlatformTenantInput; setForm: React.Dispatch<Re
           </select>
         </Field>
         <Field label="حد المستخدمين">
-          <input type="number" min={1} className={inputClass} value={form.seatsLimit ?? 1} onChange={(event) => setForm({ ...form, seatsLimit: Number(event.target.value) })} />
+          <input type="number" min={1} className={inputClass} value={form.seatsLimit ?? 1} onChange={(event) => setForm({ ...form, seatsLimit: clampLimit(event.target.value) })} />
         </Field>
         <Field label="حد الفروع">
-          <input type="number" min={1} className={inputClass} value={form.branchesLimit ?? 1} onChange={(event) => setForm({ ...form, branchesLimit: Number(event.target.value) })} />
+          <input type="number" min={1} className={inputClass} value={form.branchesLimit ?? 1} onChange={(event) => setForm({ ...form, branchesLimit: clampLimit(event.target.value) })} />
         </Field>
         <Field label="حد الأجهزة">
-          <input type="number" min={1} className={inputClass} value={form.devicesLimit ?? 1} onChange={(event) => setForm({ ...form, devicesLimit: Number(event.target.value) })} />
+          <input type="number" min={1} className={inputClass} value={form.devicesLimit ?? 1} onChange={(event) => setForm({ ...form, devicesLimit: clampLimit(event.target.value) })} />
         </Field>
       </div>
 

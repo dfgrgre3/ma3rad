@@ -9,12 +9,7 @@ import {
   CheckCircle2,
   Sliders,
   History,
-  Eye,
-  FileText,
   Tag,
-  Shield,
-  ArrowRight,
-  Info,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
 import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
@@ -39,6 +34,7 @@ import {
   type ModuleDefinition,
 } from '../../config/moduleRegistry';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, inputClass, formatDateTime } from './components/PlatformUI';
 
@@ -66,6 +62,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   const [enabledModules, setEnabledModules] = React.useState<string[]>([]);
   const [customTerminology, setCustomTerminology] = React.useState<Record<string, string>>({});
   const [changeSummary, setChangeSummary] = React.useState('');
+  const [rollbackVersion, setRollbackVersion] = React.useState<number | null>(null);
 
   const loadTenants = React.useCallback(async () => {
     const centralState = getCentralDataSourceState();
@@ -74,15 +71,15 @@ export const PlatformActivitySettingsPage: React.FC = () => {
         ? await centralPlatformClient.listTenants()
         : platformAdminService.listTenants();
       setTenants(list);
-      if (list.length > 0 && !selectedTenantId) {
-        setSelectedTenantId(list[0].id);
-      }
+      // Pick the first tenant only once — re-running this on every selection
+      // would refetch the whole tenant list each time the user switches.
+      setSelectedTenantId((prev) => prev || list[0]?.id || '');
     } catch (err) {
       toast.error('تعذر استرجاع قائمة العملاء');
     } finally {
       setLoading(false);
     }
-  }, [selectedTenantId, toast]);
+  }, [toast]);
 
   React.useEffect(() => {
     loadTenants();
@@ -93,12 +90,12 @@ export const PlatformActivitySettingsPage: React.FC = () => {
     if (!tenantId) return;
     const centralState = getCentralDataSourceState();
     try {
-      let config: any;
-      let vList: any[] = [];
+      let config: PlatformTenantActivityConfig | null;
+      let vList: PlatformTenantActivityVersion[];
 
       if (centralState.active) {
-        config = await centralPlatformClient.getTenantActivity(tenantId);
-        vList = await centralPlatformClient.listTenantActivityVersions(tenantId);
+        config = (await centralPlatformClient.getTenantActivity(tenantId)) as PlatformTenantActivityConfig | null;
+        vList = (await centralPlatformClient.listTenantActivityVersions(tenantId)) as PlatformTenantActivityVersion[];
       } else {
         config = platformAdminService.getTenantActivity(tenantId);
         vList = platformAdminService.listTenantActivityVersions(tenantId);
@@ -137,14 +134,17 @@ export const PlatformActivitySettingsPage: React.FC = () => {
     const centralState = getCentralDataSourceState();
     try {
       const act = allActivities.find((a) => a.id === selectedActivityId);
-      let updated: any;
+      let updated: PlatformTenantActivityConfig;
 
       if (centralState.active) {
-        updated = await centralPlatformClient.saveTenantActivity(selectedTenantId, {
+        // Central API contract only accepts activityId/enabledModules/
+        // customTerminology — profileId & changeSummary are local-only fields
+        // the server silently ignores, so they are not sent.
+        updated = (await centralPlatformClient.saveTenantActivity(selectedTenantId, {
           activityId: selectedActivityId,
           enabledModules,
           customTerminology,
-        });
+        })) as PlatformTenantActivityConfig;
       } else {
         updated = platformAdminService.saveTenantActivity({
           tenantId: selectedTenantId,
@@ -167,17 +167,21 @@ export const PlatformActivitySettingsPage: React.FC = () => {
     }
   };
 
-  const handleRollback = async (ver: number) => {
+  const handleRollback = (ver: number) => {
     if (!canManageActivity) { toast.error('لا تملك صلاحية إدارة الأنشطة'); return; }
-    if (!window.confirm(`هل أنت متأكد من استرجاع إعدادات النشاط إلى الإصدار #${ver}؟`)) {
-      return;
-    }
+    setRollbackVersion(ver);
+  };
+
+  const confirmRollback = async () => {
+    const ver = rollbackVersion;
+    if (ver == null) return;
+    setRollbackVersion(null);
     setSaving(true);
     const centralState = getCentralDataSourceState();
     try {
-      let restored: any;
+      let restored: PlatformTenantActivityConfig;
       if (centralState.active) {
-        restored = await centralPlatformClient.rollbackTenantActivity(selectedTenantId, ver);
+        restored = (await centralPlatformClient.rollbackTenantActivity(selectedTenantId, ver)) as PlatformTenantActivityConfig;
       } else {
         restored = platformAdminService.rollbackTenantActivity(selectedTenantId, ver);
       }
@@ -211,7 +215,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
   }, [allActivities, catalogSearch, selectedFamilyId]);
 
   const selectedTenant = tenants.find((t) => t.id === selectedTenantId);
-  const currentProfile = selectedActivityId ? getBusinessProfile(selectedActivityId) : null;
+  const centralMode = getCentralDataSourceState().active;
 
   return (
     <div className="space-y-5">
@@ -270,6 +274,12 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               الوحدات النشطة: <strong className="text-success">{activityConfig.enabledModules.length}</strong>
             </div>
           </div>
+        )}
+
+        {centralMode && (
+          <p className="w-full text-[10px] text-muted">
+            في الوضع المركزي لا يُرسَل «وصف التغيير» (changeSummary) — واجهة الخادم تقبل حالياً النشاط والوحدات والمصطلحات فقط.
+          </p>
         )}
       </div>
 
@@ -467,6 +477,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                   type="text"
                   value={customTerminology['product_name'] || ''}
                   onChange={(e) => setCustomTerminology({ ...customTerminology, product_name: e.target.value })}
+                  disabled={!canManageActivity}
                   className={inputClass}
                   placeholder="مثال: بلاطة، صنف، وجبة، قطعة، خدمة"
                 />
@@ -478,6 +489,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                   type="text"
                   value={customTerminology['customer_name'] || ''}
                   onChange={(e) => setCustomTerminology({ ...customTerminology, customer_name: e.target.value })}
+                  disabled={!canManageActivity}
                   className={inputClass}
                   placeholder="مثال: عميل، زبون، ضيف، مريض، موكل"
                 />
@@ -489,6 +501,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                   type="text"
                   value={customTerminology['warehouse_name'] || ''}
                   onChange={(e) => setCustomTerminology({ ...customTerminology, warehouse_name: e.target.value })}
+                  disabled={!canManageActivity}
                   className={inputClass}
                   placeholder="مثال: معرض، مستودع، فرع، صالة، مخزن"
                 />
@@ -500,6 +513,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                   type="text"
                   value={customTerminology['invoice_name'] || ''}
                   onChange={(e) => setCustomTerminology({ ...customTerminology, invoice_name: e.target.value })}
+                  disabled={!canManageActivity}
                   className={inputClass}
                   placeholder="مثال: فاتورة ضريبية، شيك طاولة، إيصال، تذكرة"
                 />
@@ -529,19 +543,19 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                 <DataTable
                   ariaLabel="سجل إصدارات الأنشطة"
                   rows={versions}
-                  rowKey={(ver: any) => String(ver.id)}
+                  rowKey={(ver) => String(ver.id)}
                   dense
                   tableClassName="text-xs"
                   rowClassName={() => 'transition hover:bg-surface-muted/70'}
                   columns={[
-                    { key: 'ver', header: 'رقم الإصدار', render: (ver: any) => <span className="font-bold text-primary">#{ver.version}</span> },
-                    { key: 'activity', header: 'النشاط التجاري', render: (ver: any) => <span className="font-semibold text-ink">{allActivities.find((a: any) => a.id === ver.activityId)?.label || ver.activityId}</span> },
-                    { key: 'reason', header: 'سبب التحديث', render: (ver: any) => <span className="text-ink-secondary">{ver.changeSummary || '—'}</span> },
-                    { key: 'by', header: 'المنفذ', render: (ver: any) => <span className="text-ink-secondary">{ver.createdBy || 'النظام'}</span> },
-                    { key: 'date', header: 'تاريخ الإصدار', render: (ver: any) => <span className="font-mono text-muted" dir="ltr">{formatDateTime(ver.createdAt)}</span> },
+                    { key: 'ver', header: 'رقم الإصدار', render: (ver) => <span className="font-bold text-primary">#{ver.version}</span> },
+                    { key: 'activity', header: 'النشاط التجاري', render: (ver) => <span className="font-semibold text-ink">{allActivities.find((a) => a.id === ver.activityId)?.label || ver.activityId}</span> },
+                    { key: 'reason', header: 'سبب التحديث', render: (ver) => <span className="text-ink-secondary">{ver.changeSummary || '—'}</span> },
+                    { key: 'by', header: 'المنفذ', render: (ver) => <span className="text-ink-secondary">{ver.createdBy || 'النظام'}</span> },
+                    { key: 'date', header: 'تاريخ الإصدار', render: (ver) => <span className="font-mono text-muted" dir="ltr">{formatDateTime(ver.createdAt)}</span> },
                     {
                       key: 'action', header: 'الإجراء', align: 'center',
-                      render: (ver: any) => canManageActivity ? (
+                      render: (ver) => canManageActivity ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -560,6 +574,27 @@ export const PlatformActivitySettingsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Rollback confirmation */}
+      <Modal
+        open={rollbackVersion != null}
+        onClose={() => setRollbackVersion(null)}
+        title={`استرجاع إصدار النشاط #${rollbackVersion ?? ''}`}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setRollbackVersion(null)}>إلغاء</Button>
+            <Button variant="primary" onClick={() => void confirmRollback()} disabled={saving}>
+              {saving ? 'جارٍ الاسترجاع...' : 'تأكيد الاسترجاع'}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-xs text-ink-secondary leading-relaxed">
+          سيتم استرجاع إعدادات نشاط العميل «{selectedTenant?.name ?? ''}» إلى الإصدار #{rollbackVersion}.
+          سيُنشأ إصدار جديد بنفس محتوى النسخة المختارة — لا تُحذف الإصدارات السابقة.
+        </p>
+      </Modal>
     </div>
   );
 };

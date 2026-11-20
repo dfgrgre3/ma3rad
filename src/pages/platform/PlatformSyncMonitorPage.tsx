@@ -41,8 +41,10 @@ export const PlatformSyncMonitorPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const SYNC_STATUSES: PlatformSyncStatus[] = ['SUCCESS', 'FAIL', 'PARTIAL'];
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const centralState = getCentralDataSourceState();
       if (centralState.active) {
@@ -50,11 +52,14 @@ export const PlatformSyncMonitorPage: React.FC = () => {
           centralPlatformClient.listSyncEvents({ status: statusFilter || undefined, limit: 100 }),
           centralPlatformClient.listTenants(),
         ]);
-        setLogs(logList as any);
-        setTenants(tenantList as any);
+        setLogs(logList as PlatformSyncLogEntry[]);
+        setTenants(tenantList);
       } else {
+        const status = SYNC_STATUSES.includes(statusFilter as PlatformSyncStatus)
+          ? (statusFilter as PlatformSyncStatus)
+          : undefined;
         const logList = platformAdminService.listSyncStatus({
-          status: statusFilter as PlatformSyncStatus || undefined,
+          status,
           limit: 100,
         });
         const tenantList = platformAdminService.listTenants();
@@ -65,12 +70,21 @@ export const PlatformSyncMonitorPage: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل سجلات المزامنة.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
+  }, [loadData]);
+
+  // Poll the sync feed so this monitor actually monitors (skip when tab hidden).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!document.hidden) void loadData(true);
+    }, 30000);
+    return () => clearInterval(timer);
   }, [loadData]);
 
   // Run a real pull through the configured sync client and log its actual result.
@@ -88,26 +102,55 @@ export const PlatformSyncMonitorPage: React.FC = () => {
       }
       const result = await sync.pullEvents('all', null, 100);
       const pulledCount = result?.events?.length ?? 0;
-      platformAdminService.logSyncEvent({
-        tenantId: tenantId || tenants[0]?.id,
-        syncType: 'MANUAL_PULL',
-        status: 'SUCCESS',
-        recordsSynced: pulledCount,
-      });
+      const centralActive = getCentralDataSourceState().active;
+      if (centralActive) {
+        // Central sync events are server-side only — there is no endpoint to
+        // log a device-local pull. Surface the real result in the list instead
+        // of silently writing to the local store the table never reads.
+        setLogs((prev) => [{
+          id: `local-${Date.now()}`,
+          tenantId: tenantId || tenants[0]?.id,
+          syncType: 'MANUAL_PULL (محلي)',
+          status: 'SUCCESS',
+          recordsSynced: pulledCount,
+          errorDetail: 'نتيجة سحب من هذا الجهاز — لا تُسجَّل في سجل الخادم المركزي',
+          createdAt: new Date().toISOString(),
+        }, ...prev]);
+      } else {
+        platformAdminService.logSyncEvent({
+          tenantId: tenantId || tenants[0]?.id,
+          syncType: 'MANUAL_PULL',
+          status: 'SUCCESS',
+          recordsSynced: pulledCount,
+        });
+      }
       toast.success(`تم تنفيذ المزامنة وسحب ${pulledCount} حدثاً.`);
       loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'فشلت المزامنة.';
-      try {
-        platformAdminService.logSyncEvent({
+      const centralActive = getCentralDataSourceState().active;
+      if (centralActive) {
+        setLogs((prev) => [{
+          id: `local-${Date.now()}`,
           tenantId: tenantId || tenants[0]?.id,
-          syncType: 'MANUAL_PULL',
+          syncType: 'MANUAL_PULL (محلي)',
           status: 'FAIL',
           recordsSynced: 0,
-          errorDetail: message,
-        });
-      } catch {
-        // Logging can fail when the platform console is not in an owner session.
+          errorDetail: `${message} — نتيجة محلية من هذا الجهاز`,
+          createdAt: new Date().toISOString(),
+        }, ...prev]);
+      } else {
+        try {
+          platformAdminService.logSyncEvent({
+            tenantId: tenantId || tenants[0]?.id,
+            syncType: 'MANUAL_PULL',
+            status: 'FAIL',
+            recordsSynced: 0,
+            errorDetail: message,
+          });
+        } catch {
+          // Logging can fail when the platform console is not in an owner session.
+        }
       }
       toast.warning(message);
       loadData();
@@ -141,7 +184,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
             </Button>
             <Button
               size="sm"
-              onClick={loadData}
+              onClick={() => void loadData()}
               leadingIcon={<RefreshCw className="h-4 w-4" />}
             >
               تحديث السجلات
@@ -165,7 +208,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
           <p className="text-xl font-black text-danger mt-1">{failedCount}</p>
         </div>
         <div className="p-3 bg-warning/20 border border-warning/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-warning">معلقة أو جزئية</p>
+          <p className="text-[11px] font-semibold text-warning">مزامنة جزئية / تعارض</p>
           <p className="text-xl font-black text-warning mt-1">{pendingCount}</p>
         </div>
       </div>
@@ -218,7 +261,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
             <DataTable
               ariaLabel="سجل المزامنة"
               rows={filteredLogs}
-              rowKey={(log: any) => String(log.id)}
+              rowKey={(log) => String(log.id)}
               minWidth={900}
               dense
               tableClassName="text-xs"
@@ -226,8 +269,8 @@ export const PlatformSyncMonitorPage: React.FC = () => {
               columns={[
                 {
                   key: 'tenant', header: 'العميل / الجهاز',
-                  render: (log: any) => {
-                    const tenantObj = tenants.find((t: any) => t.id === log.tenantId);
+                  render: (log) => {
+                    const tenantObj = tenants.find((t) => t.id === log.tenantId);
                     return (
                       <span className="block">
                         <span className="block font-bold text-muted">{tenantObj ? tenantObj.name : log.tenantId ? log.tenantId : 'عام للمنصة'}</span>
@@ -243,11 +286,11 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                 },
                 {
                   key: 'type', header: 'نوع المزامنة',
-                  render: (log: any) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{log.syncType}</span>,
+                  render: (log) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{log.syncType}</span>,
                 },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (log: any) => (
+                  render: (log) => (
                     <span className={`inline-flex items-center gap-1 font-bold ${log.status === 'SUCCESS' ? 'text-success' : log.status === 'FAIL' ? 'text-danger' : log.status === 'PARTIAL' ? 'font-black text-warning' : 'text-primary'}`}>
                       {log.status === 'SUCCESS' ? (<><CheckCircle2 className="h-3 w-3" /> نجاح</>)
                         : log.status === 'FAIL' ? (<><XCircle className="h-3 w-3" /> فشل</>)
@@ -256,17 +299,17 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                     </span>
                   ),
                 },
-                { key: 'records', header: 'السجلات المنقولة', render: (log: any) => <span className="font-semibold text-muted">{formatNumber(log.recordsSynced)} سجل</span> },
+                { key: 'records', header: 'السجلات المنقولة', render: (log) => <span className="font-semibold text-muted">{formatNumber(log.recordsSynced)} سجل</span> },
                 {
                   key: 'detail', header: 'تفاصيل أو أخطاء',
-                  render: (log: any) => log.errorDetail ? (
+                  render: (log) => log.errorDetail ? (
                     <span className="block max-w-xs truncate font-mono text-[11px] text-danger">{log.errorDetail}</span>
                   ) : <span className="text-muted">مزامنة سليمة تماماً</span>,
                 },
-                { key: 'time', header: 'التوقيت', render: (log: any) => <span className="text-muted">{formatDateTime(log.createdAt)}</span> },
+                { key: 'time', header: 'التوقيت', render: (log) => <span className="text-muted">{formatDateTime(log.createdAt)}</span> },
                 {
                   key: 'action', header: 'إجراء', align: 'center',
-                  render: (log: any) => (
+                  render: (log) => (
                     <button onClick={() => void handleRunSync(log.tenantId)} className="mx-auto flex items-center gap-1 text-xs text-primary hover:text-primary" title="إعادة المزامنة فوراً">
                       <RotateCcw className="h-3 w-3" />
                       إعادة

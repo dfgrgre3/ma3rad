@@ -11,11 +11,12 @@ interface ApiKeyModalProps {
   form: ApiKeyFormState;
   setForm: React.Dispatch<React.SetStateAction<ApiKeyFormState>>;
   tenants: PlatformTenant[];
+  isCentral?: boolean;
   canManageSecurity: boolean;
   onSubmit: () => void;
 }
 
-export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, setForm, tenants, canManageSecurity, onSubmit }) => (
+export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, setForm, tenants, isCentral, canManageSecurity, onSubmit }) => (
   <Modal
     open={open}
     onClose={onClose}
@@ -33,20 +34,28 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
         />
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-muted mb-1">العميل المرتبط (المستأجر) *</label>
-        <select
-          value={form.tenantId}
-          onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
-          className={inputClass}
-        >
-          {tenants.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} ({t.code})
-            </option>
-          ))}
-        </select>
-      </div>
+      {!isCentral && (
+        <div>
+          <label className="block text-xs font-semibold text-muted mb-1">العميل المرتبط (المستأجر) *</label>
+          <select
+            value={form.tenantId}
+            onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
+            className={inputClass}
+          >
+            <option value="" disabled>اختر العميل…</option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.code})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {isCentral && (
+        <p className="text-[11px] text-muted bg-surface-sunken border border-line rounded-lg px-3 py-2">
+          في الوضع المركزي يُنشأ المفتاح على مستوى المنصة ولا يُربط بعميل محدد.
+        </p>
+      )}
 
       <div>
         <label className="block text-xs font-semibold text-muted mb-1">نطاقات الصلاحية (Scopes)</label>

@@ -36,10 +36,13 @@ export function mapStaff(row: any): PlatformStaff {
   };
 }
 
-export function mapInvite(row: any): PlatformStaffInvite {
+export function mapInvite(row: any, options: { includeToken?: boolean } = {}): PlatformStaffInvite {
   return {
     id: String(row.id),
-    token: String(row.token),
+    // The raw invite token is a credential — only surface it on flows that
+    // explicitly need it (lookup-by-token). Listings must never expose it;
+    // the DB keeps `token`/`token_hash` columns untouched for compatibility.
+    token: options.includeToken ? String(row.token ?? '') : '',
     email: String(row.email),
     fullName: String(row.full_name),
     role: String(row.role) as PlatformStaffRole,
@@ -104,12 +107,15 @@ export function mapSecurityIncident(row: any): PlatformCentralSecurityIncident {
     severity: row.severity,
     title: String(row.title),
     description: row.description ?? null,
+    details: row.details ?? row.description ?? null,
+    sourceIp: row.source_ip ?? row.ip_address ?? null,
     tenantId: row.tenant_id ?? null,
     staffId: row.staff_id ?? null,
     deviceId: row.device_id ?? null,
     ipAddress: row.ip_address ?? null,
     status: row.status,
     response: row.response ?? null,
+    containmentAction: row.containment_action ?? row.response ?? null,
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),

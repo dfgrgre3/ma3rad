@@ -57,29 +57,81 @@ const CENTRAL_JOB_TYPE_MAP: Record<string, string> = {
   NOTIFICATION_BLAST: 'CUSTOM',
 };
 
-function mapCentralJob(row: any): PlatformOpsJob {
+/** Reverse of CENTRAL_JOB_TYPE_MAP plus central-only types, for display. */
+const CENTRAL_TO_UI_JOB_TYPE: Record<string, string> = {
+  MIGRATION: 'SCHEMA_MIGRATE',
+  BACKUP_CREATE: 'BACKUP',
+  BACKUP_RESTORE: 'RESTORE',
+  REMOTE_SYNC: 'DEVICE_SYNC',
+  CONFIG_PUSH: 'CONFIG_PUSH',
+  PROVISIONING: 'PROVISIONING',
+  CUSTOM: 'CUSTOM',
+};
+
+const OPS_JOB_STATUSES: readonly string[] = ['PENDING', 'RUNNING', 'DONE', 'FAILED', 'CANCELLED'];
+
+interface TenantUsageRow {
+  id: string;
+  name: string;
+  code: string;
+  plan_name?: string | null;
+  devices_active?: number;
+  devices_total?: number;
+  users_active?: number;
+  users_total?: number;
+  invoices_count?: number;
+  payments_total?: number;
+  open_tickets?: number;
+  last_activity_at?: string | null;
+}
+
+function mapCentralJob(row: Record<string, unknown>): PlatformOpsJob {
+  const payload =
+    row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)
+      ? (row.payload as Record<string, unknown>)
+      : {};
+  const statusRaw = String(row.status ?? 'PENDING');
+  const status = (
+    statusRaw === 'COMPLETED' ? 'DONE' : OPS_JOB_STATUSES.includes(statusRaw) ? statusRaw : 'PENDING'
+  ) as PlatformOpsJobStatus;
+  const priorityNum = Number(payload.priority);
+  const toIso = (v: unknown) => (v == null ? undefined : String(v));
   return {
-    id: row.id,
-    type: row.type,
-    tenantId: row.tenantId ?? undefined,
-    payload: row.payload ?? {},
-    status: row.status === 'COMPLETED' ? 'DONE' : row.status,
-    priority: row.payload?.priority ?? 5,
-    retries: row.attempts ?? 0,
+    id: String(row.id ?? ''),
+    type: CENTRAL_TO_UI_JOB_TYPE[String(row.type ?? '')] ?? String(row.type ?? 'CUSTOM'),
+    tenantId: row.tenantId != null ? String(row.tenantId) : undefined,
+    payload,
+    status,
+    priority: Number.isFinite(priorityNum) ? Math.min(10, Math.max(1, priorityNum)) : 5,
+    retries: Number(row.attempts ?? 0) || 0,
     maxRetries: 3,
-    errorMessage: row.error ?? undefined,
-    scheduledAt: row.runAt ?? undefined,
-    startedAt: row.startedAt ?? undefined,
-    completedAt: row.finishedAt ?? undefined,
+    errorMessage: row.error != null && row.error !== '' ? String(row.error) : undefined,
+    scheduledAt: toIso(row.runAt),
+    startedAt: toIso(row.startedAt),
+    completedAt: toIso(row.finishedAt),
     createdBy: '',
-    createdAt: row.createdAt,
+    createdAt: String(row.createdAt ?? ''),
   };
 }
 
 export const PlatformOperationsSettingsPage: React.FC = () => {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<OperationsTab>('jobs');
-  const centralActive = getCentralDataSourceState().active;
+  // Reactive snapshot — the data-source toggle lives in platform settings and
+  // has no change event, so poll it cheaply like CentralUnsupportedNotice does.
+  const [centralActive, setCentralActive] = useState<boolean>(() => getCentralDataSourceState().active);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setCentralActive(getCentralDataSourceState().active);
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const canManageOperations = canPlatform('operations');
   const [loading, setLoading] = useState<boolean>(true);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
@@ -113,7 +165,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   const [syncStatusFilter, setSyncStatusFilter] = useState<string>('');
 
   // Central usage state
-  const [usageRows, setUsageRows] = useState<any[]>([]);
+  const [usageRows, setUsageRows] = useState<TenantUsageRow[]>([]);
 
   // Load Tenants
   const loadTenants = useCallback(() => {
@@ -138,8 +190,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
     if (centralActive) {
       if (activeTab === 'usage') {
         centralPlatformClient.listTenantUsage()
-          .then((rows) => setUsageRows(rows))
-          .catch((e) => console.error('Failed to load usage:', e))
+          .then((rows) => { setUsageRows(rows as TenantUsageRow[]); setLoadError(null); })
+          .catch((e) => setLoadError(e instanceof Error ? e.message : 'تعذر تحميل بيانات استهلاك المنشآت.'))
           .finally(() => setLoading(false));
         return;
       }
@@ -150,14 +202,15 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           type: undefined,
           tenantId: jobTenantFilter || undefined,
         })
-          .then((rows) => setJobs(rows.map(mapCentralJob)))
-          .catch((e) => console.error('Failed to load central jobs:', e))
+          .then((rows) => { setJobs(rows.map((r) => mapCentralJob(r as Record<string, unknown>))); setLoadError(null); })
+          .catch((e) => setLoadError(e instanceof Error ? e.message : 'تعذر تحميل مهام التشغيل.'))
           .finally(() => setLoading(false));
         return;
       }
       setMaintenanceWindows([]);
       setApprovals([]);
       setSyncLogs([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
@@ -184,7 +237,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
         setSyncLogs(logs);
       }
     } catch (err) {
-      console.error('Failed to load operations data:', err);
+      setLoadError(err instanceof Error ? err.message : 'تعذر تحميل بيانات العمليات.');
     } finally {
       setLoading(false);
     }
@@ -245,20 +298,22 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       return;
     }
     if (centralActive) {
+      const priority = Number(newJobPriority);
       centralPlatformClient.createOpsJob({
         type: CENTRAL_JOB_TYPE_MAP[newJobType] ?? 'CUSTOM',
         tenantId: newJobTenantId || null,
-        payload: { originalType: newJobType, priority: Number(newJobPriority) },
+        payload: { originalType: newJobType, priority: Number.isFinite(priority) ? Math.min(10, Math.max(1, priority)) : 5 },
       })
         .then(() => { setNewJobModalOpen(false); loadData(); })
         .catch((e) => toast.error((e as Error).message));
       return;
     }
     try {
+      const priority = Number(newJobPriority);
       platformAdminService.createOpsJob({
         type: newJobType,
         tenantId: newJobTenantId || undefined,
-        priority: Number(newJobPriority),
+        priority: Number.isFinite(priority) ? Math.min(10, Math.max(1, priority)) : 5,
       });
       setNewJobModalOpen(false);
       loadData();
@@ -271,6 +326,12 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
     e.preventDefault();
     if (!canManageOperations) {
       toast.warning('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
+    // No central maintenance-window endpoint exists — never write local while
+    // the page is displaying central data.
+    if (centralActive) {
+      toast.error('جدولة نوافذ الصيانة غير مدعومة في الوضع المركزي بعد.');
       return;
     }
     if (!newMaintTitle || !newMaintStart || !newMaintEnd) return;
@@ -294,6 +355,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   const handleCancelMaintenance = (id: string) => {
     if (!canManageOperations) {
       toast.warning('لا تملك صلاحية إدارة العمليات.');
+      return;
+    }
+    if (centralActive) {
+      toast.error('إدارة نوافذ الصيانة غير مدعومة في الوضع المركزي بعد.');
       return;
     }
     if (!confirm('هل أنت متأكد من إلغاء نافذة الصيانة؟')) return;
@@ -383,6 +448,11 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
+          {loadError}
+        </div>
+      )}
       {/* Page Header */}
       <PageHeader
         title="مركز التشغيل والموافقات"
@@ -399,7 +469,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 إنشاء مهمة تشغيل
               </Button>
             )}
-            {activeTab === 'maintenance' && canManageOperations && (
+            {activeTab === 'maintenance' && canManageOperations && !centralActive && (
               <Button variant="primary" onClick={() => setNewMaintModalOpen(true)}>
                 <Plus className="w-4 h-4 ml-2" />
                 جدولة صيانة
@@ -810,7 +880,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                   min="1"
                   max="10"
                   value={newJobPriority}
-                  onChange={(e) => setNewJobPriority(Number(e.target.value))}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    setNewJobPriority(Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 5);
+                  }}
                   className={`w-full ${inputClass}`}
                 />
               </div>
@@ -982,7 +1055,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                             { key: 'payments', header: 'المدفوعات', render: (u) => <span className="text-muted">{formatNumber(u.payments_total ?? 0)}</span> },
                             {
                               key: 'tickets', header: 'تذاكر مفتوحة',
-                              render: (u) => <span className={u.open_tickets > 0 ? 'text-warning font-bold' : 'text-muted'}>{u.open_tickets}</span>,
+                              render: (u) => <span className={(u.open_tickets ?? 0) > 0 ? 'text-warning font-bold' : 'text-muted'}>{u.open_tickets ?? 0}</span>,
                             },
                             { key: 'last', header: 'آخر نشاط', render: (u) => <span className="text-[11px] text-muted">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</span> },
                           ]}

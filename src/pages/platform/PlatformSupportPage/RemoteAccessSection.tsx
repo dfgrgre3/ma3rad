@@ -29,9 +29,9 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
         <span className="text-xs text-muted">
           {details.ticket.remoteAccessRequested ? (
             details.ticket.remoteAccessApproved ? (
-              <span className="text-success font-bold">معتمد من العميل</span>
+              <span className="text-success font-bold">معتمد — جاهز لبدء الجلسة</span>
             ) : (
-              <span className="text-warning font-bold">بانتظار موافقة العميل</span>
+              <span className="text-warning font-bold">بانتظار الاعتماد</span>
             )
           ) : (
             'غير مطلوب'
@@ -60,7 +60,7 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
                 onClick={() => onApproveRemoteAccess(true)}
                 leadingIcon={<Unlock className="h-3 w-3" />}
               >
-                الموافقة على الوصول
+                اعتماد الوصول
               </Button>
             ) : (
               <Button

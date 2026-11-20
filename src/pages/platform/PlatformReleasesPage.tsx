@@ -72,12 +72,18 @@ interface CentralReleaseRow {
   updatedAt: string;
 }
 
-function mapCentralRelease(r: CentralReleaseRow): PlatformRelease & { _central?: CentralReleaseRow } {
+type ReleaseWithCentral = PlatformRelease & { _central?: CentralReleaseRow };
+
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function mapCentralRelease(r: CentralReleaseRow): ReleaseWithCentral {
   const targets = Array.isArray(r.targetTenantIds) ? r.targetTenantIds : [];
   return {
     id: r.id,
     version: r.version,
-    channel: (r.channel === 'BETA' ? 'BETA' : r.channel === 'ALPHA' ? 'ALPHA' : 'STABLE') as PlatformRelease['channel'],
+    // Preserve every channel the central server reports; only fall back to
+    // STABLE for unrecognised values (never silently upgrade HOTFIX→BETA).
+    channel: (['STABLE', 'BETA', 'ALPHA', 'HOTFIX'].includes(r.channel) ? r.channel : 'STABLE') as PlatformRelease['channel'],
     status: (r.status === 'PUBLISHED' ? 'PUBLISHED' : r.status === 'DRAFT' ? 'DRAFT' : 'DEPRECATED') as PlatformRelease['status'],
     isMandatory: r.isMandatory,
     minVersion: r.minRequiredVersion || '1.0.0',
@@ -94,7 +100,7 @@ function mapCentralRelease(r: CentralReleaseRow): PlatformRelease & { _central?:
     createdAt: r.publishedAt || r.createdAt,
     updatedAt: r.updatedAt,
     _central: r,
-  } as PlatformRelease & { _central?: CentralReleaseRow };
+  };
 }
 
 export const PlatformReleasesPage: React.FC = () => {
@@ -151,7 +157,7 @@ export const PlatformReleasesPage: React.FC = () => {
     setActiveReleaseForTargets(rel);
     setTargetsLoading(true);
     if (centralActive) {
-      const central = (rel as any)._central as CentralReleaseRow | undefined;
+      const central = (rel as ReleaseWithCentral)._central;
       setSelectedTenantIds(Array.isArray(central?.targetTenantIds) ? central.targetTenantIds : []);
       setTargets([]);
       setTargetsLoading(false);
@@ -175,7 +181,7 @@ export const PlatformReleasesPage: React.FC = () => {
       return;
     }
     if (centralActive) {
-      const central = (activeReleaseForTargets as any)._central as CentralReleaseRow | undefined;
+      const central = (activeReleaseForTargets as ReleaseWithCentral)._central;
       centralPlatformClient.updateRelease(activeReleaseForTargets.id, {
         targetTenantIds: selectedTenantIds,
         rolloutStrategy: selectedTenantIds.length ? 'PHASED' : (central?.rolloutStrategy === 'PHASED' ? 'PHASED' : 'FULL'),
@@ -194,21 +200,22 @@ export const PlatformReleasesPage: React.FC = () => {
     }
   };
 
-  const handleDisableRelease = (id: string) => {
+  // Central: published releases are rolled back; drafts are deleted — separate
+  // actions with honest labels (previously both were labelled "تعطيل").
+  const handleDisableRelease = (id: string, rel: PlatformRelease) => {
     if (!canManageReleases) {
       toast.warning('لا تملك صلاحية إدارة الإصدارات.');
       return;
     }
-    const rel = releases.find((r) => r.id === id);
     if (centralActive) {
-      const central = (rel as any)?._central as CentralReleaseRow | undefined;
+      const central = (rel as ReleaseWithCentral)._central;
       if (central?.status === 'PUBLISHED') {
-        if (!confirm('إيقاف هذا الإصدار المنشور (rollback)؟ لن يصل للعملاء الجدد.')) return;
+        if (!confirm(`إيقاف الإصدار المنشور ${rel.version} (rollback)؟ لن يصل للعملاء الجدد.`)) return;
         centralPlatformClient.rollbackRelease(id)
           .then(loadData)
           .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر إيقاف الإصدار.'));
       } else {
-        if (!confirm('حذف هذا الإصدار غير المنشور؟')) return;
+        if (!confirm(`حذف مسودة الإصدار ${rel.version}؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
         centralPlatformClient.deleteRelease(id)
           .then(loadData)
           .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر حذف الإصدار.'));
@@ -230,7 +237,7 @@ export const PlatformReleasesPage: React.FC = () => {
       return;
     }
     if (centralActive) {
-      if (!confirm(`إيقاف الإصدار ${rel.version} (rollback)؟`)) return;
+      if (!confirm(`إيقاف الإصدار ${rel.version} (rollback)؟ لن يصل للعملاء الجدد.`)) return;
       centralPlatformClient.rollbackRelease(rel.id)
         .then(loadData)
         .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع.'));
@@ -238,8 +245,13 @@ export const PlatformReleasesPage: React.FC = () => {
     }
     const safeVer = prompt(`أدخل الإصدار الآمن الذي ترغب في التراجع الطارئ إليه (الإصدار الحالي: ${rel.version}):`);
     if (!safeVer || !safeVer.trim()) return;
+    const trimmed = safeVer.trim();
+    if (!SEMVER_RE.test(trimmed)) {
+      toast.error('صيغة رقم الإصدار غير صحيحة — استخدم SemVer مثل 1.4.2.');
+      return;
+    }
     try {
-      platformAdminService.rollbackRelease(rel.id, safeVer.trim());
+      platformAdminService.rollbackRelease(rel.id, trimmed);
       loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر تنفيذ التراجع الطارئ.');
@@ -265,8 +277,18 @@ export const PlatformReleasesPage: React.FC = () => {
       toast.warning('رقم الإصدار مطلوب.');
       return;
     }
+    if (!SEMVER_RE.test(releaseForm.version.trim())) {
+      toast.error('صيغة رقم الإصدار غير صحيحة — استخدم SemVer مثل 2.1.0 أو 2.1.0-beta.1.');
+      return;
+    }
     if (centralActive) {
-      const channel = releaseForm.channel === 'HOTFIX' ? 'BETA' : releaseForm.channel;
+      // Central channel enum has no HOTFIX — refuse rather than silently
+      // downgrading it to BETA.
+      if (releaseForm.channel === 'HOTFIX') {
+        toast.error('قناة HOTFIX غير مدعومة في الوضع المركزي — اختر STABLE أو BETA.');
+        return;
+      }
+      const channel = releaseForm.channel;
       const payload = {
         version: releaseForm.version.trim(),
         channel,
@@ -279,13 +301,18 @@ export const PlatformReleasesPage: React.FC = () => {
         rolloutPercent: 100,
         targetTenantIds: [],
       };
-      const existing = (releaseForm as any)._central as CentralReleaseRow | undefined;
+      const existing = (releaseForm as ReleaseWithCentral)._central;
+      // Create stays a draft — publishing is a separate explicit action via the
+      // "نشر" button, so accidental publishes are impossible.
       const request = existing
         ? centralPlatformClient.updateRelease(releaseForm.id, payload)
-        : centralPlatformClient.createRelease(payload).then((created: any) =>
-            centralPlatformClient.publishRelease(created?.id ?? created?.data?.id ?? releaseForm.id));
+        : centralPlatformClient.createRelease(payload);
       Promise.resolve(request)
-        .then(() => { setIsUpsertOpen(false); loadData(); })
+        .then(() => {
+          setIsUpsertOpen(false);
+          if (!existing) toast.success('تم إنشاء الإصدار كمسودة — انشره عند الجاهزية.');
+          loadData();
+        })
         .catch((err) => toast.error(err instanceof Error ? err.message : 'فشل حفظ الإصدار.'));
       return;
     }
@@ -341,7 +368,7 @@ export const PlatformReleasesPage: React.FC = () => {
             <DataTable
               ariaLabel="إصدارات التطبيق"
               rows={releases}
-              rowKey={(rel: any) => String(rel.id)}
+              rowKey={(rel: PlatformRelease) => String(rel.id)}
               minWidth={950}
               dense
               tableClassName="text-xs"
@@ -349,7 +376,7 @@ export const PlatformReleasesPage: React.FC = () => {
               columns={[
                 {
                   key: 'ver', header: 'الإصدار / القناة',
-                  render: (rel: any) => (
+                  render: (rel: PlatformRelease) => (
                     <span className="block">
                       <span className="flex items-center gap-2">
                         <span className="font-mono text-sm font-bold text-muted">{rel.version}</span>
@@ -363,7 +390,7 @@ export const PlatformReleasesPage: React.FC = () => {
                 },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (rel: any) => (
+                  render: (rel: PlatformRelease) => (
                     <span className="block">
                       <span className={`inline-flex items-center gap-1 font-bold ${rel.status === 'PUBLISHED' ? 'text-success' : rel.status === 'DEPRECATED' ? 'text-danger' : 'text-muted'}`}>
                         {rel.status === 'PUBLISHED' ? 'منشور (نشط)' : rel.status === 'DEPRECATED' ? 'معطّل/ملغي' : 'مسودة'}
@@ -374,7 +401,7 @@ export const PlatformReleasesPage: React.FC = () => {
                 },
                 {
                   key: 'mandatory', header: 'إجباري / الحد الأدنى',
-                  render: (rel: any) => (
+                  render: (rel: PlatformRelease) => (
                     <span className="block">
                       <span className="block">{rel.isMandatory ? <span className="font-bold text-danger">إجباري</span> : 'اختياري'}</span>
                       <span className="block text-[10px] text-muted">أدنى: {rel.minVersion || 'لا يوجد'}</span>
@@ -383,11 +410,11 @@ export const PlatformReleasesPage: React.FC = () => {
                 },
                 {
                   key: 'group', header: 'مجموعة التوزيع',
-                  render: (rel: any) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{rel.rolloutGroup}</span>,
+                  render: (rel: PlatformRelease) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{rel.rolloutGroup}</span>,
                 },
                 {
                   key: 'targets', header: 'نتائج التطبيق (Targets)',
-                  render: (rel: any) => {
+                  render: (rel: PlatformRelease) => {
                     const summary = rel.targetsSummary || { total: 0, pending: 0, success: 0, failed: 0 };
                     return (
                       <span className="flex items-center gap-2 text-[11px]">
@@ -399,25 +426,47 @@ export const PlatformReleasesPage: React.FC = () => {
                     );
                   },
                 },
-                { key: 'date', header: 'تاريخ النشر', render: (rel: any) => <span className="text-muted">{formatDateTime(rel.createdAt)}</span> },
+                { key: 'date', header: 'تاريخ النشر', render: (rel: PlatformRelease) => <span className="text-muted">{formatDateTime(rel.createdAt)}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
-                  render: (rel: any) => (
+                  render: (rel: PlatformRelease) => (
                     <span className="flex items-center justify-center gap-2">
                       <button onClick={() => handleOpenTargets(rel)} className="flex items-center gap-1 text-xs text-primary hover:text-primary" title="تحديد أو فحص العملاء المستهدفين">
                         <Users className="h-3.5 w-3.5" />
                         العملاء
                       </button>
                       {centralActive && rel.status === 'DRAFT' && canManageReleases && (
-                        <button onClick={() => handlePublish(rel.id)} className="text-xs font-bold text-success hover:text-success" title="نشر الإصدار">
-                          نشر
-                        </button>
+                        <>
+                          <button
+                            onClick={() => {
+                              setReleaseForm({ ...rel });
+                              setIsUpsertOpen(true);
+                            }}
+                            className="text-xs font-bold text-primary hover:text-primary"
+                            title="تعديل مسودة الإصدار"
+                          >
+                            تعديل
+                          </button>
+                          <button onClick={() => handlePublish(rel.id)} className="text-xs font-bold text-success hover:text-success" title="نشر الإصدار">
+                            نشر
+                          </button>
+                        </>
                       )}
                       {rel.status !== 'DEPRECATED' && canManageReleases && (
                         <>
-                          <button onClick={() => handleDisableRelease(rel.id)} className="text-xs text-danger hover:text-danger" title="تعطيل فوري للإصدار">
-                            تعطيل
-                          </button>
+                          {centralActive ? (
+                            <button
+                              onClick={() => handleDisableRelease(rel.id, rel)}
+                              className="text-xs text-danger hover:text-danger"
+                              title={rel.status === 'PUBLISHED' ? 'إيقاف الإصدار (rollback)' : 'حذف مسودة الإصدار'}
+                            >
+                              {rel.status === 'PUBLISHED' ? 'إيقاف' : 'حذف'}
+                            </button>
+                          ) : (
+                            <button onClick={() => handleDisableRelease(rel.id, rel)} className="text-xs text-danger hover:text-danger" title="تعطيل فوري للإصدار">
+                              تعطيل
+                            </button>
+                          )}
                           <button onClick={() => handleRollback(rel)} className="flex items-center gap-1 text-xs text-warning hover:text-warning" title="تراجع طارئ">
                             <RotateCcw className="h-3 w-3" />
                             تراجع
@@ -457,6 +506,7 @@ export const PlatformReleasesPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={!canManageReleases}
                       onChange={(e) => {
                         if (e.target.checked) {
                           setSelectedTenantIds([...selectedTenantIds, t.id]);
@@ -526,7 +576,7 @@ export const PlatformReleasesPage: React.FC = () => {
               <label className="block text-xs font-semibold text-muted mb-1">قناة الإصدار</label>
               <select
                 value={releaseForm.channel}
-                onChange={(e) => setReleaseForm({ ...releaseForm, channel: e.target.value as any })}
+                onChange={(e) => setReleaseForm({ ...releaseForm, channel: e.target.value as PlatformRelease['channel'] })}
                 className={inputClass}
               >
                 <option value="STABLE">مستقر (STABLE)</option>
@@ -588,7 +638,7 @@ export const PlatformReleasesPage: React.FC = () => {
               إلغاء
             </Button>
             <Button size="sm" onClick={handleSaveRelease} disabled={!canManageReleases}>
-              نشر الإصدار
+              {releaseForm.id && (releaseForm as ReleaseWithCentral)._central ? 'حفظ التعديلات' : centralActive ? 'إنشاء كمسودة' : 'نشر الإصدار'}
             </Button>
           </div>
         </div>

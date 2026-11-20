@@ -17,12 +17,16 @@ import type {
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/Toast';
+import type { PlatformRemoteSession } from '../../services/domains/platform/platformTypes';
 import {
   mapPriorityToCentral,
   mapCentralTicket,
   mapCentralMessage,
   type CentralTicketRow,
+  type CentralMessageRow,
 } from './PlatformSupportPage/mappers';
+import { Modal } from '../../components/ui/Modal';
+import { inputClass } from './components/PlatformUI';
 import { TicketListPanel } from './PlatformSupportPage/TicketListPanel';
 import { TicketDetailPanel } from './PlatformSupportPage/TicketDetailPanel';
 import { NewTicketModal } from './PlatformSupportPage/NewTicketModal';
@@ -58,6 +62,8 @@ export const PlatformSupportPage: React.FC = () => {
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [isRemoteSessionOpen, setIsRemoteSessionOpen] = useState(false);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+  const [endSessionModal, setEndSessionModal] = useState<{ sessionId: string } | null>(null);
+  const [endSessionSummary, setEndSessionSummary] = useState('');
 
   // New ticket form
   const [newTenantId, setNewTenantId] = useState('');
@@ -108,53 +114,71 @@ export const PlatformSupportPage: React.FC = () => {
     loadTickets();
   }, [loadTickets]);
 
-  // Load ticket details when selected
+  // Load ticket details when selected — with a stale-response guard so a slow
+  // response for a previously selected ticket cannot overwrite the current one.
+  const detailsRequestRef = React.useRef(0);
+  const selectedTicketIdRef = React.useRef<string | null>(null);
+  selectedTicketIdRef.current = selectedTicketId;
+
   const loadTicketDetails = useCallback((id: string) => {
+    const requestId = ++detailsRequestRef.current;
+    const isCurrent = () => requestId === detailsRequestRef.current && selectedTicketIdRef.current === id;
     setDetailsLoading(true);
+    setDetails(null);
     if (centralActive) {
-      Promise.all([
-        centralPlatformClient.getSupportTicket(id),
-        centralPlatformClient.listRemoteSessions(id).catch(() => []),
-      ])
-        .then(([data, sessions]: [any, any[]]) => {
-          const ticket = mapCentralTicket({ ...(data.ticket ?? data), messages: data.messages });
+      centralPlatformClient.getSupportTicket(id)
+        .then(async (data) => {
+          if (!isCurrent()) return;
+          // Remote sessions are fetched separately so a session-endpoint failure
+          // surfaces as a warning instead of hiding the whole ticket detail.
+          let sessions: Array<Record<string, unknown>> = [];
+          let sessionsError: string | null = null;
+          try {
+            sessions = (await centralPlatformClient.listRemoteSessions(id)) as Array<Record<string, unknown>>;
+          } catch (e) {
+            sessionsError = e instanceof Error ? e.message : 'تعذر تحميل جلسات الوصول عن بُعد.';
+          }
+          if (!isCurrent()) return;
+          if (sessionsError) toast.warning(sessionsError);
+          const ticket = mapCentralTicket({ ...(data.ticket ?? data), messages: data.messages } as CentralTicketRow);
           setDetails({
             ticket,
-            messages: (Array.isArray(data.messages) ? data.messages : []).map(mapCentralMessage),
-            remoteSessions: sessions.map((s: any) => ({
-              id: s.id,
-              ticketId: s.ticket_id,
-              tenantId: s.tenant_id || '',
-              staffId: s.staff_id || '',
-              technicianName: s.technician_name,
-              status: s.status === 'ENDED' ? 'COMPLETED' : s.status === 'EXPIRED' ? 'TERMINATED' : 'ACTIVE',
-              startedAt: s.started_at,
-              endedAt: s.ended_at,
-              durationMinutes: s.duration_minutes || 60,
-              actionsSummary: s.summary,
+            messages: (Array.isArray(data.messages) ? data.messages : []).map((m: unknown) => mapCentralMessage(m as CentralMessageRow)),
+            remoteSessions: sessions.map((s) => ({
+              id: String(s.id ?? ''),
+              ticketId: String(s.ticket_id ?? s.ticketId ?? ''),
+              tenantId: String(s.tenant_id ?? s.tenantId ?? ''),
+              staffId: String(s.staff_id ?? s.staffId ?? ''),
+              technicianName: String(s.technician_name ?? s.technicianName ?? ''),
+              status: (s.status === 'ENDED' ? 'COMPLETED' : s.status === 'EXPIRED' ? 'TERMINATED' : 'ACTIVE') as PlatformRemoteSession['status'],
+              startedAt: String(s.started_at ?? s.startedAt ?? ''),
+              endedAt: (s.ended_at ?? s.endedAt ?? null) as string | null,
+              durationMinutes: Number(s.duration_minutes ?? s.durationMinutes ?? 60) || 60,
+              actionsSummary: (s.summary ?? null) as string | null,
             })),
             tenant: data.tenantName ? {
-              id: data.tenantId ?? ticket.tenantId,
-              code: data.tenantCode ?? '',
-              name: data.tenantName,
-              email: data.requesterEmail ?? null,
-              phone: data.requesterPhone ?? null,
+              id: String(data.tenantId ?? ticket.tenantId),
+              code: String(data.tenantCode ?? ''),
+              name: String(data.tenantName),
+              email: (data.requesterEmail ?? null) as string | null,
+              phone: (data.requesterPhone ?? null) as string | null,
               status: 'ACTIVE',
             } : null,
             assignedStaff: null,
           });
         })
-        .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.'))
-        .finally(() => setDetailsLoading(false));
+        .catch((err) => { if (isCurrent()) setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.'); })
+        .finally(() => { if (isCurrent()) setDetailsLoading(false); });
       return;
     }
     try {
       const data = platformAdminService.getSupportTicketDetails(id);
+      if (!isCurrent()) return;
       setDetails(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.');
+      if (isCurrent()) setError(err instanceof Error ? err.message : 'تعذر تحميل تفاصيل التذكرة.');
     } finally {
-      setDetailsLoading(false);
+      if (isCurrent()) setDetailsLoading(false);
     }
   }, [centralActive]);
 
@@ -162,6 +186,7 @@ export const PlatformSupportPage: React.FC = () => {
     if (selectedTicketId) {
       loadTicketDetails(selectedTicketId);
     } else {
+      detailsRequestRef.current += 1;
       setDetails(null);
     }
   }, [selectedTicketId, loadTicketDetails]);
@@ -178,6 +203,11 @@ export const PlatformSupportPage: React.FC = () => {
   const handleSendMessage = () => {
     if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId || !messageBody.trim()) return;
+    // Reject malformed attachment links instead of storing junk in the body.
+    if (attachmentUrl.trim() && !/^https?:\/\//i.test(attachmentUrl.trim())) {
+      toast.error('رابط المرفق يجب أن يبدأ بـ http:// أو https://');
+      return;
+    }
     setSendingMessage(true);
     if (centralActive) {
       const attachmentNote = [attachmentUrl.trim(), attachmentName.trim()].filter(Boolean).join(' — ');
@@ -334,16 +364,20 @@ export const PlatformSupportPage: React.FC = () => {
     }
   };
 
-  // End Remote Session
-  const handleEndRemoteSession = async (sessionId: string) => {
+  // End Remote Session — confirm via modal (was window.prompt).
+  const handleConfirmEndSession = async () => {
+    if (!endSessionModal) return;
     if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
-    const summary = prompt('أدخل ملخص إنهاء جلسة الوصول عن بُعد:');
+    const { sessionId } = endSessionModal;
+    const summary = endSessionSummary.trim() || undefined;
     try {
       if (centralActive) {
-        await centralPlatformClient.endRemoteSession(sessionId, summary || undefined);
+        await centralPlatformClient.endRemoteSession(sessionId, summary);
       } else {
-        platformAdminService.endRemoteSession(sessionId, summary || undefined);
+        platformAdminService.endRemoteSession(sessionId, summary);
       }
+      setEndSessionModal(null);
+      setEndSessionSummary('');
       if (selectedTicketId) loadTicketDetails(selectedTicketId);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر إنهاء جلسة الوصول.');
@@ -366,7 +400,7 @@ export const PlatformSupportPage: React.FC = () => {
         body: newDescription.trim() || undefined,
         assigneeName: newAssignedTo.trim() || undefined,
       })
-        .then((created: any) => {
+        .then((created: { id?: string; data?: { id?: string } }) => {
           setIsNewTicketOpen(false);
           setNewSubject('');
           setNewDescription('');
@@ -480,7 +514,7 @@ export const PlatformSupportPage: React.FC = () => {
           onToggleRemoteRequest={handleToggleRemoteRequest}
           onApproveRemoteAccess={handleApproveRemoteAccess}
           onStartSession={() => setIsRemoteSessionOpen(true)}
-          onEndRemoteSession={handleEndRemoteSession}
+          onEndRemoteSession={(sessionId) => setEndSessionModal({ sessionId })}
         />
       </div>
 
@@ -526,6 +560,35 @@ export const PlatformSupportPage: React.FC = () => {
         canManageSupport={canManageSupport}
         onSubmit={handleRateTicket}
       />
+
+      {/* Modal: End Remote Session */}
+      <Modal
+        open={endSessionModal !== null}
+        onClose={() => { setEndSessionModal(null); setEndSessionSummary(''); }}
+        title="إنهاء جلسة الوصول عن بُعد"
+      >
+        <div className="space-y-3.5 text-right">
+          <p className="text-xs text-muted">سيتم تسجيل ملخص الجلسة في سجل التدقيق.</p>
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-1">ملخص الجلسة (اختياري)</label>
+            <textarea
+              rows={3}
+              value={endSessionSummary}
+              onChange={(e) => setEndSessionSummary(e.target.value)}
+              placeholder="ما الذي تم إنجازه خلال الجلسة؟"
+              className={inputClass}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setEndSessionModal(null); setEndSessionSummary(''); }}>
+              إلغاء
+            </Button>
+            <Button variant="primary" onClick={handleConfirmEndSession}>
+              إنهاء الجلسة
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

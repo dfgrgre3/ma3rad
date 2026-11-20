@@ -44,7 +44,8 @@ import { PlatformStaffAuthService } from '../../services/domains/platform/Platfo
 export interface PlatformRoutesProps {
   currentUser: User;
   onLogout: () => void;
-  onSwitchUser: (userId: string) => void;
+  /** Accepted for AppRouter compatibility; platform routes never switch users. */
+  onSwitchUser?: (userId: string) => void;
 }
 
 const PlatformRouteGuard: React.FC<{

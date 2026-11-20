@@ -19,7 +19,7 @@ export const LoginsTab: React.FC<LoginsTabProps> = ({ failedOnly, onFailedOnlyCh
           الفاشلة/المحظورة فقط
         </label>
       </div>
-      <span className="text-[11px] text-muted">آخر {logins.length} محاولة · كل المحاولات مسجلة في سجل التدقيق</span>
+      <span className="text-[11px] text-muted">آخر {logins.length} محاولة معروضة · كل المحاولات مسجلة في سجل التدقيق</span>
     </div>
     <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70">
       {logins.length === 0 ? (

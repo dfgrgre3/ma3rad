@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { platformAdminService } from '../../../services/domains/platform/PlatformAdminService';
 import { centralPlatformClient } from '../../../services/domains/platform/CentralPlatformClient';
+import { getCentralDataSourceState } from '../../../hooks/platform/useCentralDataSource';
 import type {
   PlatformPlan,
   PlatformTenant,
@@ -237,10 +238,16 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
       let overrideRows: any[] = [];
 
       if (centralActive) {
+        const central = getCentralDataSourceState();
+        if (central.misconfigured) {
+          throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+        }
+        // Let failures surface in the error state instead of silently
+        // rendering an empty catalog.
         const [m, f, o] = await Promise.all([
-          centralPlatformClient.listModules().catch(() => [] as any[]),
-          centralPlatformClient.listFeatureFlags().catch(() => [] as any[]),
-          centralPlatformClient.listTenantOverrides(tenant.id).catch(() => [] as any[]),
+          centralPlatformClient.listModules(),
+          centralPlatformClient.listFeatureFlags(),
+          centralPlatformClient.listTenantOverrides(tenant.id),
         ]);
         moduleRows = Array.isArray(m) ? m : [];
         featureRows = Array.isArray(f) ? f : [];
@@ -305,12 +312,12 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
     async (kind: 'MODULE' | 'FEATURE', code: string, desired: boolean, existing: CatalogOverride | undefined) => {
       if (centralActive) {
         const body = { kind, code, value: null, isEnabled: desired };
-        try {
-          await centralPlatformClient.addTenantOverride(tenant!.id, body);
-        } catch {
-          if (existing) await centralPlatformClient.removeTenantOverride(tenant!.id, existing.id).catch(() => undefined);
-          await centralPlatformClient.addTenantOverride(tenant!.id, body);
+        // The central API has no override-update endpoint: replace the row
+        // deterministically (remove-then-add) so a stale override cannot linger.
+        if (existing) {
+          await centralPlatformClient.removeTenantOverride(tenant!.id, existing.id).catch(() => undefined);
         }
+        await centralPlatformClient.addTenantOverride(tenant!.id, body);
         return;
       }
       if (existing) {

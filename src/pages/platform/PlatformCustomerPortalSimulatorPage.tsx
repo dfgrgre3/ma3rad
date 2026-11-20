@@ -17,13 +17,30 @@ import { platformAdminService } from '../../services/domains/platform/PlatformAd
  * unavailable rather than presenting mock or hardcoded records.
  */
 export const PlatformCustomerPortalSimulatorPage: React.FC = () => {
-  const dataSource = (() => {
+  // Reactive snapshot — the data-source flag can change while the page is open.
+  const [dataSource, setDataSource] = React.useState<'local' | 'central'>(() => {
     try {
       return platformAdminService.getDataSource();
     } catch {
       return 'local';
     }
-  })();
+  });
+  React.useEffect(() => {
+    const refresh = () => {
+      try {
+        setDataSource(platformAdminService.getDataSource());
+      } catch {
+        setDataSource('local');
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   const checks: Array<{ label: string; ok: boolean; detail: string }> = [
     {

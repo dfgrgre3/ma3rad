@@ -170,3 +170,55 @@ test('ensureModuleInstalled installs once, shares concurrent calls and reports f
   assert.deepEqual(await ensureModuleInstalled('any', undefined), { ok: true }, 'no desktop shell → no-op');
   resetModuleInstallerState();
 });
+
+test('provisionEntitledModules installs only entitled catalog modules and reports progress', async () => {
+  const { provisionEntitledModules, resetModuleInstallerState } = await import('../src/modules/moduleInstaller.ts');
+  resetModuleInstallerState();
+
+  // Non module-packages build (no buildId): nothing to provision.
+  const plain = await provisionEntitledModules({
+    status: async () => ({ installed: [] }),
+    install: async () => undefined,
+    available: async () => [],
+  });
+  assert.equal(plain.attempted, false);
+
+  const installedOrder: string[] = [];
+  const progress: Array<{ completed: number; total: number; currentModuleId?: string; finishedModuleId?: string; finishedOk?: boolean }> = [];
+  let catalogSeen: string[] = [];
+  const api = {
+    status: async () => ({ buildId: 'b'.repeat(64), installed: [] }),
+    available: async () => [
+      { moduleId: 'sales', version: '1.0.0', sizeBytes: 10, installed: false },
+      { moduleId: 'hr', version: '1.0.0', sizeBytes: 10, installed: false },
+      { moduleId: 'finance', version: '1.0.0', sizeBytes: 10, installed: true },
+    ],
+    install: async (id: string) => {
+      if (id === 'hr') throw new Error('offline');
+      installedOrder.push(id);
+    },
+  };
+  const result = await provisionEntitledModules(api, (p) => progress.push(p), (modules) => { catalogSeen = modules.map((m) => m.moduleId); });
+
+  assert.equal(result.attempted, true);
+  assert.deepEqual(catalogSeen, ['sales', 'hr', 'finance']);
+  assert.deepEqual(installedOrder, ['sales'], 'installed entries and failed modules are not retried blindly');
+  assert.deepEqual(result.installed, ['sales']);
+  assert.deepEqual(result.failed, [{ moduleId: 'hr', reason: 'offline' }]);
+  assert.equal(progress.at(-1)?.completed, 2);
+  assert.equal(progress.at(-1)?.total, 2);
+
+  // Already-ready modules are skipped on a second run.
+  const again = await provisionEntitledModules({
+    status: async () => ({ buildId: 'b'.repeat(64), installed: [{ moduleId: 'sales' }] }),
+    available: async () => [{ moduleId: 'sales', version: '1.0.0', sizeBytes: 10, installed: true }],
+    install: async () => { throw new Error('must not be called'); },
+  });
+  assert.deepEqual(again.installed, []);
+  assert.deepEqual(again.failed, []);
+
+  // No installer API at all → no-op.
+  const noApi = await provisionEntitledModules(undefined);
+  assert.equal(noApi.attempted, false);
+  resetModuleInstallerState();
+});

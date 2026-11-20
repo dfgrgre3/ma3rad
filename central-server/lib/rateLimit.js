@@ -14,6 +14,11 @@ const LOGIN_IP_MAX_FAILURES = envInt('LOGIN_RATE_LIMIT_IP_MAX', 30);
 const LOGIN_USERNAME_MAX_FAILURES = envInt('LOGIN_RATE_LIMIT_USERNAME_MAX', 10);
 const MFA_WINDOW_MINUTES = envInt('MFA_RATE_LIMIT_WINDOW_MINUTES', 15);
 const MFA_MAX_FAILURES = envInt('MFA_RATE_LIMIT_MAX', 5);
+// Device-activation attempts verify tenant account credentials before any
+// device credential exists, so they get their own counters — scoped by
+// failure_reason so they never interfere with platform staff logins.
+const ACTIVATION_IP_MAX_FAILURES = envInt('ACTIVATION_RATE_LIMIT_IP_MAX', 30);
+const ACTIVATION_USERNAME_MAX_FAILURES = envInt('ACTIVATION_RATE_LIMIT_USERNAME_MAX', 10);
 
 /**
  * Count failed login attempts recorded in platform_login_attempts within a
@@ -62,4 +67,6 @@ module.exports = {
   LOGIN_USERNAME_MAX_FAILURES,
   MFA_WINDOW_MINUTES,
   MFA_MAX_FAILURES,
+  ACTIVATION_IP_MAX_FAILURES,
+  ACTIVATION_USERNAME_MAX_FAILURES,
 };

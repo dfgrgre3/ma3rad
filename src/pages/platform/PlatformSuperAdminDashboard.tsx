@@ -66,36 +66,12 @@ import {
   AlertCard,
 } from './components/Charts';
 import { usePlatformDashboardData } from './dashboard/usePlatformDashboardData';
-
-const CHANNEL_LABELS: Record<string, string> = {
-  STABLE: 'مستقر',
-  BETA: 'تجريبي',
-  NIGHTLY: 'ليلي',
-};
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: 'نقدي',
-  BANK: 'تحويل بنكي',
-  CARD: 'بطاقة',
-  WALLET: 'محفظة إلكترونية',
-  OTHER: 'أخرى',
-};
-
-const TENANT_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: 'نشط',
-  TRIAL: 'تجريبي',
-  SUSPENDED: 'موقوف',
-  EXPIRED: 'منتهي',
-  CANCELLED: 'ملغي',
-};
-
-const TENANT_STATUS_TONES: Record<string, string> = {
-  ACTIVE: 'bg-success-soft text-success border-success-border',
-  TRIAL: 'bg-warning-soft text-warning border-warning-border',
-  SUSPENDED: 'bg-danger-soft text-danger border-danger-border',
-  EXPIRED: 'bg-surface-sunken text-ink-secondary border-line',
-  CANCELLED: 'bg-surface-sunken text-muted border-line',
-};
+import {
+  CHANNEL_LABELS,
+  PAYMENT_METHOD_LABELS,
+  TENANT_STATUS_LABELS,
+  TENANT_STATUS_TONES,
+} from './platformLabels';
 
 const SUB_STATUS_COLORS: Record<string, string> = {
   نشط: '#10b981',
@@ -150,6 +126,14 @@ const periodLabel = (period: string): string =>
     : period === 'all' ? 'كل الفترات'
     : 'الفترة المحددة';
 
+const TENANT_STATUS_COUNT_KEYS: Record<string, 'active' | 'trial' | 'suspended' | 'expired' | 'cancelled'> = {
+  ACTIVE: 'active',
+  TRIAL: 'trial',
+  SUSPENDED: 'suspended',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
+};
+
 const DonutLegend: React.FC<{ segments: Array<{ label: string; value: number; color: string }> }> = ({ segments }) => (
   <ul className="mt-3 space-y-1.5">
     {segments.filter((s) => s.value > 0).map((s) => (
@@ -178,7 +162,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
     return () => window.clearInterval(id);
   }, [reload]);
 
-  if (error) {
+  // Only show the full-page loading state on the INITIAL load — during
+  // background refreshes `data` is retained so the page stays rendered.
+  if (error && !data?.overview) {
     return (
       <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
         {error}
@@ -187,18 +173,17 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
     );
   }
 
-  if (loading || !data?.overview) {
+  if (!data?.overview) {
     return <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل بيانات المنصة...</div>;
   }
 
   const { overview, plans, bp, cm, sm, lm, om, ca, alerts: rawAlerts, extras } = data;
   const ex = extras;
 
-  const latestReleaseRaw = overview.releases?.[0] as any;
-  const latestReleaseDate = latestReleaseRaw
-    ? (latestReleaseRaw.releasedAt ?? latestReleaseRaw.releaseDate ?? latestReleaseRaw.released_at ?? latestReleaseRaw.createdAt ?? latestReleaseRaw.created_at)
-    : null;
-  const latestReleaseChannel = latestReleaseRaw ? (CHANNEL_LABELS[latestReleaseRaw.channel] ?? latestReleaseRaw.channel) : null;
+  // overview.releases is already normalized to PlatformRelease[] by the hook.
+  const latestRelease = overview.releases?.[0] ?? null;
+  const latestReleaseDate = latestRelease ? (latestRelease.releasedAt ?? latestRelease.createdAt ?? null) : null;
+  const latestReleaseChannel = latestRelease ? (CHANNEL_LABELS[latestRelease.channel] ?? latestRelease.channel) : null;
 
   const go = (path: string) => navigate(path);
 
@@ -330,8 +315,8 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
   const strugglingItems = ex.strugglingSubscriptions;
   const pendingLicenseItems = ex.pendingLicenses;
   const failedActivationItems = ex.failedActivations;
-  const expiringLicenseItems = overview.expiringLicenses ?? ex.expiringLicenses;
-  const expiringSubItems = overview.expiringSubscriptions ?? ex.expiringSubscriptions;
+  const expiringLicenseItems = overview.expiringLicenses;
+  const expiringSubItems = overview.expiringSubscriptions;
   const syncErrorItems = ex.recentSyncErrors;
   const endpointHealthItems = ex.apiEndpointsHealth;
   const topCustomerItems = ex.topCustomers;
@@ -401,10 +386,10 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 <span className={`h-1.5 w-1.5 rounded-full ${isCentral ? 'bg-accent-border' : 'bg-success'}`} />
                 {isCentral ? 'الخادم المركزي' : 'البيانات المحلية'}
               </span>
-              {latestReleaseRaw && (
+              {latestRelease && (
                 <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-surface/10 px-2.5 py-1 text-[10.5px] font-semibold text-muted">
                   <Rocket className="h-3.5 w-3.5 text-success" />
-                  آخر إصدار: <span dir="ltr" className="font-mono">v{latestReleaseRaw.version}</span>
+                  آخر إصدار: <span dir="ltr" className="font-mono">v{latestRelease.version}</span>
                   {latestReleaseChannel && <span className="rounded-full bg-success/20 px-2 py-0.5 text-success">{latestReleaseChannel}</span>}
                   <span className="text-muted">· {formatDate(latestReleaseDate)}</span>
                 </span>
@@ -429,8 +414,10 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               ))}
             </select>
             {lastUpdated && (
-              <span className="text-[10px] text-muted">
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+                {loading && <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />}
                 آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
+                {loading && ' — جارٍ التحديث'}
               </span>
             )}
             <button
@@ -574,7 +561,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
       >
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {(['ACTIVE', 'TRIAL', 'SUSPENDED', 'EXPIRED', 'CANCELLED'] as const).map((status) => {
-            const count = overview.tenants?.[status.toLowerCase() as keyof typeof overview.tenants] as number | undefined;
+            const count = overview.tenants[TENANT_STATUS_COUNT_KEYS[status]];
             return (
               <button
                 key={status}

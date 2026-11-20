@@ -100,6 +100,11 @@ declare global {
           body?: string;
         }) => Promise<{ ok: boolean; status: number; body: unknown }>;
       };
+      /** API key collected by the NSIS installer's custom page (first-run activation prefill). */
+      activation?: {
+        pending?: () => Promise<{ apiKey: string } | null>;
+        clear?: () => Promise<{ ok: boolean }>;
+      };
       /** Downloadable feature modules (desktop builds made with CERAMISYS_MODULE_PACKAGES=1). */
       modules?: {
         status: () => Promise<{ configured: boolean; trustConfigured: boolean; buildId: string; installed: Array<{ moduleId: string; version: string }> }>;

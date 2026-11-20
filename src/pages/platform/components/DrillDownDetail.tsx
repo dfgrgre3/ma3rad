@@ -1,16 +1,17 @@
 import React from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
-import { X, ExternalLink, ArrowLeft, Building2, KeyRound, CalendarClock, Wallet, CreditCard, AlertTriangle, CheckCircle2, XCircle, Clock, User, Mail, Phone, MapPin, Package, GitBranch, Cpu, Server, DollarSign, TrendingUp, BarChart2, LineChart, PieChart, Activity, Shield, Eye, Edit, Download, MoreVertical, Users, RotateCcw, ScrollText, Tag, Percent, Calculator, Wifi } from 'lucide-react';
-import type { PlatformTenant, PlatformLicense, PlatformSubscription, PlatformInvoice, PlatformPayment, PlatformDevice } from '../../../services/domains/platform/platformTypes';
+import { X, Building2, KeyRound, CalendarClock, Wallet, CreditCard, AlertTriangle, CheckCircle2, XCircle, Clock, User, Mail, Phone, MapPin, Package, GitBranch, Cpu, Server, DollarSign, Shield, Eye, Edit, Download, Users, RotateCcw, ScrollText, Tag, Percent, Calculator, Wifi, Activity } from 'lucide-react';
+import type { PlatformTenant, PlatformLicense, PlatformSubscription, PlatformInvoice, PlatformInvoiceItem, PlatformPayment, PlatformDevice } from '../../../services/domains/platform/platformTypes';
 import { formatMoney, formatNumber, formatDate, formatDateTime, StatusBadge } from './PlatformUI';
-import { Panel, MetricCard, LineChart as LineChartComp } from './Charts';
-import type { PlatformTimeSeriesPoint, PlatformMetricComparison } from '../../../services/domains/platform/platformTypes';
+import { MetricCard } from './Charts';
 
 interface DrillDownDetailProps {
   type: 'tenant' | 'license' | 'subscription' | 'invoice' | 'payment' | 'device';
   data: PlatformTenant | PlatformLicense | PlatformSubscription | PlatformInvoice | PlatformPayment | PlatformDevice;
   onClose: () => void;
   onAction?: (action: string, entityId: string) => void;
+  /** Optional permission gate — return false to disable an action button. */
+  canAction?: (action: string) => boolean;
 }
 
 const typeIcons = {
@@ -40,16 +41,16 @@ const typeColors = {
   device: 'bg-surface-muted text-ink-secondary',
 };
 
-export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, onClose, onAction }) => {
+export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, onClose, onAction, canAction }) => {
   const Icon = typeIcons[type];
-  const tenant = data as PlatformTenant;
-  const license = data as PlatformLicense;
-  const subscription = data as PlatformSubscription;
-  const invoice = data as PlatformInvoice;
-  const payment = data as PlatformPayment;
-  const device = data as PlatformDevice;
+  const actionAllowed = (action: string) => !canAction || canAction(action);
+  const actionBtnClass = 'inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-line disabled:hover:bg-surface';
+  const dangerBtnClass = 'inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50';
+  const viewBtnClass = 'inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft disabled:cursor-not-allowed disabled:opacity-50';
+  const primaryBtnClass = 'inline-flex items-center gap-1.5 rounded-lg border border-success bg-success px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-success disabled:cursor-not-allowed disabled:opacity-50';
+  const warningBtnClass = 'inline-flex items-center gap-1.5 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-[11.5px] font-semibold text-warning hover:bg-warning-soft disabled:cursor-not-allowed disabled:opacity-50';
 
-  const renderTenantDetail = () => (
+  const renderTenantDetail = (tenant: PlatformTenant) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="اسم العميل" value={tenant.name} icon={<Building2 className="h-4 w-4" />} />
@@ -71,24 +72,24 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="المستحقات" value={formatMoney(tenant.outstanding ?? 0)} icon={<DollarSign className="h-4 w-4" />} />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', tenant.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('edit', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('edit', tenant.id)} disabled={!actionAllowed('edit')} className={actionBtnClass}>
           <Edit className="h-3.5 w-3.5" /> تعديل
         </button>
-        <button onClick={() => onAction?.('activate', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('activate', tenant.id)} disabled={!actionAllowed('license')} className={actionBtnClass}>
           <KeyRound className="h-3.5 w-3.5" /> إصدار ترخيص
         </button>
-        <button onClick={() => onAction?.('invoice', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('invoice', tenant.id)} disabled={!actionAllowed('invoice')} className={actionBtnClass}>
           <Wallet className="h-3.5 w-3.5" /> إنشاء فاتورة
         </button>
       </div>
     </div>
   );
 
-  const renderLicenseDetail = () => (
+  const renderLicenseDetail = (license: PlatformLicense) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="مفتاح الترخيص" value={license.licenseKey} icon={<KeyRound className="h-4 w-4" />} />
@@ -108,24 +109,24 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="تاريخ الإنشاء" value={formatDate(license.createdAt)} icon={<CalendarClock className="h-4 w-4" />} />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', license.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('renew', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('renew', license.id)} disabled={!actionAllowed('renew')} className={actionBtnClass}>
           <RotateCcw className="h-3.5 w-3.5" /> تجديد
         </button>
-        <button onClick={() => onAction?.('activate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('activate', license.id)} disabled={!actionAllowed('device')} className={actionBtnClass}>
           <Cpu className="h-3.5 w-3.5" /> ربط جهاز
         </button>
-        <button onClick={() => onAction?.('deactivate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
+        <button onClick={() => onAction?.('deactivate', license.id)} disabled={!actionAllowed('license')} className={dangerBtnClass}>
           <XCircle className="h-3.5 w-3.5" /> إلغاء التفعيل
         </button>
       </div>
     </div>
   );
 
-  const renderSubscriptionDetail = () => (
+  const renderSubscriptionDetail = (subscription: PlatformSubscription) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="الحالة" value={<StatusBadge value={subscription.status} />} icon={<Shield className="h-4 w-4" />} />
@@ -140,24 +141,24 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="تاريخ الإنشاء" value={formatDate(subscription.createdAt || '')} icon={<CalendarClock className="h-4 w-4" />} />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', subscription.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('renew', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('renew', subscription.id)} disabled={!actionAllowed('renew')} className={actionBtnClass}>
           <RotateCcw className="h-3.5 w-3.5" /> تجديد
         </button>
-        <button onClick={() => onAction?.('cancel', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
+        <button onClick={() => onAction?.('cancel', subscription.id)} disabled={!actionAllowed('subscription')} className={dangerBtnClass}>
           <XCircle className="h-3.5 w-3.5" /> إلغاء
         </button>
-        <button onClick={() => onAction?.('change-plan', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('change-plan', subscription.id)} disabled={!actionAllowed('plan')} className={actionBtnClass}>
           <Package className="h-3.5 w-3.5" /> تغيير الباقة
         </button>
       </div>
     </div>
   );
 
-  const renderInvoiceDetail = () => (
+  const renderInvoiceDetail = (invoice: PlatformInvoice) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="رقم الفاتورة" value={invoice.number} icon={<Wallet className="h-4 w-4" />} />
@@ -179,40 +180,40 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <div>
           <h4 className="mb-2 text-sm font-bold text-ink">بنود الفاتورة</h4>
           <div className="overflow-x-auto">
-            <DataTable
+            <DataTable<PlatformInvoiceItem & { __i: number }>
             ariaLabel="أصناف الفاتورة"
-            rows={invoice.items.map((item: any, i: number) => ({ ...item, __i: i }))}
-            rowKey={(item: any) => String(item.__i)}
+            rows={invoice.items.map((item, i) => ({ ...item, __i: i }))}
+            rowKey={(item) => String(item.__i)}
             dense
             columns={[
-              { key: 'desc', header: 'الوصف', render: (item: any) => <span className="text-[12px] font-semibold text-ink">{item.description}</span> },
-              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="text-[11px] text-muted">{formatNumber(item.quantity)}</span> },
-              { key: 'price', header: 'سعر الوحدة', render: (item: any) => <span className="text-[11px] text-muted">{formatMoney(item.unitPrice)}</span> },
-              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="text-[11px] font-bold text-ink">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</span> },
+              { key: 'description', header: 'الوصف', render: (item) => <span className="text-[12px] font-semibold text-ink">{item.description}</span> },
+              { key: 'quantity', header: 'الكمية', render: (item) => <span className="text-[11px] text-muted">{formatNumber(item.quantity)}</span> },
+              { key: 'unitPrice', header: 'سعر الوحدة', render: (item) => <span className="text-[11px] text-muted">{formatMoney(item.unitPrice)}</span> },
+              { key: 'total', header: 'الإجمالي', render: (item) => <span className="text-[11px] font-bold text-ink">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</span> },
             ]}
           />
           </div>
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', invoice.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('pay', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-success">
+        <button onClick={() => onAction?.('pay', invoice.id)} disabled={!actionAllowed('payment')} className={primaryBtnClass}>
           <CreditCard className="h-3.5 w-3.5" /> تسجيل دفعة
         </button>
-        <button onClick={() => onAction?.('void', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
+        <button onClick={() => onAction?.('void', invoice.id)} disabled={!actionAllowed('invoice')} className={dangerBtnClass}>
           <XCircle className="h-3.5 w-3.5" /> إلغاء الفاتورة
         </button>
-        <button onClick={() => onAction?.('export', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('export', invoice.id)} disabled={!actionAllowed('export')} className={actionBtnClass}>
           <Download className="h-3.5 w-3.5" /> تصدير
         </button>
       </div>
     </div>
   );
 
-  const renderPaymentDetail = () => (
+  const renderPaymentDetail = (payment: PlatformPayment) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="المبلغ" value={formatMoney(payment.amount)} icon={<DollarSign className="h-4 w-4" />} />
@@ -224,18 +225,18 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="ملاحظات" value={payment.notes || '—'} icon={<ScrollText className="h-4 w-4" />} />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', payment.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('void', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
+        <button onClick={() => onAction?.('void', payment.id)} disabled={!actionAllowed('payment')} className={dangerBtnClass}>
           <XCircle className="h-3.5 w-3.5" /> إلغاء الدفعة
         </button>
       </div>
     </div>
   );
 
-  const renderDeviceDetail = () => (
+  const renderDeviceDetail = (device: PlatformDevice) => (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard label="اسم الجهاز" value={device.name || '—'} icon={<Server className="h-4 w-4" />} />
@@ -252,17 +253,17 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="تاريخ الإنشاء" value={formatDate(device.createdAt)} icon={<CalendarClock className="h-4 w-4" />} />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onAction?.('view', device.id)} disabled={!actionAllowed('view')} className={viewBtnClass}>
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('suspend', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-[11.5px] font-semibold text-warning hover:bg-warning-soft">
+        <button onClick={() => onAction?.('suspend', device.id)} disabled={!actionAllowed('device')} className={warningBtnClass}>
           <XCircle className="h-3.5 w-3.5" /> إيقاف
         </button>
-        <button onClick={() => onAction?.('activate', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success-border bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('activate', device.id)} disabled={!actionAllowed('device')} className={viewBtnClass}>
           <CheckCircle2 className="h-3.5 w-3.5" /> تفعيل
         </button>
-        <button onClick={() => onAction?.('reassign', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
+        <button onClick={() => onAction?.('reassign', device.id)} disabled={!actionAllowed('device')} className={actionBtnClass}>
           <RotateCcw className="h-3.5 w-3.5" /> إعادة تخصيص
         </button>
       </div>
@@ -271,12 +272,12 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
 
   const renderContent = () => {
     switch (type) {
-      case 'tenant': return renderTenantDetail();
-      case 'license': return renderLicenseDetail();
-      case 'subscription': return renderSubscriptionDetail();
-      case 'invoice': return renderInvoiceDetail();
-      case 'payment': return renderPaymentDetail();
-      case 'device': return renderDeviceDetail();
+      case 'tenant': return renderTenantDetail(data as PlatformTenant);
+      case 'license': return renderLicenseDetail(data as PlatformLicense);
+      case 'subscription': return renderSubscriptionDetail(data as PlatformSubscription);
+      case 'invoice': return renderInvoiceDetail(data as PlatformInvoice);
+      case 'payment': return renderPaymentDetail(data as PlatformPayment);
+      case 'device': return renderDeviceDetail(data as PlatformDevice);
       default: return <div>نوع غير معروف</div>;
     }
   };

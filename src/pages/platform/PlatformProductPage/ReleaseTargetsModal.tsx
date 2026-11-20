@@ -18,7 +18,8 @@ interface ReleaseTargetsModalProps {
   saving: boolean;
   canManageProduct: boolean;
   onSaveTargets: () => void;
-  onMarkTargetStatus: (targetId: string, status: PlatformReleaseTarget['status']) => void;
+  /** Undefined in central mode — per-target status tracking is local-only. */
+  onMarkTargetStatus?: (targetId: string, status: PlatformReleaseTarget['status']) => void;
 }
 
 export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
@@ -71,15 +72,17 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            disabled={!canManageProduct}
             onClick={() => setSelectedTenantIds(tenants.map((t) => t.id))}
-            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken"
+            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken disabled:opacity-40"
           >
             تحديد الكل
           </button>
           <button
             type="button"
+            disabled={!canManageProduct}
             onClick={() => setSelectedTenantIds([])}
-            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken"
+            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken disabled:opacity-40"
           >
             إلغاء التحديد
           </button>
@@ -110,6 +113,7 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
                   <input
                     type="checkbox"
                     checked={isSelected}
+                    disabled={!canManageProduct}
                     onChange={(e) => {
                       if (e.target.checked) {
                         setSelectedTenantIds([...selectedTenantIds, tenant.id]);
@@ -141,16 +145,19 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
                           {targetRecord.error}
                         </span>
                       )}
-                      <select
-                        className="rounded border border-line text-[10px] p-1 bg-surface"
-                        value={targetRecord.status}
-                        onChange={(e) => onMarkTargetStatus(targetRecord.id, e.target.value as PlatformReleaseTarget['status'])}
-                      >
-                        <option value="PENDING">قيد الانتظار</option>
-                        <option value="SUCCESS">نجح التحديث</option>
-                        <option value="FAILED">فشل</option>
-                        <option value="SKIPPED">تخطي</option>
-                      </select>
+                      {onMarkTargetStatus && (
+                        <select
+                          className="rounded border border-line text-[10px] p-1 bg-surface"
+                          value={targetRecord.status}
+                          disabled={!canManageProduct}
+                          onChange={(e) => onMarkTargetStatus(targetRecord.id, e.target.value as PlatformReleaseTarget['status'])}
+                        >
+                          <option value="PENDING">قيد الانتظار</option>
+                          <option value="SUCCESS">نجح التحديث</option>
+                          <option value="FAILED">فشل</option>
+                          <option value="SKIPPED">تخطي</option>
+                        </select>
+                      )}
                     </div>
                   ) : (
                     <span className="text-[10px] text-muted">غير مدرج بالتحديث</span>

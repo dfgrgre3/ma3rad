@@ -4,19 +4,11 @@ import {
   Webhook,
   CreditCard,
   MessageSquare,
-  Globe,
-  Radio,
   Plus,
   Trash2,
   Play,
-  CheckCircle2,
-  XCircle,
   Copy,
   Settings,
-  Lock,
-  ArrowRightLeft,
-  RefreshCw,
-  AlertTriangle,
 } from 'lucide-react';
 import { platformAdminApiClient } from '../../services/domains/platform/PlatformAdminApiClient';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -65,7 +57,23 @@ interface SmsConfig {
 export const PlatformIntegrationsPage: React.FC = () => {
   const toast = useToast();
   const [tab, setTab] = useState<'WEBHOOKS' | 'PAYMENTS' | 'SMS'>('WEBHOOKS');
-  const canManageIntegrations = canPlatform('integrations');
+  const canManageIntegrations = canPlatform('integrations', 'platform.integrations.update');
+  // Reactive snapshot of the central data-source flag (polled — the flag lives
+  // in platform settings and has no change event).
+  const [centralActive, setCentralActive] = useState<boolean>(() => getCentralDataSourceState().active);
+  useEffect(() => {
+    const refresh = () => setCentralActive(getCentralDataSourceState().active);
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+  // Webhook endpoints exist on both backends — pick the client that matches
+  // the active data source so we never write local while displaying central.
+  const webhookApi = centralActive ? centralPlatformClient : platformAdminApiClient;
 
   // ── Webhooks State ─────────────────────────────────────────────────────────
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
@@ -76,7 +84,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
     setWebhooksLoading(true);
     setWebhooksError(null);
     try {
-      const rows = await platformAdminApiClient.listWebhooks();
+      const rows = await webhookApi.listWebhooks();
       setWebhooks(rows);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'تعذر تحميل نقاط الربط';
@@ -85,7 +93,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
     } finally {
       setWebhooksLoading(false);
     }
-  }, [toast]);
+  }, [toast, webhookApi]);
 
   React.useEffect(() => {
     void loadWebhooks();
@@ -115,7 +123,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
     setSavingWebhook(true);
     try {
       if (editingWebhookId) {
-        await platformAdminApiClient.updateWebhook(editingWebhookId, {
+        await webhookApi.updateWebhook(editingWebhookId, {
           name: whForm.name.trim(),
           url: whForm.url.trim(),
           events: whForm.events,
@@ -124,7 +132,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
         });
         toast.success('تم تعديل نقطة الربط');
       } else {
-        await platformAdminApiClient.createWebhook({
+        await webhookApi.createWebhook({
           name: whForm.name.trim(),
           url: whForm.url.trim(),
           events: whForm.events,
@@ -150,7 +158,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
       return;
     }
     try {
-      const result = await platformAdminApiClient.testWebhook(wh.id);
+      const result = await webhookApi.testWebhook(wh.id);
       if (result.status === 'SENT') {
         toast.success('تم إرسال رسالة الاختبار بنجاح', `الحالة: HTTP ${result.httpStatus ?? '—'}`);
       } else {
@@ -169,7 +177,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
     }
     if (!window.confirm('هل أنت متأكد من حذف هذه نقطة الربط؟')) return;
     try {
-      await platformAdminApiClient.deleteWebhook(id);
+      await webhookApi.deleteWebhook(id);
       toast.success('تم حذف نقطة الربط');
       void loadWebhooks();
     } catch (err) {
@@ -190,14 +198,13 @@ export const PlatformIntegrationsPage: React.FC = () => {
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
 
   const loadPaymentConfig = useCallback(async () => {
-    const centralState = getCentralDataSourceState();
     setPaymentsLoading(true);
     setPaymentsError(null);
     try {
-      if (centralState.active) {
+      if (centralActive) {
         const providers = await centralPlatformClient.listIntegrationProviders();
-        const fawry = providers.payments.find((p: any) => p.provider_code === 'FAWRY');
-        const paymob = providers.payments.find((p: any) => p.provider_code === 'PAYMOB');
+        const fawry = providers.payments.find((p) => p.provider_code === 'FAWRY');
+        const paymob = providers.payments.find((p) => p.provider_code === 'PAYMOB');
         const sms = providers.sms[0];
         if (fawry?.config) {
           const cfg = typeof fawry.config === 'string' ? JSON.parse(fawry.config) : fawry.config;
@@ -225,7 +232,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
     } finally {
       setPaymentsLoading(false);
     }
-  }, []);
+  }, [centralActive]);
 
   useEffect(() => {
     if (tab === 'PAYMENTS' || tab === 'SMS') {
@@ -243,8 +250,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة التكاملات.');
       return;
     }
-    const centralState = getCentralDataSourceState();
-    if (!centralState.active) {
+    if (!centralActive) {
       toast.info(
         'غير متاح في الوضع المحلي',
         'إعدادات التكاملات متاحة فقط في الوضع المركزي.',
@@ -401,17 +407,17 @@ export const PlatformIntegrationsPage: React.FC = () => {
                 <DataTable
                 ariaLabel="نقاط الربط Webhooks"
                 rows={webhooks}
-                rowKey={(wh: any) => String(wh.id)}
+                rowKey={(wh: WebhookEndpoint) => String(wh.id)}
                 minWidth={850}
                 dense
                 tableClassName="text-xs"
                 rowClassName={() => 'transition-colors hover:bg-primary/30'}
                 columns={[
-                  { key: 'name', header: 'اسم نقطة الربط', render: (wh: any) => <span className="font-bold text-muted">{wh.name}</span> },
-                  { key: 'url', header: 'الرابط الهدف (Target URL)', render: (wh: any) => <span className="font-mono text-[11px] text-muted">{wh.url}</span> },
+                  { key: 'name', header: 'اسم نقطة الربط', render: (wh: WebhookEndpoint) => <span className="font-bold text-muted">{wh.name}</span> },
+                  { key: 'url', header: 'الرابط الهدف (Target URL)', render: (wh: WebhookEndpoint) => <span className="font-mono text-[11px] text-muted">{wh.url}</span> },
                   {
                     key: 'events', header: 'الأحداث المشترك بها',
-                    render: (wh: any) => (
+                    render: (wh: WebhookEndpoint) => (
                       <span className="flex flex-wrap gap-1">
                         {(wh.events as string[]).map((ev: string) => (
                           <span key={ev} className="rounded bg-primary px-1.5 py-0.5 font-mono text-[10px] text-primary">{ev}</span>
@@ -421,7 +427,7 @@ export const PlatformIntegrationsPage: React.FC = () => {
                   },
                   {
                     key: 'secret', header: 'المفتاح السري (Signing Secret)',
-                    render: (wh: any) => (
+                    render: (wh: WebhookEndpoint) => (
                       <span className="font-mono text-[11px] text-muted">
                         {maskSecret(wh.secret)}
                         <button
@@ -438,10 +444,10 @@ export const PlatformIntegrationsPage: React.FC = () => {
                       </span>
                     ),
                   },
-                  { key: 'last', header: 'آخر تسليم', render: (wh: any) => <span className="text-muted">{wh.lastTriggeredAt ? formatDateTime(wh.lastTriggeredAt) : 'لم يتم الإرسال بعد'}</span> },
+                  { key: 'last', header: 'آخر تسليم', render: (wh: WebhookEndpoint) => <span className="text-muted">{wh.lastTriggeredAt ? formatDateTime(wh.lastTriggeredAt) : 'لم يتم الإرسال بعد'}</span> },
                   {
                     key: 'actions', header: 'إجراءات', align: 'center',
-                    render: (wh: any) => (
+                    render: (wh: WebhookEndpoint) => (
                       <span className="flex items-center justify-center gap-2">
                         {canManageIntegrations && (
                           <>
@@ -501,6 +507,11 @@ export const PlatformIntegrationsPage: React.FC = () => {
       {/* TAB 2: PAYMENTS */}
       {tab === 'PAYMENTS' && (
         <div className="space-y-4 max-w-3xl">
+          {!centralActive && (
+            <div role="note" className="rounded-lg border border-warning-border bg-warning-soft px-4 py-2.5 text-xs font-semibold text-warning">
+              إعدادات بوابات الدفع متاحة فقط في الوضع المركزي — لا توجد بيانات محلية لعرضها.
+            </div>
+          )}
           <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-4">
             <div className="text-xs font-bold text-muted flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-success" />
@@ -580,6 +591,11 @@ export const PlatformIntegrationsPage: React.FC = () => {
       {/* TAB 3: SMS */}
       {tab === 'SMS' && (
         <div className="space-y-4 max-w-2xl">
+          {!centralActive && (
+            <div role="note" className="rounded-lg border border-warning-border bg-warning-soft px-4 py-2.5 text-xs font-semibold text-warning">
+              إعدادات مزود الرسائل متاحة فقط في الوضع المركزي — لا توجد بيانات محلية لعرضها.
+            </div>
+          )}
           <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-4">
             <h3 className="text-xs font-bold text-muted flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" />

@@ -40,9 +40,8 @@ interface TenantListSectionProps {
   canManageTenants: boolean;
   openProfile: (tenant: PlatformTenant) => void;
   openEdit: (tenant: PlatformTenant) => void;
-  setBulkActionType: React.Dispatch<React.SetStateAction<'status' | 'plan' | 'activation' | 'export' | 'import'>>;
+  setBulkActionType: React.Dispatch<React.SetStateAction<'status' | 'plan' | 'activation' | 'export'>>;
   setBulkActionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  executeBulkAction: () => void;
   showAdvancedFilters: boolean;
   setShowAdvancedFilters: React.Dispatch<React.SetStateAction<boolean>>;
   dateRange: { from: string; to: string };
@@ -56,6 +55,7 @@ interface TenantListSectionProps {
   filterPresets: Record<string, any>;
   loadFilterPreset: (name: string) => void;
   saveFilterPreset: (name: string) => void;
+  deleteFilterPreset: (name: string) => void;
 }
 
 export const TenantListSection: React.FC<TenantListSectionProps> = ({
@@ -80,7 +80,6 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
   openEdit,
   setBulkActionType,
   setBulkActionOpen,
-  executeBulkAction,
   showAdvancedFilters,
   setShowAdvancedFilters,
   dateRange,
@@ -94,6 +93,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
   filterPresets,
   loadFilterPreset,
   saveFilterPreset,
+  deleteFilterPreset,
 }) => (
   <>
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
@@ -150,7 +150,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
               <Button variant="secondary" size="sm" leadingIcon={<Send className="h-3 w-3" />} onClick={() => { setBulkActionType('activation'); setBulkActionOpen(true); }}>
                 إرسال تفعيل
               </Button>
-              <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3 w-3" />} onClick={() => { setBulkActionType('export'); executeBulkAction(); }}>
+              <Button variant="ghost" size="sm" leadingIcon={<Download className="h-3 w-3" />} onClick={() => { setBulkActionType('export'); setBulkActionOpen(true); }}>
                 تصدير
               </Button>
             </div>
@@ -187,6 +187,15 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
               }}>
                 <Plus className="h-3.5 w-3.5" /> حفظ
               </Button>
+              <select
+                className={`${inputClass} max-w-[130px]`}
+                value=""
+                onChange={(e) => { if (e.target.value) deleteFilterPreset(e.target.value); }}
+                aria-label="حذف قالب محفوظ"
+              >
+                <option value="">حذف قالب...</option>
+                {Object.keys(filterPresets).map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
             </div>
           )}
         </div>

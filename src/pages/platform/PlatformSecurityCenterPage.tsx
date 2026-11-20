@@ -13,7 +13,10 @@ import type {
   PlatformCentralSecurityOverview,
   PlatformApiKey,
   PlatformTenant,
+  PlatformStaffSession,
+  PlatformSigningKey,
 } from '../../services/domains/platform/platformTypes';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import type { PlatformOwnerAuditEntry } from '../../services/domains/platform/PlatformBootstrapService';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -32,6 +35,65 @@ import { ApiKeyResultModal } from './PlatformSecurityCenterPage/ApiKeyResultModa
 import { IpBansTab, type PlatformIpBan } from './PlatformSecurityCenterPage/IpBansTab';
 
 import { useToast } from '../../components/ui/Toast';
+
+// ── Central-mode row mappers ────────────────────────────────────────────────
+const parseScopes = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string' && value) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const mapCentralSession = (row: any): PlatformStaffSession => ({
+  id: String(row.id),
+  staffId: String(row.staffId ?? row.staff_id ?? ''),
+  staffName: String(row.staffName ?? row.staff_name ?? row.staff_email ?? ''),
+  staffRole: String(row.staffRole ?? row.role ?? ''),
+  ipAddress: row.ipAddress ?? row.ip_address ?? null,
+  deviceName: row.deviceName ?? row.device_name ?? null,
+  userAgent: row.userAgent ?? row.user_agent ?? null,
+  isTrustedDevice: Boolean(row.isTrustedDevice ?? row.is_trusted_device),
+  isCurrent: Boolean(row.isCurrent ?? row.is_current),
+  expiresAt: row.expiresAt ?? row.expires_at ?? null,
+  createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  lastActivityAt: String(row.lastActivityAt ?? row.last_activity_at ?? row.created_at ?? ''),
+});
+
+const mapCentralApiKey = (row: any): PlatformApiKey => ({
+  id: String(row.id),
+  tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+  name: String(row.name ?? ''),
+  keyPrefix: String(row.keyPrefix ?? row.prefix ?? row.key_prefix ?? ''),
+  scopes: parseScopes(row.scopes),
+  isActive: Boolean(row.isActive ?? row.is_active),
+  expiresAt: row.expiresAt ?? row.expires_at ?? null,
+  lastUsedAt: row.lastUsedAt ?? row.last_used_at ?? null,
+  createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  updatedAt: String(row.updatedAt ?? row.updated_at ?? row.created_at ?? ''),
+});
+
+const mapCentralSigningKey = (row: any, currentKeyId: string | null): PlatformSigningKey => {
+  const keyId = String(row.keyId ?? row.key_id ?? row.id ?? '');
+  const active = Boolean(row.isActive ?? row.is_active);
+  const createdAt = String(row.createdAt ?? row.created_at ?? '');
+  return {
+    id: keyId || String(row.id ?? ''),
+    alias: keyId,
+    keyAlias: keyId,
+    algorithm: 'Ed25519',
+    version: 1,
+    status: active ? 'ACTIVE' : 'REVOKED',
+    isCurrent: currentKeyId ? keyId === currentKeyId : active,
+    createdAt,
+    updatedAt: createdAt,
+  };
+};
 
 export const PlatformSecurityCenterPage: React.FC = () => {
   const toast = useToast();
@@ -78,14 +140,47 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       const centralState = getCentralDataSourceState();
       setIsCentral(centralState.active);
       if (centralState.active) {
-        const [overview, keys, tenantList, bans] = await Promise.all([
+        const [overviewRaw, sessionsRaw, devicesRaw, keysRaw, tenantList, bans, signingRaw, settings] = await Promise.all([
           centralPlatformClient.getSecurityOverview(),
+          centralPlatformClient.listStaffSessions(),
+          centralPlatformClient.listStaffDevices(),
           centralPlatformClient.listApiKeys(),
           centralPlatformClient.listTenants(),
           centralPlatformClient.listIpBans(),
+          centralPlatformClient.listCentralSigningKeys(),
+          centralPlatformClient.getSettings().catch(() => ({} as Record<string, string>)),
         ]);
-        setData(overview as any);
-        setApiKeys(keys as any);
+        const overview = (overviewRaw ?? {}) as Record<string, any>;
+        const signing = (signingRaw ?? {}) as { keys?: any[]; currentKeyId?: string | null };
+        const sessions = (sessionsRaw as any[]).map(mapCentralSession);
+        const devicesCount = Array.isArray(devicesRaw) ? devicesRaw.length : 0;
+        const failedLogins24h = Number(overview.failedLogins24h ?? 0);
+        const activeSessions = Number(overview.activeSessions ?? sessions.length);
+        const mfaEnforcement = (settings['platform.staffMfaEnforcement'] as 'off' | 'optional' | 'required' | undefined) ?? 'optional';
+        // Central overview endpoint only exposes raw counters — derive the
+        // same posture shape the tabs expect.
+        const securityScore = Math.max(
+          0,
+          Math.min(100, 100 - Math.min(30, failedLogins24h * 2) - (activeSessions > 50 ? 10 : 0)),
+        );
+        setData({
+          securityScore,
+          twoFactorEnforcement: {
+            enabled: mfaEnforcement === 'required',
+            compliantStaffCount: 0,
+            totalStaffCount: 0,
+          },
+          activeStaffSessionsCount: activeSessions,
+          failedLogins24hCount: failedLogins24h,
+          activeIncidentsCount: 0,
+          signingKeysCount: Array.isArray(signing.keys) ? signing.keys.length : 0,
+          trustedDevicesCount: devicesCount,
+          sessions,
+          recentLogins: [],
+          incidents: [],
+          signingKeys: (signing.keys ?? []).map((k) => mapCentralSigningKey(k, signing.currentKeyId ?? null)),
+        });
+        setApiKeys((keysRaw as any[]).map(mapCentralApiKey));
         setTenants(tenantList as any);
         setIpBans(bans as PlatformIpBan[]);
       } else {
@@ -113,10 +208,14 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   }, [loadSecurity]);
 
   // Revoke Single Session
-  const handleRevokeSession = (sessionId: string) => {
+  const handleRevokeSession = async (sessionId: string) => {
     if (!confirm('هل أنت متأكد من رغبتك في إنهاء هذه الجلسة عن بعد؟')) return;
     try {
-      platformAdminService.revokeStaffSession(sessionId);
+      if (isCentral) {
+        await centralPlatformClient.revokeStaffSession(sessionId);
+      } else {
+        platformAdminService.revokeStaffSession(sessionId);
+      }
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر إنهاء الجلسة.');
@@ -124,21 +223,31 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   };
 
   // Revoke All Other Sessions
-  const handleRevokeAllOtherSessions = () => {
+  const handleRevokeAllOtherSessions = async () => {
     if (!confirm('تأكيد: سيتم تسجيل خروج كافة الموظفين من جلساتهم المفتوحة فوراً!')) return;
     try {
-      platformAdminService.revokeAllOtherStaffSessions();
+      if (isCentral) {
+        // No bulk endpoint — revoke every non-current session individually.
+        const targets = (data?.sessions ?? []).filter((s) => !s.isCurrent).map((s) => s.id);
+        await Promise.all(targets.map((id) => centralPlatformClient.revokeStaffSession(id)));
+      } else {
+        platformAdminService.revokeAllOtherStaffSessions();
+      }
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'فشلت العملية.');
     }
   };
 
-  // Rotate Signing Key
+  // Rotate Signing Key — centrally this rotates the server-held Ed25519 key.
   const handleRotateKey = async (keyAlias: string) => {
     if (!confirm(`هل أنت متأكد من تدوير مفتاح التوقيع (${keyAlias})؟`)) return;
     try {
-      await platformAdminService.rotatePlatformSigningKey(keyAlias);
+      if (isCentral) {
+        await centralPlatformClient.rotateCentralSigningKey();
+      } else {
+        await platformAdminService.rotatePlatformSigningKey(keyAlias);
+      }
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر تدوير المفتاح.');
@@ -146,22 +255,44 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   };
 
   // Revoke API Key
-  const handleRevokeApiKey = (id: string) => {
+  const handleRevokeApiKey = async (id: string) => {
     if (!confirm('هل أنت متأكد من إلغاء مفتاح الـ API هذا؟')) return;
     try {
-      platformAdminService.revokeApiKey(id);
+      if (isCentral) {
+        await centralPlatformClient.revokeApiKey(id);
+      } else {
+        platformAdminService.revokeApiKey(id);
+      }
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر إلغاء المفتاح.');
     }
   };
 
-  // Rotate API Key
+  // Rotate API Key — local-only: the central API has no rotate endpoint.
   const handleRotateApiKey = (id: string) => {
+    if (isCentral) {
+      toast.error('تدوير مفاتيح API غير مدعوم في الوضع المركزي — أنشئ مفتاحًا جديدًا وألغِ القديم.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من تدوير هذا المفتاح؟ سيتم إلغاء المفتاح الحالي فوراً وتوليد مفتاح جديد بنفس الصلاحيات.')) return;
     try {
       const res = platformAdminService.rotateApiKey(id);
-      setNewKeyResult(res);
+      setNewKeyResult({
+        plainTextKey: res.plainTextKey,
+        key: {
+          id: res.id,
+          tenantId: res.tenantId,
+          name: res.name,
+          keyPrefix: res.keyPrefix,
+          scopes: res.scopes,
+          isActive: true,
+          expiresAt: res.expiresAt,
+          lastUsedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      });
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر تدوير مفتاح الـ API.');
@@ -169,45 +300,85 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   };
 
   // Create API Key
-  const handleCreateApiKey = () => {
+  const handleCreateApiKey = async () => {
     if (!apiKeyForm.name.trim()) {
       toast.warning('اسم المفتاح مطلوب.');
       return;
     }
-    const tenantTarget = apiKeyForm.tenantId || (tenants[0]?.id ?? '');
-    if (!tenantTarget) {
-      toast.warning('يجب اختيار العميل أو توفير عميل مسجل أولاً.');
+    // Local keys are tenant-scoped and require an explicit tenant — never
+    // silently bind to the first tenant in the list.
+    if (!isCentral && !apiKeyForm.tenantId) {
+      toast.warning('يجب اختيار العميل الذي سيُربط به المفتاح.');
       return;
     }
     try {
-      const res = platformAdminService.createApiKey({
-        tenantId: tenantTarget,
-        name: apiKeyForm.name.trim(),
-        scopes: apiKeyForm.scopes,
-        expiresAt: apiKeyForm.expiresAt || undefined,
-      });
-      setIsApiKeyModalOpen(false);
-      setNewKeyResult(res);
-      setApiKeyForm({
-        tenantId: tenants[0]?.id ?? '',
-        name: '',
-        scopes: ['read', 'write'],
-        expiresAt: '',
-      });
+      if (isCentral) {
+        // Central keys are not tenant-bound; expiry is expressed in days.
+        let expiresInDays: number | undefined;
+        if (apiKeyForm.expiresAt) {
+          const ms = new Date(apiKeyForm.expiresAt).getTime() - Date.now();
+          expiresInDays = Math.max(1, Math.ceil(ms / 86_400_000));
+        }
+        const res = (await centralPlatformClient.createApiKey({
+          name: apiKeyForm.name.trim(),
+          scopes: apiKeyForm.scopes,
+          expiresInDays,
+        })) as any;
+        setIsApiKeyModalOpen(false);
+        setNewKeyResult({
+          plainTextKey: String(res?.key ?? ''),
+          key: mapCentralApiKey({ ...res, is_active: res?.is_active ?? 1 }),
+        });
+      } else {
+        const expiresAt = apiKeyForm.expiresAt ? new Date(apiKeyForm.expiresAt).toISOString() : undefined;
+        const res = platformAdminService.createApiKey({
+          tenantId: apiKeyForm.tenantId,
+          name: apiKeyForm.name.trim(),
+          scopes: apiKeyForm.scopes,
+          expiresAt,
+        });
+        setIsApiKeyModalOpen(false);
+        setNewKeyResult({
+          plainTextKey: res.plainTextKey,
+          key: {
+            id: res.id,
+            tenantId: res.tenantId,
+            name: res.name,
+            keyPrefix: res.keyPrefix,
+            scopes: res.scopes,
+            isActive: true,
+            expiresAt: res.expiresAt,
+            lastUsedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        });
+      }
+      setApiKeyForm({ tenantId: '', name: '', scopes: ['read', 'write'], expiresAt: '' });
       loadSecurity();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'فشل إنشاء مفتاح الـ API.');
     }
   };
 
-  // Create Incident
+  // Create Incident — local store only; no central incidents endpoint exists.
   const handleCreateIncident = () => {
+    if (isCentral) {
+      toast.error('تسجيل الحوادث الأمنية غير مدعوم في الوضع المركزي بعد.');
+      return;
+    }
     if (!incidentForm.title.trim()) {
       toast.warning('عنوان الحادث مطلوب.');
       return;
     }
     try {
-      platformAdminService.recordSecurityIncident(incidentForm);
+      platformAdminService.recordSecurityIncident({
+        type: incidentForm.type,
+        severity: incidentForm.severity,
+        title: incidentForm.title,
+        description: incidentForm.details || undefined,
+        ipAddress: incidentForm.sourceIp || undefined,
+      });
       setIsIncidentModalOpen(false);
       setIncidentForm({
         type: 'SUSPICIOUS_TRAFFIC',
@@ -222,8 +393,12 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     }
   };
 
-  // Contain/Resolve Incident
+  // Contain/Resolve Incident — local store only (no central endpoint).
   const handleRespondIncident = (id: string, resolve: boolean) => {
+    if (isCentral) {
+      toast.error('الاستجابة للحوادث الأمنية غير مدعومة في الوضع المركزي بعد.');
+      return;
+    }
     const action = prompt(
       resolve
         ? 'أدخل ملخص الإجراء النهائي لحل الحادث الأمني وإغلاقه:'
@@ -264,12 +439,23 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     })();
   };
 
-  // 2FA policy card toggle (overview tab)
-  const handleToggleMfaPolicy = () => {
+  // 2FA policy card toggle (overview tab). Locally this flips the
+  // platform.staffMfaEnforcement setting; centrally the same key is stored in
+  // the central platform_settings store via the settings API.
+  const handleToggleMfaPolicy = async () => {
     if (!canManageSecurity || !data) return;
     try {
-      platformAdminService.setStaffMfaEnforcement(data.twoFactorEnforcement.enabled ? 'optional' : 'required');
-      loadSecurity();
+      if (isCentral) {
+        const settings = await centralPlatformClient.getSettings();
+        const current = settings['platform.staffMfaEnforcement'];
+        const next = current === 'required' ? 'optional' : 'required';
+        await centralPlatformClient.updateSettings({ 'platform.staffMfaEnforcement': next });
+        toast.success(next === 'required' ? 'أُلزمت المصادقة الثنائية على كل الموظفين.' : 'المصادقة الثنائية اختيارية.');
+        loadSecurity();
+      } else {
+        platformAdminService.setStaffMfaEnforcement(data.twoFactorEnforcement.enabled ? 'optional' : 'required');
+        loadSecurity();
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'تعذر تغيير السياسة.');
     }
@@ -372,15 +558,19 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         />
       )}
 
-      {/* TAB 3: STAFF LOGINS AUDIT */}
+      {/* TAB 3: STAFF LOGINS AUDIT — no central endpoint for the login log yet */}
       {tab === 'LOGINS' && (
-        <LoginsTab
-          logins={filteredLogins}
-          loginSearch={loginSearch}
-          onLoginSearchChange={setLoginSearch}
-          loginFilterFailed={loginFilterFailed}
-          onLoginFilterFailedChange={setLoginFilterFailed}
-        />
+        isCentral ? (
+          <CentralUnsupportedNotice feature="سجل محاولات دخول الموظفين" />
+        ) : (
+          <LoginsTab
+            logins={filteredLogins}
+            loginSearch={loginSearch}
+            onLoginSearchChange={setLoginSearch}
+            loginFilterFailed={loginFilterFailed}
+            onLoginFilterFailedChange={setLoginFilterFailed}
+          />
+        )
       )}
 
       {/* TAB 4: API & SIGNING KEYS */}
@@ -388,13 +578,14 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         <KeysTab
           signingKeys={data.signingKeys}
           apiKeys={apiKeys}
+          isCentral={isCentral}
           canManageSecurity={canManageSecurity}
           onRotateKey={handleRotateKey}
           onRotateApiKey={handleRotateApiKey}
           onRevokeApiKey={handleRevokeApiKey}
           onOpenCreateApiKey={() => {
             setApiKeyForm({
-              tenantId: tenants[0]?.id ?? '',
+              tenantId: '',
               name: '',
               scopes: ['read', 'write'],
               expiresAt: '',
@@ -404,14 +595,17 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         />
       )}
 
-      {/* TAB 5: INCIDENTS & EMERGENCY PLAYBOOK */}
+      {/* TAB 5: INCIDENTS & EMERGENCY PLAYBOOK — local store only */}
       {tab === 'INCIDENTS' && (
-        <IncidentsTab
-          incidents={data.incidents}
-          canManageSecurity={canManageSecurity}
-          onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
-          onRespondIncident={handleRespondIncident}
-        />
+        <>
+          {isCentral && <CentralUnsupportedNotice feature="سجل الحوادث الأمنية والاستجابة لها" />}
+          <IncidentsTab
+            incidents={data.incidents}
+            canManageSecurity={canManageSecurity && !isCentral}
+            onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
+            onRespondIncident={handleRespondIncident}
+          />
+        </>
       )}
 
       {/* TAB 6: IP BANS */}
@@ -442,6 +636,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         form={apiKeyForm}
         setForm={setApiKeyForm}
         tenants={tenants}
+        isCentral={isCentral}
         canManageSecurity={canManageSecurity}
         onSubmit={handleCreateApiKey}
       />

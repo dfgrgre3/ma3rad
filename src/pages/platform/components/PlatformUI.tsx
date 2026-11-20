@@ -111,7 +111,13 @@ export const Field: React.FC<{ label: string; hint?: string; required?: boolean;
     <span className="mb-1 block text-[11.5px] font-semibold text-ink">
       {label} {required && <span className="text-danger">*</span>}
     </span>
-    {children}
+    {required
+      ? React.Children.map(children, (child) =>
+          React.isValidElement(child)
+            ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, { required: true })
+            : child
+        )
+      : children}
     {hint && <span className="mt-1 block text-[10.5px] text-muted">{hint}</span>}
   </label>
 );
@@ -121,7 +127,12 @@ export const inputClass =
 
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>): void {
   const escape = (cell: string | number | null | undefined) => {
-    const text = cell === null || cell === undefined ? '' : String(cell);
+    let text = cell === null || cell === undefined ? '' : String(cell);
+    // CSV formula injection guard: prefix cells that spreadsheet apps would
+    // evaluate as formulas (=, +, -, @, tab, CR).
+    if (/^[=+\-@\t\r]/.test(text)) {
+      text = `'${text}`;
+    }
     return `"${text.replace(/"/g, '""')}"`;
   };
   const csv = `\uFEFF${rows.map((row) => row.map(escape).join(',')).join('\r\n')}`;

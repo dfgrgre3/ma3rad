@@ -28,6 +28,7 @@ import type {
   AuditStatus,
   AuditActorType,
   PlatformAuditFilters,
+  PlatformTenant,
 } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -99,6 +100,8 @@ function mapCentralAuditEntry(event: PlatformAuditEvent): PlatformAuditEntry {
     action: event.action,
     entityType: event.resourceType ?? '',
     entityId: event.resourceId,
+    // Central chain events carry no severity/status — they are integrity
+    // records, not outcomes. Local-only fields stay at neutral defaults.
     severity: 'INFO' as AuditSeverity,
     status: 'SUCCESS' as AuditStatus,
     details: null,
@@ -140,7 +143,8 @@ export const PlatformAuditPage: React.FC = () => {
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
 
-  const [tenants, setTenants] = React.useState<any[]>([]);
+  const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
+  const tenantsLoadedRef = React.useRef(false);
   const [centralMode, setCentralMode] = React.useState(false);
   const [integrityState, setIntegrityState] = React.useState<{ checked: boolean; valid: boolean; count?: number }>({
     checked: false,
@@ -149,6 +153,16 @@ export const PlatformAuditPage: React.FC = () => {
 
   // Selected entry for modal view (Diff & details)
   const [selectedEntry, setSelectedEntry] = React.useState<PlatformAuditEntry | null>(null);
+
+  // Close the detail modal on Escape.
+  React.useEffect(() => {
+    if (!selectedEntry) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedEntry(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedEntry]);
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -191,8 +205,12 @@ export const PlatformAuditPage: React.FC = () => {
         setTotalPages(res.totalPages);
       }
 
-      if (tenants.length === 0) {
-        setTenants(central.active ? await centralPlatformClient.listTenants() : platformAdminService.listTenants());
+      if (!tenantsLoadedRef.current) {
+        const tenantList = central.active
+          ? await centralPlatformClient.listTenants()
+          : platformAdminService.listTenants();
+        setTenants(tenantList);
+        tenantsLoadedRef.current = true;
       }
       setError(null);
     } catch (err) {
@@ -200,7 +218,7 @@ export const PlatformAuditPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, tenantId, severity, status, actorType, dateFrom, dateTo, page, pageSize, tenants.length]);
+  }, [search, tenantId, severity, status, actorType, dateFrom, dateTo, page, pageSize]);
 
   React.useEffect(() => {
     void loadData();
@@ -307,7 +325,7 @@ export const PlatformAuditPage: React.FC = () => {
         ]),
       ]);
     } catch (err) {
-      setError('فشل تصدير السجلات بالكامل.');
+      setError(err instanceof Error ? `فشل تصدير السجلات بالكامل: ${err.message}` : 'فشل تصدير السجلات بالكامل.');
     }
   };
 
@@ -393,7 +411,7 @@ export const PlatformAuditPage: React.FC = () => {
               <select
                 value={severity}
                 onChange={(e) => {
-                  setSeverity(e.target.value as any);
+                  setSeverity(e.target.value as AuditSeverity | 'all');
                   setPage(1);
                 }}
                 className={`${inputClass} max-w-[140px]`}
@@ -408,7 +426,7 @@ export const PlatformAuditPage: React.FC = () => {
               <select
                 value={status}
                 onChange={(e) => {
-                  setStatus(e.target.value as any);
+                  setStatus(e.target.value as AuditStatus | 'all');
                   setPage(1);
                 }}
                 className={`${inputClass} max-w-[130px]`}
@@ -424,7 +442,7 @@ export const PlatformAuditPage: React.FC = () => {
           <select
             value={actorType}
             onChange={(e) => {
-              setActorType(e.target.value as any);
+              setActorType(e.target.value as AuditActorType | 'all');
               setPage(1);
             }}
             className={`${inputClass} max-w-[150px]`}
@@ -523,15 +541,15 @@ export const PlatformAuditPage: React.FC = () => {
             <DataTable
               ariaLabel="سجل التدقيق"
               rows={entries}
-              rowKey={(entry: any) => String(entry.id)}
+              rowKey={(entry) => String(entry.id)}
               dense
               tableClassName="text-xs"
               rowClassName={() => 'transition-colors hover:bg-surface-muted/70'}
               columns={[
-                { key: 'time', header: 'الوقت والتاريخ', render: (entry: any) => <span className="whitespace-nowrap font-mono text-muted" dir="ltr">{formatDateTime(entry.createdAt)}</span> },
+                { key: 'time', header: 'الوقت والتاريخ', render: (entry) => <span className="whitespace-nowrap font-mono text-muted" dir="ltr">{formatDateTime(entry.createdAt)}</span> },
                 ...(!centralMode ? [{
                   key: 'severity', header: 'مستوى الخطورة',
-                  render: (entry: any) => {
+                  render: (entry: PlatformAuditEntry) => {
                     const badge = SEVERITY_BADGES[entry.severity as keyof typeof SEVERITY_BADGES] || SEVERITY_BADGES.INFO;
                     return (
                       <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}>
@@ -543,7 +561,7 @@ export const PlatformAuditPage: React.FC = () => {
                 }] : []),
                 ...(!centralMode ? [{
                   key: 'result', header: 'النتيجة',
-                  render: (entry: any) => entry.status === 'SUCCESS' ? (
+                  render: (entry: PlatformAuditEntry) => entry.status === 'SUCCESS' ? (
                     <span className="inline-flex items-center gap-1 font-medium text-success"><CheckCircle2 className="h-3.5 w-3.5" /> ناجح</span>
                   ) : entry.status === 'BLOCKED' ? (
                     <span className="inline-flex items-center gap-1 font-medium text-primary"><Lock className="h-3.5 w-3.5" /> محظور</span>
@@ -553,7 +571,7 @@ export const PlatformAuditPage: React.FC = () => {
                 }] : []),
                 {
                   key: 'actor', header: 'المنفذ',
-                  render: (entry: any) => (
+                  render: (entry) => (
                     <span className="block">
                       <span className="block font-semibold text-ink">{entry.actorName || 'النظام'}</span>
                       <span className="block text-[10px] text-muted">{ACTOR_LABELS[(entry.actorType || 'SUPER_ADMIN') as keyof typeof ACTOR_LABELS]}</span>
@@ -562,7 +580,7 @@ export const PlatformAuditPage: React.FC = () => {
                 },
                 {
                   key: 'action', header: 'الإجراء',
-                  render: (entry: any) => (
+                  render: (entry) => (
                     <span className="block">
                       <span className="block font-semibold text-ink">{entry.action}</span>
                       {entry.entityId && <span className="block max-w-[200px] truncate font-mono text-[10px] text-muted" dir="ltr">{entry.entityId}</span>}
@@ -571,11 +589,11 @@ export const PlatformAuditPage: React.FC = () => {
                 },
                 {
                   key: 'entity', header: 'نوع الكيان',
-                  render: (entry: any) => <span className="rounded bg-surface-sunken px-2 py-0.5 text-[10.5px] font-semibold text-ink">{ENTITY_LABELS[entry.entityType as keyof typeof ENTITY_LABELS] || entry.entityType}</span>,
+                  render: (entry) => <span className="rounded bg-surface-sunken px-2 py-0.5 text-[10.5px] font-semibold text-ink">{ENTITY_LABELS[entry.entityType as keyof typeof ENTITY_LABELS] || entry.entityType}</span>,
                 },
                 {
                   key: 'device', header: 'الجهاز / العنوان',
-                  render: (entry: any) => (
+                  render: (entry) => (
                     <span className="block whitespace-nowrap text-[11px] text-muted">
                       <span className="block">{entry.deviceName || entry.deviceId || '—'}</span>
                       {entry.ipAddress && <span className="block font-mono text-[10px] text-muted">{entry.ipAddress}</span>}
@@ -584,7 +602,7 @@ export const PlatformAuditPage: React.FC = () => {
                 },
                 {
                   key: 'details', header: 'التفاصيل', align: 'center',
-                  render: (entry: any) => (
+                  render: (entry) => (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -601,6 +619,7 @@ export const PlatformAuditPage: React.FC = () => {
         )}
 
         {/* Pagination Footer */}
+        {entries.length > 0 && (
         <div className="flex flex-wrap items-center justify-between border-t border-line bg-surface-muted/60 px-4 py-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-muted">حجم الصفحة:</span>
@@ -646,6 +665,7 @@ export const PlatformAuditPage: React.FC = () => {
             </Button>
           </div>
         </div>
+        )}
       </section>
 
       {/* Audit Detail & Diff Modal */}

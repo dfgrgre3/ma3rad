@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus,
@@ -23,7 +23,9 @@ import type {
   PlatformStaffInviteCreated,
   PlatformTrustedDevice,
   PlatformStaffDataScope,
+  PlatformStaffInviteStatus,
 } from '../../services/domains/platform/platformTypes';
+import type { PlatformStaffMfaCompliance } from '../../services/domains/platform/PlatformStaffService/context';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { TABS, type TabKey } from './PlatformStaffPage/constants';
@@ -38,8 +40,112 @@ import { TransferPermissionsModal } from './PlatformStaffPage/TransferPermission
 import { DataScopeModal } from './PlatformStaffPage/DataScopeModal';
 import { MfaEnrollModal, type MfaSetupData } from './PlatformStaffPage/MfaEnrollModal';
 import { MfaDisableModal } from './PlatformStaffPage/MfaDisableModal';
+import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 
 import { useToast } from '../../components/ui/Toast';
+
+// ── Central-mode row mappers ────────────────────────────────────────────────
+// The central admin-control/staff endpoints return snake_case rows that do
+// not match the local PlatformStaff shape — normalize them defensively.
+const parseJsonArray = (value: unknown): string[] | null => {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string' && value) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const mapCentralStaff = (row: any): PlatformStaff => ({
+  id: String(row.id),
+  username: String(row.username ?? row.email ?? ''),
+  fullName: String(row.fullName ?? row.full_name ?? ''),
+  email: String(row.email ?? ''),
+  phone: row.phone ?? row.phone_number ?? null,
+  role: String(row.role ?? 'SUPPORT_AGENT') as PlatformStaffRole,
+  isActive: Boolean(row.isActive ?? row.is_active),
+  mustChangePassword: Boolean(row.mustChangePassword ?? row.must_change_password),
+  mfaEnabled: Boolean(row.mfaEnabled ?? row.mfa_enabled),
+  mfaEnforcement: String(row.mfaEnforcement ?? row.mfa_enforcement ?? 'optional') as PlatformStaff['mfaEnforcement'],
+  dataScope: String(row.dataScope ?? row.data_scope ?? 'ALL') === 'LIMITED' ? 'LIMITED' : 'ALL',
+  dataScopeTenantIds: parseJsonArray(row.dataScopeTenantIds ?? row.data_scope_tenant_ids),
+  lastLoginAt: row.lastLoginAt ?? row.last_login_at ?? null,
+  failedLoginAttempts: Number(row.failedLoginAttempts ?? row.failed_login_attempts ?? 0),
+  lockedUntil: row.lockedUntil ?? row.locked_until ?? null,
+  createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  updatedAt: String(row.updatedAt ?? row.updated_at ?? ''),
+});
+
+const mapCentralRole = (row: any): PlatformStaffRoleDefinition => ({
+  role: String(row.role ?? row.code ?? '') as PlatformStaffRole,
+  title: String(row.title ?? row.name ?? row.code ?? ''),
+  description: String(row.description ?? ''),
+  allowedModules: parseJsonArray(row.allowedModules ?? row.allowed_modules) ?? [],
+  restrictedModules: parseJsonArray(row.restrictedModules ?? row.restricted_modules) ?? [],
+});
+
+const mapCentralSession = (row: any): PlatformStaffSession => ({
+  id: String(row.id),
+  staffId: String(row.staffId ?? row.staff_id ?? ''),
+  staffName: String(row.staffName ?? row.staff_name ?? row.full_name ?? ''),
+  staffRole: String(row.staffRole ?? row.role ?? ''),
+  ipAddress: row.ipAddress ?? row.ip_address ?? null,
+  deviceName: row.deviceName ?? row.device_name ?? null,
+  userAgent: row.userAgent ?? row.user_agent ?? null,
+  isTrustedDevice: Boolean(row.isTrustedDevice ?? row.is_trusted_device),
+  isCurrent: Boolean(row.isCurrent ?? row.is_current),
+  expiresAt: row.expiresAt ?? row.expires_at ?? null,
+  createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  lastActivityAt: String(row.lastActivityAt ?? row.last_activity_at ?? row.created_at ?? ''),
+});
+
+const mapCentralDevice = (row: any): PlatformTrustedDevice => ({
+  id: String(row.id),
+  staffId: String(row.staffId ?? row.staff_id ?? ''),
+  staffName: row.staffName ?? row.staff_name ?? null,
+  deviceName: row.deviceName ?? row.device_name ?? null,
+  fingerprint: String(row.fingerprint ?? ''),
+  ipAddress: row.ipAddress ?? row.ip_address ?? null,
+  userAgent: row.userAgent ?? row.user_agent ?? null,
+  trustedAt: String(row.trustedAt ?? row.trusted_at ?? row.created_at ?? ''),
+  lastSeenAt: row.lastSeenAt ?? row.last_seen_at ?? row.last_used_at ?? null,
+  revokedAt: row.revokedAt ?? row.revoked_at ?? null,
+  createdAt: String(row.createdAt ?? row.created_at ?? ''),
+});
+
+const mapCentralInvite = (row: any): PlatformStaffInvite => {
+  const expiresAt = String(row.expiresAt ?? row.expires_at ?? '');
+  const revoked = Boolean(row.revokedAt ?? row.revoked_at);
+  const status: PlatformStaffInviteStatus = revoked
+    ? 'REVOKED'
+    : row.status
+      ? (String(row.status).toUpperCase() as PlatformStaffInviteStatus)
+      : expiresAt && new Date(expiresAt).getTime() < Date.now()
+        ? 'EXPIRED'
+        : 'PENDING';
+  return {
+    id: String(row.id),
+    token: '',
+    email: String(row.email ?? ''),
+    fullName: String(row.fullName ?? row.full_name ?? ''),
+    phone: row.phone ?? null,
+    role: String(row.role ?? 'SUPPORT_AGENT') as PlatformStaffRole,
+    status,
+    expiresAt,
+    acceptedAt: row.acceptedAt ?? row.accepted_at ?? null,
+    revokedAt: row.revokedAt ?? row.revoked_at ?? null,
+    invitedBy: row.invitedBy ?? row.invited_by ?? null,
+    invitedByName: row.invitedByName ?? row.invited_by_name ?? null,
+    createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  };
+};
+
+const isStaffPasswordStrong = (password: string): boolean =>
+  password.length >= 8 && /[a-zA-Z\u0600-\u06FF]/.test(password) && /[0-9]/.test(password);
 
 export const PlatformStaffPage: React.FC = () => {
   const navigate = useNavigate();
@@ -50,11 +156,17 @@ export const PlatformStaffPage: React.FC = () => {
 
   // ── Accounts ──────────────────────────────────────────────
   const [staffList, setStaffList] = useState<PlatformStaff[]>([]);
+  // Unfiltered list — used only for the per-role count cards so filters do
+  // not shrink the totals.
+  const [allStaffList, setAllStaffList] = useState<PlatformStaff[]>([]);
   const [roles, setRoles] = useState<PlatformStaffRoleDefinition[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [centralActive, setCentralActive] = useState(false);
+  const staffRequestSeq = useRef(0);
 
   const canCreate = canPlatformPermission('platform.staff.create');
   const canUpdate = canPlatformPermission('platform.staff.update');
@@ -110,7 +222,9 @@ export const PlatformStaffPage: React.FC = () => {
 
   // ── Security (MFA) ────────────────────────────────────────
   const [mfaStatus, setMfaStatus] = useState<{ enabled: boolean; enforcement: 'off' | 'optional' | 'required' }>({ enabled: false, enforcement: 'off' });
-  const [mfaCompliance, setMfaCompliance] = useState<{ enforcement: string; total: number; compliant: number; missing: PlatformStaff[] }>({ enforcement: 'off', total: 0, compliant: 0, missing: [] });
+  const [mfaCompliance, setMfaCompliance] = useState<PlatformStaffMfaCompliance>({
+    enforcement: 'off', total: 0, enabled: 0, compliant: 0, requiredButDisabled: 0, byRole: {}, missing: [],
+  });
   const [mfaEnrollOpen, setMfaEnrollOpen] = useState(false);
   const [mfaSetup, setMfaSetup] = useState<MfaSetupData | null>(null);
   const [mfaQrDataUrl, setMfaQrDataUrl] = useState<string>('');
@@ -121,24 +235,47 @@ export const PlatformStaffPage: React.FC = () => {
 
   const mfaMissingIds = useMemo(() => new Set(mfaCompliance.missing.map((item) => item.id)), [mfaCompliance]);
 
+  // Debounce the accounts search (~300ms) so every keystroke does not fire a
+  // central API request, and guard against stale responses overwriting newer
+  // ones via a request sequence counter.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const loadStaff = useCallback(async () => {
+    const seq = ++staffRequestSeq.current;
     setLoading(true);
     try {
       const centralState = getCentralDataSourceState();
+      setCentralActive(centralState.active);
       if (centralState.active) {
-        const staff = await centralPlatformClient.listStaff();
-        setStaffList(staff as any);
+        const [staff, staffRoles, allStaff] = await Promise.all([
+          centralPlatformClient.listAdminControlStaff({
+            search: debouncedSearch || undefined,
+            role: roleFilter || undefined,
+          }),
+          centralPlatformClient.listAdminControlStaffRoles(),
+          centralPlatformClient.listAdminControlStaff(),
+        ]);
+        if (seq !== staffRequestSeq.current) return;
+        setStaffList((staff as any[]).map(mapCentralStaff));
+        setAllStaffList((allStaff as any[]).map(mapCentralStaff));
+        setRoles((staffRoles as any[]).map(mapCentralRole));
       } else {
-        setStaffList(platformAdminService.listPlatformStaff(search, roleFilter));
+        setStaffList(platformAdminService.listPlatformStaff(debouncedSearch, roleFilter));
+        setAllStaffList(platformAdminService.listPlatformStaff('', ''));
+        setRoles(platformAdminService.listPlatformStaffRoles());
       }
-      setRoles(platformAdminService.listPlatformStaffRoles());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل موظفي المنصة.');
+      if (seq === staffRequestSeq.current) {
+        setError(err instanceof Error ? err.message : 'تعذر تحميل موظفي المنصة.');
+      }
     } finally {
-      setLoading(false);
+      if (seq === staffRequestSeq.current) setLoading(false);
     }
-  }, [search, roleFilter]);
+  }, [debouncedSearch, roleFilter]);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -148,8 +285,8 @@ export const PlatformStaffPage: React.FC = () => {
           centralPlatformClient.listStaffSessions(),
           centralPlatformClient.listStaffDevices(),
         ]);
-        setSessions(sessions as any);
-        setDevices(devices as any);
+        setSessions((sessions as any[]).map(mapCentralSession));
+        setDevices((devices as any[]).map(mapCentralDevice));
       } else {
         setSessions(platformAdminService.listStaffSessions());
         setDevices(platformAdminService.listTrustedDevices());
@@ -166,7 +303,7 @@ export const PlatformStaffPage: React.FC = () => {
       const centralState = getCentralDataSourceState();
       if (centralState.active) {
         const invites = await centralPlatformClient.listStaffInvites();
-        setInvites(invites as any);
+        setInvites((invites as any[]).map(mapCentralInvite));
       } else {
         setInvites(platformAdminService.listStaffInvites('all'));
       }
@@ -177,6 +314,12 @@ export const PlatformStaffPage: React.FC = () => {
 
   const loadLogins = useCallback(() => {
     try {
+      // No central endpoint exposes the staff login-attempt log yet — keep the
+      // list empty in central mode; the tab renders CentralUnsupportedNotice.
+      if (getCentralDataSourceState().active) {
+        setLogins([]);
+        return;
+      }
       setLogins(platformAdminService.listStaffLogins(100, failedOnly));
     } catch {
       setLogins([]);
@@ -185,8 +328,11 @@ export const PlatformStaffPage: React.FC = () => {
 
   const loadMfa = useCallback(() => {
     try {
+      // MFA enrollment/compliance live in the local staff store — there is no
+      // central API for them, so skip in central mode (the tab shows a notice).
+      if (getCentralDataSourceState().active) return;
       setMfaStatus(platformAdminService.getOwnStaffMfaStatus());
-      setMfaCompliance(platformAdminService.getStaffMfaCompliance() as any);
+      setMfaCompliance(platformAdminService.getStaffMfaCompliance());
     } catch {
       /* staff page without permission: keep zeros */
     }
@@ -220,7 +366,7 @@ export const PlatformStaffPage: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canCreate && !editingStaff) {
       toast.error('لا تملك صلاحية إضافة موظفي المنصة.');
       return;
@@ -233,18 +379,36 @@ export const PlatformStaffPage: React.FC = () => {
       toast.error('الاسم والبريد الإلكتروني مطلوبان.');
       return;
     }
-    if (!editingStaff && (!formData.password || formData.password.length < 8)) {
-      toast.error('كلمة المرور مطلوبة ويجب أن تكون 8 أحرف على الأقل للموظف الجديد.');
+    if (!editingStaff && !isStaffPasswordStrong(formData.password ?? '')) {
+      toast.error('كلمة المرور مطلوبة ويجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم.');
       return;
     }
     try {
-      if (editingStaff) {
+      if (getCentralDataSourceState().active) {
+        // Central admin-control API has no password field — the invite flow
+        // covers credential setup for centrally-managed staff.
+        if (editingStaff) {
+          await centralPlatformClient.updateAdminControlStaff(editingStaff.id, {
+            fullName: formData.fullName.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone?.trim() || undefined,
+            role: formData.role,
+            isActive: formData.isActive,
+          });
+        } else {
+          await centralPlatformClient.createAdminControlStaff({
+            fullName: formData.fullName.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone?.trim() || undefined,
+            role: formData.role,
+          });
+        }
+      } else if (editingStaff) {
         platformAdminService.updatePlatformStaff(editingStaff.id, formData);
-        toast.success('تم تحديث بيانات الموظف.');
       } else {
         platformAdminService.createPlatformStaff(formData);
-        toast.success('تم إنشاء الموظف وحفظ كلمة المرور المؤقتة — سيُطلب منه تغييرها عند أول دخول.');
       }
+      toast.success(editingStaff ? 'تم تحديث بيانات الموظف.' : 'تم إنشاء الموظف وحفظ كلمة المرور المؤقتة — سيُطلب منه تغييرها عند أول دخول.');
       setIsFormOpen(false);
       loadStaff();
       loadMfa();
@@ -253,9 +417,13 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleToggleActive = (staff: PlatformStaff) => {
+  const handleToggleActive = async (staff: PlatformStaff) => {
     try {
-      platformAdminService.setPlatformStaffActive(staff.id, !staff.isActive);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.updateAdminControlStaff(staff.id, { isActive: !staff.isActive });
+      } else {
+        platformAdminService.setPlatformStaffActive(staff.id, !staff.isActive);
+      }
       toast.success(staff.isActive ? 'تم تجميد الحساب وإنهاء جلساته.' : 'تم تفعيل الحساب.');
       loadStaff();
     } catch (err) {
@@ -263,10 +431,14 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleDelete = (staff: PlatformStaff) => {
+  const handleDelete = async (staff: PlatformStaff) => {
     if (!window.confirm(`حذف حساب الموظف "${staff.fullName}" منطقياً؟\nيبقى سجل التدقيق والعمليات محفوظاً ويمكن استعادة الحساب من قاعدة البيانات.`)) return;
     try {
-      platformAdminService.deletePlatformStaff(staff.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.deleteAdminControlStaff(staff.id);
+      } else {
+        platformAdminService.deletePlatformStaff(staff.id);
+      }
       toast.success('تم الحذف المنطقي للموظف وإنهاء جلساته.');
       loadStaff();
     } catch (err) {
@@ -274,7 +446,18 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
+  // Actions with no central endpoint — blocked explicitly in central mode so
+  // they never silently write to the local store while displaying central data.
+  const requireLocalStaffAction = (feature: string): boolean => {
+    if (getCentralDataSourceState().active) {
+      toast.error(`«${feature}» غير مدعوم في الوضع المركزي بعد.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleForcePasswordChange = (staff: PlatformStaff) => {
+    if (!requireLocalStaffAction('فرض تغيير كلمة المرور')) return;
     const next = !staff.mustChangePassword;
     try {
       platformAdminService.forcePlatformStaffPasswordChange(staff.id, next);
@@ -287,8 +470,9 @@ export const PlatformStaffPage: React.FC = () => {
 
   const handleResetPassword = () => {
     if (!resetTarget) return;
-    if (resetPassword.length < 8) {
-      toast.error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+    if (!requireLocalStaffAction('إعادة تعيين كلمة المرور')) return;
+    if (!isStaffPasswordStrong(resetPassword)) {
+      toast.error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم.');
       return;
     }
     if (resetPassword !== resetConfirm) {
@@ -309,6 +493,7 @@ export const PlatformStaffPage: React.FC = () => {
 
   const handleTransfer = () => {
     if (!transferFrom || !transferToId) return;
+    if (!requireLocalStaffAction('نقل الصلاحيات')) return;
     try {
       platformAdminService.transferStaffPermissions(transferFrom.id, transferToId, transferNote.trim() || undefined);
       toast.success('نُقلت الصلاحيات إلى الموظف الهدف وأُنهيت جلساته الحالية.');
@@ -322,6 +507,7 @@ export const PlatformStaffPage: React.FC = () => {
   };
 
   const openScopeEditor = (staff: PlatformStaff) => {
+    if (!requireLocalStaffAction('نطاق البيانات')) return;
     try {
       const state = platformAdminService.getStaffDataScope(staff.id);
       setScope(state.scope);
@@ -341,6 +527,7 @@ export const PlatformStaffPage: React.FC = () => {
 
   const handleSaveScope = () => {
     if (!scopeTarget) return;
+    if (!requireLocalStaffAction('نطاق البيانات')) return;
     try {
       platformAdminService.setStaffDataScope(scopeTarget.id, scope, scope === 'LIMITED' ? scopeTenantIds : []);
       toast.success('تم تحديث نطاق البيانات للموظف.');
@@ -351,7 +538,7 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleCreateInvite = () => {
+  const handleCreateInvite = async () => {
     if (!canCreate) {
       toast.error('لا تملك صلاحية إنشاء دعوات.');
       return;
@@ -361,8 +548,35 @@ export const PlatformStaffPage: React.FC = () => {
       return;
     }
     try {
-      const created = platformAdminService.createStaffInvite(inviteForm);
-      setCreatedInvite(created);
+      if (getCentralDataSourceState().active) {
+        const created = await centralPlatformClient.createStaffInvite({
+          email: inviteForm.email.trim(),
+          fullName: inviteForm.fullName.trim(),
+          phone: inviteForm.phone?.trim() || undefined,
+          role: inviteForm.role,
+          expiresInDays: inviteForm.expiresInHours / 24,
+        });
+        const row = created as any;
+        const token = String(row?.token ?? '');
+        const mappedInvite: PlatformStaffInvite = {
+          id: String(row?.id ?? ''),
+          token: '',
+          email: String(row?.email ?? inviteForm.email.trim()),
+          fullName: String(row?.fullName ?? row?.full_name ?? inviteForm.fullName.trim()),
+          phone: row?.phone ?? inviteForm.phone?.trim() ?? null,
+          role: String(row?.role ?? inviteForm.role) as PlatformStaffRole,
+          status: 'PENDING',
+          expiresAt: String(row?.expiresAt ?? row?.expires_at ?? ''),
+          invitedBy: row?.invitedBy ?? row?.invited_by ?? null,
+          invitedByName: row?.invitedByName ?? row?.invited_by_name ?? null,
+          createdAt: String(row?.createdAt ?? row?.created_at ?? new Date().toISOString()),
+        };
+        const link = token ? `${window.location.origin}/#/accept-staff-invite/${token}` : '';
+        setCreatedInvite({ invite: mappedInvite, token, link, loginUrl: link, temporaryPassword: '' });
+      } else {
+        const created = platformAdminService.createStaffInvite(inviteForm);
+        setCreatedInvite(created);
+      }
       setCopied(false);
       setInviteForm({ fullName: '', email: '', phone: '', role: 'SUPPORT_AGENT', expiresInHours: 72 });
       loadInvites();
@@ -372,9 +586,13 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleRevokeInvite = (invite: PlatformStaffInvite) => {
+  const handleRevokeInvite = async (invite: PlatformStaffInvite) => {
     try {
-      platformAdminService.revokeStaffInvite(invite.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.revokeStaffInvite(invite.id);
+      } else {
+        platformAdminService.revokeStaffInvite(invite.id);
+      }
       toast.success('تم إلغاء الدعوة.');
       loadInvites();
     } catch (err) {
@@ -385,7 +603,9 @@ export const PlatformStaffPage: React.FC = () => {
   const handleCopyInvite = () => {
     if (!createdInvite) return;
     try {
-      navigator.clipboard?.writeText(createdInvite.link);
+      void navigator.clipboard?.writeText(createdInvite.link).catch(() => {
+        toast.error('تعذر النسخ إلى الحافظة.');
+      });
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -393,9 +613,13 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleRevokeSession = (session: PlatformStaffSession) => {
+  const handleRevokeSession = async (session: PlatformStaffSession) => {
     try {
-      platformAdminService.revokeStaffSession(session.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.revokeStaffSession(session.id);
+      } else {
+        platformAdminService.revokeStaffSession(session.id);
+      }
       toast.success('تم إنهاء الجلسة.');
       loadSessions();
     } catch (err) {
@@ -403,10 +627,16 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleRevokeAllOtherSessions = () => {
+  const handleRevokeAllOtherSessions = async () => {
     if (!window.confirm('إنهاء كل جلسات موظفي المنصة الأخرى؟ ستبقى جلستك الحالية فقط.')) return;
     try {
-      platformAdminService.revokeAllOtherStaffSessions();
+      if (getCentralDataSourceState().active) {
+        // No bulk endpoint — revoke every non-current session individually.
+        const targets = sessions.filter((s) => !s.isCurrent).map((s) => s.id);
+        await Promise.all(targets.map((id) => centralPlatformClient.revokeStaffSession(id)));
+      } else {
+        platformAdminService.revokeAllOtherStaffSessions();
+      }
       toast.success('تم إنهاء كل الجلسات الأخرى.');
       loadSessions();
     } catch (err) {
@@ -414,9 +644,13 @@ export const PlatformStaffPage: React.FC = () => {
     }
   };
 
-  const handleRevokeTrustedDevice = (device: PlatformTrustedDevice) => {
+  const handleRevokeTrustedDevice = async (device: PlatformTrustedDevice) => {
     try {
-      platformAdminService.revokeTrustedDevice(device.id);
+      if (getCentralDataSourceState().active) {
+        await centralPlatformClient.revokeStaffDevice(device.id);
+      } else {
+        platformAdminService.revokeTrustedDevice(device.id);
+      }
       toast.success('تم إلغاء توثيق الجهاز.');
       loadSessions();
     } catch (err) {
@@ -425,6 +659,7 @@ export const PlatformStaffPage: React.FC = () => {
   };
 
   const handleTrustCurrentDevice = () => {
+    if (!requireLocalStaffAction('توثيق الجهاز الحالي')) return;
     try {
       platformAdminService.trustCurrentStaffDevice();
       toast.success('تم توثيق هذا الجهاز كجهاز موثوق.');
@@ -435,6 +670,7 @@ export const PlatformStaffPage: React.FC = () => {
   };
 
   const handleSetMfaEnforcement = (policy: 'off' | 'optional' | 'required') => {
+    if (!requireLocalStaffAction('سياسة المصادقة الثنائية')) return;
     try {
       platformAdminService.setStaffMfaEnforcement(policy);
       toast.success(policy === 'required' ? 'أُلزمت المصادقة الثنائية على كل موظفي المنصة.' : policy === 'optional' ? 'المصادقة الثنائية اختيارية.' : 'توقفت إلزامية المصادقة الثنائية.');
@@ -445,6 +681,7 @@ export const PlatformStaffPage: React.FC = () => {
   };
 
   const handleResetStaffMfa = (staff: PlatformStaff) => {
+    if (!requireLocalStaffAction('إعادة تعيين المصادقة الثنائية')) return;
     if (!window.confirm(`إعادة تعيين المصادقة الثنائية للموظف "${staff.fullName}"؟ سيحتاج إلى إعدادها من جديد.`)) return;
     try {
       platformAdminService.resetStaffMfa(staff.id);
@@ -459,8 +696,11 @@ export const PlatformStaffPage: React.FC = () => {
   const handleStartMfaEnrollment = async () => {
     try {
       const setup = await platformAdminService.startMfaEnrollmentForStaffSelf();
-      const otpauth = setup.qrCodeImage ?? `otpauth://totp/CeramiSys:${currentUser?.id}?secret=${setup.secret}&issuer=CeramiSys`;
-      setMfaSetup({ secret: setup.secret, qrCodeImage: otpauth, recoveryCodes: setup.recoveryCodes });
+      // Service contract: { secret, uri (otpauth://), backupCodes }.
+      const otpauth = setup.uri?.startsWith('otpauth://')
+        ? setup.uri
+        : `otpauth://totp/CeramiSys:${encodeURIComponent(currentUser?.username ?? currentUser?.id ?? 'staff')}?secret=${setup.secret}&issuer=CeramiSys`;
+      setMfaSetup({ secret: setup.secret, qrCodeImage: otpauth, recoveryCodes: setup.backupCodes ?? [] });
       setMfaCode('');
       setMfaAck(false);
       try {
@@ -541,6 +781,8 @@ export const PlatformStaffPage: React.FC = () => {
         <AccountsTab
           roles={roles}
           staffList={staffList}
+          allStaffList={allStaffList}
+          centralActive={centralActive}
           search={search}
           onSearchChange={setSearch}
           roleFilter={roleFilter}
@@ -570,6 +812,7 @@ export const PlatformStaffPage: React.FC = () => {
           devices={devices}
           sessions={sessions}
           currentDeviceTrusted={currentDeviceTrusted}
+          centralActive={centralActive}
           canRevokeSessions={canRevokeSessions}
           canUpdate={canUpdate}
           onTrustCurrentDevice={handleTrustCurrentDevice}
@@ -598,16 +841,23 @@ export const PlatformStaffPage: React.FC = () => {
 
       {/* ─── TAB: Logins ───────────────────────────────────────────────── */}
       {tab === 'logins' && (
-        <LoginsTab
-          failedOnly={failedOnly}
-          onFailedOnlyChange={setFailedOnly}
-          logins={logins}
-        />
+        centralActive ? (
+          <CentralUnsupportedNotice feature="سجل محاولات دخول الموظفين" />
+        ) : (
+          <LoginsTab
+            failedOnly={failedOnly}
+            onFailedOnlyChange={setFailedOnly}
+            logins={logins}
+          />
+        )
       )}
 
       {/* ─── TAB: Security / MFA ───────────────────────────────────────── */}
       {tab === 'security' && (
-        <SecurityTab
+        centralActive ? (
+          <CentralUnsupportedNotice feature="المصادقة الثنائية (MFA) وامتثال الموظفين" />
+        ) : (
+          <SecurityTab
           mfaStatus={mfaStatus}
           mfaCompliance={mfaCompliance}
           canManageSecurity={canManageSecurity}
@@ -616,7 +866,8 @@ export const PlatformStaffPage: React.FC = () => {
           onStartEnrollment={handleStartMfaEnrollment}
           onSetEnforcement={handleSetMfaEnforcement}
           onResetStaffMfa={handleResetStaffMfa}
-        />
+          />
+        )
       )}
 
       {/* ─── Modal: Create / Edit staff ─────────────────────────────────── */}

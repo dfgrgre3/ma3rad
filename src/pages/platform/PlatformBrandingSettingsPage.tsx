@@ -70,6 +70,12 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
 
   const [currentVersion, setCurrentVersion] = useState<number>(1);
   const [versions, setVersions] = useState<PlatformBrandingVersion[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const savedTimerRef = React.useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+  }, []);
 
   // Load Tenants
   const loadTenants = useCallback(async () => {
@@ -89,14 +95,23 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
     setLoading(true);
     const centralState = getCentralDataSourceState();
     try {
-      let data: any;
-      let vList: any[] = [];
+      // Central rows come back snake_case; local service returns camelCase.
+      let data: PlatformBrandingConfig | Record<string, unknown> | null = null;
+      let vList: PlatformBrandingVersion[] = [];
 
       if (centralState.active) {
         data = tenantId
           ? await centralPlatformClient.getTenantBranding(tenantId)
           : await centralPlatformClient.getPlatformBranding();
-        vList = tenantId ? await centralPlatformClient.listTenantBrandingVersions(tenantId) : [];
+        const rawVersions = tenantId ? await centralPlatformClient.listTenantBrandingVersions(tenantId) : [];
+        vList = (Array.isArray(rawVersions) ? rawVersions : []).map((v) => {
+          const row = v as Record<string, unknown>;
+          return {
+            ...(v as PlatformBrandingVersion),
+            changeSummary: String(row.changeSummary ?? row.change_summary ?? ''),
+            createdAt: String(row.createdAt ?? row.created_at ?? ''),
+          } as PlatformBrandingVersion;
+        });
       } else {
         data = tenantId
           ? platformAdminService.getTenantBranding(tenantId)
@@ -104,32 +119,42 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
         vList = platformAdminService.listTenantBrandingVersions(tenantId || null);
       }
 
-      setCompanyName(data.companyName || '');
-      setLogoUrl(data.logoUrl || '');
-      setLogoDarkUrl(data.logoDarkUrl || '');
-      setFaviconUrl(data.faviconUrl || '');
-      setPrimaryColor(data.primaryColor || '#10b981');
-      setSecondaryColor(data.secondaryColor || '#064e3b');
-      setAccentColor(data.accentColor || '#3b82f6');
-      setFontFamily(data.fontFamily || 'Tajawal');
-      setInvoiceTemplate(data.invoiceTemplate || 'classic');
-      setLoginBackgroundUrl(data.loginBackgroundUrl || '');
-      setLoginWelcomeTitle(data.loginWelcomeTitle || '');
-      setLoginWelcomeSubtitle(data.loginWelcomeSubtitle || '');
-      setEmailHeaderLogo(data.emailHeaderLogo || '');
-      setEmailFooterText(data.emailFooterText || '');
-      setCustomSubdomain(data.customSubdomain || '');
+      const row = (data ?? {}) as Record<string, unknown>;
+      const pick = (...keys: string[]) => {
+        for (const key of keys) {
+          const value = row[key];
+          if (value !== undefined && value !== null && value !== '') return value;
+        }
+        return undefined;
+      };
+      const allowedRaw = (pick('allowedCustomizations', 'allowed_customizations') ?? {}) as Record<string, unknown>;
 
-      const allowed = data.allowedCustomizations || {};
-      setCanChangeLogo(allowed.canChangeLogo ?? true);
-      setCanChangeColors(allowed.canChangeColors ?? true);
-      setCanChangeInvoiceTemplate(allowed.canChangeInvoiceTemplate ?? true);
-      setCanChangeLogin(allowed.canChangeLogin ?? false);
+      setCompanyName(String(pick('companyName', 'company_name') ?? ''));
+      setLogoUrl(String(pick('logoUrl', 'logo_url') ?? ''));
+      setLogoDarkUrl(String(pick('logoDarkUrl', 'logo_dark_url') ?? ''));
+      setFaviconUrl(String(pick('faviconUrl', 'favicon_url') ?? ''));
+      setPrimaryColor(String(pick('primaryColor', 'primary_color') ?? '#10b981'));
+      setSecondaryColor(String(pick('secondaryColor', 'secondary_color') ?? '#064e3b'));
+      setAccentColor(String(pick('accentColor', 'accent_color') ?? '#3b82f6'));
+      setFontFamily(String(pick('fontFamily', 'font_family') ?? 'Tajawal'));
+      setInvoiceTemplate((pick('invoiceTemplate', 'invoice_template') as PlatformInvoiceTemplate) || 'classic');
+      setLoginBackgroundUrl(String(pick('loginBackgroundUrl', 'login_background_url') ?? ''));
+      setLoginWelcomeTitle(String(pick('loginWelcomeTitle', 'login_welcome_title') ?? ''));
+      setLoginWelcomeSubtitle(String(pick('loginWelcomeSubtitle', 'login_welcome_subtitle') ?? ''));
+      setEmailHeaderLogo(String(pick('emailHeaderLogo', 'email_header_logo') ?? ''));
+      setEmailFooterText(String(pick('emailFooterText', 'email_footer_text') ?? ''));
+      setCustomSubdomain(String(pick('customSubdomain', 'custom_subdomain') ?? ''));
 
-      setCurrentVersion(data.version);
+      setCanChangeLogo(allowedRaw.canChangeLogo !== false);
+      setCanChangeColors(allowedRaw.canChangeColors !== false);
+      setCanChangeInvoiceTemplate(allowedRaw.canChangeInvoiceTemplate !== false);
+      setCanChangeLogin(allowedRaw.canChangeLogin === true);
+
+      setCurrentVersion(Number(pick('version') ?? 1) || 1);
       setVersions(vList);
+      setLoadError(null);
     } catch (e) {
-      console.error('Failed to load branding:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل إعدادات الهوية.');
     } finally {
       setLoading(false);
     }
@@ -147,9 +172,23 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageBranding) { toast.warning('لا تملك صلاحية إدارة الهوية'); return; }
+    const centralState = getCentralDataSourceState();
+    // The central server only exposes tenant-scoped branding writes
+    // (PUT /admin/branding/tenant/:id). There is no platform-level branding
+    // save endpoint, so refuse rather than silently writing elsewhere.
+    if (centralState.active && !selectedTenantId) {
+      toast.error('حفظ الهوية على مستوى المنصة غير مدعوم في الوضع المركزي — عدّل هوية كل عميل على حدة.');
+      return;
+    }
+    const hexOk = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(primaryColor)
+      && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(secondaryColor)
+      && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(accentColor);
+    if (!hexOk) {
+      toast.error('قيم الألوان يجب أن تكون بصيغة HEX صحيحة (مثل #10b981).');
+      return;
+    }
     setSaving(true);
     setSavedSuccess(false);
-    const centralState = getCentralDataSourceState();
     try {
       const brandingInput = {
         companyName,
@@ -175,15 +214,10 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
         },
       };
 
-      let updated: any;
+      let updated: { version?: number };
       if (centralState.active) {
-        if (selectedTenantId) {
-          updated = await centralPlatformClient.saveTenantBranding(selectedTenantId, brandingInput);
-        } else {
-          // For platform-level branding, use updateBranding (settings endpoint)
-          await centralPlatformClient.updateSettings({ branding: JSON.stringify(brandingInput) });
-          updated = { version: currentVersion + 1 };
-        }
+        // Platform scope was rejected above — only tenant branding reaches here.
+        updated = (await centralPlatformClient.saveTenantBranding(selectedTenantId, brandingInput)) as { version?: number };
       } else {
         updated = platformAdminService.saveTenantBranding({
           tenantId: selectedTenantId || null,
@@ -196,7 +230,8 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
 
       setCurrentVersion(updated.version || currentVersion + 1);
       setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = window.setTimeout(() => setSavedSuccess(false), 3000);
       loadBranding(selectedTenantId);
     } catch (err) {
       toast.error((err as Error).message);
@@ -208,13 +243,20 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
   // Handle Rollback
   const handleRollback = async (ver: number) => {
     if (!canManageBranding) { toast.warning('لا تملك صلاحية إدارة الهوية'); return; }
-    if (!confirm(`هل أنت متأكد من استرجاع إعدادات الهوية للإصدار #${ver}؟`)) return;
     const centralState = getCentralDataSourceState();
+    // No platform-level branding versions exist on the central server.
+    if (centralState.active && !selectedTenantId) {
+      toast.error('استرجاع إصدارات الهوية على مستوى المنصة غير متاح في الوضع المركزي.');
+      return;
+    }
+    if (!confirm(`هل أنت متأكد من استرجاع إعدادات الهوية للإصدار #${ver}؟`)) return;
     try {
       if (centralState.active && selectedTenantId) {
         await centralPlatformClient.rollbackTenantBranding(selectedTenantId, ver);
       } else if (!centralState.active) {
         platformAdminService.rollbackTenantBranding(selectedTenantId || null, ver);
+      } else {
+        return;
       }
       loadBranding(selectedTenantId);
       toast.success(`تم استرجاع الإصدار #${ver} بنجاح.`);
@@ -223,8 +265,21 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
     }
   };
 
+  const centralActive = getCentralDataSourceState().active;
+  // Central mode has no platform-level branding write endpoint — only tenant saves.
+  const platformSaveBlocked = centralActive && !selectedTenantId;
+  const showHistoryTab = !(centralActive && !selectedTenantId);
+
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
+          {loadError}
+        </div>
+      )}
+      {platformSaveBlocked && (
+        <CentralUnsupportedNotice feature="حفظ الهوية على مستوى المنصة" />
+      )}
       {/* Header */}
       <PageHeader
         title="الهوية والمظهر وواجهات العملاء (Branding)"
@@ -234,7 +289,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={saving || loading || !canManageBranding}
+              disabled={saving || loading || !canManageBranding || platformSaveBlocked}
             >
               <Save className="w-4 h-4 ml-2" />
               {saving ? 'جاري الحفظ...' : 'حفظ الهوية والتطبيق'}
@@ -332,6 +387,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
                 صلاحيات التخصيص
               </button>
             )}
+            {showHistoryTab && (
             <button
               onClick={() => setActiveTab('history')}
               className={`flex items-center gap-2 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -341,6 +397,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
               <History className="w-4 h-4" />
               سجل الإصدارات
             </button>
+            )}
           </div>
 
           {/* Tab Content Box */}
@@ -620,7 +677,7 @@ export const PlatformBrandingSettingsPage: React.FC = () => {
             )}
 
             {/* 6. History Tab */}
-            {activeTab === 'history' && (
+            {activeTab === 'history' && showHistoryTab && (
               <div className="space-y-3">
                 <div className="text-xs text-muted">
                   سجل الإصدارات واللقطات السابقة للهوية:

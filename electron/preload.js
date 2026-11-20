@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('ceramisys', {
     clearCredential: () => ipcRenderer.invoke('central:clear-credential'),
     request: (request) => ipcRenderer.invoke('central:request', request),
   },
+  activation: {
+    pending: () => ipcRenderer.invoke('activation:pending-read'),
+    clear: () => ipcRenderer.invoke('activation:pending-clear'),
+  },
   modules: {
     status: () => ipcRenderer.invoke('modules:status'),
     available: () => ipcRenderer.invoke('modules:available'),

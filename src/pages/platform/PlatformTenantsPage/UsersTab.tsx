@@ -1,17 +1,24 @@
 import React from 'react';
 import { Ban, CheckCircle2, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import type { PlatformTenantUser } from '../../../services/domains/platform/platformTypes';
 import { Button } from '../../../components/ui/Button';
 import { DataTable } from '../../../components/ui/DataTable';
 import { EmptyState, StatusBadge } from '../components/PlatformUI';
 import { SectionCard } from './shared';
 
+const USER_STATUS_LABELS: Record<PlatformTenantUser['status'], string> = {
+  ACTIVE: 'نشط',
+  SUSPENDED: 'موقوف',
+  INVITED: 'مدعو',
+};
+
 interface UsersTabProps {
-  users: any[];
+  users: PlatformTenantUser[];
   canManageTenants: boolean;
   openUserCreate: () => void;
-  openUserEdit: (user: any) => void;
-  toggleUser: (user: any, active: boolean) => void;
-  deleteUser: (user: any) => void;
+  openUserEdit: (user: PlatformTenantUser) => void;
+  toggleUser: (user: PlatformTenantUser, active: boolean) => void;
+  deleteUser: (user: PlatformTenantUser) => void;
 }
 
 export const UsersTab: React.FC<UsersTabProps> = ({
@@ -50,7 +57,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({
                         { key: 'role', header: 'الدور', render: (user) => <span className="text-[10.5px] font-semibold text-ink">{user.role}</span> },
                         {
                           key: 'status', header: 'الحالة',
-                          render: (user) => <StatusBadge value={user.status === 'ACTIVE' ? 'ACTIVE' : user.status === 'SUSPENDED' ? 'SUSPENDED' : 'TRIAL'} label={user.status === 'ACTIVE' ? 'نشط' : user.status === 'SUSPENDED' ? 'موقوف' : 'مدعو'} />,
+                          render: (user) => <StatusBadge value={user.status} label={USER_STATUS_LABELS[user.status] ?? user.status} />,
                         },
                         { key: 'notes', header: 'ملاحظات', render: (user) => <span className="text-[10.5px] text-muted">{user.notes || '—'}</span> },
                         {

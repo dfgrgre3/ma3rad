@@ -52,7 +52,9 @@ export function respondToSecurityIncident(ctx: StaffServiceContext, id: string, 
   if (!incidentRow) throw new Error('الحادث غير موجود.')
 
   const now = nowIso();
-  const status = resolve ? 'RESOLVED' : 'IN_PROGRESS';
+  // 'CONTAINED' is the in-progress state the security-center UI understands;
+  // 'RESOLVED' closes the incident and stamps resolved_at.
+  const status = resolve ? 'RESOLVED' : 'CONTAINED';
 
   ctx.db.run(
     'UPDATE platform_security_incidents SET status = ?, response = ?, updated_at = ? WHERE id = ?',
@@ -157,10 +159,14 @@ export function getPlatformSecurityOverview(ctx: StaffServiceContext): PlatformC
   securityScore -= Math.min(30, openIncidents * 10);
   securityScore = Math.max(0, Math.min(100, securityScore));
 
+  const mfaEnforcement = ctx.getStaffMfaEnforcement();
+
   return {
     securityScore,
     twoFactorEnforcement: {
-      enabled: true,
+      // Reflect the real platform.staffMfaEnforcement policy — 'required'
+      // means 2FA is mandatory for every staff account.
+      enabled: mfaEnforcement === 'required',
       compliantStaffCount: mfaCompliance.enabled,
       totalStaffCount: mfaCompliance.total,
     },

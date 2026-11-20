@@ -24,7 +24,7 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
   // Bulk operations state
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [bulkActionOpen, setBulkActionOpen] = React.useState(false);
-  const [bulkActionType, setBulkActionType] = React.useState<'status' | 'plan' | 'activation' | 'export' | 'import'>('status');
+  const [bulkActionType, setBulkActionType] = React.useState<'status' | 'plan' | 'activation' | 'export'>('status');
   const [bulkStatus, setBulkStatus] = React.useState<PlatformTenantStatus>('SUSPENDED');
   const [bulkPlanId, setBulkPlanId] = React.useState('');
   const [bulkMonths, setBulkMonths] = React.useState(12);
@@ -48,17 +48,8 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
     });
   };
 
-  const openBulkAction = (type: 'status' | 'plan' | 'activation' | 'export' | 'import') => {
-    if (selectedIds.size === 0 && type !== 'import') {
-      toast.error('اختر عميلاً واحداً على الأقل');
-      return;
-    }
-    setBulkActionType(type);
-    setBulkActionOpen(true);
-  };
-
   const executeBulkAction = async () => {
-    if (selectedIds.size === 0 && bulkActionType !== 'import') {
+    if (selectedIds.size === 0) {
       toast.error('لا يوجد عملاء محددون');
       return;
     }
@@ -119,11 +110,6 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
             ]),
           ]);
           toast.success('تم تصدير البيانات', `${selected.length} عميل`);
-        } else {
-          // 'import' is handled by the CSV import modal.
-          toast.info('استخدم نافذة استيراد CSV لإضافة عملاء جدد');
-          setBulkWorking(false);
-          return;
         }
         setBulkActionOpen(false);
         setSelectedIds(new Set());
@@ -168,10 +154,6 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
           toast.success('تم تصدير البيانات', `${ids.length} عميل`);
           break;
         }
-        case 'import': {
-          // Handled by CSV import modal
-          break;
-        }
       }
       setBulkActionOpen(false);
       setSelectedIds(new Set());
@@ -202,7 +184,6 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
     bulkWorking,
     handleSelectAll,
     handleSelectOne,
-    openBulkAction,
     executeBulkAction,
   };
 }

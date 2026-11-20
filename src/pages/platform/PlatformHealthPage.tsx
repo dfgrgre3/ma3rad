@@ -1,6 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ShieldCheck,
   ShieldAlert,
   Activity,
   AlertTriangle,
@@ -14,12 +13,9 @@ import {
   Archive,
   Zap,
   Clock,
-  ArrowUpRight,
   TrendingUp,
-  Cpu,
   Layers,
   Check,
-  XCircle,
   ExternalLink,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
@@ -32,12 +28,58 @@ import type {
 } from '../../services/domains/platform/platformTypes';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { StatusBadge, formatDate, formatMoney, formatNumber } from './components/PlatformUI';
+import { formatDate, formatMoney, formatNumber } from './components/PlatformUI';
 
 import { useToast } from '../../components/ui/Toast';
+
+/** Row shape returned by GET /api/v1/admin/monitoring/errors (central-server). */
+interface CentralErrorReport {
+  id: string;
+  tenantId: string | null;
+  tenantName: string | null;
+  deviceId: string | null;
+  fingerprint: string;
+  title: string;
+  description: string | null;
+  stack: string | null;
+  issueType: string | null;
+  severity: string;
+  appVersion: string | null;
+  os: string | null;
+  occurrences: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  status: string;
+  acknowledgedBy: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Shape returned by GET /api/v1/admin/monitoring/errors/summary. */
+interface CentralErrorSummary {
+  byStatus: Record<string, number>;
+  bySeverity: Record<string, { count: number; occurrences: number }>;
+  total: number;
+  occurrences: number;
+  last24h: number;
+}
+
 export const PlatformHealthPage: React.FC = () => {
   const toast = useToast();
-  const centralActive = getCentralDataSourceState().active;
+  // Reactive snapshot — the data-source setting has no change event, so poll
+  // it (same pattern as CentralUnsupportedNotice) instead of reading once.
+  const [centralActive, setCentralActive] = useState(() => getCentralDataSourceState().active);
+  React.useEffect(() => {
+    const refresh = () => setCentralActive(getCentralDataSourceState().active);
+    const timer = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const canUpdateHealth = canPlatform('platform-health', 'platform.platform-health.update')
     || canPlatform('operations', 'platform.operations.update')
     || canPlatform('system-health', 'platform.system-health.update');
@@ -47,13 +89,17 @@ export const PlatformHealthPage: React.FC = () => {
   const [alertFilter, setAlertFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'INFO'>('ALL');
 
   // Central error-monitoring state
-  const [errorReports, setErrorReports] = useState<any[]>([]);
-  const [errorSummary, setErrorSummary] = useState<any>(null);
+  const [errorReports, setErrorReports] = useState<CentralErrorReport[]>([]);
+  const [errorSummary, setErrorSummary] = useState<CentralErrorSummary | null>(null);
   const [errStatusFilter, setErrStatusFilter] = useState('OPEN');
   const [errSeverityFilter, setErrSeverityFilter] = useState('');
   const [errSearch, setErrSearch] = useState('');
 
+  // Guards against out-of-order responses when filters change mid-flight.
+  const loadSeq = React.useRef(0);
+
   const loadCentral = useCallback(() => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     Promise.all([
       centralPlatformClient.getErrorReportsSummary(),
@@ -64,12 +110,16 @@ export const PlatformHealthPage: React.FC = () => {
       }),
     ])
       .then(([summary, rows]) => {
-        setErrorSummary(summary);
-        setErrorReports(rows);
+        if (seq !== loadSeq.current) return;
+        setErrorSummary(summary as CentralErrorSummary);
+        setErrorReports(rows as CentralErrorReport[]);
         setError(null);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل مركز مراقبة الأخطاء.'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (seq !== loadSeq.current) return;
+        setError(err instanceof Error ? err.message : 'تعذر تحميل مركز مراقبة الأخطاء.');
+      })
+      .finally(() => { if (seq === loadSeq.current) setLoading(false); });
   }, [errStatusFilter, errSeverityFilter, errSearch]);
 
   const handleErrorAction = useCallback((id: string, action: 'acknowledge' | 'resolve' | 'ignore' | 'reopen') => {
@@ -80,15 +130,18 @@ export const PlatformHealthPage: React.FC = () => {
 
   const load = useCallback(() => {
     if (centralActive) { loadCentral(); return; }
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const dashboard = platformAdminService.getPlatformHealthDashboard();
+      if (seq !== loadSeq.current) return;
       setData(dashboard);
       setError(null);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات صحة ومراقبة المنصة.');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [centralActive, loadCentral]);
 
@@ -96,16 +149,18 @@ export const PlatformHealthPage: React.FC = () => {
     load();
   }, [load]);
 
-  if (error) {
-    return (
-      <div role="alert" className="rounded-xl border border-danger bg-danger/40 p-5 text-danger">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="h-6 w-6 text-danger" />
-          <span className="font-bold">{error}</span>
-        </div>
-      </div>
-    );
-  }
+  const errorBanner = error ? (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-xs font-bold text-danger">
+      <span className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        {error}
+      </span>
+      <Button variant="secondary" size="sm" onClick={load} disabled={loading}
+        leadingIcon={<RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />}>
+        إعادة المحاولة
+      </Button>
+    </div>
+  ) : null;
 
   if (centralActive) {
     const byStatus: Record<string, number> = errorSummary?.byStatus ?? {};
@@ -132,6 +187,8 @@ export const PlatformHealthPage: React.FC = () => {
             </Button>
           }
         />
+
+        {errorBanner}
 
         {/* Summary cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -266,7 +323,7 @@ export const PlatformHealthPage: React.FC = () => {
     );
   }
 
-  if (!data || loading) {
+  if ((!data && !error) || (loading && !data)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex items-center gap-3 text-muted">
@@ -275,6 +332,11 @@ export const PlatformHealthPage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (!data) {
+    // Load failed with no cached data — show the error with retry, not a spinner.
+    return <div className="space-y-4">{errorBanner}</div>;
   }
 
   const { technical, business } = data;
@@ -306,6 +368,8 @@ export const PlatformHealthPage: React.FC = () => {
           </Button>
         }
       />
+
+      {errorBanner}
 
       {/* Hero: Technical Infrastructure Health Score */}
       <section

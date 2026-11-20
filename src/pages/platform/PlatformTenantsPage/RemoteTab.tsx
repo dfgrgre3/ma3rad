@@ -1,5 +1,6 @@
 import React from 'react';
 import { Ban, CheckCircle2, Cpu, RefreshCw, RotateCw, ScrollText, Send } from 'lucide-react';
+import type { PlatformDevice } from '../../../services/domains/platform/platformTypes';
 import { Button } from '../../../components/ui/Button';
 import { DataTable } from '../../../components/ui/DataTable';
 import { EmptyState, Field, StatusBadge, formatDateTime, inputClass } from '../components/PlatformUI';
@@ -18,10 +19,11 @@ interface RemoteTabProps {
   forceSync: () => void;
   forceSyncWorking: boolean;
   canManageTenants: boolean;
-  remoteDevices: any[];
+  centralActive: boolean;
+  remoteDevices: PlatformDevice[];
   selectedDeviceIds: string[];
   setSelectedDeviceIds: React.Dispatch<React.SetStateAction<string[]>>;
-  toggleDeviceStatus: (device: any) => void;
+  toggleDeviceStatus: (device: PlatformDevice) => void;
   configForm: { key: string; value: string; scope: string; targetDeviceIds: string[] };
   setConfigForm: React.Dispatch<React.SetStateAction<{ key: string; value: string; scope: string; targetDeviceIds: string[] }>>;
   pushConfig: () => void;
@@ -36,6 +38,7 @@ export const RemoteTab: React.FC<RemoteTabProps> = ({
   forceSync,
   forceSyncWorking,
   canManageTenants,
+  centralActive,
   remoteDevices,
   selectedDeviceIds,
   setSelectedDeviceIds,
@@ -94,7 +97,14 @@ export const RemoteTab: React.FC<RemoteTabProps> = ({
                       dense
                       columns={[
                         {
-                          key: 'select', header: <input type="checkbox" onChange={(e) => e.target.checked ? setSelectedDeviceIds(remoteDevices.map(d => d.id)) : setSelectedDeviceIds([])} />,
+                          key: 'select', header: (
+                            <input
+                              type="checkbox"
+                              checked={remoteDevices.length > 0 && selectedDeviceIds.length === remoteDevices.length}
+                              onChange={(e) => setSelectedDeviceIds(e.target.checked ? remoteDevices.map(d => d.id) : [])}
+                              aria-label="تحديد كل الأجهزة"
+                            />
+                          ),
                           render: (device) => <input type="checkbox" checked={selectedDeviceIds.includes(device.id)} onChange={(e) => setSelectedDeviceIds(e.target.checked ? [...selectedDeviceIds, device.id] : selectedDeviceIds.filter(id => id !== device.id))} />,
                           width: 40,
                         },
@@ -123,9 +133,21 @@ export const RemoteTab: React.FC<RemoteTabProps> = ({
                           key: 'actions', header: 'إجراءات',
                           render: (device) => (
                             <div className="flex items-center gap-1">
-                              {canManageTenants && (<button type="button" onClick={() => toggleDeviceStatus(device)} className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning" title={device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}>
-                                {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                              </button>)}
+                              {canManageTenants && (() => {
+                                // Central API can suspend devices but cannot re-activate them.
+                                const unsupported = centralActive && device.status !== 'ACTIVE';
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={unsupported}
+                                    onClick={() => toggleDeviceStatus(device)}
+                                    className={`rounded p-1.5 ${unsupported ? 'cursor-not-allowed text-muted/40' : 'text-muted hover:bg-warning-soft hover:text-warning'}`}
+                                    title={unsupported ? 'إعادة التفعيل غير مدعومة في الوضع المركزي' : device.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}
+                                  >
+                                    {device.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                  </button>
+                                );
+                              })()}
                             </div>
                           ),
                         },

@@ -22,6 +22,9 @@ import type {
   PlatformRelease,
   PlatformModuleUsage,
   PlatformDevice,
+  PlatformAuditEntry,
+  AuditSeverity,
+  AuditStatus,
 } from '../../../services/domains/platform/platformTypes';
 
 // ─── Flat analytics payloads returned by the central server endpoints ────────
@@ -140,6 +143,15 @@ const num = (v: unknown, fallback = 0): number => {
 
 const str = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
 
+/** First non-null/undefined value among `keys` of a loosely-typed central row. */
+const pick = (row: Record<string, unknown>, ...keys: string[]): unknown => {
+  for (const key of keys) {
+    const v = row[key];
+    if (v !== undefined && v !== null) return v;
+  }
+  return undefined;
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRING_WINDOW_DAYS = 30;
 
@@ -148,12 +160,12 @@ const timeOf = (v: unknown): number => {
   return Number.isFinite(t) ? t : NaN;
 };
 
-/** True when `dateStr` falls within the next `days` days (and is not long past). */
+/** True when `dateStr` falls within the next `days` days (already-past dates excluded). */
 const expiresWithin = (dateStr: unknown, days = EXPIRING_WINDOW_DAYS): boolean => {
   const t = timeOf(dateStr);
   if (!Number.isFinite(t)) return false;
   const now = Date.now();
-  return t >= now - DAY_MS && t <= now + days * DAY_MS;
+  return t >= now && t <= now + days * DAY_MS;
 };
 
 const byDateAsc = <T>(get: (row: T) => unknown) => (a: T, b: T) => timeOf(get(a)) - timeOf(get(b));
@@ -271,16 +283,16 @@ function buildLocalExtras(
 }
 
 function localAlerts(overview: PlatformOverview): PlatformAlertDetail[] {
-  const raw = Array.isArray(overview.alertDetails) && overview.alertDetails.length > 0
+  const raw = (Array.isArray(overview.alertDetails) && overview.alertDetails.length > 0
     ? overview.alertDetails
-    : (Array.isArray(overview.alerts) ? overview.alerts : []);
-  return raw.map((a: any, index: number) => ({
+    : (Array.isArray(overview.alerts) ? overview.alerts : [])) as PlatformAlertDetail[];
+  return raw.map((a: PlatformAlertDetail, index: number) => ({
     ...(a as PlatformAlertDetail),
     id: String(a?.id ?? `alert-${index}`),
     severity: (['danger', 'warning', 'info', 'success'].includes(String(a?.severity))
       ? String(a.severity)
       : 'info') as PlatformAlertDetail['severity'],
-    title: String(a?.title ?? a?.message ?? 'تنبيه'),
+    title: String(a.title || (a as { message?: unknown }).message || 'تنبيه'),
     description: String(a?.description ?? ''),
     entityType: a?.entityType,
     entityId: a?.entityId != null ? String(a.entityId) : '',
@@ -400,69 +412,90 @@ function centralAlerts(input: {
   return alerts.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9));
 }
 
-function mapCentralRelease(row: any): PlatformRelease {
+function mapCentralRelease(row: Record<string, unknown>): PlatformRelease {
+  const boolOrNull = (v: unknown): boolean | null =>
+    typeof v === 'boolean' ? v : typeof v === 'string' ? v === 'true' || v === '1' : null;
+  const strOrNull = (v: unknown): string | null => (v === null || v === undefined || v === '' ? null : str(v));
   return {
-    id: str(row?.id ?? row?.releaseId),
-    version: str(row?.version ?? ''),
-    channel: str(row?.channel ?? 'STABLE'),
-    status: row?.status ?? null,
-    isMandatory: row?.isMandatory ?? row?.is_mandatory ?? null,
-    minVersion: row?.minVersion ?? row?.min_version ?? null,
-    rolloutGroup: row?.rolloutGroup ?? row?.rollout_group ?? null,
-    notes: row?.notes ?? row?.changelog ?? null,
-    releasedAt: str(row?.releasedAt ?? row?.released_at ?? row?.createdAt ?? row?.created_at),
-    fileUrl: row?.fileUrl ?? row?.file_url ?? null,
-    fileName: row?.fileName ?? row?.file_name ?? null,
-    fileSize: num(row?.fileSize ?? row?.file_size, 0) || null,
-    checksumSha256: row?.checksumSha256 ?? row?.checksum_sha256 ?? null,
-    packageSignature: row?.packageSignature ?? row?.package_signature ?? null,
-    changelog: row?.changelog ?? null,
-    rollbackVersion: row?.rollbackVersion ?? row?.rollback_version ?? null,
-    stagingGroup: row?.stagingGroup ?? row?.staging_group ?? null,
-    targetsSummary: row?.targetsSummary ?? row?.targets_summary ?? null,
-    createdAt: str(row?.createdAt ?? row?.created_at ?? ''),
-    updatedAt: str(row?.updatedAt ?? row?.updated_at ?? ''),
+    id: str(pick(row, 'id', 'releaseId')),
+    version: str(pick(row, 'version')),
+    channel: str(pick(row, 'channel')) || 'STABLE',
+    status: strOrNull(pick(row, 'status')),
+    isMandatory: boolOrNull(pick(row, 'isMandatory', 'is_mandatory')),
+    minVersion: strOrNull(pick(row, 'minVersion', 'min_version')),
+    rolloutGroup: strOrNull(pick(row, 'rolloutGroup', 'rollout_group')),
+    notes: strOrNull(pick(row, 'notes', 'changelog')),
+    releasedAt: strOrNull(pick(row, 'releasedAt', 'released_at', 'createdAt', 'created_at')),
+    fileUrl: strOrNull(pick(row, 'fileUrl', 'file_url')),
+    fileName: strOrNull(pick(row, 'fileName', 'file_name')),
+    fileSize: num(pick(row, 'fileSize', 'file_size'), 0) || null,
+    checksumSha256: strOrNull(pick(row, 'checksumSha256', 'checksum_sha256')),
+    packageSignature: strOrNull(pick(row, 'packageSignature', 'package_signature')),
+    changelog: strOrNull(pick(row, 'changelog')),
+    rollbackVersion: strOrNull(pick(row, 'rollbackVersion', 'rollback_version')),
+    stagingGroup: strOrNull(pick(row, 'stagingGroup', 'staging_group')),
+    targetsSummary: (pick(row, 'targetsSummary', 'targets_summary') ?? null) as Record<string, number> | null,
+    createdAt: str(pick(row, 'createdAt', 'created_at')),
+    updatedAt: str(pick(row, 'updatedAt', 'updated_at')),
   };
 }
 
-function mapCentralAuditEvent(row: any): DashboardAuditItem {
+function mapCentralAuditEvent(row: Record<string, unknown>): DashboardAuditItem {
   return {
-    id: str(row?.id ?? ''),
-    action: str(row?.action ?? ''),
-    actorName: row?.actorName ?? row?.actor_name ?? null,
-    entityType: row?.resourceType ?? row?.resource_type ?? row?.entityType ?? null,
-    severity: row?.severity ?? null,
-    status: row?.status ?? null,
-    createdAt: str(row?.createdAt ?? row?.created_at ?? ''),
+    id: str(pick(row, 'id')),
+    action: str(pick(row, 'action')),
+    actorName: (pick(row, 'actorName', 'actor_name') ?? null) as string | null,
+    entityType: (pick(row, 'resourceType', 'resource_type', 'entityType') ?? null) as string | null,
+    severity: (pick(row, 'severity') ?? null) as string | null,
+    status: (pick(row, 'status') ?? null) as string | null,
+    createdAt: str(pick(row, 'createdAt', 'created_at')),
   };
 }
 
-function mapCentralSyncError(row: any, index: number): DashboardSyncError {
+function mapCentralSyncError(row: Record<string, unknown>, index: number): DashboardSyncError {
   return {
-    id: str(row?.id ?? `sync-${index}`),
-    deviceId: str(row?.deviceId ?? row?.device_id ?? ''),
-    deviceName: str(row?.deviceName ?? row?.device_name ?? row?.deviceId ?? 'جهاز'),
-    tenantId: row?.tenantId ?? row?.tenant_id ?? undefined,
-    tenantName: str(row?.tenantName ?? row?.tenant_name ?? ''),
-    error: str(row?.error ?? row?.message ?? ''),
-    occurredAt: str(row?.occurredAt ?? row?.occurred_at ?? row?.createdAt ?? row?.created_at ?? ''),
-    resolved: Boolean(row?.resolved ?? false),
+    id: str(pick(row, 'id')) || `sync-${index}`,
+    deviceId: str(pick(row, 'deviceId', 'device_id')),
+    deviceName: str(pick(row, 'deviceName', 'device_name')) || str(pick(row, 'deviceId', 'device_id')) || 'جهاز',
+    tenantId: (pick(row, 'tenantId', 'tenant_id') ?? undefined) as string | undefined,
+    tenantName: str(pick(row, 'tenantName', 'tenant_name')),
+    error: str(pick(row, 'error', 'message')),
+    occurredAt: str(pick(row, 'occurredAt', 'occurred_at', 'createdAt', 'created_at')),
+    resolved: Boolean(pick(row, 'resolved')),
   };
 }
 
-function mapCentralModule(row: any): PlatformModuleUsage {
+function mapCentralModule(row: Record<string, unknown>): PlatformModuleUsage {
   return {
-    code: str(row?.code ?? ''),
-    name: str(row?.name ?? row?.code ?? ''),
-    category: row?.category ?? null,
-    enabled: Boolean(row?.isActive ?? row?.is_active ?? row?.enabled),
-    licenseCount: num(row?.licenseCount ?? row?.license_count, 0),
-    tenantCount: num(row?.tenantCount ?? row?.tenant_count, 0),
+    code: str(pick(row, 'code')),
+    name: str(pick(row, 'name')) || str(pick(row, 'code')),
+    category: (pick(row, 'category') ?? null) as string | null,
+    enabled: Boolean(pick(row, 'isActive', 'is_active', 'enabled')),
+    licenseCount: num(pick(row, 'licenseCount', 'license_count'), 0),
+    tenantCount: num(pick(row, 'tenantCount', 'tenant_count'), 0),
+  };
+}
+
+const AUDIT_SEVERITY_SET = new Set<string>(['INFO', 'NOTICE', 'WARNING', 'SECURITY', 'CRITICAL']);
+const AUDIT_STATUS_SET = new Set<string>(['SUCCESS', 'FAILURE', 'BLOCKED']);
+
+/** Adapt a loosely-typed central audit row to the local PlatformAuditEntry shape. */
+function toPlatformAuditEntry(a: DashboardAuditItem): PlatformAuditEntry {
+  const sev = str(a.severity).toUpperCase();
+  const stat = str(a.status).toUpperCase();
+  return {
+    id: a.id,
+    action: a.action,
+    entityType: str(a.entityType) || 'UNKNOWN',
+    severity: (AUDIT_SEVERITY_SET.has(sev) ? sev : 'INFO') as AuditSeverity,
+    status: (AUDIT_STATUS_SET.has(stat) ? stat : 'SUCCESS') as AuditStatus,
+    actorName: a.actorName ?? null,
+    createdAt: a.createdAt,
   };
 }
 
 interface CentralBundle {
-  overviewRaw: any;
+  overviewRaw: Record<string, unknown>;
   plans: PlatformPlan[];
   ca: CentralAnalytics;
   tenants: PlatformTenant[];
@@ -523,14 +556,39 @@ function buildCentralDashboard(bundle: CentralBundle, period: string): {
     .reduce((acc, l) => acc + num(l.branchesLimit, 1), 0);
 
   // ── Revenue by plan ─────────────────────────────────────────────────────
+  // Keyed by planId when available so subscriptions on the same plan merge
+  // even if the plan display name differs between rows.
   const planRevenue = new Map<string, { planName: string; revenue: number; tenants: number }>();
   for (const sub of activeSubs) {
     const name = str(sub.planName) || 'بدون خطة';
-    const row = planRevenue.get(name) ?? { planName: name, revenue: 0, tenants: 0 };
+    const key = str(sub.planId) || name;
+    const row = planRevenue.get(key) ?? { planName: name, revenue: 0, tenants: 0 };
     row.revenue += num(sub.price);
     row.tenants += 1;
-    planRevenue.set(name, row);
+    planRevenue.set(key, row);
   }
+
+  // NOTE: PlatformOverview.subscriptions has no dedicated `suspended` bucket,
+  // so central SUSPENDED subscriptions are folded into `cancelled` below.
+  const alerts = centralAlerts({
+    struggling: strugglingSubs,
+    expiringLicenses,
+    expiringSubscriptions: upcomingSubs,
+    pendingLicenses,
+    syncErrors,
+    overdueInvoices,
+  });
+
+  // Best-effort: the central /admin/overview payload may carry the installing
+  // tenant's branch count under a few possible keys.
+  const rawBranches = overviewRaw['branches'];
+  const installationBranches = num(
+    overviewRaw['installationBranches']
+      ?? overviewRaw['installation_branches']
+      ?? (rawBranches && typeof rawBranches === 'object'
+        ? (rawBranches as Record<string, unknown>)['installationBranches']
+        : undefined),
+  );
 
   // ── Normalized overview ─────────────────────────────────────────────────
   const overview: PlatformOverview = {
@@ -548,6 +606,7 @@ function buildCentralDashboard(bundle: CentralBundle, period: string): {
       active: (subCounts['ACTIVE'] ?? 0) + (subCounts['PAST_DUE'] ?? 0),
       trial: subCounts['TRIAL'] ?? 0,
       expired: subCounts['EXPIRED'] ?? 0,
+      // PlatformOverview has no suspended bucket — see note above.
       cancelled: (subCounts['CANCELLED'] ?? 0) + (subCounts['SUSPENDED'] ?? 0),
       expiringSoon: upcomingSubs.length,
     },
@@ -577,18 +636,28 @@ function buildCentralDashboard(bundle: CentralBundle, period: string): {
     },
     branches: {
       totalLimit: branchesLimit,
-      installationBranches: 0,
+      installationBranches,
     },
-    releases: releases.length > 0 ? releases : (Array.isArray(overviewRaw?.releases) ? overviewRaw.releases.map(mapCentralRelease) : []),
-    moduleUsage: modules.length > 0 ? modules : (Array.isArray(overviewRaw?.moduleUsage) ? overviewRaw.moduleUsage : []),
+    releases: releases.length > 0
+      ? releases
+      : (Array.isArray(overviewRaw['releases']) ? (overviewRaw['releases'] as Array<Record<string, unknown>>).map(mapCentralRelease) : []),
+    moduleUsage: modules.length > 0
+      ? modules
+      : (Array.isArray(overviewRaw['moduleUsage']) ? (overviewRaw['moduleUsage'] as PlatformModuleUsage[]) : []),
     revenueByPlan: Array.from(planRevenue.values()).sort((a, b) => b.revenue - a.revenue),
-    alerts: [],
+    alerts: alerts.map((a) => ({
+      id: a.id,
+      severity: a.severity,
+      title: a.title,
+      description: a.description,
+      link: a.link,
+    })),
     recentTenants: [...tenants].sort(byDateDesc((t) => t.createdAt)).slice(0, 8),
     expiringLicenses,
     expiringSubscriptions: upcomingSubs,
     recentPayments: [...payments].sort(byDateDesc((p) => p.paidAt)).slice(0, 8),
-    recentAudit: [],
-    currentInstallation: overviewRaw?.currentInstallation ?? {
+    recentAudit: auditEvents.map(toPlatformAuditEntry),
+    currentInstallation: (overviewRaw['currentInstallation'] as PlatformOverview['currentInstallation']) ?? {
       companyName: 'المنصة المركزية',
       currency: 'EGP',
       users: 0,
@@ -643,15 +712,6 @@ function buildCentralDashboard(bundle: CentralBundle, period: string): {
     moduleUsage: modules,
   };
 
-  const alerts = centralAlerts({
-    struggling: strugglingSubs,
-    expiringLicenses,
-    expiringSubscriptions: upcomingSubs,
-    pendingLicenses,
-    syncErrors,
-    overdueInvoices,
-  });
-
   return { overview, alerts, extras };
 }
 
@@ -663,6 +723,7 @@ export function usePlatformDashboardData(period: string, planFilter: string): Us
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
+  const mountedRef = React.useRef(true);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -705,7 +766,7 @@ export function usePlatformDashboardData(period: string, planFilter: string): Us
 
         const { overview, alerts, extras } = buildCentralDashboard(
           {
-            overviewRaw: val(0, {}),
+            overviewRaw: val(0, {} as Record<string, unknown>),
             plans: val(1, [] as PlatformPlan[]),
             ca,
             tenants: val(7, [] as PlatformTenant[]),
@@ -714,10 +775,10 @@ export function usePlatformDashboardData(period: string, planFilter: string): Us
             devices: val(11, [] as PlatformDevice[]),
             payments: val(8, [] as PlatformPayment[]),
             invoices: val(12, [] as PlatformInvoice[]),
-            releases: (val(13, []) as any[]).map(mapCentralRelease),
-            auditEvents: ((val(14, { data: [] }) as { data?: any[] }).data ?? []).map(mapCentralAuditEvent),
-            syncErrors: ((val(15, []) as any[]) ?? []).map(mapCentralSyncError),
-            modules: ((val(16, []) as any[]) ?? []).map(mapCentralModule),
+            releases: (val(13, [] as Array<Record<string, unknown>>) ?? []).map(mapCentralRelease),
+            auditEvents: ((val(14, { data: [] as Array<Record<string, unknown>> }) as { data?: Array<Record<string, unknown>> }).data ?? []).map(mapCentralAuditEvent),
+            syncErrors: ((val(15, [] as Array<Record<string, unknown>>) ?? [])).map(mapCentralSyncError),
+            modules: ((val(16, [] as Array<Record<string, unknown>>) ?? [])).map(mapCentralModule),
           },
           period,
         );
@@ -756,16 +817,22 @@ export function usePlatformDashboardData(period: string, planFilter: string): Us
           extras: buildLocalExtras(ov, bp, cm, sm, lm, om),
         });
       }
+      if (!mountedRef.current) return;
       setLastUpdated(new Date());
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : 'تعذر تحميل بيانات المنصة.');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [period, planFilter]);
 
   React.useEffect(() => {
-    load();
+    mountedRef.current = true;
+    void load();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [load]);
 
   const reload = React.useCallback(() => {

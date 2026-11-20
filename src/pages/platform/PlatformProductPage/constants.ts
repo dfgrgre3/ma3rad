@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import {
   SlidersHorizontal,
   Sparkles,
@@ -29,7 +30,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
   NIGHTLY: 'ليلي',
 };
 
-export const TARGET_STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
+export const TARGET_STATUS_LABELS: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   PENDING: { label: 'قيد الانتظار', color: 'bg-warning-soft text-warning border-warning-border', icon: Clock },
   SUCCESS: { label: 'تم بنجاح', color: 'bg-success-soft text-success border-success-border', icon: CheckCircle2 },
   FAILED: { label: 'فشل التحديث', color: 'bg-danger-soft text-danger border-danger-border', icon: XCircle },

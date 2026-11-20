@@ -9,11 +9,14 @@ import type {
   PlatformTenantOverrideInput,
   PlatformTenantProfile,
   PlatformTenantStatus,
+  PlatformTenantUser,
+  PlatformTenantUserInput,
 } from '../../../services/domains/platform/platformTypes';
 import { useToast } from '../../../components/ui/Toast';
 import { formatNumber } from '../components/PlatformUI';
 import { buildActivation } from './activation';
 import type { TabKey } from './constants';
+import type { TenantBranch } from './shared';
 
 interface UseTenantDetailOptions {
   plans: PlatformPlan[];
@@ -38,15 +41,19 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   const [working, setWorking] = React.useState(false);
   const [overrides, setOverrides] = React.useState<PlatformTenantOverride[]>([]);
   const [overrideForm, setOverrideForm] = React.useState<PlatformTenantOverrideInput>({ kind: 'MODULE', code: '', value: '', isEnabled: true });
-  const [users, setUsers] = React.useState<any[]>([]);
+  const [users, setUsers] = React.useState<PlatformTenantUser[]>([]);
   const [userOpen, setUserOpen] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<any>(null);
+  const [editingUser, setEditingUser] = React.useState<PlatformTenantUser | null>(null);
   const [userForm, setUserForm] = React.useState({ fullName: '', username: '', email: '', phone: '', role: 'USER', status: 'ACTIVE', notes: '' });
-  const [branches, setBranches] = React.useState<any[]>([]);
+  const [branches, setBranches] = React.useState<TenantBranch[]>([]);
   const [branchForm, setBranchForm] = React.useState({ code: '', name: '', city: '', phone: '', seatsLimit: 1, devicesLimit: 1, isMain: false });
   const [branchOpen, setBranchOpen] = React.useState(false);
+  // Guards against stale profile responses overwriting a newer tenant's data.
+  const profileRequestRef = React.useRef(0);
 
   const loadProfile = React.useCallback((id: string) => {
+    const requestId = ++profileRequestRef.current;
+    const isCurrent = () => profileRequestRef.current === requestId;
     const applyProfile = (next: PlatformTenantProfile) => {
       setProfile(next);
       setPlanForm((current) => ({
@@ -63,12 +70,14 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
         centralPlatformClient.listTenantBranches(id),
       ])
         .then(([next, nextOverrides, nextUsers, nextBranches]) => {
+          if (!isCurrent()) return;
           applyProfile(next as PlatformTenantProfile);
           setOverrides(nextOverrides as PlatformTenantOverride[]);
           setUsers(nextUsers);
           setBranches(nextBranches);
         })
         .catch((err) => {
+          if (!isCurrent()) return;
           toast.error('تعذر تحميل ملف العميل', err instanceof Error ? err.message : undefined);
           setDetailId(null);
           setProfile(null);
@@ -82,6 +91,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
       setUsers(platformAdminService.listTenantUsers(id));
       setBranches([]);
     } catch (err) {
+      if (!isCurrent()) return;
       toast.error('تعذر تحميل ملف العميل', err instanceof Error ? err.message : undefined);
       setDetailId(null);
       setProfile(null);
@@ -128,7 +138,16 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
       .finally(() => setWorking(false));
   };
 
+  const requireManage = (): boolean => {
+    if (!canManageTenants) {
+      toast.error('لا تملك صلاحية إدارة العملاء');
+      return false;
+    }
+    return true;
+  };
+
   const changeStatus = (tenant: PlatformTenant, next: PlatformTenantStatus) => {
+    if (!requireManage()) return;
     run(
       () => (centralActive ? centralPlatformClient.setTenantStatus(tenant.id, next) : platformAdminService.setTenantStatus(tenant.id, next)),
       `تم تحديث الحالة إلى ${PLATFORM_TENANT_STATUS_LABELS[next]}`
@@ -136,6 +155,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const archive = (tenant: PlatformTenant) => {
+    if (!requireManage()) return;
     if (!window.confirm(`أرشفة العميل "${tenant.name}" وإلغاء كل تراخيصه؟`)) return;
     run(
       () => (centralActive ? centralPlatformClient.archiveTenant(tenant.id) : platformAdminService.archiveTenant(tenant.id)),
@@ -144,20 +164,30 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const createAccount = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
+    const password = accountForm.password.trim();
+    if (password && password.length < 8) {
+      toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
+      return;
+    }
+    if (accountForm.username.trim() && !/^[a-zA-Z0-9_.-]+$/.test(accountForm.username.trim())) {
+      toast.error('اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و . _ - فقط');
+      return;
+    }
     setWorking(true);
     const request = centralActive
       ? centralPlatformClient.createTenantAccount(detailId, {
           username: accountForm.username,
           email: accountForm.email,
           fullName: accountForm.fullName,
-          password: accountForm.password || undefined,
+          password: password || undefined,
         })
       : Promise.resolve(platformAdminService.createTenantAccount(detailId, {
           username: accountForm.username,
           email: accountForm.email,
           fullName: accountForm.fullName,
-          password: accountForm.password || undefined,
+          password: password || undefined,
         }));
     request
       .then((created: any) => {
@@ -202,6 +232,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const toggleAccount = (active: boolean) => {
+    if (!requireManage()) return;
     if (!detailId) return;
     run(
       () => (centralActive ? centralPlatformClient.setTenantAccountActive(detailId, active) : platformAdminService.setTenantAccountActive(detailId, active)),
@@ -210,6 +241,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const renewSubscription = () => {
+    if (!requireManage()) return;
     if (!detailId) return;
     run(
       () => (centralActive ? centralPlatformClient.renewSubscription(detailId, renewMonths) : platformAdminService.renewTenantSubscription(detailId, renewMonths)),
@@ -218,6 +250,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const changePlan = () => {
+    if (!requireManage()) return;
     if (!detailId || !planForm.planId) return;
     run(
       () => (centralActive
@@ -231,6 +264,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const cancelSubscription = () => {
+    if (!requireManage()) return;
     if (!detailId || !profile) return;
     if (!window.confirm(`إلغاء اشتراك العميل "${profile.tenant.name}"؟ سيتم إلغاء الاشتراك وإبطال التراخيص وحساب الدخول.`)) return;
     run(
@@ -242,6 +276,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const addOverride = () => {
+    if (!requireManage()) return;
     if (!detailId || !overrideForm.code.trim()) {
       toast.error('أدخل رمز الميزة أو الحد');
       return;
@@ -256,6 +291,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const removeOverride = (id: string) => {
+    if (!requireManage()) return;
     if (!window.confirm('حذف هذا التجاوز الخاص؟')) return;
     run(
       () => (centralActive && detailId
@@ -266,6 +302,11 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const saveBranch = () => {
+    if (!requireManage()) return;
+    if (!centralActive) {
+      toast.error('إدارة فروع العميل غير مدعومة في الوضع المحلي — متاحة في الوضع المركزي فقط.');
+      return;
+    }
     if (!detailId || !branchForm.code.trim() || !branchForm.name.trim()) {
       toast.error('كود الفرع واسمه مطلوبان');
       return;
@@ -292,6 +333,11 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const closeBranch = (branchId: string) => {
+    if (!requireManage()) return;
+    if (!centralActive) {
+      toast.error('إدارة فروع العميل غير مدعومة في الوضع المحلي — متاحة في الوضع المركزي فقط.');
+      return;
+    }
     if (!detailId) return;
     if (!window.confirm('هل تريد إغلاق هذا الفرع؟')) return;
     setWorking(true);
@@ -311,7 +357,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     setUserOpen(true);
   };
 
-  const openUserEdit = (user: any) => {
+  const openUserEdit = (user: PlatformTenantUser) => {
     setEditingUser(user);
     setUserForm({
       fullName: user.fullName,
@@ -332,7 +378,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     const request = editingUser
       ? (centralActive
           ? centralPlatformClient.updateTenantUser(detailId, editingUser.id, { ...userForm, status: userForm.status })
-          : Promise.resolve(platformAdminService.updateTenantUser(editingUser.id, { ...userForm, status: userForm.status as any })))
+          : Promise.resolve(platformAdminService.updateTenantUser(editingUser.id, { ...userForm, status: userForm.status as PlatformTenantUserInput['status'] })))
       : (centralActive
           ? centralPlatformClient.createTenantUser(detailId, {
               ...userForm,
@@ -342,7 +388,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
             })
           : Promise.resolve(platformAdminService.createTenantUser(detailId, {
               ...userForm,
-              status: userForm.status as any,
+              status: userForm.status as PlatformTenantUserInput['status'],
               provisionIdentity: true,
               provisioningMode: 'INVITE',
             })));
@@ -368,7 +414,8 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
       .finally(() => setWorking(false));
   };
 
-  const toggleUser = (user: any, active: boolean) => {
+  const toggleUser = (user: PlatformTenantUser, active: boolean) => {
+    if (!requireManage()) return;
     run(
       () => (centralActive && detailId
         ? centralPlatformClient.setTenantUserActive(detailId, user.id, active)
@@ -377,7 +424,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     );
   };
 
-  const deleteUser = (user: any) => {
+  const deleteUser = (user: PlatformTenantUser) => {
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!window.confirm(`حذف المستخدم "${user.fullName}"؟`)) return;
     run(
@@ -393,17 +440,30 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     if (!detailId) return;
     if (!window.confirm('إعادة تعيين الأجهزة المرتبطة بهذا العميل؟ سيتم تحرير كل الأجهزة المربوطة بالتراخيص.')) return;
     setWorking(true);
-    const request = centralActive
-      ? centralPlatformClient.getTenantRemoteControl(detailId).then((data: any) => {
+    // Resolves to { released, failed } so partial failures are reported, not thrown.
+    const request: Promise<{ released: number; failed: number }> = centralActive
+      ? centralPlatformClient.getTenantRemoteControl(detailId).then(async (data: any) => {
           const devices = Array.isArray(data?.devices) ? data.devices : [];
-          return devices.reduce((chain: Promise<number>, device: any) =>
-            chain.then((count) => centralPlatformClient.releaseDevice(device.id).then(() => count + 1)),
-          Promise.resolve(0));
+          let released = 0;
+          let failed = 0;
+          for (const device of devices) {
+            try {
+              await centralPlatformClient.releaseDevice(device.id);
+              released += 1;
+            } catch {
+              failed += 1;
+            }
+          }
+          return { released, failed };
         })
-      : Promise.resolve(platformAdminService.resetTenantDevices(detailId));
+      : Promise.resolve(platformAdminService.resetTenantDevices(detailId)).then((count) => ({ released: count, failed: 0 }));
     request
-      .then((count: number) => {
-        toast.success('تم إعادة تعيين الأجهزة', `تم تحرير ${formatNumber(count)} جهاز`);
+      .then(({ released, failed }) => {
+        if (failed > 0) {
+          toast.error('تم تحرير بعض الأجهزة فقط', `نجح: ${formatNumber(released)}، فشل: ${formatNumber(failed)} — أعد المحاولة للأجهزة الفاشلة`);
+        } else {
+          toast.success('تم إعادة تعيين الأجهزة', `تم تحرير ${formatNumber(released)} جهاز`);
+        }
         refreshDetail();
       })
       .catch((err) => toast.error('تعذر إعادة تعيين الأجهزة', err instanceof Error ? err.message : undefined))
@@ -411,6 +471,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const sendActivation = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (centralActive) {
       if (!detailId || !profile) return;
       if (channels.length === 0) {
@@ -429,7 +490,6 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
         .finally(() => setWorking(false));
       return;
     }
-    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
     if (channels.length === 0) {
       toast.error('اختر وسيلة إرسال واحدة على الأقل');
@@ -450,6 +510,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   };
 
   const closeDetail = React.useCallback(() => {
+    profileRequestRef.current += 1; // invalidate any in-flight profile response
     setDetailId(null);
     setProfile(null);
   }, []);

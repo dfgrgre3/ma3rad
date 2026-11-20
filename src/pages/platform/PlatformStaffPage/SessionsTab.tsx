@@ -9,6 +9,8 @@ interface SessionsTabProps {
   devices: PlatformTrustedDevice[];
   sessions: PlatformStaffSession[];
   currentDeviceTrusted: boolean;
+  /** Central mode has no "trust current device" endpoint — hide that action. */
+  centralActive?: boolean;
   canRevokeSessions: boolean;
   canUpdate: boolean;
   onTrustCurrentDevice: () => void;
@@ -21,6 +23,7 @@ export const SessionsTab: React.FC<SessionsTabProps> = ({
   devices,
   sessions,
   currentDeviceTrusted,
+  centralActive = false,
   canRevokeSessions,
   canUpdate,
   onTrustCurrentDevice,
@@ -35,15 +38,15 @@ export const SessionsTab: React.FC<SessionsTabProps> = ({
         <p className="text-[10px] text-muted mt-0.5">توثيق جهازك الحالي يجعل جلساته المستقبلية مميزة في مركز الأمان وسجل الدخول.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {!currentDeviceTrusted ? (
+        {!centralActive && (!currentDeviceTrusted ? (
           <Button size="sm" variant="secondary" onClick={onTrustCurrentDevice} leadingIcon={<MonitorSmartphone className="h-4 w-4" />}>
             وثّق هذا الجهاز
           </Button>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 border border-success/20 px-3 py-1.5 text-xs font-bold text-success">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 border border-success/20 px-3 py-1.5 text-xs font-bold text-success">
             <CheckCircle2 className="h-4 w-4" /> هذا الجهاز موثوق
           </span>
-        )}
+        ))}
         {canRevokeSessions && (
           <Button size="sm" variant="ghost" onClick={onRevokeAllOtherSessions}>
             إنهاء كل الجلسات الأخرى
@@ -103,7 +106,7 @@ export const SessionsTab: React.FC<SessionsTabProps> = ({
           columns={[
             { key: 'staff', header: 'الموظف', render: (device) => <span className="font-bold text-muted">{device.staffName || device.staffId}</span> },
             { key: 'device', header: 'الجهاز', render: (device) => <span className="text-muted">{device.deviceName || 'جهاز'}</span> },
-            { key: 'fp', header: 'البصمة', render: (device) => <span className="font-mono text-[10.5px] text-muted" dir="ltr">{device.fingerprint.slice(0, 18)}…</span> },
+            { key: 'fp', header: 'البصمة', render: (device) => <span className="font-mono text-[10.5px] text-muted" dir="ltr">{device.fingerprint ? `${device.fingerprint.slice(0, 18)}…` : '—'}</span> },
             { key: 'seen', header: 'آخر ظهور', render: (device) => <span className="text-muted">{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : '—'}</span> },
             {
               key: 'actions', header: '',

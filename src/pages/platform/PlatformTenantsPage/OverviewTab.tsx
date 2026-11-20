@@ -20,7 +20,9 @@ import {
 } from 'lucide-react';
 import { PLATFORM_TENANT_STATUS_LABELS } from '../../../services/domains/platform/PlatformAdminService';
 import type {
+  PlatformSubscription,
   PlatformTenant,
+  PlatformTenantAccount,
   PlatformTenantOverride,
   PlatformTenantOverrideInput,
   PlatformTenantProfile,
@@ -29,15 +31,15 @@ import { Button } from '../../../components/ui/Button';
 import { DataTable } from '../../../components/ui/DataTable';
 import { Field, StatusBadge, formatDate, formatDateTime, formatMoney, formatNumber, inputClass } from '../components/PlatformUI';
 import { ACCOUNT_STATUS, CYCLE_LABELS } from './constants';
-import { InfoItem, SectionCard } from './shared';
+import { InfoItem, SectionCard, type TenantBranch } from './shared';
 
 interface OverviewTabProps {
   tenant: PlatformTenant;
   profile: PlatformTenantProfile;
-  account: any;
-  subscription: any;
+  account: PlatformTenantAccount | null;
+  subscription: PlatformSubscription | null;
   centralActive: boolean;
-  branches: any[];
+  branches: TenantBranch[];
   canManageTenants: boolean;
   working: boolean;
   setBranchOpen: React.Dispatch<React.SetStateAction<boolean>>;

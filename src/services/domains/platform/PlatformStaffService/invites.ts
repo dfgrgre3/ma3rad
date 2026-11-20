@@ -9,7 +9,7 @@ import type {
   PlatformStaffInviteCreated,
   PlatformStaffInviteStatus,
 } from '../platformTypes';
-import { nowIso, randomToken, generateTemporaryPassword, addDays } from '../platformUtils';
+import { nowIso, randomToken, generateTemporaryPassword } from '../platformUtils';
 import type { StaffServiceContext } from './context';
 import { mapInvite } from './mappers';
 
@@ -18,7 +18,9 @@ export function createStaffInvite(ctx: StaffServiceContext, input: PlatformStaff
   ctx.requirePlatformAccess('staff', 'platform.staff.invite');
 
   const token = randomToken(32, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
-  const expiresAt = addDays(new Date(), 7).toISOString();
+  const expiresInHours =
+    typeof input.expiresInHours === 'number' && input.expiresInHours > 0 ? input.expiresInHours : 168;
+  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
 
   const id = `si_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
   const now = nowIso();
@@ -47,7 +49,7 @@ export function listStaffInvites(ctx: StaffServiceContext, status: 'all' | Platf
   const params = status !== 'all' ? [status] : [];
 
   const rows = ctx.db.query<any>(`SELECT * FROM platform_staff_invites ${where} ORDER BY created_at DESC`, params);
-  return rows.map(mapInvite);
+  return rows.map((row: any) => mapInvite(row));
 }
 
 export function revokeStaffInvite(ctx: StaffServiceContext, id: string): void {
@@ -63,7 +65,7 @@ export function revokeStaffInvite(ctx: StaffServiceContext, id: string): void {
 export function getStaffInviteByToken(ctx: StaffServiceContext, token: string): PlatformStaffInvite {
   const row = ctx.db.query<any>('SELECT * FROM platform_staff_invites WHERE token = ?', [token])[0];
   if (!row) throw new Error('الدعوة غير موجودة.');
-  return mapInvite(row);
+  return mapInvite(row, { includeToken: true });
 }
 
 export function acceptStaffInvite(ctx: StaffServiceContext, token: string, fullName: string, password: string): PlatformStaff {
@@ -77,7 +79,9 @@ export function acceptStaffInvite(ctx: StaffServiceContext, token: string, fullN
   if (invite.status !== 'PENDING') throw new Error('الدعوة لم تعد صالحة.');
   if (new Date(invite.expiresAt) < new Date()) throw new Error('الدعوة منتهية الصلاحية.');
 
-  if (password.length < 8) throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+  if (password.length < 8 || !/[a-zA-Z\u0600-\u06FF]/.test(password) || !/[0-9]/.test(password)) {
+    throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم.');
+  }
 
   const username = invite.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[-_.]+|[-_.]+$/g, '').slice(0, 24);
   let finalUsername = username;

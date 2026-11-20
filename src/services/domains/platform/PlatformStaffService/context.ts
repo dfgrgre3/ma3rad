@@ -8,6 +8,18 @@ import type {
   PlatformSigningKey,
 } from '../platformTypes';
 
+export interface PlatformStaffMfaCompliance {
+  enforcement: 'off' | 'optional' | 'required';
+  total: number;
+  enabled: number;
+  /** Alias of `enabled` — staff with MFA turned on. */
+  compliant: number;
+  requiredButDisabled: number;
+  byRole: Record<string, { total: number; enabled: number }>;
+  /** Non-deleted staff accounts that do NOT have MFA enabled. */
+  missing: PlatformStaff[];
+}
+
 export interface StaffAuditOptions {
   severity?: import('../platformTypes').AuditSeverity;
   status?: import('../platformTypes').AuditStatus;
@@ -44,12 +56,7 @@ export interface StaffServiceContext {
   getStaffInviteByToken: (token: string) => PlatformStaffInvite;
   getStaffMfaEnforcement: () => 'off' | 'optional' | 'required';
   listPlatformSecurityIncidents: () => PlatformCentralSecurityIncident[];
-  getStaffMfaCompliance: () => {
-    total: number;
-    enabled: number;
-    requiredButDisabled: number;
-    byRole: Record<string, { total: number; enabled: number }>;
-  };
+  getStaffMfaCompliance: () => PlatformStaffMfaCompliance;
   listStaffLogins: (limit?: number, failedOnly?: boolean, staffId?: string) => PlatformStaffLogin[];
   listPlatformSigningKeys: () => PlatformSigningKey[];
   listStaffSessions: (staffId?: string) => PlatformStaffSession[];
