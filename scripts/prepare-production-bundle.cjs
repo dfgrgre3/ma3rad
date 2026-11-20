@@ -21,6 +21,8 @@ const compiledFiles = [
   'gracefulShutdown',
   'autoUpdater',
   'safeStorageCompat',
+  'moduleDelivery',
+  'modulePackages',
   'security/crypto',
   'security/licenseValidator',
   'security/fileIntegrity',

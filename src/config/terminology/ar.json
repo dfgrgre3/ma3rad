@@ -49,5 +49,16 @@
   "actions.newPaymentGateway": "بوابة دفع جديدة",
   "actions.newCostCenter": "مركز تكلفة جديد",
   "actions.newBudget": "موازنة تقديرية جديدة",
-  "actions.newAccount": "حساب جديد"
+  "actions.newAccount": "حساب جديد",
+  "actions.newProject": "مشروع جديد",
+  "actions.newDelivery": "أمر تسليم جديد",
+  "actions.newDriver": "سائق جديد",
+  "actions.newVehicle": "مركبة جديدة",
+  "actions.newWarehouse": "مخزن جديد",
+  "actions.newDocument": "مستند جديد",
+  "actions.newContract": "عقد جديد",
+  "actions.newPromotion": "عرض ترويجي جديد",
+  "actions.newLeaveRequest": "طلب إجازة",
+  "actions.newJobPosting": "وظيفة جديدة",
+  "actions.newCandidate": "تسجيل مرشح"
 }

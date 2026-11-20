@@ -5,6 +5,7 @@ import type { DailyPurchaseItemRow } from '../../../services/domains/operations/
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { sumItemQuantityByUnit } from './helpers';
 import { ShareBar } from './primitives';
+import { useActivityElementHidden } from '../../../hooks/domains/config/useActivityUi';
 import type { NumberFormatter } from '../../../types/dashboard/todayPurchases';
 
 export interface ItemsPanelProps {
@@ -14,7 +15,9 @@ export interface ItemsPanelProps {
   plain: NumberFormatter;
 }
 
-export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, plain }) => (
+export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, plain }) => {
+  const detailsHidden = useActivityElementHidden('details', '/daily/purchases');
+  return (
   <div role="tabpanel" aria-label="أصناف التوريد">
     {items.length === 0 ? (
       <div className="flex flex-col items-center px-4 py-14 text-center">
@@ -55,9 +58,15 @@ export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, p
               {
                 key: 'invoice', header: 'الفاتورة',
                 render: (item: any) => (
-                  <button type="button" onClick={() => onDetails(item.purchaseId)} className="whitespace-nowrap font-mono font-bold text-warning hover:underline ">
-                    {item.invoiceNumber}
-                  </button>
+                  detailsHidden ? (
+                    <span className="whitespace-nowrap font-mono font-bold text-warning ">
+                      {item.invoiceNumber}
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => onDetails(item.purchaseId)} className="whitespace-nowrap font-mono font-bold text-warning hover:underline ">
+                      {item.invoiceNumber}
+                    </button>
+                  )
                 ),
               },
               { key: 'supplier', header: 'المورد', render: (item: any) => <span className="text-ink-secondary ">{item.supplierName || '—'}</span> },
@@ -79,4 +88,5 @@ export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, p
       </>
     )}
   </div>
-);
+  );
+};

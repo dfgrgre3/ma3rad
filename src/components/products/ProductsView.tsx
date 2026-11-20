@@ -27,6 +27,7 @@ import { useToast } from '../ui/Toast';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
+import { ActivityGate } from '../ui/ActivityGate';
 import { StatCard as ErpStatCard } from '../ui/Card';
 import { ProductFormModal } from './ProductFormModal';
 import { ProductsTable } from './ProductsTable';
@@ -505,9 +506,9 @@ export const ProductsView: React.FC = () => {
         icon={<Package className="h-5 w-5" />}
         actions={
           <>
-            {canImportProducts && <Button variant="secondary" size="sm" leadingIcon={<Upload className="h-4 w-4" />} onClick={() => setIsImportOpen(true)}>استيراد جدول بيانات</Button>}
-            {canExportProducts && <Button variant="secondary" size="sm" leadingIcon={<Download className="h-4 w-4" />} onClick={handleExport}>تصدير جدول بيانات</Button>}
-            {canCreateProduct && <CentralLimitGuard metric="maxProducts"><Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAddModal}>إضافة {productSingularLabel} جديد</Button></CentralLimitGuard>}
+            {canImportProducts && <ActivityGate element="import"><Button variant="secondary" size="sm" leadingIcon={<Upload className="h-4 w-4" />} onClick={() => setIsImportOpen(true)}>استيراد جدول بيانات</Button></ActivityGate>}
+            {canExportProducts && <ActivityGate element="export"><Button variant="secondary" size="sm" leadingIcon={<Download className="h-4 w-4" />} onClick={handleExport}>تصدير جدول بيانات</Button></ActivityGate>}
+            {canCreateProduct && <ActivityGate element="new-product"><CentralLimitGuard metric="maxProducts"><Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAddModal}>إضافة {productSingularLabel} جديد</Button></CentralLimitGuard></ActivityGate>}
           </>
         }
       />

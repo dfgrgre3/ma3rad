@@ -5,6 +5,7 @@ import {
   Plus, Printer, Receipt, Ruler, Wallet, BarChart3,
 } from 'lucide-react';
 import { buildExportHtml, printHtml } from '../../utils/export/export';
+import { ActivityGate } from '../../components/ui/ActivityGate';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToast } from '../../components/ui/Toast';
 import { AuthService } from '../../services/domains/auth/AuthService';

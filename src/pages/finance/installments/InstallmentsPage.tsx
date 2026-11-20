@@ -3,6 +3,7 @@ import {
   CalendarDays, Plus, Search, Calendar, CheckCircle2, Check, CreditCard,
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InstallmentService } from '../../../services/domains/finance/InstallmentService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -250,13 +251,13 @@ export const InstallmentsPage: React.FC = () => {
           title="إدارة الأقساط والتحصيلات المجدولة (Installment Plans)"
           description="جدولة الأقساط الشهرية، تسجيل سندات السداد، ومتابعة المتأخرات مع إدراجها بالخزينة تلقائياً"
           actions={
-            <button
+            <ActivityGate element="new-plan"><button
               onClick={() => setShowCreateModal(true)} disabled={!canManage}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-warning to-warning hover:from-warning hover:to-warning text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-warning/20 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               {newPlanLabel}
-            </button>
+            </button></ActivityGate>
           }
         />
       </div>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Archive, Download, Eye, FileText, History, Loader2, Pencil, Plus, RefreshCw, Upload, X } from 'lucide-react';
 import { EmployeeDocumentService } from '../../../services/domains/hr/EmployeeDocumentService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
@@ -324,7 +325,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
             <RefreshCw className="h-4 w-4" />
           </button>
           {canManage && (
-            <button
+            <ActivityGate element="upload"><button
               className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white"
               onClick={() => {
                 setEditingDocument(null);
@@ -333,7 +334,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
               }}
             >
               <Plus className="h-4 w-4" /> مستند جديد
-            </button>
+            </button></ActivityGate>
           )}
         </>}
       />

@@ -3,6 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
+const { credentialMatches } = require('../lib/deviceAuth');
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.post('/errors', async (req, res, next) => {
     const {
       deviceId = '', title = '', description = '', stackTrace = '',
       issueType = 'error', severity = 'medium', appVersion = '', os = '',
+      deviceCredential = '',
       tenantId: claimedTenantId = null,
     } = req.body || {};
 
@@ -40,10 +42,18 @@ router.post('/errors', async (req, res, next) => {
     let tenantId = null;
     if (deviceId) {
       const device = await db.get(
-        'SELECT tenant_id FROM platform_devices WHERE hardware_id = ? OR id = ? LIMIT 1',
+        'SELECT * FROM platform_devices WHERE hardware_id = ? OR id = ? LIMIT 1',
         [deviceId, deviceId]
       );
-      if (device) tenantId = device.tenant_id;
+      if (device) {
+        // A registered device must prove its credential (sent in the body as
+        // deviceCredential by the desktop bridge); it is checked against the
+        // enrolled hash, same as the header-based device channels.
+        if (device.status !== 'ACTIVE' || !credentialMatches(device, deviceCredential)) {
+          return res.status(401).json({ error: 'Invalid device credential' });
+        }
+        tenantId = device.tenant_id;
+      }
     }
     if (!tenantId && claimedTenantId) {
       const tenant = await db.get('SELECT id FROM platform_tenants WHERE id = ?', [claimedTenantId]);

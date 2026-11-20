@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Play, RefreshCw, Loader2, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConsistencyAuditService } from '../../../services/domains/finance/ConsistencyAuditService';
 import { useToast } from '../../../components/ui/Toast';
@@ -137,7 +138,7 @@ export const ConsistencyAuditPage: React.FC = () => {
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-            <button
+            <ActivityGate element="run"><button
               type="button"
               onClick={runNow}
               disabled={running}
@@ -145,7 +146,7 @@ export const ConsistencyAuditPage: React.FC = () => {
             >
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               {running ? 'جارٍ التدقيق...' : 'تشغيل التدقيق الآن'}
-            </button>
+            </button></ActivityGate>
           </>}
         />
       </div>

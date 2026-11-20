@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { AlertTriangle, Bell, Search, Download, RefreshCw, CircleDollarSign, Package } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
@@ -160,9 +161,9 @@ export const InventoryAlertsPage: React.FC = () => {
             <button onClick={loadData} className="flex items-center gap-2 px-3 py-2 bg-surface border border-line rounded-xl text-xs font-semibold text-ink hover:bg-surface-muted transition">
               <RefreshCw className="w-4 h-4" /> تحديث
             </button>
-            <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold transition">
+            <ActivityGate element="export"><button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold transition">
               <Download className="w-4 h-4" /> تصدير Excel
-            </button>
+            </button></ActivityGate>
           </>}
         />
       </div>

@@ -5,7 +5,8 @@ const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess } = require('../middleware/auth');
 const { signString, getKeyId } = require('../lib/signing');
-const { platformCodesToRegistryIds } = require('../lib/platformModuleMap');
+const { resolveDeviceEntitlements } = require('../lib/entitlements');
+const { authenticateDevice } = require('../lib/deviceAuth');
 const { FEATURE_CODE_TO_PAGE_PATHS } = require('../lib/featurePageMap');
 
 const router = express.Router();
@@ -20,62 +21,12 @@ function parseJsonArray(raw) {
  * client verifies `signature` over `configJson` with the published Ed25519
  * public key and fails closed on any mismatch.
  */
-router.get('/configuration/current', async (req, res, next) => {
+router.get('/configuration/current', authenticateDevice, async (req, res, next) => {
   try {
-    const deviceId = String(req.get('X-Device-Id') || '').trim();
-    const credential = String(req.get('X-Device-Credential') || '').trim();
-    if (!deviceId || !credential) {
-      return res.status(401).json({ error: 'Device authentication required' });
-    }
     const db = getDb();
-    const device = await db.get(
-      'SELECT * FROM platform_devices WHERE id = ? OR hardware_id = ? LIMIT 1',
-      [deviceId, deviceId]
-    );
-    if (!device) return res.status(401).json({ error: 'Unknown device' });
-    if (device.status !== 'ACTIVE') return res.status(403).json({ error: `Device is ${device.status}` });
-    const tenantId = device.tenant_id;
-
-    // Resolve the plan: device license first, then the tenant's active subscription.
-    let planId = null;
-    let license = null;
-    if (device.license_id) {
-      license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [device.license_id]);
-      planId = license?.plan_id || null;
-    }
-    if (!planId) {
-      const sub = await db.get(
-        `SELECT plan_id AS planId FROM platform_subscriptions
-         WHERE tenant_id = ? AND status IN ('TRIAL','ACTIVE','PAST_DUE')
-         ORDER BY created_at DESC LIMIT 1`,
-        [tenantId]
-      );
-      planId = sub?.planId || null;
-    }
-
-    // Effective platform module set: license snapshot → plan defaults → tenant
-    // overrides (kind='MODULE'). Codes are platform catalog codes and are
-    // translated to tenant registry ids before being signed into the config.
-    let baseModules = license?.modules ? parseJsonArray(license.modules) : [];
-    let baseFeatures = license?.features ? parseJsonArray(license.features) : [];
-    if ((!baseModules.length || !baseFeatures.length) && planId) {
-      const plan = await db.get('SELECT included_modules AS includedModules, features AS planFeatures FROM platform_plans WHERE id = ?', [planId]);
-      if (!baseModules.length) baseModules = parseJsonArray(plan?.includedModules);
-      if (!baseFeatures.length) baseFeatures = parseJsonArray(plan?.planFeatures);
-    }
-    const moduleOverrides = await db.all(
-      `SELECT code, is_enabled AS isEnabled FROM platform_tenant_overrides
-       WHERE tenant_id = ? AND kind = 'MODULE'`,
-      [tenantId]
-    );
-    const effectiveModuleCodes = new Set(baseModules.map(String));
-    for (const row of moduleOverrides) {
-      const code = String(row.code || '');
-      if (!code) continue;
-      if (row.isEnabled) effectiveModuleCodes.add(code);
-      else effectiveModuleCodes.delete(code);
-    }
-    const allowedModuleIds = platformCodesToRegistryIds([...effectiveModuleCodes]);
+    const device = req.device;
+    // Plan, license snapshot and effective module set (shared with module delivery).
+    const { tenantId, planId, license, baseFeatures, allowedModuleIds } = await resolveDeviceEntitlements(db, device);
 
     // Effective feature set: license snapshot → plan defaults → tenant
     // overrides (kind='FEATURE'). Features absent from the set hide the pages

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight, ClipboardList, Loader2, Plus, Printer, Save, Send, Trash2,
 } from 'lucide-react';
+import { ActivityGate } from '../../components/ui/ActivityGate';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToast } from '../../components/ui/Toast';
 import { AuthService } from '../../services/domains/auth/AuthService';
@@ -312,7 +313,7 @@ export const GeneralBoqPage: React.FC = () => {
           </select>
         </label>
         <div className="flex items-end">
-          <button type="button" onClick={newEstimate} disabled={!projectId} className="rounded-lg border border-accent-border bg-surface px-3 py-2 text-xs font-bold text-primary disabled:opacity-40">+ مقايَسة جديدة</button>
+          <ActivityGate element="new-item"><button type="button" onClick={newEstimate} disabled={!projectId} className="rounded-lg border border-accent-border bg-surface px-3 py-2 text-xs font-bold text-primary disabled:opacity-40">+ مقايَسة جديدة</button></ActivityGate>
         </div>
       </div>
 

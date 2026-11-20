@@ -8,7 +8,8 @@ import { DocumentService } from '../../../services/domains/documents/DocumentSer
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { useActivityPageCopy, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { exportToExcel } from '../../../utils/export/export';
 import type {
   ContractEffectiveStatus,
@@ -70,6 +71,8 @@ async function pickAttachment(): Promise<EnterpriseDocumentVersion | null> {
 
 export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' }) => {
   const pageCopy = useActivityPageCopy('documents');
+  const newDocumentLabel = useBusinessTerm('actions.newDocument');
+  const newContractLabel = useBusinessTerm('actions.newContract');
   const toast = useToast();
   const can = usePermission();
   const navigate = useNavigate();
@@ -457,13 +460,13 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
             </button>
             {(tab === 'documents' ? can('documents.create') : can('contracts.create')) && (
               <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition">
-                <Plus className="w-4 h-4" /> {tab === 'documents' ? 'مستند جديد' : 'عقد جديد'}
+                <Plus className="w-4 h-4" /> {tab === 'documents' ? newDocumentLabel : newContractLabel}
               </button>
             )}
             {(tab === 'documents' ? canExportDocuments : canExportContracts) && (
-              <button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-sm font-semibold">
+              <ActivityGate element="export"><button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-sm font-semibold">
                 <Download className="w-4 h-4" /> تصدير
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

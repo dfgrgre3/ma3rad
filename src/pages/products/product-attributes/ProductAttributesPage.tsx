@@ -6,6 +6,7 @@ import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { OperationalFieldsManager } from '../operational-fields/OperationalFieldsManager';
 
 import { useToast } from '../../../components/ui/Toast';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
@@ -117,9 +118,9 @@ export const ProductAttributesPage: React.FC = () => {
           title="الخصائص والمواصفات الفنية (Tile Attributes)"
           description="تعريف مقاسات السيراميك، التشطيبات، الفئات وأماكن الاستخدام"
           actions={canManage && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <ActivityGate element="new-attribute"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
               <Plus className="w-4 h-4" /> خاصية جديدة
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

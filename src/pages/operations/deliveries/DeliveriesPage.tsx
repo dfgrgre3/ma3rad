@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Truck, Plus, Search, Loader2, MapPin, User, Phone, Calendar } from 'lucide-react';
 import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -10,9 +11,11 @@ import { DeliveryCreateModal } from './DeliveryCreateModal';
 import { DeliveryDetailModal } from './DeliveryDetailModal';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 type Customer = { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null };
 export const DeliveriesPage: React.FC = () => {
   const toast = useToast();
+  const newDeliveryLabel = useBusinessTerm('actions.newDelivery');
   const service = useMemo(() => new OperationsService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.deliveries.deliveries.create');
@@ -102,9 +105,9 @@ export const DeliveriesPage: React.FC = () => {
           title="أوامر التسليم"
           description="جدولة الشحنات ومتابعة حالة التوصيل"
           actions={canCreate && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
-              <Plus className="w-4 h-4" /> أمر تسليم جديد
-            </button>
+            <ActivityGate element="new-delivery"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> {newDeliveryLabel}
+            </button></ActivityGate>
           )}
         />
       </div>

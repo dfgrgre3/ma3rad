@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Users, Plus, Search, Phone, Loader2, X, Power, Truck } from 'lucide-react';
 import { OperationsService, Driver } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 export const DriversPage: React.FC = () => {
   const toast = useToast();
+  const newDriverLabel = useBusinessTerm('actions.newDriver');
   const service = new OperationsService();
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.drivers.drivers.create');
@@ -61,9 +64,9 @@ export const DriversPage: React.FC = () => {
           title="السائقون"
           description="بيانات السائقين والرخص وعدد الرحلات"
           actions={canCreate && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0">
-              <Plus className="w-4 h-4" /> إضافة سائق
-            </button>
+            <ActivityGate element="new-driver"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> {newDriverLabel}
+            </button></ActivityGate>
           )}
         />
       </div>
@@ -133,7 +136,7 @@ export const DriversPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">إضافة سائق جديد</h3>
+              <h3 className="text-base font-extrabold text-ink">{newDriverLabel}</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">

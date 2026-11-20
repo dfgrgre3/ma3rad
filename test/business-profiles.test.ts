@@ -161,8 +161,11 @@ test('business activity capability summaries distinguish configured profiles fro
       assert.equal(capabilities[2].status, 'implemented', `${profile.id} reports`);
       assert.equal(capabilities[3].status, 'implemented', `${profile.id} templates`);
     } else {
-      assert.equal(capabilities[2].status, 'not-implemented', `${profile.id} reports`);
-      assert.equal(capabilities[3].status, 'not-implemented', `${profile.id} templates`);
+      // Reports/templates ship per profile now; the summary must mirror what each profile declares.
+      const expected = (raw: unknown) => (raw === true || raw === 'implemented' || String(raw).startsWith('implemented-')
+        ? 'implemented' : String(raw).includes('partially-implemented') ? 'partial' : 'not-implemented');
+      assert.equal(capabilities[2].status, expected(profile.support.industrySpecificReports), `${profile.id} reports`);
+      assert.equal(capabilities[3].status, expected(profile.support.industrySpecificDocumentTemplates), `${profile.id} templates`);
     }
   }
   assert.equal(getBusinessProfileCapabilities('food')[1].status, 'not-implemented');

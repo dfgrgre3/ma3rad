@@ -5,6 +5,7 @@ import {
   RefreshCw, FileSpreadsheet, FileDown, ChevronLeft, ChevronRight, Banknote,
   Wallet, TrendingDown, FileText, CheckCircle2, PackageX,
 } from 'lucide-react';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   PurchaseReturnService, PurchaseReturnRow, ReturnablePurchaseItem, PurchaseReturnStats, PurchaseRefundMethod,
@@ -236,9 +237,9 @@ export const PurchaseReturnsPage: React.FC = () => {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             {canReturn && (
-              <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-bold transition">
+              <ActivityGate element="new-return"><button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-bold transition">
                 <Plus className="w-4 h-4" /> تسجيل مرتجع
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

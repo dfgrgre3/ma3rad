@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   Barcode, Plus, Search, RefreshCw, Printer, 
@@ -183,13 +184,13 @@ export const WarehouseLocationsPage: React.FC = () => {
           description="إدارة ممرات ورفوف وخانات التخزين وتوليد ملصقات الباركود الداخلية"
           actions={<>
             {canManage && (
-              <button
+              <ActivityGate element="new-location"><button
                 onClick={handleOpenCreate}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black shadow-md shadow-primary/20 transition active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 إضافة موقع تخزين
-              </button>
+              </button></ActivityGate>
             )}
             <button
               onClick={loadData}

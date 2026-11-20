@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   Plus,
   RefreshCw,
@@ -185,13 +186,13 @@ export const BankReconciliationPage: React.FC = () => {
               <RefreshCw className="w-4 h-4" />
             </button>
             {canManageAccounts && (
-              <button
+              <ActivityGate element="new-bank-account"><button
                 onClick={() => setShowBankModal(true)}
                 className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold transition"
               >
                 <Plus className="w-4 h-4" />
                 <span>{newBankAccountLabel}</span>
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

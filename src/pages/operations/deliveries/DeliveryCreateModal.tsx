@@ -1,14 +1,17 @@
 import React from 'react';
 import { Loader2, X } from 'lucide-react';
 import type { Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 interface Customer { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null }
 interface DeliveryForm { customerId: string; address: string; city: string; driverId: string; vehicleId: string; scheduledAt: string; deliveryFee: string; notes: string }
 interface Props { form: DeliveryForm; setForm: React.Dispatch<React.SetStateAction<DeliveryForm>>; customers: Customer[]; drivers: Driver[]; vehicles: Vehicle[]; saving: boolean; onClose: () => void; onSubmit: (event: React.FormEvent) => void; onPickCustomer: (customerId: string) => void }
-export const DeliveryCreateModal: React.FC<Props> = ({ form, setForm, customers, drivers, vehicles, saving, onClose, onSubmit, onPickCustomer }) => (
+export const DeliveryCreateModal: React.FC<Props> = ({ form, setForm, customers, drivers, vehicles, saving, onClose, onSubmit, onPickCustomer }) => {
+  const newDeliveryLabel = useBusinessTerm('actions.newDelivery');
+  return (
 <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">أمر تسليم جديد</h3>
+              <h3 className="text-base font-extrabold text-ink">{newDeliveryLabel}</h3>
               <button onClick={() => onClose()} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={onSubmit} className="space-y-3 text-xs">
@@ -47,4 +50,5 @@ export const DeliveryCreateModal: React.FC<Props> = ({ form, setForm, customers,
             </form>
           </div>
         </div>
-);
+  );
+};

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   BookOpen, ChevronDown, ChevronLeft, ChevronsDownUp, ChevronsUpDown,
   Loader2, Pencil, Plus, Power, RotateCcw, Search, Trash2, X,
@@ -241,9 +242,9 @@ export const ChartOfAccountsPage: React.FC = () => {
           actions={<>
             <span className="text-xs font-semibold text-muted">{accounts.length} حساب</span>
             {canManage && (
-              <button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+              <ActivityGate element="new-account"><button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                 <Plus className="h-4 w-4" /> {newAccountLabel}
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

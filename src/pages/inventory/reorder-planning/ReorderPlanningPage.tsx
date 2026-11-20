@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   TrendingDown, AlertTriangle, Package, RefreshCw, 
@@ -190,14 +191,14 @@ export const ReorderPlanningPage: React.FC = () => {
           description="مراقبة حدود الأمان ومعدل المبيعات اليومي واقتراح طلبيات الشراء آلياً"
           actions={<>
             {canCreatePurchaseRequest && selectedProductIds.size > 0 && (
-              <button
+              <ActivityGate element="create-po"><button
                 onClick={handleCreatePurchaseRequest}
                 disabled={creatingPO}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success hover:bg-success text-white text-xs font-black shadow-md shadow-success/20 transition active:scale-95 disabled:opacity-50"
               >
                 <ShoppingCart className="w-4 h-4" />
                 إنشاء طلب شراء للمحدد ({selectedProductIds.size})
-              </button>
+              </button></ActivityGate>
             )}
 
             {canCreatePurchaseRequest && (

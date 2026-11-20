@@ -7,12 +7,17 @@ import { getOrderActionLabels, getOrderStatusLabel, fmt } from '../../../types/s
 import { summarizeOrderQuantity } from './helpers';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import type { OrderDetailModalProps } from './OrderDetailModal_part01';
+import { useDocElements } from '../../../hooks/domains/config/useActivityUi';
+import { isWorkflowActionAllowed } from '../../../config/activityDocumentSpec';
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   order: detail, canUpdate, canApprove, onClose, onPrint, onShareOnWhatsApp,
   onOpenTimeline, onOpenDelivery, onAdvance, onSetStatus, onOpenConvert, onCancel,
   operationalFields, operationalFieldValues,
-}) => (
+}) => {
+  const doc = useDocElements('/doc/sales_order');
+  const docVisible = (id: string) => doc[id]?.visible !== false;
+  return (
   <Modal onClose={onClose} wide>
     <div className="flex items-start justify-between mb-4">
       <div>
@@ -78,39 +83,40 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     />
     </div>
     <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-line">
-      <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
-      <button onClick={() => onShareOnWhatsApp(detail)} className="px-3 py-2 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
-      <button onClick={() => onOpenTimeline(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> سجل الحالات</button>
-      {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && (
+      {docVisible('print') && <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>}
+      {docVisible('share') && <button onClick={() => onShareOnWhatsApp(detail)} className="px-3 py-2 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>}
+      {docVisible('timeline') && <button onClick={() => onOpenTimeline(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> سجل الحالات</button>}
+      {canUpdate && docVisible('delivery') && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && (
         <button onClick={() => onOpenDelivery(detail)} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تسجيل تسليم</button>
       )}
-      {canApprove && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
+      {canApprove && docVisible('advance') && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
         <button onClick={() => onAdvance(detail)} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
           <ChevronLeft className="w-3.5 h-3.5" />
           {detail.status === 'PENDING' ? getOrderActionLabels().confirm : getOrderActionLabels().start}
         </button>
       )}
-      {canApprove && ['CONFIRMED', 'PROCESSING'].includes(detail.status) && (
+      {canApprove && docVisible('hold') && ['CONFIRMED', 'PROCESSING'].includes(detail.status) && (
         <button onClick={() => onSetStatus(detail, 'ON_HOLD')} className="px-3 py-2 bg-warning-soft hover:bg-warning-soft text-warning border border-warning-border rounded-xl text-xs font-bold flex items-center gap-1.5"><Pause className="w-3.5 h-3.5" /> تعليق مؤقت</button>
       )}
-      {canApprove && detail.status === 'ON_HOLD' && (
+      {canApprove && docVisible('hold') && detail.status === 'ON_HOLD' && (
         <>
           <button onClick={() => onSetStatus(detail, 'CONFIRMED')} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تأكيد</button>
           <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تجهيز</button>
         </>
       )}
-      {canApprove && detail.status === 'PROCESSING' && (
+      {canApprove && docVisible('ready') && detail.status === 'PROCESSING' && (
         <button onClick={() => onSetStatus(detail, 'READY')} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تحديد كجاهز</button>
       )}
-      {canApprove && detail.status === 'READY' && (
+      {canApprove && docVisible('ready') && detail.status === 'READY' && (
         <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><ChevronLeft className="w-3.5 h-3.5" /> إعادة للتجهيز</button>
       )}
-      {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
+      {docVisible('convert-to-invoice') && isWorkflowActionAllowed('/doc/sales_order', 'convert-to-invoice', detail.status) && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
         <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-success hover:bg-success text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
       )}
-      {canApprove && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
+      {canApprove && docVisible('cancel') && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
         <button onClick={() => onCancel(detail)} className="px-3 py-2 bg-danger hover:bg-danger text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> إلغاء الطلب</button>
       )}
     </div>
   </Modal>
-);
+  );
+};

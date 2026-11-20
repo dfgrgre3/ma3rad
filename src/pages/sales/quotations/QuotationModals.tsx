@@ -17,6 +17,7 @@ import { OperationalFieldsSummary } from '../../../components/products/Operation
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { DataTable } from '../../../components/ui/DataTable';
+import { useDocElements } from '../../../hooks/domains/config/useActivityUi';
 
 export const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
   PENDING: { label: 'بانتظار الموافقة', color: 'bg-warning/10 text-warning border-warning/20' },
@@ -209,7 +210,10 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
   onOperationalFieldValuesChange,
   canUpdateOperationalFields,
   onSaveOperationalFields,
-}) => (
+}) => {
+  const doc = useDocElements('/doc/quotation');
+  const docVisible = (id: string) => doc[id]?.visible !== false;
+  return (
   <>
 {/* Create / edit modal */}
 {formOpen && (
@@ -453,28 +457,28 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       </div>
     )}
     <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-line">
-      <button onClick={() => printService.printQuotation(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
-      <button onClick={() => shareOnWhatsApp(detail)} className="px-3 py-2 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
-      {canCreate && detail.status === 'PENDING' && (
+      {docVisible('print') && <button onClick={() => printService.printQuotation(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>}
+      {docVisible('send') && <button onClick={() => shareOnWhatsApp(detail)} className="px-3 py-2 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> {doc.send?.label ?? 'واتساب'}</button>}
+      {canCreate && detail.status === 'PENDING' && docVisible('follow-up') && (
         <button onClick={() => { setDetail(null); openFollowUp(detail); }} className="px-3 py-2 bg-accent-soft hover:bg-accent-soft text-primary border border-accent-border rounded-xl text-xs font-bold flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" /> جدولة متابعة</button>
       )}
-      {canCreate && <button onClick={() => duplicate(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> نسخ</button>}
-      {canUpdate && ['PENDING', 'EXPIRED'].includes(detail.status) && (
+      {canCreate && docVisible('duplicate') && <button onClick={() => duplicate(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> نسخ</button>}
+      {canUpdate && ['PENDING', 'EXPIRED'].includes(detail.status) && docVisible('edit') && (
         <button onClick={() => { setDetail(null); openEdit(detail); }} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" /> تعديل</button>
       )}
-      {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && !(detail.serviceItems || []).length && (
+      {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && !(detail.serviceItems || []).length && docVisible('convert-to-order') && (
         <button onClick={() => { setDetail(null); openConvertOrder(detail); }} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><ShoppingBag className="w-3.5 h-3.5" /> تحويل لطلب</button>
       )}
-      {canCreate && detail.status === 'PENDING' && !(detail.serviceItems || []).length && (
+      {canCreate && detail.status === 'PENDING' && !(detail.serviceItems || []).length && docVisible('convert-to-invoice') && (
         <button onClick={() => { setDetail(null); openConvert(detail); }} className="px-3 py-2 bg-success hover:bg-success text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> تحويل لفاتورة</button>
       )}
-      {canUpdate && detail.status === 'EXPIRED' && (
+      {canUpdate && detail.status === 'EXPIRED' && docVisible('reopen') && (
         <button onClick={() => reopenQuotation(detail)} className="px-3 py-2 bg-warning hover:bg-warning text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> إعادة فتح</button>
       )}
-      {canApprove && detail.status === 'PENDING' && (
+      {canApprove && detail.status === 'PENDING' && docVisible('cancel') && (
         <button onClick={() => cancelQuotation(detail)} className="px-3 py-2 bg-danger hover:bg-danger text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CancelIcon className="w-3.5 h-3.5" /> إلغاء</button>
       )}
-      {canCreate && detail.status !== 'CONVERTED' && (
+      {canCreate && detail.status !== 'CONVERTED' && docVisible('delete') && (
         <button onClick={() => deleteQuotation(detail)} className="px-3 py-2 bg-danger-soft text-danger border border-danger-border rounded-xl text-xs font-bold flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> حذف</button>
       )}
     </div>
@@ -597,6 +601,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
 )}
 
   </>
-);
+  );
+};
 
 export default QuotationModals;

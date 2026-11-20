@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, Plus, RefreshCw, Wallet } from 'lucide-react';
 import type { CashShift, User } from '../../../types';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 interface Props {
   currentUser: User | null;
@@ -37,21 +38,25 @@ export const CashierHeader: React.FC<Props> = ({
 
       <div className="flex gap-2 flex-wrap">
         {activeShift && canCloseShift ? (
-          <button
-            onClick={onCloseShiftModal}
-            className="px-4 py-2.5 bg-warning hover:bg-warning text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-warning/20 transition-all active:scale-95 text-xs"
-          >
-            <Clock className="w-4 h-4" />
-            <span>إغلاق الوردية ({activeShift.shiftNumber})</span>
-          </button>
+          <ActivityGate element="close">
+            <button
+              onClick={onCloseShiftModal}
+              className="px-4 py-2.5 bg-warning hover:bg-warning text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-warning/20 transition-all active:scale-95 text-xs"
+            >
+              <Clock className="w-4 h-4" />
+              <span>إغلاق الوردية ({activeShift.shiftNumber})</span>
+            </button>
+          </ActivityGate>
         ) : !activeShift && canOpenShift ? (
-          <button
-            onClick={onOpenShiftModal}
-            className="px-4 py-2.5 bg-success hover:bg-success text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-success/20 transition-all active:scale-95 text-xs"
-          >
-            <Clock className="w-4 h-4" />
-            <span>فتح وردية جديدة</span>
-          </button>
+          <ActivityGate element="open">
+            <button
+              onClick={onOpenShiftModal}
+              className="px-4 py-2.5 bg-success hover:bg-success text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-success/20 transition-all active:scale-95 text-xs"
+            >
+              <Clock className="w-4 h-4" />
+              <span>فتح وردية جديدة</span>
+            </button>
+          </ActivityGate>
         ) : null}
 
         <button

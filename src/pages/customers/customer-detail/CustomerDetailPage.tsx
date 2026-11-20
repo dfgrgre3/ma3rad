@@ -17,6 +17,7 @@ import { useToast } from '../../../components/ui/Toast';
 import { format, isValid } from 'date-fns';
 import { Customer, Product } from '../../../types';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
+import { useActivityPathHidden } from '../../../hooks/domains/config/useActivityUi';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
@@ -107,6 +108,7 @@ export const CustomerDetailPage: React.FC = () => {
   const projectsLabel = useBusinessTerm('entities.projects.plural');
   const salesLabel = useBusinessTerm('modules.sales');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
+  const importedProductsHidden = useActivityPathHidden('/customers/imported-products');
   const [tab, setTab] = useState<Tab>('overview');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -479,7 +481,7 @@ export const CustomerDetailPage: React.FC = () => {
                 <span className="text-danger">{Number(r.remaining) > 0 ? fmt(r.remaining) : '—'}</span>,
                 <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${PAY_STATUS[r.status || ''] || 'bg-surface-sunken text-ink-secondary'}`}>{PAY_LABEL[r.status || ''] || r.status}</span>,
               ] : []),
-              <button onClick={() => r.id && navigate(`/customers/${id}/imported-products?invoiceId=${encodeURIComponent(r.id)}`)} disabled={!r.id} className="px-2.5 py-1.5 rounded-lg bg-success-soft text-success hover:bg-success-soft text-[11px] font-bold whitespace-nowrap disabled:opacity-50">متابعة {productsLabel} الخارجية</button>,
+              ...(importedProductsHidden ? [] : [<button key="imp" onClick={() => r.id && navigate(`/customers/${id}/imported-products?invoiceId=${encodeURIComponent(r.id)}`)} disabled={!r.id} className="px-2.5 py-1.5 rounded-lg bg-success-soft text-success hover:bg-success-soft text-[11px] font-bold whitespace-nowrap disabled:opacity-50">متابعة {productsLabel} الخارجية</button>]),
             ])}
           />
         )}

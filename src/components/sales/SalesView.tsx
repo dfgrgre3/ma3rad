@@ -18,6 +18,7 @@ import { exportToExcel, buildExportHtml } from '../../utils/export/export';
 import { SalesModals } from './SalesModals';
 import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
+import { ActivityGate } from '../ui/ActivityGate';
 import { StatCard } from '../ui/Card';
 import { FilterToolbar } from '../ui/FilterToolbar';
 import { DataTable } from '../ui/DataTable';
@@ -409,9 +410,9 @@ export const SalesView: React.FC = () => {
         icon={<Receipt className="h-5 w-5" />}
         actions={
           <>
-            {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => doExport('excel')}>جدول بيانات</Button>}
-            {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => doExport('pdf')}>مستند</Button>}
-            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>{newInvoiceLabel} (POS)</Button>}
+            {canExport && <ActivityGate element="export"><Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => doExport('excel')}>جدول بيانات</Button></ActivityGate>}
+            {canExport && <ActivityGate element="print"><Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => doExport('pdf')}>مستند</Button></ActivityGate>}
+            {canCreate && <ActivityGate element="pos-checkout"><Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>{newInvoiceLabel}</Button></ActivityGate>}
           </>
         }
       />
@@ -584,24 +585,24 @@ export const SalesView: React.FC = () => {
               <div className="flex items-center justify-center gap-1">
                 <Button variant="ghost" size="sm" iconOnly title="معاينة الفاتورة" aria-label="معاينة الفاتورة" onClick={() => openInvoicePreview(inv)}><Eye className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="sm" iconOnly title="تفاصيل الفاتورة" aria-label="تفاصيل الفاتورة" onClick={() => openDetails(inv)}><Info className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="sm" iconOnly title="طباعة A4" aria-label="طباعة A4" onClick={() => {
+                <ActivityGate element="print"><Button variant="ghost" size="sm" iconOnly title="طباعة A4" aria-label="طباعة A4" onClick={() => {
                   const full = salesService.getInvoiceById(inv.id);
                   if (full) printService.printInvoice(full);
-                }}><Printer className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="sm" iconOnly title="طباعة إيصال حراري" aria-label="طباعة إيصال حراري" onClick={() => {
+                }}><Printer className="h-4 w-4" /></Button></ActivityGate>
+                <ActivityGate element="receipt-print"><Button variant="ghost" size="sm" iconOnly title="طباعة إيصال حراري" aria-label="طباعة إيصال حراري" onClick={() => {
                   const full = salesService.getInvoiceById(inv.id);
                   if (full) printService.printThermalReceipt(full);
-                }}><Receipt className="h-4 w-4" /></Button>
+                }}><Receipt className="h-4 w-4" /></Button></ActivityGate>
                 {inv.invoiceStatus !== 'VOID' && inv.remainingAmount > 0 && canCollect && (
-                  <Button variant="ghost" size="sm" iconOnly title="تحصيل دفعة" aria-label="تحصيل دفعة" onClick={() => {
+                  <ActivityGate element="collect-payment"><Button variant="ghost" size="sm" iconOnly title="تحصيل دفعة" aria-label="تحصيل دفعة" onClick={() => {
                     const full = salesService.getInvoiceById(inv.id);
                     if (full) openPayment(full);
-                  }}><Wallet className="h-4 w-4" /></Button>
+                  }}><Wallet className="h-4 w-4" /></Button></ActivityGate>
                 )}
                 {inv.invoiceStatus !== 'VOID' && canRefund && (
-                  <Button variant="ghost" size="sm" iconOnly title="مرتجع مبيعات" aria-label="مرتجع مبيعات" onClick={() => goToReturn(inv.id)}>
+                  <ActivityGate element="sales-return"><Button variant="ghost" size="sm" iconOnly title="مرتجع مبيعات" aria-label="مرتجع مبيعات" onClick={() => goToReturn(inv.id)}>
                     <RotateCcw className="h-4 w-4" />
-                  </Button>
+                  </Button></ActivityGate>
                 )}
               </div>
             ),

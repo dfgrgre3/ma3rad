@@ -1,5 +1,6 @@
 import type { Migration } from './support';
 import { tableExists, columnExists } from './support';
+import { withTableTriggersSuspended } from './triggerSuspend';
 
 interface MoneyColumnSpec { table: string; columns: string[]; }
 
@@ -22,6 +23,10 @@ const MONEY_TABLES: MoneyColumnSpec[] = [
 ];
 
 function convertTableColumns(db: any, table: string, columns: string[]): void {
+  withTableTriggersSuspended(db, table, () => convertTableColumnsInner(db, table, columns));
+}
+
+function convertTableColumnsInner(db: any, table: string, columns: string[]): void {
   if (!tableExists(db, table)) return;
 
   const createResult = db.exec(

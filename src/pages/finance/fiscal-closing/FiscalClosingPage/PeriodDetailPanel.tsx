@@ -7,6 +7,8 @@ import { TasksTab } from './TasksTab';
 import { AdjustmentsTab } from './AdjustmentsTab';
 import { ReportsTab } from './ReportsTab';
 import { AuditTab } from './AuditTab';
+import { ActivityGate } from '../../../../components/ui/ActivityGate';
+import { useActivityElementHidden } from '../../../../hooks/domains/config/useActivityUi';
 
 interface PeriodDetailPanelProps {
   state: FiscalClosingState;
@@ -22,7 +24,9 @@ export const PeriodDetailPanel: FC<PeriodDetailPanelProps> = ({ state, activeTab
     checks, failedChecks, warningChecks, tasks, completedTasks, adjustments,
     report, audit, runs, openLegacyReconcile, setShowTaskModal, setShowAdjustmentModal,
   } = state;
+  const auditTabHidden = useActivityElementHidden('audit');
   if (!selectedPeriod) return null;
+  const visibleTabs = auditTabHidden ? tabs.filter((tab) => tab.id !== 'audit') : tabs;
 
   return (
     <section className="rounded-2xl border border-line bg-surface shadow-sm">
@@ -38,8 +42,9 @@ export const PeriodDetailPanel: FC<PeriodDetailPanelProps> = ({ state, activeTab
             من {formatDate(selectedPeriod.startDate)} إلى {formatDate(selectedPeriod.endDate)}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {(selectedPeriod.workflowState === 'OPEN' || !selectedPeriod.workflowState) && canClose && selectedPeriod.status === 'OPEN' && (
+        <ActivityGate element="run">
+          <div className="flex flex-wrap gap-2">
+            {(selectedPeriod.workflowState === 'OPEN' || !selectedPeriod.workflowState) && canClose && selectedPeriod.status === 'OPEN' && (
             <button type="button" onClick={() => runAction(() => service.startPeriodReview(selectedPeriod.id), 'بدأت مراجعة الفترة.')} className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs font-bold text-warning hover:bg-warning-soft">
               بدء المراجعة
             </button>
@@ -49,16 +54,17 @@ export const PeriodDetailPanel: FC<PeriodDetailPanelProps> = ({ state, activeTab
               إرسال للاعتماد
             </button>
           )}
-          {selectedPeriod.workflowState === 'PENDING_APPROVAL' && canManage && (
-            <button type="button" onClick={() => runAction(() => service.approveAndClosePeriod(selectedPeriod.id, closeNotes || undefined), 'تم اعتماد وإقفال الفترة.')} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success">
-              اعتماد وإقفال
-            </button>
-          )}
-        </div>
+            {selectedPeriod.workflowState === 'PENDING_APPROVAL' && canManage && (
+              <button type="button" onClick={() => runAction(() => service.approveAndClosePeriod(selectedPeriod.id, closeNotes || undefined), 'تم اعتماد وإقفال الفترة.')} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success">
+                اعتماد وإقفال
+              </button>
+            )}
+          </div>
+        </ActivityGate>
       </div>
 
       <div className="flex flex-wrap gap-1 border-b border-line px-3 pt-3">
-        {tabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button

@@ -14,6 +14,7 @@ const {
   assertTenantAccess,
 } = require('../middleware/auth');
 const { appBackupDir } = require('../lib/opsWorker');
+const { authenticateDevice: authenticateDeviceCredential } = require('../lib/deviceAuth');
 
 const adminRouter = express.Router();
 const clientRouter = express.Router();
@@ -55,34 +56,15 @@ function appBackupFilePath(storageUri) {
 
 // ─── Device authentication ──────────────────────────────────────────────────
 // Client devices are bound to a registered platform_devices row by
-// X-Device-Id (device id or hardware id). The device credential is required
-// but verified by the licensing service, not this server — same trust model
-// as /telemetry/errors and /releases. The tenant is ALWAYS resolved from the
-// device row; request bodies/params can never claim another tenant.
+// X-Device-Id (device id or hardware id). X-Device-Credential is verified
+// against the enrolled credential hash; the tenant is ALWAYS resolved from
+// the device row, so request bodies/params can never claim another tenant.
 async function authenticateDevice(req, res, next) {
-  try {
-    const deviceId = String(req.get('X-Device-Id') || '').trim();
-    const credential = String(req.get('X-Device-Credential') || '').trim();
-    if (!deviceId || !credential) {
-      return res.status(401).json({ error: 'Device authentication required' });
-    }
-    const db = getDb();
-    const device = await db.get(
-      'SELECT * FROM platform_devices WHERE id = ? OR hardware_id = ? LIMIT 1',
-      [deviceId, deviceId]
-    );
-    if (!device) {
-      return res.status(401).json({ error: 'Unknown device' });
-    }
-    if (device.status !== 'ACTIVE') {
-      return res.status(403).json({ error: `Device is ${device.status}` });
-    }
-    req.device = device;
-    req.deviceTenantId = device.tenant_id;
+  await authenticateDeviceCredential(req, res, (err) => {
+    if (err) return next(err);
+    req.deviceTenantId = req.device.tenant_id;
     next();
-  } catch (err) {
-    next(err);
-  }
+  });
 }
 
 // ═══ Admin router — /api/v1/admin/app-backups ═══════════════════════════════

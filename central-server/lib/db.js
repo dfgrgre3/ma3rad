@@ -125,6 +125,11 @@ async function migratePlatformIdentityTables() {
     await db.exec('UPDATE platform_roles SET code = id WHERE code IS NULL');
     await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_roles_code ON platform_roles(code)');
   }
+
+  if (await tableExists('platform_devices')) {
+    const deviceColumns = (await db.all(`PRAGMA table_info('platform_devices')`)).map((col) => col.name);
+    await addColumnIfMissing('platform_devices', deviceColumns, 'credential_hash', `credential_hash TEXT`);
+  }
 }
 
 async function createTables() {
@@ -261,6 +266,7 @@ async function createTables() {
       first_activated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_seen_at TEXT,
       clone_suspected INTEGER NOT NULL DEFAULT 0 CHECK(clone_suspected IN (0,1)),
+      credential_hash TEXT,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

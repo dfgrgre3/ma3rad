@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import {
@@ -212,12 +213,12 @@ export const SupplierQuotationsPage: React.FC = () => {
           title="طلب عروض أسعار الموردين ومقارنة العروض (RFQ)"
           description="طرح الاحتياجات للمصانع، تسجيل العروض التنافسية، والترسية مع توليد أمر الشراء آلياً"
           actions={canCreate && (
-            <button
+            <ActivityGate element="new-quotation"><button
               onClick={handleOpenNewRfq}
               className="flex items-center gap-2 px-4 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold shadow-md shadow-warning/20 transition shrink-0"
             >
               <Plus className="w-4 h-4" /> {newRfqLabel} (RFQ)
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

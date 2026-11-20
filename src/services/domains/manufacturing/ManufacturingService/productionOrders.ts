@@ -508,7 +508,9 @@ export class ProductionOrdersModule {
     const onHand = Number(stock?.quantityM2 || 0);
     const reservedTotal = Number(stock?.reservedM2 || 0);
     // Usable = unreserved stock + this order's own reservation share.
-    if (onHand - reservedTotal + reservedUsed + 1e-6 < qty) {
+    // Physical stock is a hard ceiling: a reservation can never cover units
+    // that are no longer on the shelf.
+    if (onHand + 1e-6 < qty || onHand - reservedTotal + reservedUsed + 1e-6 < qty) {
       throw new Error(`الرصيد المتاح من ${material.productName || material.productId} غير كافٍ للصرف.`);
     }
     // Freeze the actual issue cost on the immutable transaction: FIFO layer

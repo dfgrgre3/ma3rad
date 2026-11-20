@@ -108,3 +108,26 @@ test('part134 converts REAL money columns to INTEGER piastres idempotently', () 
   assert.equal(moneyValue(db, 'inventory_cost_layers', 'original_unit_cost'), 11457);
   assert.equal(columnType(db, 'products', 'cost_price'), 'INTEGER');
 });
+
+test('part134 runs on inventory_transactions with immutability triggers and restores them', () => {
+  const db = new SQL.Database();
+  createLegacySchema(db);
+  db.exec(`CREATE TRIGGER IF NOT EXISTS trg_prevent_update_inv_tx BEFORE UPDATE ON inventory_transactions
+           BEGIN SELECT RAISE(ABORT, 'Inventory ledger is immutable. Update is prohibited.'); END;`);
+  db.exec(`CREATE TRIGGER IF NOT EXISTS trg_prevent_delete_inv_tx BEFORE DELETE ON inventory_transactions
+           BEGIN SELECT RAISE(ABORT, 'Inventory ledger is immutable. Delete is prohibited.'); END;`);
+
+  MIGRATION_PART_134.up(db as any);
+
+  assert.equal(moneyValue(db, 'inventory_transactions', 'unit_cost'), 11457);
+  assert.equal(columnType(db, 'inventory_transactions', 'unit_cost'), 'INTEGER');
+
+  // Triggers must be back in place after the conversion.
+  const trg = db.exec(
+    `SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='inventory_transactions' ORDER BY name`
+  )[0];
+  assert.deepEqual(trg?.values.map((r: any[]) => r[0]), ['trg_prevent_delete_inv_tx', 'trg_prevent_update_inv_tx']);
+
+  // And the ledger is still immutable afterwards.
+  assert.throws(() => db.run(`UPDATE inventory_transactions SET unit_cost = 1 WHERE id = 'r1'`), /immutable/);
+});

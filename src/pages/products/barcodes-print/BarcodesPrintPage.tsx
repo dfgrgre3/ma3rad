@@ -7,6 +7,7 @@ import { SettingsService } from '../../../services/domains/config/SettingsServic
 import { Product } from '../../../types';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { OperationalFieldService } from '../../../services/domains/products/OperationalFieldService';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
 interface LabelSettings {
@@ -76,13 +77,13 @@ export const BarcodesPrintPage: React.FC = () => {
           title="استوديو طباعة باركود وملصقات السيراميك (Barcode Studio)"
           description="تصميم وتجهيز باركود الكراتين والعينات مع المقاس والفرز والأسعار للطابعات الحرارية"
           actions={
-            <button
+            <ActivityGate element="print"><button
               onClick={handlePrint}
               className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold transition shadow-lg shadow-primary/20 active:scale-95"
             >
               <Printer className="w-4 h-4" />
               طباعة الملصقات ({labelCopies} نسخة)
-            </button>
+            </button></ActivityGate>
           }
         />
       </div>

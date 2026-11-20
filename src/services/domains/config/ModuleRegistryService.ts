@@ -16,6 +16,7 @@ import {
 import type { User } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { getEffectiveBusinessType } from './BusinessTypeService';
+import { DEPLOYMENT_MODULES } from '../../../modules/featureModuleLoader';
 
 // Kept as a literal so the service layer does not import the React navigation tree.
 const NAV_HIDDEN_SETTING_KEY = 'nav.hidden';
@@ -76,7 +77,10 @@ export class ModuleRegistryService {
     const stored = parseEnabledModules(SettingsService.getValue(ENABLED_MODULES_SETTING_KEY), type);
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const validation = validateModuleSelection(stored, { trackInventory });
-    return validation.enabled.filter((id) => id !== 'inventory' || trackInventory);
+    // Feature-based deployment: a module this build does not ship is never enabled.
+    // The deployment selection is dependency-closed, so the intersection is too.
+    const deployed = new Set(DEPLOYMENT_MODULES.enabled);
+    return validation.enabled.filter((id) => deployed.has(id) && (id !== 'inventory' || trackInventory));
   }
 
   public static isModuleEnabled(moduleId: string): boolean {
@@ -98,14 +102,20 @@ export class ModuleRegistryService {
     if (!PermissionService.can(AuthService.getCurrentUser(), 'ui.modules.registry.view')) return [];
     const enabled = new Set(ModuleRegistryService.getEnabledModuleIds());
     const trackInventory = ModuleRegistryService.isInventoryTracked();
+    const deployed = new Set(DEPLOYMENT_MODULES.enabled);
     return MODULE_REGISTRY.map((definition) => {
       const requiresInventory = definition.activation.requiresInventoryTracking === true;
-      const available = !requiresInventory || trackInventory;
+      const isDeployed = deployed.has(definition.id);
+      const available = isDeployed && (!requiresInventory || trackInventory);
       return {
         ...definition,
         enabled: enabled.has(definition.id),
         available,
-        unavailableReason: available ? undefined : 'تتطلب تفعيل تتبع المخزون في إعدادات النشاط.',
+        unavailableReason: available
+          ? undefined
+          : !isDeployed
+            ? 'هذه الوحدة غير مضمّنة في هذا الإصدار من البرنامج.'
+            : 'تتطلب تفعيل تتبع المخزون في إعدادات النشاط.',
       };
     });
   }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertCircle, ArrowDownRight, ArrowUpRight, Check, CheckCircle2, Clock,
@@ -280,22 +281,22 @@ export const SupplierStatementPage: React.FC = () => {
           description="مراجعة الحركات المالية ومطابقة سندات الصرف بفواتير الشراء"
           actions={canExport && (
             <>
-              <button
+              <ActivityGate element="export"><button
                 type="button"
                 onClick={() => handleExport('excel')}
                 disabled={!statementData || loading}
                 className="inline-flex items-center gap-2 rounded-md border border-success bg-success px-3 py-2 text-xs font-bold text-white transition hover:bg-success focus:outline-none focus:ring-2 focus:ring-success focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Download className="h-3.5 w-3.5" /> تصدير Excel
-              </button>
-              <button
+              </button></ActivityGate>
+              <ActivityGate element="print"><button
                 type="button"
                 onClick={() => handleExport('pdf')}
                 disabled={!statementData || loading}
                 className="inline-flex items-center gap-2 rounded-md border border-line-strong bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Printer className="h-3.5 w-3.5" /> طباعة / PDF
-              </button>
+              </button></ActivityGate>
             </>
           )}
         />

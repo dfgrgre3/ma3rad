@@ -2,6 +2,8 @@ import React from 'react';
 import { AlertCircle, Download, HardHat, Plus } from 'lucide-react';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface EmployeesHeaderProps {
   loading: boolean;
@@ -20,6 +22,7 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
   canExport,
   onExport,
 }) => {
+  const employeeSingular = useBusinessTerm('entities.employees.singular');
   return (
     <>
       {/* Header Banner */}
@@ -30,22 +33,22 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
           description="تصنيف وتوزيع العمال في المستودعات والمعارض ومتابعة السلفيات، الرواتب، والأجور اليومية"
           actions={<>
             <CentralLimitGuard metric="maxEmployees">
-              <button
+              <ActivityGate element="new-employee"><button
                 onClick={onAddEmployee}
                 className="flex items-center gap-2 px-4 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold shadow-lg shadow-warning/10 transition-all transform active:scale-95 shrink-0"
               >
                 <Plus className="w-4 h-4" />
-                إضافة عامل / موظف جديد
-              </button>
+                إضافة {employeeSingular} جديد
+              </button></ActivityGate>
             </CentralLimitGuard>
             {canExport && onExport && (
-              <button
+              <ActivityGate element="export"><button
                 onClick={onExport}
                 className="flex items-center gap-2 px-4 py-2.5 bg-surface border border-line text-ink rounded-xl text-sm font-bold hover:bg-surface-muted transition-all shrink-0"
               >
                 <Download className="w-4 h-4" />
                 تصدير
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

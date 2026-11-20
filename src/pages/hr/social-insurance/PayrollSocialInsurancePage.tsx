@@ -8,6 +8,7 @@ import {
 } from '../../../services/domains/hr/PayrollSocialInsuranceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
 
@@ -248,7 +249,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
     { id: 'eos', label: 'نهاية الخدمة', icon: <ShieldCheck className="h-4 w-4" /> },
     { id: 'calculator', label: 'الحاسبة', icon: <Calculator className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/social-insurance');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

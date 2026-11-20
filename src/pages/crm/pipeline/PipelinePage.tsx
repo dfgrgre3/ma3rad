@@ -7,6 +7,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 const STAGES: { id: LeadStage; label: string; color: string; bg: string; border: string }[] = [
   { id: 'NEW',         label: 'عميل محتمل',  color: 'text-ink-secondary',   bg: 'bg-surface-sunken',  border: 'border-line-strong' },
   { id: 'CONTACTED',   label: 'تم التواصل',  color: 'text-primary',     bg: 'bg-accent-soft',     border: 'border-accent-border' },
@@ -71,9 +72,9 @@ export const PipelinePage: React.FC = () => {
             </span>
           }
           actions={
-            <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-primary hover:text-primary transition">
+            <ActivityGate element="lead"><button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-primary hover:text-primary transition">
               إدارة العملاء المحتملين
-            </button>
+            </button></ActivityGate>
           }
         />
       </div>

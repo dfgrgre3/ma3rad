@@ -11,6 +11,7 @@ import type { BrandWithCount } from '../../services/domains/products/BrandServic
 import type { BusinessConfiguration } from '../../config/businessProfiles';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { Field } from './ProductUi';
+import { useActivityPathHidden } from '../../hooks/domains/config/useActivityUi';
 import { OperationalFieldsForm } from './OperationalFieldsForm';
 import type { OperationalFieldDefinition, ProductGradeOption } from '../../services/domains/products/OperationalFieldService';
 import {
@@ -167,6 +168,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   gradeOptions,
   isSaving,
 }) => {
+  const barcodesHidden = useActivityPathHidden('/products/barcodes');
   const [newTone, setNewTone] = React.useState('');
   const [showFieldPreferences, setShowFieldPreferences] = React.useState(false);
   const [selectedFieldKeys, setSelectedFieldKeys] = React.useState<string[]>([]);
@@ -236,7 +238,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <Field label="الباركود" required>
                           <div className="flex gap-2">
                             <input required value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} className="min-w-0 flex-1 px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary" />
-                            {!editingProduct && <button type="button" onClick={onRegenerateBarcode} aria-label="توليد باركود جديد" title="توليد باركود جديد يبدأ من أول رقم غير مستخدم" className="rounded-xl border border-accent-border px-3 text-primary hover:bg-accent-soft"><RefreshCw className="h-4 w-4" /></button>}
+                            {!editingProduct && !barcodesHidden && <button type="button" onClick={onRegenerateBarcode} aria-label="توليد باركود جديد" title="توليد باركود جديد يبدأ من أول رقم غير مستخدم" className="rounded-xl border border-accent-border px-3 text-primary hover:bg-accent-soft"><RefreshCw className="h-4 w-4" /></button>}
                           </div>
                         </Field>
                         <Field label="كود الصنف (SKU)" required>

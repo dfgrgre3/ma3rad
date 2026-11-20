@@ -4,6 +4,7 @@ import { Shield, Globe, Lock, AlertCircle, CheckCircle2, KeyRound } from 'lucide
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { AuthService } from '../../../services/domains/auth/AuthService';
+import { ModulePackagesCard } from './ModulePackagesCard';
 
 export const LicenseModeSettingsPage: React.FC = () => {
   const can = usePermission();
@@ -170,6 +171,8 @@ export const LicenseModeSettingsPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        <ModulePackagesCard />
       </div>
       {pendingMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 p-4" role="presentation">

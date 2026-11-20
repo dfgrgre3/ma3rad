@@ -11,6 +11,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 
 const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
@@ -213,12 +214,12 @@ export const FleetDashboardPage: React.FC = () => {
           title="لوحة تحكم التوصيل والأسطول"
           description="إدارة التوصيل والسائقين والمركبات"
           actions={<>
-            <button onClick={() => navigate('/deliveries')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <ActivityGate element="delivery"><button onClick={() => navigate('/deliveries')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-2 rounded-lg flex items-center gap-1.5">
               <Truck className="w-3.5 h-3.5" /> التوصيلات
-            </button>
-            <button onClick={() => navigate('/drivers')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-accent-border">
+            </button></ActivityGate>
+            <ActivityGate element="driver"><button onClick={() => navigate('/drivers')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-accent-border">
               <UserRound className="w-3.5 h-3.5" /> السائقون
-            </button>
+            </button></ActivityGate>
             <button onClick={load} className="p-2 hover:bg-surface-sunken rounded-lg transition">
               <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
             </button>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BookmarkPlus, Loader2, Clock, Plus } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { ReservationService, StockReservation } from '../../../services/domains/sales/ReservationService';
 import { OrderService, Order, OrderDeposit } from '../../../services/domains/sales/OrderService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -297,13 +298,13 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
             <Clock className="w-4 h-4 text-warning" />
             تحديث الصلاحيات
           </button>}
-          {mode === 'inventory' && canAdjustInventory && <button
+          {mode === 'inventory' && canAdjustInventory && <ActivityGate element="new-reservation"><button
             onClick={() => setShowNewResModal(true)}
             className="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary rounded-xl shadow-sm hover:shadow transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             حجز كمية بضاعة يدوياً
-          </button>}
+          </button></ActivityGate>}
         </>}
       />
 

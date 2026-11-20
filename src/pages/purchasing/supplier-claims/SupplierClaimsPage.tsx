@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import {
   ShieldAlert, Plus, Search, ChevronDown, X, Layers,
@@ -206,12 +207,12 @@ export const SupplierClaimsPage: React.FC = () => {
           title="مطالبات عيوب ونقص توريد الموردين"
           description="توثيق الكسر، العيوب، فروق الأسعار، وإصدار إشعارات الخصم (Debit Notes) المعتمدة"
           actions={canCreate && (
-            <button
+            <ActivityGate element="new-claim"><button
               onClick={openCreateModal}
               className="flex items-center gap-2 px-4 py-2.5 bg-danger hover:bg-danger text-white rounded-xl text-sm font-bold shadow-md shadow-danger/20 transition shrink-0"
             >
               <Plus className="w-4 h-4" /> {newClaimLabel}
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

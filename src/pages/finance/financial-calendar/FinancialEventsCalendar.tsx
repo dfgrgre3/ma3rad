@@ -6,6 +6,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { StatsCards } from './FinancialEventsCalendar/StatsCards';
 import { FilterPanel } from './FinancialEventsCalendar/FilterPanel';
 import { CalendarView } from './FinancialEventsCalendar/CalendarView';
@@ -449,9 +450,9 @@ export const FinancialEventsCalendar: React.FC = () => {
           description={`${options?.branchName || 'مواعيد الاستحقاق والتحصيل والسداد'} · أحداثك المالية في عرض واحد`}
           actions={<>
             {canManage && (
-              <button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-sm font-bold text-white hover:bg-primary">
+              <ActivityGate element="new-event"><button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-sm font-bold text-white hover:bg-primary">
                 <Plus className="h-4 w-4" /> حدث مالي جديد
-              </button>
+              </button></ActivityGate>
             )}
             <button type="button" onClick={loadEvents} disabled={loading} aria-label="تحديث الأحداث" className="rounded-xl border border-line-strong bg-surface p-2.5 text-ink-secondary transition hover:bg-surface-sunken disabled:opacity-50">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />

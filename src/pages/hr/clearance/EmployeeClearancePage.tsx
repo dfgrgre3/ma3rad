@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   CheckCircle2, ClipboardCheck, FileBadge, MessageSquareText, Plus, RefreshCw,
@@ -231,7 +232,7 @@ export const EmployeeClearancePage: React.FC = () => {
     { id: 'requests', label: 'طلبات إخلاء الطرف', icon: <UserMinus className="h-4 w-4" /> },
     { id: 'followup', label: 'المتابعة وقائمة التحقق', icon: <ClipboardCheck className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/clearance');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   const groupedItems = useMemo(() => {

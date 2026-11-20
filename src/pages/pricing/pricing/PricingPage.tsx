@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
@@ -118,9 +119,9 @@ export const PricingPage: React.FC = () => {
           title="قوائم تسعير السيراميك والمواد"
           description="إعداد الخصومات وقوائم الأسعار المخصصة للمقاولين والتجار وكبار العملاء"
           actions={canManage && (
-            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <ActivityGate element="new-price-list"><button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
               <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

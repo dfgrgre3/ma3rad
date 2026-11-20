@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Plus, Search, Loader2, X, Calendar, Fuel } from 'lucide-react';
 import { OperationsService, Vehicle, Driver } from '../../../services/domains/operations/OperationsService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
@@ -11,6 +12,7 @@ import { OperationalFieldsRecordEditor } from '../../../components/products/Oper
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const STATUS_LABEL: Record<Vehicle['status'], string> = {
   AVAILABLE: 'متاحة', ON_DELIVERY: 'في رحلة', MAINTENANCE: 'صيانة', OUT_OF_SERVICE: 'خارج الخدمة',
 };
@@ -23,6 +25,7 @@ const STATUS_STYLE: Record<Vehicle['status'], string> = {
 
 export const VehiclesPage: React.FC = () => {
   const toast = useToast();
+  const newVehicleLabel = useBusinessTerm('actions.newVehicle');
   const service = useMemo(() => new OperationsService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const currentUser = AuthService.getCurrentUser();
@@ -96,9 +99,9 @@ export const VehiclesPage: React.FC = () => {
           title="المركبات"
           description="أسطول التوصيل وحالات المركبات"
           actions={canCreate && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
-              <Plus className="w-4 h-4" /> إضافة مركبة
-            </button>
+            <ActivityGate element="new-vehicle"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> {newVehicleLabel}
+            </button></ActivityGate>
           )}
         />
       </div>
@@ -157,7 +160,7 @@ export const VehiclesPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">إضافة مركبة</h3>
+              <h3 className="text-base font-extrabold text-ink">{newVehicleLabel}</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">

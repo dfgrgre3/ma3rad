@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { CommissionService, CommissionRow, CommissionStats } from '../../../services/domains/hr/CommissionService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -106,11 +107,11 @@ export const CommissionsPage: React.FC = () => {
               <option value="PAID">مدفوعة</option>
               <option value="CANCELLED">ملغاة</option>
             </select>
-            {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold disabled:opacity-50">
+            {canManagePayroll && <ActivityGate element="calculate"><button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold disabled:opacity-50">
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} احتساب الشهر
-            </button>}
+            </button></ActivityGate>}
             <button onClick={() => load()} className="p-2 rounded-xl border border-line bg-surface-muted text-ink-secondary"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-            <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
+            <ActivityGate element="export"><button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button></ActivityGate>
           </>}
         />
       </div>

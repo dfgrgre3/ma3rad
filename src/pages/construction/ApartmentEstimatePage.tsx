@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Building2, Printer, RotateCcw, Save, AlertTriangle, FolderOpen, Trash2, FileSpreadsheet, MessageCircle,
 } from 'lucide-react';
+import { ActivityGate } from '../../components/ui/ActivityGate';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { fieldClass, fmt, initialLines, initialRooms } from './ApartmentEstimatePage/estimateModel';
 import { useApartmentEstimateState } from './ApartmentEstimatePage/useApartmentEstimateState';

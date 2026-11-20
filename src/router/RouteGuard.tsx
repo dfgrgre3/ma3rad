@@ -5,7 +5,8 @@ import { getEffectiveBusinessType } from '../services/domains/config/BusinessTyp
 import { AppConfigService } from '../services/domains/config/AppConfigService';
 import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
-import { withModuleDependencies } from '../config/moduleRegistry';
+import { getModulePathOwner, withModuleDependencies } from '../config/moduleRegistry';
+import { DEPLOYMENT_MODULES } from '../modules/featureModuleLoader';
 import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import { isActivityPathHidden } from '../config/activityPageVisibility';
 import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
@@ -50,6 +51,13 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ currentUser, children 
         ليس لديك صلاحية للوصول إلى هذه الصفحة.
       </div>
     );
+  }
+
+  // Feature-based deployment: a module that this build does not include is never
+  // routed, even in open-pages mode. Core pages (no owning module) are always included.
+  const deploymentOwner = getModulePathOwner(pathname);
+  if (deploymentOwner && !DEPLOYMENT_MODULES.enabled.includes(deploymentOwner)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   // وضع التشغيل المحلي: فتح كل الصفحات دون أي بوابة (وحدات/مظهر/قيود مركزية).

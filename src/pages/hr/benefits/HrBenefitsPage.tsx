@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Gift, HeartPulse, Landmark, CalendarCheck, PiggyBank } from 'lucide-react';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   HrBenefitsService, HrAllowance, HrBenefit, HrLoan, HrLoanInstallment, HrLeaveSettlement,
@@ -67,7 +68,7 @@ export const HrBenefitsPage: React.FC = () => {
     { id: 'installments', label: 'أقساط القروض', icon: <PiggyBank className="h-4 w-4" /> },
     { id: 'settlements', label: 'تسويات الإجازات', icon: <CalendarCheck className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/benefits');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   const loadInstallments = () => {

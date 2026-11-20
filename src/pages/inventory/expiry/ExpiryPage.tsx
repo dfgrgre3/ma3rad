@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarClock, PackageX, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card, StatCard } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
@@ -11,6 +12,7 @@ import { ProductService } from '../../../services/domains/products/ProductServic
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import type { Product, Warehouse } from '../../../types';
 import { ExpiryService, type ExpiryLot } from '../../../services/domains/inventory/ExpiryService';
+import { useActivityControlHidden } from '../../../hooks/domains/config/useActivityUi';
 
 const currency = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
 const inputCls = 'w-full rounded-lg border border-[var(--cerami-border)] bg-[var(--cerami-surface)] px-3 py-2 text-sm';
@@ -21,6 +23,7 @@ export const ExpiryPage: React.FC = () => {
   const toast = useToast();
   const can = usePermission();
   const canManage = can('inventory.adjust');
+  const expiryBatchesHidden = useActivityControlHidden('inventory.expiry-batches');
 
   const [lots, setLots] = useState<ExpiryLot[]>([]);
   const [stats, setStats] = useState<ReturnType<ExpiryService['getDashboardStats']> | null>(null);
@@ -66,7 +69,7 @@ export const ExpiryPage: React.FC = () => {
         icon={<CalendarClock className="w-6 h-6" />}
         actions={<div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={load} leadingIcon={<RefreshCw className="w-4 h-4" />}>تحديث</Button>
-          {canManage && <Button size="sm" onClick={() => { setLotForm({ productId: '', warehouseId: '', lotNumber: '', expiryDate: '', quantity: '', receivedDate: '', costPrice: '' }); setLotModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>تشغيلة جديدة</Button>}
+          {canManage && !expiryBatchesHidden && <ActivityGate element="new-batch"><Button size="sm" onClick={() => { setLotForm({ productId: '', warehouseId: '', lotNumber: '', expiryDate: '', quantity: '', receivedDate: '', costPrice: '' }); setLotModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>تشغيلة جديدة</Button></ActivityGate>}
         </div>}
       />
 

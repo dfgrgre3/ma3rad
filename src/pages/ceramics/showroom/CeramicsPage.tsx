@@ -28,6 +28,7 @@ import {
 import type { ProductBatch } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { PrintService } from '../../../services/shared/PrintService';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 const currency = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
 const fmt = (n: number) => currency.format(n || 0);
@@ -494,7 +495,9 @@ export const CeramicsPage: React.FC = () => {
               {calcLines.length === 0 && <p className="text-center text-sm text-[var(--cerami-muted)] py-8">لا توجد بنود — احسب المساحة وأضفها هنا.</p>}
             </div>
             {canManage && calcLines.length > 0 && (
-              <Button className="w-full" onClick={() => setQuoteModal(true)}>حفظ المقاييسات</Button>
+              <ActivityGate element="save-design">
+                <Button className="w-full" onClick={() => setQuoteModal(true)}>حفظ المقاييسات</Button>
+              </ActivityGate>
             )}
           </Card>
         </div>

@@ -5,6 +5,7 @@ import {
 import type { OperationShiftStaff } from '../../../../services/domains/operations/OperationsShiftService';
 import { money, STATUS_LABELS, STATUS_STYLES, timeOf } from './constants';
 import type { OperationsShiftsState } from './useOperationsShifts';
+import { ActivityGate } from '../../../../components/ui/ActivityGate';
 
 interface ShiftDetailPanelProps {
   state: OperationsShiftsState;
@@ -38,21 +39,25 @@ export const ShiftDetailPanel: FC<ShiftDetailPanelProps> = ({ state }) => {
         </div>
         <div className="flex gap-2 flex-wrap">
           {canManage && ['PLANNED', 'MISSED'].includes(detail.shift.status) && (
-            <button type="button" disabled={busy === 'open'}
-              onClick={() => run('open', () => service.openShift(detail.shift.id, {
-                supervisorId: openForm.supervisorId || null,
-                notes: openForm.notes,
-              }), 'تم فتح وردية التشغيل.')}
-              className="px-3 py-2 rounded-lg bg-success text-white text-xs font-bold flex items-center gap-1">
-              <PlayCircle className="w-4 h-4" /> فتح الوردية
-            </button>
+            <ActivityGate element="open">
+              <button type="button" disabled={busy === 'open'}
+                onClick={() => run('open', () => service.openShift(detail.shift.id, {
+                  supervisorId: openForm.supervisorId || null,
+                  notes: openForm.notes,
+                }), 'تم فتح وردية التشغيل.')}
+                className="px-3 py-2 rounded-lg bg-success text-white text-xs font-bold flex items-center gap-1">
+                <PlayCircle className="w-4 h-4" /> فتح الوردية
+              </button>
+            </ActivityGate>
           )}
           {canManage && detail.shift.status === 'OPEN' && (
-            <button type="button" disabled={busy === 'close'}
-              onClick={() => run('close', () => service.closeShift(detail.shift.id), 'تم إغلاق وردية التشغيل.')}
-              className="px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold flex items-center gap-1">
-              <PauseCircle className="w-4 h-4" /> إغلاق مباشر
-            </button>
+            <ActivityGate element="close">
+              <button type="button" disabled={busy === 'close'}
+                onClick={() => run('close', () => service.closeShift(detail.shift.id), 'تم إغلاق وردية التشغيل.')}
+                className="px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold flex items-center gap-1">
+                <PauseCircle className="w-4 h-4" /> إغلاق مباشر
+              </button>
+            </ActivityGate>
           )}
           <button type="button" onClick={() => setDetail(null)}
             className="px-3 py-2 rounded-lg border border-line text-xs font-bold text-ink-secondary">إغلاق اللوحة</button>

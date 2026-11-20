@@ -34,7 +34,7 @@ export const OperationalFieldsForm: React.FC<OperationalFieldsFormProps> = ({
             };
             return (
               <fieldset key={field.id} aria-required={field.isRequired} disabled={readOnly} className="min-w-0 space-y-2 text-[11px] text-ink disabled:opacity-70">
-                <legend className="font-bold">{field.name}{field.isRequired ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</legend>
+                <legend className="font-bold">{field.name}{field.isRequired || field.requiredByActivity ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</legend>
                 <p className="text-[10px] font-medium text-muted">اختر كل ما ينطبق · المحدد: {selectedValues.length}</p>
                 <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-success-border bg-surface p-2 overscroll-contain">
                   {field.values.map((option) => {
@@ -58,7 +58,7 @@ export const OperationalFieldsForm: React.FC<OperationalFieldsFormProps> = ({
           }
           return (
             <label key={field.id} className="space-y-1 text-[11px] font-bold text-ink">
-              <span>{field.name}{field.isRequired ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</span>
+              <span>{field.name}{field.isRequired || field.requiredByActivity ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</span>
               {field.dataType === 'BOOLEAN' ? (
                 <select required={field.isRequired} disabled={readOnly} value={value} onChange={(event) => update(event.target.value)} className={className}>
                   <option value="">— بدون —</option><option value="true">نعم</option><option value="false">لا</option>

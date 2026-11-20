@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import type { ComponentType, ReactNode } from 'react';
+import { resolveActivityTabs } from '../../../config/activityElementSpec';
 
 export interface WorkspaceHubTab {
   id: string;
@@ -29,7 +30,11 @@ export const WorkspaceHub: React.FC<WorkspaceHubProps> = ({
   showHeading = true,
   showTabs = true,
   children,
-}) => (
+}) => {
+  // Tabs hidden by the per-activity element spec (`tab` element on the
+  // destination page) are removed here so every hub inherits the rules.
+  const visibleTabs = resolveActivityTabs(tabs);
+  return (
   <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--win-canvas)]">
     {(showHeading || showTabs) && (
       <header className="shrink-0 border-b border-[var(--win-border)] bg-[var(--win-surface)]">
@@ -50,7 +55,7 @@ export const WorkspaceHub: React.FC<WorkspaceHubProps> = ({
               className="no-scrollbar flex w-full min-w-0 items-stretch gap-1 overflow-x-auto rounded-[var(--win-radius)] bg-[var(--win-surface-sunken)] p-1"
               aria-label={`أقسام ${title}`}
             >
-              {tabs.map(({ id, label, path, icon: TabIcon }) => (
+              {visibleTabs.map(({ id, label, path, icon: TabIcon }) => (
                 <Link
                   key={id}
                   to={path}
@@ -79,4 +84,5 @@ export const WorkspaceHub: React.FC<WorkspaceHubProps> = ({
       </Suspense>
     </section>
   </div>
-);
+  );
+};

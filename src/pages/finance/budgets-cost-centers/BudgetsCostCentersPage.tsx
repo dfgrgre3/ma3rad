@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   PieChart,
   Plus,
@@ -174,14 +175,14 @@ export const BudgetsCostCentersPage: React.FC = () => {
             </button>
             {canManage && (
               <>
-                <button
+                <ActivityGate element="new-cost-center"><button
                   onClick={() => setShowCostCenterModal(true)}
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <FolderTree className="w-4 h-4" />
                   <span>{newCostCenterLabel}</span>
-                </button>
-                <button
+                </button></ActivityGate>
+                <ActivityGate element="new-budget"><button
                   onClick={() => {
                     setBudgetForm({
                       name: `موازنة ${new Date().getFullYear()}`,
@@ -195,7 +196,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
                 >
                   <Plus className="w-4 h-4" />
                   <span>{newBudgetLabel}</span>
-                </button>
+                </button></ActivityGate>
               </>
             )}
           </>}

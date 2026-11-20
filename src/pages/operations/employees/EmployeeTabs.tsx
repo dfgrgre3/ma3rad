@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart3, HardHat, Landmark, UserCheck } from 'lucide-react';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import type { EmployeeTab } from '../../../types/hr/employeesPage';
 
 interface EmployeeTabsProps {
@@ -26,24 +27,24 @@ export const EmployeeTabs: React.FC<EmployeeTabsProps> = ({
         دليل العمال وتوزيعهم
       </button>
       {canManageEmployees && (
-        <button
+        <ActivityGate element="payroll"><button
           onClick={() => onTabChange('finance')}
           className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
 }`}
         >
           <Landmark className="w-4 h-4" />
           حسابات الأجور والرواتب
-        </button>
+        </button></ActivityGate>
       )}
       {canViewAttendance && (
-        <button
+        <ActivityGate element="attendance"><button
           onClick={() => onTabChange('attendance')}
           className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'attendance' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
 }`}
         >
           <UserCheck className="w-4 h-4" />
           سجل الحضور اليومي
-        </button>
+        </button></ActivityGate>
       )}
       {canManageEmployees && (
         <button

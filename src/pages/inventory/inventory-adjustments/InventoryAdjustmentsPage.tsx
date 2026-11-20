@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { useSearchParams } from 'react-router-dom';
@@ -261,13 +262,13 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           title="تسويات المخزون"
           description="طلب ← اعتماد من مستخدم آخر ← ترحيل مخزني ومالي"
           actions={canCreate && (
-            <button
+            <ActivityGate element="new-adjustment"><button
               onClick={() => { setErrorMsg(''); setShowCreateModal(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0"
             >
               <Plus className="w-4 h-4" />
               {newAdjustmentLabel}
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

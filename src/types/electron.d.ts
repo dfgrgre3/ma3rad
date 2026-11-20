@@ -100,6 +100,13 @@ declare global {
           body?: string;
         }) => Promise<{ ok: boolean; status: number; body: unknown }>;
       };
+      /** Downloadable feature modules (desktop builds made with CERAMISYS_MODULE_PACKAGES=1). */
+      modules?: {
+        status: () => Promise<{ configured: boolean; trustConfigured: boolean; buildId: string; installed: Array<{ moduleId: string; version: string }> }>;
+        available: () => Promise<Array<{ moduleId: string; version: string; sizeBytes: number; installed: boolean }>>;
+        install: (moduleId: string) => Promise<{ moduleId: string; version?: string }>;
+        remove: (moduleId: string) => Promise<{ ok: boolean }>;
+      };
       centralAppBackup?: {
         status?: () => Promise<{ configured: boolean; activated: boolean }>;
         list?: () => Promise<CentralAppBackupInfo[] | null>;

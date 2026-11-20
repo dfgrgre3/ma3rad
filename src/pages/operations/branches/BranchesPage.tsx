@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { OperationsService, type Branch, type WarehouseRow } from '../../../services/domains/operations/OperationsService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { BranchService } from '../../../services/domains/organization/BranchService';
 import { CompanyService } from '../../../services/domains/organization/CompanyService';
@@ -355,9 +356,9 @@ export const BranchesPage: React.FC = () => {
             </button>
             <CentralLimitGuard metric="maxBranches">
               {canCreate && (
-                <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary">
+                <ActivityGate element="new-branch"><button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary">
                   <Plus className="h-4 w-4" /> إضافة فرع
-                </button>
+                </button></ActivityGate>
               )}
             </CentralLimitGuard>
           </>}

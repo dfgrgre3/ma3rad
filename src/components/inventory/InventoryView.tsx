@@ -18,11 +18,14 @@ import { FilterToolbar } from '../ui/FilterToolbar';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
+import { ActivityGate } from '../ui/ActivityGate';
+import { useActivityElementHidden } from '../../hooks/domains/config/useActivityUi';
 
 export const InventoryView: React.FC = () => {
   const inventoryLabel = useBusinessTerm('modules.inventory');
   const newTransferLabel = useBusinessTerm('actions.newTransfer');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
+  const ledgerTabHidden = useActivityElementHidden('ledger');
   const [stockList, setStockList] = useState<any[]>([]);
   const [inactiveStockList, setInactiveStockList] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -32,7 +35,8 @@ export const InventoryView: React.FC = () => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'STOCK' | 'INACTIVE_STOCK' | 'LOGS'>('STOCK');
-  const displayedStockList = activeTab === 'INACTIVE_STOCK' ? inactiveStockList : stockList;
+  const displayedStockList = (ledgerTabHidden && activeTab === 'LOGS' ? 'STOCK' : activeTab) === 'INACTIVE_STOCK' ? inactiveStockList : stockList;
+  const effectiveActiveTab = ledgerTabHidden && activeTab === 'LOGS' ? 'STOCK' : activeTab;
 
   // Transfer Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -149,6 +153,7 @@ export const InventoryView: React.FC = () => {
         icon={<Boxes className="h-5 w-5" />}
         actions={
           canTransfer ? (
+            <ActivityGate element="new-transfer">
             <Button
               variant="primary"
               leadingIcon={<ArrowLeftRight className="h-4 w-4" />}
@@ -156,6 +161,7 @@ export const InventoryView: React.FC = () => {
             >
               {newTransferLabel} بين المخازن
             </Button>
+            </ActivityGate>
           ) : undefined
         }
       />
@@ -166,26 +172,27 @@ export const InventoryView: React.FC = () => {
           ['INACTIVE_STOCK', `المخزون المتوقف (${inactiveStockList.length})`],
           ['LOGS', 'سجل حركات المخزون'],
         ] as const).map(([key, label]) => (
+          <ActivityGate key={key} element={key === 'LOGS' ? 'ledger' : key === 'STOCK' ? 'stock' : 'inactive-stock'}>
           <button
-            key={key}
             type="button"
             role="tab"
-            aria-selected={activeTab === key}
+            aria-selected={effectiveActiveTab === key}
             onClick={() => setActiveTab(key)}
             className={`px-3 py-1.5 rounded-[var(--ui-radius-sm)] text-xs font-bold transition ${
-              activeTab === key
+              effectiveActiveTab === key
                 ? 'bg-[var(--win-accent-soft)] text-[var(--win-accent-readable)]'
                 : 'text-[var(--win-text-secondary)] hover:bg-[var(--win-surface-sunken)] hover:text-[var(--win-text)]'
             }`}
           >
             {label}
           </button>
+          </ActivityGate>
         ))}
       </div>
 
-      {activeTab !== 'LOGS' ? (
+      {effectiveActiveTab !== 'LOGS' ? (
         <div className="space-y-4">
-          {activeTab === 'INACTIVE_STOCK' && (
+          {effectiveActiveTab === 'INACTIVE_STOCK' && (
             <p className="text-xs text-[var(--cerami-warning)]">
               أصناف معطلة ما زالت لها كميات فعلية بالمخزون؛ لا تُحتسب ضمن القائمة الرئيسية للأصناف النشطة.
             </p>
@@ -249,6 +256,7 @@ export const InventoryView: React.FC = () => {
               {
                 key: 'actions', header: 'إجراءات', align: 'center' as const,
                 render: (stk: any) => canAdjust ? (
+                  <ActivityGate element="new-adjustment">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -265,6 +273,7 @@ export const InventoryView: React.FC = () => {
                   >
                     تسوية جردية
                   </Button>
+                  </ActivityGate>
                 ) : null,
               },
             ]}

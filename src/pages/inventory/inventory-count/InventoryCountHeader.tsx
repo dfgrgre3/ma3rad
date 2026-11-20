@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, ScanLine } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 interface InventoryCountHeaderProps {
   onCreateSession: () => void;
@@ -14,13 +15,13 @@ export const InventoryCountHeader: React.FC<InventoryCountHeaderProps> = ({ onCr
         title="جرد المخزون (Inventory Count)"
         description="متابعة ومطابقة الجرد الدوري والمفاجئ للمخازن والمعارض"
         actions={
-          <button
+          <ActivityGate element="new-count"><button
             onClick={onCreateSession}
             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0"
           >
             <Plus className="w-4 h-4" />
             بدء جلسة جرد جديدة
-          </button>
+          </button></ActivityGate>
         }
       />
     </div>

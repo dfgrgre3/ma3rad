@@ -18,6 +18,8 @@ const {
 } = require('./databaseHandlers');
 const { createAppBackupClient, registerCentralAppBackupHandlers, startPendingRestoreWatcher } = require('./centralAppBackup');
 const { registerAppHandlers } = require('./appHandlers');
+const { ModuleStore, computeBuildId } = require('./modulePackages');
+const { createModuleDelivery, registerModuleHandlers, registerModuleProtocol } = require('./moduleDelivery');
 const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
@@ -367,6 +369,37 @@ registerCentralAppBackupHandlers({
     return plaintext;
   },
 });
+// ─── Downloadable feature modules ─────────────────────────────────────────────
+// Active only for builds made with CERAMISYS_MODULE_PACKAGES=1 (dist/build-info.json).
+// Packages are verified against this pinned release-signing public key (Ed25519,
+// SPKI DER, base64). It is deliberately separate from the license key. The
+// matching private key lives outside the repo (CERAMISYS_MODULE_SIGNING_KEY_FILE)
+// and is used only by scripts/package-modules.cjs at release time.
+const PINNED_MODULE_PUBLIC_KEY = 'MCowBQYDK2VwAyEAdf6U0Hu7tVFzleLuLi/B6XH+Il4SuPE5Mug/A8+ma24=';
+const MODULE_DIST_DIR = path.join(__dirname, "../dist");
+function readModuleBuildId() {
+  try {
+    const info = JSON.parse(fsSync.readFileSync(path.join(MODULE_DIST_DIR, "build-info.json"), "utf8"));
+    return info && info.modulePackages === true ? computeBuildId(MODULE_DIST_DIR) : null;
+  } catch {
+    return null;
+  }
+}
+const MODULE_BUILD_ID = readModuleBuildId();
+const moduleStore = new ModuleStore(path.join(APP_DATA_DIR, "modules"), {
+  // Only unpackaged development runs may override the pinned key.
+  publicKey: (!app.isPackaged && process.env.CERAMISYS_MODULE_PUBLIC_KEY) || PINNED_MODULE_PUBLIC_KEY,
+  buildId: MODULE_BUILD_ID || "",
+});
+const moduleDelivery = createModuleDelivery({
+  store: moduleStore,
+  getOrigin: async () => CENTRAL_API_URL?.origin || null,
+  getCredential: () => loadCentralCredential(),
+  getDeviceId: async () => getHardwareId(),
+  buildId: MODULE_BUILD_ID || "",
+});
+registerModuleHandlers({ ipcMain, validateIpcSender, delivery: moduleDelivery });
+
 registerAppHandlers({
   ipcMain, validateIpcSender, app, fs, shell, dialog, BrowserWindow,
   appDataDir: APP_DATA_DIR, DATA_DIR, BACKUP_DIR, ensureDirs,
@@ -485,7 +518,7 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = 'dec5790f71d984e2033583d609414574db31e761c9a2e0d583757d52c0b8877c';
+const PRELOAD_INTEGRITY_SHA256 = 'ab6521ba7b28572e94cf75b34d3343058f8e01f0d0ae917e8d3f5c75f6dfcb8e';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = '0010fb4c0e6c72bc45ab67fd8a9e10254720794afcd624643608757bdd795f0b';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
@@ -861,6 +894,17 @@ app.whenReady().then(async () => {
   }
 
   ensureDirs();
+  if (MODULE_BUILD_ID) {
+    await moduleStore.load();
+    registerModuleProtocol({
+      protocol: require("electron").protocol,
+      net: require("electron").net,
+      store: moduleStore,
+      distAssetsDir: path.join(MODULE_DIST_DIR, "assets"),
+      fileExists: (target) => fsSync.existsSync(target),
+      fileURLToPath: require("node:url").fileURLToPath,
+    });
+  }
   installOfflineNetworkGuard(session.defaultSession);
   if (CENTRAL_API_URL) {
     console.info(`[central] Configured API origin: ${CENTRAL_API_URL.origin}`);

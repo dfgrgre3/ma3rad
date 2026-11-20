@@ -9,6 +9,7 @@ import type { OperationalFieldDefinition } from '../../../services/domains/produ
 import { OperationalFieldsChips } from '../../../components/products/OperationalFieldsChips';
 import { IconBtn } from './ui';
 import { getOrderStatusLabel, fmt } from '../../../types/sales/ordersPage';
+import { useDocElements } from '../../../hooks/domains/config/useActivityUi';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -39,7 +40,10 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
   onViewDetails, onPrintOrder, onOpenTimeline, onShareOnWhatsApp, onEditOrder,
   onOpenDelivery, onOpenConvert, onRemoveOrder, onPrevPage, onNextPage,
   operationalFields = [], valuesByOrder = {},
-}) => (
+}) => {
+  const doc = useDocElements('/doc/sales_order');
+  const docVisible = (id: string) => doc[id]?.visible !== false;
+  return (
   <>
     <div className="bg-surface border border-line rounded-xl overflow-x-auto">
       <DataTable
@@ -109,19 +113,19 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
           render: (o: any) => (
             <div className="flex items-center justify-center gap-1">
               <IconBtn title="تفاصيل الطلب" onClick={() => onViewDetails(o)}><Eye className="h-4 w-4" /></IconBtn>
-              <IconBtn title="طباعة الطلب" onClick={() => onPrintOrder(o)}><Printer className="h-4 w-4" /></IconBtn>
-              <IconBtn title="سجل الحالات" onClick={() => onOpenTimeline(o)}><History className="h-4 w-4" /></IconBtn>
-              <IconBtn title="مشاركة واتساب" onClick={() => onShareOnWhatsApp(o)}><MessageCircle className="h-4 w-4 text-success" /></IconBtn>
+              {docVisible('print') && <IconBtn title="طباعة الطلب" onClick={() => onPrintOrder(o)}><Printer className="h-4 w-4" /></IconBtn>}
+              {docVisible('timeline') && <IconBtn title="سجل الحالات" onClick={() => onOpenTimeline(o)}><History className="h-4 w-4" /></IconBtn>}
+              {docVisible('share') && <IconBtn title="مشاركة واتساب" onClick={() => onShareOnWhatsApp(o)}><MessageCircle className="h-4 w-4 text-success" /></IconBtn>}
               {canUpdate && o.status === 'PENDING' && (
                 <IconBtn title="تعديل الطلب" onClick={() => onEditOrder(o)}><Pencil className="h-4 w-4" /></IconBtn>
               )}
-              {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
+              {canUpdate && docVisible('delivery') && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
                 <IconBtn title="تسجيل تسليم" onClick={() => onOpenDelivery(o)}><PackageCheck className="h-4 w-4 text-primary" /></IconBtn>
               )}
-              {canUpdate && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
+              {canUpdate && docVisible('convert-to-invoice') && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(o.status) && (
                 <button onClick={() => onOpenConvert(o)} className="flex items-center gap-1 rounded-lg border border-success-border bg-success-soft px-2 py-1 text-[10px] font-bold text-success"><Receipt className="h-3 w-3" /> فاتورة</button>
               )}
-              {canDelete && o.status === 'CANCELLED' && (
+              {canDelete && docVisible('delete') && o.status === 'CANCELLED' && (
                 <IconBtn title="حذف الطلب الملغي" onClick={() => onRemoveOrder(o)}><Trash2 className="h-4 w-4 text-danger" /></IconBtn>
               )}
             </div>
@@ -143,4 +147,5 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
       </div>
     )}
   </>
-);
+  );
+};

@@ -52,7 +52,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/pos',
     '/construction-estimate',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
   // Construction: sites & contracts — no service-vertical pages.
@@ -65,7 +65,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/pos',
     '/manufacturing',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/promotions',
     '/products/barcodes',
     '/retail',
@@ -79,14 +79,14 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/manufacturing',
     '/construction-estimate',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
   // Hospitality (hotels & restaurants): keeps /hospitality for hotels;
   // restaurants hide it via ACTIVITY_HIDDEN_PATHS. No workshop/school pages.
   hospitality: [
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/manufacturing',
     '/construction-estimate',
     '/fleet/dashboard',
@@ -112,7 +112,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/partners',
     '/deliveries',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
   // Healthcare: clinics — same office-only surface as professional services.
@@ -131,7 +131,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/partners',
     '/deliveries',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
   // Education: schools — keeps /education, hides the rest.
@@ -150,7 +150,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/partners',
     '/deliveries',
     '/inventory/showroom-stock',
-    '/customers/imported-products',
+    '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
 };
@@ -159,7 +159,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
 const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
   // Ceramics showroom: tiles/porcelain never expire, and imported-customer
   // product tracking belongs to the import/export workflow, not a showroom.
-  ceramics: ['/inventory/expiry', '/customers/imported-products', '/retail'],
+  ceramics: ['/inventory/expiry', '/customers/imported-products', '/customers/*/imported-products', '/retail'],
   // Supermarkets & online stores sell from the warehouse — no display floor.
   food: ['/inventory/showroom-stock'],
   ecommerce: ['/inventory/showroom-stock'],
@@ -171,7 +171,7 @@ const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
   // display) does not apply to them.
   hospitality: ['/restaurant'],
   // Pure logistics/warehousing: no import-document tracking page.
-  logistics: ['/customers/imported-products'],
+  logistics: ['/customers/imported-products', '/customers/*/imported-products'],
   // Import/export keeps the import-tracking page — it is core to their workflow.
 };
 
@@ -203,14 +203,27 @@ export function getActivityHiddenPaths(
   return [...new Set(resolveHiddenPaths(businessType))];
 }
 
-/** True when `pathname` equals a hidden path or sits under it. */
+/**
+ * True when `pathname` equals a hidden path or sits under it.
+ * Hidden entries may contain a `*` segment matching exactly one path segment,
+ * so parameterized routes (e.g. per-customer imported-products) can reuse the
+ * same rules as their static siblings.
+ */
+function matchesHiddenPath(hidden: string, pathname: string): boolean {
+  if (!hidden.includes('*')) {
+    return pathname === hidden || pathname.startsWith(`${hidden}/`);
+  }
+  const hiddenSegs = hidden.split('/');
+  const pathSegs = pathname.split('/');
+  if (pathSegs.length !== hiddenSegs.length) return false;
+  return hiddenSegs.every((seg, i) => seg === '*' || seg === pathSegs[i]);
+}
+
 export function isActivityPathHidden(
   pathname: string,
   businessType: string = getEffectiveBusinessType(),
 ): boolean {
-  return resolveHiddenPaths(businessType).some(
-    (hidden) => pathname === hidden || pathname.startsWith(`${hidden}/`),
-  );
+  return resolveHiddenPaths(businessType).some((hidden) => matchesHiddenPath(hidden, pathname));
 }
 
 export default getActivityHiddenPaths;

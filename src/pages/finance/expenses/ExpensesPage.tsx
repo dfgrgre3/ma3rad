@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { CalendarDays, Download, Loader2, Pencil, Plus, Search, Tag, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import { CashierService } from '../../../services/domains/finance/CashierService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -89,8 +90,8 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
           title="إدارة المصروفات التشغيلية"
           description={dateMode === 'today' ? 'مصروفات اليوم' : 'مصروفات الفروع ضمن الفترة المحددة'}
           actions={<>
-            {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-line text-ink rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
-            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل {newExpenseLabel}</button>}
+            {canExport && <ActivityGate element="export"><button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-line text-ink rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button></ActivityGate>}
+            {canAdd && <ActivityGate element="new-expense"><button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل {newExpenseLabel}</button></ActivityGate>}
           </>}
         />
       </div>

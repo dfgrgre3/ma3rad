@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock3, Plus, Receipt, RefreshCw, TrendingUp } from 'lucide-react';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card, StatCard } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
@@ -98,7 +99,7 @@ export const TimeBillingPage: React.FC = () => {
         icon={<Clock3 className="w-6 h-6" />}
         actions={<div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={load} leadingIcon={<RefreshCw className="w-4 h-4" />}>تحديث</Button>
-          {canManage && <Button size="sm" onClick={() => { setEntryForm({ customerId: '', projectId: '', employeeId: '', entryDate: localDateString(), description: '', hours: '1', hourlyRate: '0', billable: true }); setEntryModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>قيد وقت</Button>}
+          {canManage && <ActivityGate element="new-time-entry"><Button size="sm" onClick={() => { setEntryForm({ customerId: '', projectId: '', employeeId: '', entryDate: localDateString(), description: '', hours: '1', hourlyRate: '0', billable: true }); setEntryModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>قيد وقت</Button></ActivityGate>}
         </div>}
       />
 

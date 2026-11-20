@@ -29,6 +29,8 @@ import { OperationalFieldsChips } from '../products/OperationalFieldsChips';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
 import { PrintService } from '../../services/shared/PrintService';
+import { ActivityGate } from '../ui/ActivityGate';
+import { useDocElements } from '../../hooks/domains/config/useActivityUi';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -38,6 +40,7 @@ const getBoxesCount = (product: Product | undefined, quantity: number): number =
 };
 
 export const PurchasesView: React.FC = () => {
+  const purchaseDoc = useDocElements('/doc/purchase_invoice');
   const purchasingLabel = useBusinessTerm('modules.purchasing');
   const newPurchaseLabel = useBusinessTerm('actions.newPurchaseInvoice');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
@@ -225,6 +228,7 @@ export const PurchasesView: React.FC = () => {
         icon={<Truck className="h-5 w-5" />}
         actions={
           canCreatePurchase ? (
+            <ActivityGate element="new-invoice">
             <Button
               variant="primary"
               leadingIcon={<Plus className="h-4 w-4" />}
@@ -232,6 +236,7 @@ export const PurchasesView: React.FC = () => {
             >
               {newPurchaseLabel}
             </Button>
+            </ActivityGate>
           ) : undefined
         }
       />
@@ -263,14 +268,16 @@ export const PurchasesView: React.FC = () => {
                   <Sparkles className="h-4 w-4 text-[var(--cerami-primary-readable)]" />
                   أصناف الفاتورة وتوزيع تكلفة الوصول الحقيقية (Landed Cost):
                 </h4>
-                <Button
+                <ActivityGate element="print">
+                {purchaseDoc['print']?.visible !== false && (<Button
                   variant="secondary"
                   size="sm"
                   leadingIcon={<Printer className="h-3.5 w-3.5" />}
                   onClick={() => new PrintService().printPurchaseInvoice(expandedDetails)}
                 >
                   طباعة الفاتورة
-                </Button>
+                </Button>)}
+                </ActivityGate>
               </div>
               <DataTable
                 ariaLabel="أصناف أمر الشراء وتكلفة الوصول"

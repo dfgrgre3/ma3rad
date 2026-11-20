@@ -18,16 +18,17 @@ import { getEffectiveBusinessType } from '../../../services/domains/config/Busin
 import { getActivityDashboardSpec, getActivityDashboardCopy } from '../../../config/activityDashboard';
 import { getActivityPageCopy, type ActivityPageKey } from '../../../config/activityPageCopy';
 import { isActivityPathHidden } from '../../../config/activityPageVisibility';
+import { moduleLazy } from '../../../modules/moduleLazy';
 
 // Lazy loaded integrated dashboards
 const ExecutiveCommandCenter = lazy(() => import('../executive/ExecutiveCommandCenter').then(m => ({ default: m.ExecutiveCommandCenter })));
 const ActivityDashboardPanel = lazy(() => import('../../../components/dashboard/activity/ActivityDashboardPanel').then(m => ({ default: m.ActivityDashboardPanel })));
-const SalesAnalyticsPage = lazy(() => import('../../sales/sales-analytics/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
-const PurchaseInventoryReportPage = lazy(() => import('../../reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
-const DebtsDashboardPage = lazy(() => import('../../finance/debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
-const CrmDashboardPage = lazy(() => import('../../crm/crm-dashboard/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
-const FleetDashboardPage = lazy(() => import('../../operations/fleet-dashboard/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
-const HrDashboardPage = lazy(() => import('../../hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
+const SalesAnalyticsPage = moduleLazy('sales', () => import('../../sales/sales-analytics/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
+const PurchaseInventoryReportPage = moduleLazy('reports', () => import('../../reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
+const DebtsDashboardPage = moduleLazy('finance', () => import('../../finance/debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
+const CrmDashboardPage = moduleLazy('customers', () => import('../../crm/crm-dashboard/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
+const FleetDashboardPage = moduleLazy('operations', () => import('../../operations/fleet-dashboard/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
+const HrDashboardPage = moduleLazy('hr', () => import('../../hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 
 /**
  * كل قسم داخل لوحة المعلومات يخضع لصلاحية مجاله ووحدته، لا لصلاحية المسار

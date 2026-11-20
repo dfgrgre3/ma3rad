@@ -11,6 +11,8 @@ import { getOrder } from './queries';
 import { audit, logStatus, releaseReservations } from './internals';
 import { OperationalFieldService } from '../../products/OperationalFieldService';
 import type { ConvertOrderOptions } from './types';
+import { isWorkflowActionAllowed } from '../../../../config/activityDocumentSpec';
+import { getEffectiveBusinessType } from '../../config/BusinessTypeService';
 
 export function convertToInvoice(
   db: DatabaseManager,
@@ -27,6 +29,9 @@ export function convertToInvoice(
   if (order.status === 'ON_HOLD') throw new Error('الطلب معلّق مؤقتًا؛ استأنفه قبل إصدار الفاتورة.');
   if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
     throw new Error('لا يمكن إصدار فاتورة لطلب مكتمل أو ملغي.');
+  }
+  if (!isWorkflowActionAllowed('/doc/sales_order', 'convert-to-invoice', order.status, getEffectiveBusinessType())) {
+    throw new Error('سير عمل هذا النشاط يتطلب أن يكون الطلب «جاهزًا» قبل إصدار الفاتورة.');
   }
   if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
 

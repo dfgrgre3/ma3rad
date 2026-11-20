@@ -1,92 +1,92 @@
-import { lazy } from 'react';
+import { moduleLazy } from '../modules/moduleLazy';
 
-export const InventoryValuationPage = lazy(() => import('../pages/inventory/inventory-valuation/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
+export const InventoryValuationPage = moduleLazy('inventory', () => import('../pages/inventory/inventory-valuation/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 
-export const InventoryAdjustmentsPage = lazy(() => import('../pages/inventory/inventory-adjustments/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
+export const InventoryAdjustmentsPage = moduleLazy('inventory', () => import('../pages/inventory/inventory-adjustments/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
 
-export const StockReservationsPage = lazy(() => import('../pages/inventory/stock-reservations/StockReservationsPage').then(m => ({ default: m.StockReservationsPage })));
+export const StockReservationsPage = moduleLazy('inventory', () => import('../pages/inventory/stock-reservations/StockReservationsPage').then(m => ({ default: m.StockReservationsPage })));
 
-export const ReorderPlanningPage = lazy(() => import('../pages/inventory/reorder-planning/ReorderPlanningPage').then(m => ({ default: m.ReorderPlanningPage })));
+export const ReorderPlanningPage = moduleLazy('inventory', () => import('../pages/inventory/reorder-planning/ReorderPlanningPage').then(m => ({ default: m.ReorderPlanningPage })));
 
-export const WarehouseLocationsPage = lazy(() => import('../pages/inventory/warehouse-locations/WarehouseLocationsPage').then(m => ({ default: m.WarehouseLocationsPage })));
+export const WarehouseLocationsPage = moduleLazy('inventory', () => import('../pages/inventory/warehouse-locations/WarehouseLocationsPage').then(m => ({ default: m.WarehouseLocationsPage })));
 
-export const DamageQuarantinePage = lazy(() => import('../pages/inventory/damage-quarantine/DamageQuarantinePage').then(m => ({ default: m.DamageQuarantinePage })));
+export const DamageQuarantinePage = moduleLazy('inventory', () => import('../pages/inventory/damage-quarantine/DamageQuarantinePage').then(m => ({ default: m.DamageQuarantinePage })));
 
-export const InventoryReconciliationPage = lazy(() => import('../pages/inventory/inventory-reconciliation/InventoryReconciliationPage').then(m => ({ default: m.InventoryReconciliationPage })));
+export const InventoryReconciliationPage = moduleLazy('inventory', () => import('../pages/inventory/inventory-reconciliation/InventoryReconciliationPage').then(m => ({ default: m.InventoryReconciliationPage })));
 
 // Operations, Branches & Warehouses
-export const BranchesPage = lazy(() => import('../pages/operations/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
+export const BranchesPage = moduleLazy('operations', () => import('../pages/operations/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
 
-export const WarehousesPage = lazy(() => import('../pages/operations/warehouses/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
+export const WarehousesPage = moduleLazy('operations', () => import('../pages/operations/warehouses/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
 
-export const FleetDashboardPage = lazy(() => import('../pages/operations/fleet-dashboard/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
+export const FleetDashboardPage = moduleLazy('operations', () => import('../pages/operations/fleet-dashboard/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
 
-export const FacilityManagementPage = lazy(() => import('../pages/operations/facility-management/FacilityManagementPage').then(m => ({ default: m.FacilityManagementPage })));
+export const FacilityManagementPage = moduleLazy('operations', () => import('../pages/operations/facility-management/FacilityManagementPage').then(m => ({ default: m.FacilityManagementPage })));
 
-export const DeliveriesPage = lazy(() => import('../pages/operations/deliveries/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
+export const DeliveriesPage = moduleLazy('operations', () => import('../pages/operations/deliveries/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
 
-export const DriversPage = lazy(() => import('../pages/operations/drivers/DriversPage').then(m => ({ default: m.DriversPage })));
+export const DriversPage = moduleLazy('operations', () => import('../pages/operations/drivers/DriversPage').then(m => ({ default: m.DriversPage })));
 
-export const VehiclesPage = lazy(() => import('../pages/operations/vehicles/VehiclesPage').then(m => ({ default: m.VehiclesPage })));
+export const VehiclesPage = moduleLazy('operations', () => import('../pages/operations/vehicles/VehiclesPage').then(m => ({ default: m.VehiclesPage })));
 
-export const EmployeesPage = lazy(() => import('../pages/operations/employees/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
+export const EmployeesPage = moduleLazy('hr', () => import('../pages/operations/employees/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
 
-export const AttendancePage = lazy(() => import('../pages/operations/attendance/AttendancePage').then(m => ({ default: m.AttendancePage })));
+export const AttendancePage = moduleLazy('hr', () => import('../pages/operations/attendance/AttendancePage').then(m => ({ default: m.AttendancePage })));
 
-export const PayrollPage = lazy(() => import('../pages/operations/payroll/PayrollPage').then(m => ({ default: m.PayrollPage })));
+export const PayrollPage = moduleLazy('hr', () => import('../pages/operations/payroll/PayrollPage').then(m => ({ default: m.PayrollPage })));
 
-export const CommissionsPage = lazy(() => import('../pages/hr/commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
+export const CommissionsPage = moduleLazy('hr', () => import('../pages/hr/commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 
-export const LeavePage = lazy(() => import('../pages/hr/leave/LeavePage').then(m => ({ default: m.LeavePage })));
+export const LeavePage = moduleLazy('hr', () => import('../pages/hr/leave/LeavePage').then(m => ({ default: m.LeavePage })));
 
-export const EmployeeContractsPage = lazy(() => import('../pages/hr/employee-contracts/EmployeeContractsPage').then(m => ({ default: m.EmployeeContractsPage })));
+export const EmployeeContractsPage = moduleLazy('hr', () => import('../pages/hr/employee-contracts/EmployeeContractsPage').then(m => ({ default: m.EmployeeContractsPage })));
 
-export const EmployeeDocumentsPage = lazy(() => import('../pages/hr/employee-documents/EmployeeDocumentsPage').then(m => ({ default: m.EmployeeDocumentsPage })));
+export const EmployeeDocumentsPage = moduleLazy('hr', () => import('../pages/hr/employee-documents/EmployeeDocumentsPage').then(m => ({ default: m.EmployeeDocumentsPage })));
 
-export const RecruitmentPage = lazy(() => import('../pages/hr/recruitment/RecruitmentPage').then(m => ({ default: m.RecruitmentPage })));
+export const RecruitmentPage = moduleLazy('hr', () => import('../pages/hr/recruitment/RecruitmentPage').then(m => ({ default: m.RecruitmentPage })));
 
-export const ManufacturingPage = lazy(() => import('../pages/manufacturing/manufacturing/ManufacturingPage').then(m => ({ default: m.ManufacturingPage })));
+export const ManufacturingPage = moduleLazy('manufacturing', () => import('../pages/manufacturing/manufacturing/ManufacturingPage').then(m => ({ default: m.ManufacturingPage })));
 
-export const HrDashboardPage = lazy(() => import('../pages/hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
+export const HrDashboardPage = moduleLazy('hr', () => import('../pages/hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 
-export const HrOrganizationPage = lazy(() => import('../pages/hr/organization/HrOrganizationPage').then(m => ({ default: m.HrOrganizationPage })));
+export const HrOrganizationPage = moduleLazy('hr', () => import('../pages/hr/organization/HrOrganizationPage').then(m => ({ default: m.HrOrganizationPage })));
 
-export const PerformancePage = lazy(() => import('../pages/hr/performance/PerformancePage').then(m => ({ default: m.PerformancePage })));
+export const PerformancePage = moduleLazy('hr', () => import('../pages/hr/performance/PerformancePage').then(m => ({ default: m.PerformancePage })));
 
-export const TrainingPage = lazy(() => import('../pages/hr/training/TrainingPage').then(m => ({ default: m.TrainingPage })));
+export const TrainingPage = moduleLazy('hr', () => import('../pages/hr/training/TrainingPage').then(m => ({ default: m.TrainingPage })));
 
-export const HrDisciplinePage = lazy(() => import('../pages/hr/discipline/HrDisciplinePage').then(m => ({ default: m.HrDisciplinePage })));
+export const HrDisciplinePage = moduleLazy('hr', () => import('../pages/hr/discipline/HrDisciplinePage').then(m => ({ default: m.HrDisciplinePage })));
 
-export const HrBenefitsPage = lazy(() => import('../pages/hr/benefits/HrBenefitsPage').then(m => ({ default: m.HrBenefitsPage })));
-export const HrSelfServicePage = lazy(() => import('../pages/hr/self-service/HrSelfServicePage').then(m => ({ default: m.HrSelfServicePage })));
-export const WorkforcePlanningPage = lazy(() => import('../pages/hr/workforce-planning/WorkforcePlanningPage').then(m => ({ default: m.WorkforcePlanningPage })));
-export const EmployeeClearancePage = lazy(() => import('../pages/hr/clearance/EmployeeClearancePage').then(m => ({ default: m.EmployeeClearancePage })));
-export const PayrollSocialInsurancePage = lazy(() => import('../pages/hr/social-insurance/PayrollSocialInsurancePage').then(m => ({ default: m.PayrollSocialInsurancePage })));
-export const AttendanceDevicesPage = lazy(() => import('../pages/hr/attendance-devices/AttendanceDevicesPage').then(m => ({ default: m.AttendanceDevicesPage })));
-export const HrAlertsPage = lazy(() => import('../pages/hr/alerts/HrAlertsPage').then(m => ({ default: m.HrAlertsPage })));
-export const PayslipsPage = lazy(() => import('../pages/hr/payslips/PayslipsPage').then(m => ({ default: m.PayslipsPage })));
-export const PayrollCalendarPage = lazy(() => import('../pages/hr/payroll-calendar/PayrollCalendarPage').then(m => ({ default: m.PayrollCalendarPage })));
-export const PayrollNotificationSettingsPage = lazy(() => import('../pages/hr/payroll-notification-settings/PayrollNotificationSettingsPage').then(m => ({ default: m.PayrollNotificationSettingsPage })));
+export const HrBenefitsPage = moduleLazy('hr', () => import('../pages/hr/benefits/HrBenefitsPage').then(m => ({ default: m.HrBenefitsPage })));
+export const HrSelfServicePage = moduleLazy('hr', () => import('../pages/hr/self-service/HrSelfServicePage').then(m => ({ default: m.HrSelfServicePage })));
+export const WorkforcePlanningPage = moduleLazy('hr', () => import('../pages/hr/workforce-planning/WorkforcePlanningPage').then(m => ({ default: m.WorkforcePlanningPage })));
+export const EmployeeClearancePage = moduleLazy('hr', () => import('../pages/hr/clearance/EmployeeClearancePage').then(m => ({ default: m.EmployeeClearancePage })));
+export const PayrollSocialInsurancePage = moduleLazy('hr', () => import('../pages/hr/social-insurance/PayrollSocialInsurancePage').then(m => ({ default: m.PayrollSocialInsurancePage })));
+export const AttendanceDevicesPage = moduleLazy('hr', () => import('../pages/hr/attendance-devices/AttendanceDevicesPage').then(m => ({ default: m.AttendanceDevicesPage })));
+export const HrAlertsPage = moduleLazy('hr', () => import('../pages/hr/alerts/HrAlertsPage').then(m => ({ default: m.HrAlertsPage })));
+export const PayslipsPage = moduleLazy('hr', () => import('../pages/hr/payslips/PayslipsPage').then(m => ({ default: m.PayslipsPage })));
+export const PayrollCalendarPage = moduleLazy('hr', () => import('../pages/hr/payroll-calendar/PayrollCalendarPage').then(m => ({ default: m.PayrollCalendarPage })));
+export const PayrollNotificationSettingsPage = moduleLazy('hr', () => import('../pages/hr/payroll-notification-settings/PayrollNotificationSettingsPage').then(m => ({ default: m.PayrollNotificationSettingsPage })));
 
 // CRM & Customers
-export const CustomersView = lazy(() => import('../components/customers/CustomersView').then(m => ({ default: m.CustomersView })));
+export const CustomersView = moduleLazy('customers', () => import('../components/customers/CustomersView').then(m => ({ default: m.CustomersView })));
 
-export const CRMHubPage = lazy(() => import('../pages/crm/crm-hub/CRMHubPage').then(m => ({ default: m.CRMHubPage })));
+export const CRMHubPage = moduleLazy('customers', () => import('../pages/crm/crm-hub/CRMHubPage').then(m => ({ default: m.CRMHubPage })));
 
-export const CustomerDetailPage = lazy(() => import('../pages/customers/customer-detail/CustomerDetailPage').then(m => ({ default: m.CustomerDetailPage })));
+export const CustomerDetailPage = moduleLazy('customers', () => import('../pages/customers/customer-detail/CustomerDetailPage').then(m => ({ default: m.CustomerDetailPage })));
 
-export const PartnersPage = lazy(() => import('../pages/customers/partners/PartnersPage').then(m => ({ default: m.PartnersPage })));
+export const PartnersPage = moduleLazy('finance', () => import('../pages/customers/partners/PartnersPage').then(m => ({ default: m.PartnersPage })));
 
-export const CustomerImportedProductsPage = lazy(() => import('../pages/customers/customer-imported-products/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
+export const CustomerImportedProductsPage = moduleLazy('customers', () => import('../pages/customers/customer-imported-products/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
 
-export const ReadyDeliveriesPage = lazy(() => import('../pages/customers/ready-deliveries/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
+export const ReadyDeliveriesPage = moduleLazy('customers', () => import('../pages/customers/ready-deliveries/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
 
-export const CrmDashboardPage = lazy(() => import('../pages/crm/crm-dashboard/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
+export const CrmDashboardPage = moduleLazy('customers', () => import('../pages/crm/crm-dashboard/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
 
-export const LeadsPage = lazy(() => import('../pages/crm/leads/LeadsPage').then(m => ({ default: m.LeadsPage })));
+export const LeadsPage = moduleLazy('customers', () => import('../pages/crm/leads/LeadsPage').then(m => ({ default: m.LeadsPage })));
 
-export const PipelinePage = lazy(() => import('../pages/crm/pipeline/PipelinePage').then(m => ({ default: m.PipelinePage })));
+export const PipelinePage = moduleLazy('customers', () => import('../pages/crm/pipeline/PipelinePage').then(m => ({ default: m.PipelinePage })));
 
-export const CrmActivitiesPage = lazy(() => import('../pages/crm/crm-activities/CrmActivitiesPage').then(m => ({ default: m.CrmActivitiesPage })));
+export const CrmActivitiesPage = moduleLazy('customers', () => import('../pages/crm/crm-activities/CrmActivitiesPage').then(m => ({ default: m.CrmActivitiesPage })));
 
-export const CampaignsPage = lazy(() => import('../pages/crm/campaigns/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
+export const CampaignsPage = moduleLazy('customers', () => import('../pages/crm/campaigns/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
